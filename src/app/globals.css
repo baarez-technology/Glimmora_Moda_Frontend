@@ -1,0 +1,252 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Outfit:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Primary Palette - Foundation */
+  --ivory-cream: #FAF8F5;
+  --ivory-warm: #F5F1EA;
+  --parchment: #EDE8DF;
+  --sand-light: #E5DFD3;
+  --sand: #D4CBBF;
+  --taupe: #B8AEA0;
+  --greige: #9A8F82;
+  --stone: #7A7068;
+  --charcoal-warm: #4A453D;
+  --charcoal-deep: #2D2A26;
+  --noir: #1A1816;
+
+  /* Accent Palette - Intelligence Signal */
+  --gold-soft: #C9A962;
+  --gold-muted: #B89B4A;
+  --gold-deep: #9A7F35;
+  --champagne: #E8DCC4;
+  --bronze-whisper: #A8927A;
+  --sapphire-mist: #4A5568;
+  --sapphire-subtle: #5C6B7A;
+  --sapphire-deep: #2C3E50;
+  --azure-whisper: #E8ECF0;
+
+  /* Semantic Palette */
+  --success-soft: #6B8068;
+  --success: #4A6347;
+  --warning-soft: #C4A35A;
+  --warning: #A68B3D;
+  --error-soft: #A67272;
+  --error: #8B5252;
+  --info-soft: #6B7A8A;
+  --info: #4A5A6A;
+
+  /* Surface Palette */
+  --surface-base: #FAF8F5;
+  --surface-elevated: #FFFFFF;
+  --surface-sunken: #F0EBE3;
+  --surface-overlay: rgba(45, 42, 38, 0.04);
+  --surface-glass: rgba(250, 248, 245, 0.85);
+
+  /* Text Palette */
+  --text-primary: #1A1816;
+  --text-secondary: #4A453D;
+  --text-tertiary: #7A7068;
+  --text-muted: #9A8F82;
+  --text-inverse: #FAF8F5;
+
+  /* Border & Divider */
+  --border-subtle: rgba(180, 170, 155, 0.2);
+  --border-default: rgba(180, 170, 155, 0.35);
+  --border-strong: rgba(122, 112, 104, 0.5);
+  --divider: rgba(180, 170, 155, 0.15);
+}
+
+.dark {
+  --ivory-cream: #1A1816;
+  --ivory-warm: #1E1C1A;
+  --parchment: #252320;
+  --sand-light: #2D2A26;
+  --sand: #3A3632;
+  --taupe: #4A453D;
+  --greige: #5A544C;
+  --stone: #7A7068;
+  --charcoal-warm: #B8AEA0;
+  --charcoal-deep: #D4CBBF;
+  --noir: #FAF8F5;
+
+  --surface-base: #1A1816;
+  --surface-elevated: #252320;
+  --surface-sunken: #141210;
+  --surface-overlay: rgba(250, 248, 245, 0.04);
+  --surface-glass: rgba(26, 24, 22, 0.85);
+
+  --text-primary: #FAF8F5;
+  --text-secondary: #D4CBBF;
+  --text-tertiary: #9A8F82;
+  --text-muted: #7A7068;
+  --text-inverse: #1A1816;
+
+  --border-subtle: rgba(180, 170, 155, 0.1);
+  --border-default: rgba(180, 170, 155, 0.2);
+  --border-strong: rgba(180, 170, 155, 0.35);
+  --divider: rgba(180, 170, 155, 0.08);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, sans-serif;
+  background-color: var(--surface-base);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography */
+.font-display {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+.font-body {
+  font-family: 'Outfit', -apple-system, sans-serif;
+}
+
+/* Luxury Button Styles */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream border-none rounded font-body text-sm tracking-[0.15em] uppercase cursor-pointer transition-all duration-300;
+  }
+
+  .btn-primary:hover {
+    @apply bg-noir;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-3 px-8 py-4 bg-transparent text-charcoal-deep border border-sand rounded font-body text-sm tracking-[0.15em] uppercase cursor-pointer transition-all duration-300;
+  }
+
+  .btn-secondary:hover {
+    @apply border-charcoal-deep;
+  }
+
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-3 px-8 py-4 bg-gold-muted text-noir border-none rounded font-body text-sm tracking-[0.15em] uppercase cursor-pointer transition-all duration-300;
+  }
+
+  .btn-gold:hover {
+    @apply bg-gold-deep;
+  }
+
+  /* Card Styles */
+  .card-elevated {
+    @apply bg-white rounded-lg shadow-md transition-all duration-300;
+  }
+
+  .card-elevated:hover {
+    @apply shadow-lg -translate-y-1;
+  }
+
+  /* Input Styles */
+  .input-luxury {
+    @apply w-full px-5 py-4 bg-ivory-cream border border-sand rounded font-body text-base text-charcoal-deep transition-colors duration-300 placeholder:text-greige;
+  }
+
+  .input-luxury:focus {
+    @apply outline-none border-gold-muted;
+  }
+
+  /* Section Styles */
+  .section-divider {
+    @apply w-16 h-px bg-gold-muted mx-auto;
+  }
+
+  /* Tag Styles */
+  .tag-intelligence {
+    @apply inline-block px-4 py-1.5 bg-sapphire-mist text-ivory-cream text-xs tracking-[0.1em] uppercase rounded-sm;
+  }
+}
+
+/* Animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.5s ease forwards;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--parchment);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--taupe);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--stone);
+}
+
+/* Selection */
+::selection {
+  background-color: var(--champagne);
+  color: var(--noir);
+}
