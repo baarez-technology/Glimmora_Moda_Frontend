@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield } from 'lucide-react';
+import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { showToast } = useApp();
+  const { showToast, setUserRole, userTier } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [notifications, setNotifications] = useState({
     newArrivals: true,
@@ -55,6 +55,13 @@ export default function SettingsPage() {
 
   const handleEnable2FA = () => {
     showToast('Two-factor authentication setup coming soon', 'info');
+  };
+
+  const handleSignOut = () => {
+    localStorage.removeItem('moda-user-tier');
+    setUserRole('standard');
+    showToast('You have been signed out', 'success');
+    router.push('/auth/login');
   };
 
   const handleDeleteAccount = () => {
@@ -264,6 +271,32 @@ export default function SettingsPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Sign Out */}
+        <div className="bg-white p-8">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+              <LogOut size={18} className="text-charcoal-deep" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl text-charcoal-deep">Sign Out</h2>
+              <p className="text-sm text-stone">
+                {userTier === 'uhni' ? 'UHNI Account' : 'Consumer Account'}
+              </p>
+            </div>
+          </div>
+
+          <p className="text-stone mb-6">
+            Sign out of your account. You can sign back in anytime.
+          </p>
+
+          <button
+            onClick={handleSignOut}
+            className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+          >
+            Sign Out
+          </button>
         </div>
 
         {/* Danger Zone */}

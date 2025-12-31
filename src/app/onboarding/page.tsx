@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, ArrowLeft, Sparkles, Check } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palette } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
@@ -10,12 +10,17 @@ type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | '
 export default function OnboardingPage() {
   const { showToast } = useApp();
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
+  const [isLoaded, setIsLoaded] = useState(false);
   const [selections, setSelections] = useState({
     occasions: [] as string[],
     aesthetics: [] as string[],
     confidence: '',
     budget: ''
   });
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   // Load existing fashion identity from localStorage
   useEffect(() => {
@@ -31,12 +36,12 @@ export default function OnboardingPage() {
   }, []);
 
   const occasionOptions = [
-    { id: 'professional', label: 'Professional / Business', icon: '💼' },
-    { id: 'social', label: 'Social Events', icon: '🥂' },
-    { id: 'casual', label: 'Casual Daily', icon: '☀️' },
-    { id: 'formal', label: 'Formal / Black Tie', icon: '🎭' },
-    { id: 'travel', label: 'Travel', icon: '✈️' },
-    { id: 'art', label: 'Art & Cultural Events', icon: '🎨' }
+    { id: 'professional', label: 'Professional', desc: 'Business meetings & work', icon: Briefcase },
+    { id: 'social', label: 'Social Events', desc: 'Dinners & gatherings', icon: Users },
+    { id: 'casual', label: 'Casual Daily', desc: 'Everyday elegance', icon: Sun },
+    { id: 'formal', label: 'Formal', desc: 'Galas & black tie', icon: Star },
+    { id: 'travel', label: 'Travel', desc: 'Refined journeys', icon: Plane },
+    { id: 'art', label: 'Art & Culture', desc: 'Galleries & theater', icon: Palette }
   ];
 
   const aestheticOptions = [
@@ -48,14 +53,14 @@ export default function OnboardingPage() {
 
   const confidenceOptions = [
     { id: 'decisive', label: 'I know exactly what I want', desc: 'Show me options, I\'ll decide' },
-    { id: 'guided', label: 'I like guidance but make my own decisions', desc: 'Suggest with explanations' },
-    { id: 'advisory', label: 'I prefer strong recommendations', desc: 'Tell me what works for me' }
+    { id: 'guided', label: 'I appreciate thoughtful guidance', desc: 'Suggest with explanations' },
+    { id: 'advisory', label: 'I prefer curated recommendations', desc: 'Tell me what works for me' }
   ];
 
   const budgetOptions = [
     { id: 'no-limit', label: 'No preference', desc: 'Show me everything' },
     { id: 'under-1000', label: 'Up to €1,000', desc: 'Per piece' },
-    { id: '1000-5000', label: '€1,000 - €5,000', desc: 'Per piece' },
+    { id: '1000-5000', label: '€1,000 — €5,000', desc: 'Per piece' },
     { id: '5000-plus', label: '€5,000+', desc: 'Investment pieces' }
   ];
 
@@ -73,10 +78,9 @@ export default function OnboardingPage() {
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex < steps.length - 1) {
       const nextStepValue = steps[currentIndex + 1];
-      // Save to localStorage when completing the flow
       if (nextStepValue === 'complete') {
         localStorage.setItem('moda-fashion-identity', JSON.stringify(selections));
-        showToast('Fashion Identity saved successfully!', 'success');
+        showToast('Style profile saved successfully', 'success');
       }
       setCurrentStep(nextStepValue);
     }
@@ -90,252 +94,363 @@ export default function OnboardingPage() {
     }
   };
 
+  const getStepNumber = () => {
+    const stepMap: Record<Step, number> = {
+      welcome: 0,
+      occasions: 1,
+      aesthetics: 2,
+      confidence: 3,
+      budget: 4,
+      complete: 5
+    };
+    return stepMap[currentStep];
+  };
+
   return (
     <div className="min-h-screen bg-ivory-cream flex flex-col">
-      {/* Progress */}
+      {/* Progress Bar */}
       {currentStep !== 'welcome' && currentStep !== 'complete' && (
-        <div className="fixed top-[72px] lg:top-[104px] left-0 right-0 h-1 bg-sand z-10">
-          <div
-            className="h-full bg-gold-muted transition-all duration-500"
-            style={{
-              width: `${
-                currentStep === 'occasions' ? 25 :
-                currentStep === 'aesthetics' ? 50 :
-                currentStep === 'confidence' ? 75 :
-                currentStep === 'budget' ? 100 : 0
-              }%`
-            }}
-          />
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <div className="h-1 bg-sand">
+            <div
+              className="h-full bg-gold-muted transition-all duration-700 ease-out"
+              style={{ width: `${getStepNumber() * 25}%` }}
+            />
+          </div>
         </div>
       )}
 
-      <div className="flex-1 flex items-center justify-center p-6">
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center px-8 py-16 lg:py-24">
         <div className="max-w-2xl w-full">
-          {/* Welcome */}
+          {/* ============================================
+              WELCOME
+              ============================================ */}
           {currentStep === 'welcome' && (
-            <div className="text-center animate-fade-in-up">
-              <div className="w-20 h-20 bg-gold-muted/20 rounded-full flex items-center justify-center mx-auto mb-8">
-                <Sparkles className="w-10 h-10 text-gold-muted" />
-              </div>
-              <h1 className="font-display text-4xl md:text-5xl text-charcoal-deep mb-6">
-                Create Your Fashion Identity
+            <div className={`text-center transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-6">
+                Personal Styling
+              </span>
+
+              <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-8">
+                Create Your<br />Style Profile
               </h1>
-              <p className="text-lg text-stone max-w-lg mx-auto mb-10">
-                Let our Fashion Intelligence understand your style, preferences, and aspirations.
-                This takes just 2 minutes.
+
+              <p className="text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
+                Let us understand your preferences, occasions, and aspirations.
+                This takes just a moment.
               </p>
-              <button onClick={nextStep} className="btn-primary">
-                Begin
-                <ArrowRight size={18} />
+
+              <button
+                onClick={nextStep}
+                className="group inline-flex items-center gap-5"
+              >
+                <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">
+                  Begin
+                </span>
+                <span className="w-14 h-14 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
+                  <ArrowRight size={18} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
+                </span>
               </button>
-              <p className="text-sm text-greige mt-6">
+
+              <p className="text-xs text-taupe mt-10 tracking-wide">
                 You can update these preferences anytime
               </p>
             </div>
           )}
 
-          {/* Occasions */}
+          {/* ============================================
+              OCCASIONS
+              ============================================ */}
           {currentStep === 'occasions' && (
-            <div className="animate-fade-in-up">
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4 text-center">
-                Step 1 of 4
-              </p>
-              <h2 className="font-display text-3xl text-charcoal-deep mb-4 text-center">
-                What occasions do you dress for?
-              </h2>
-              <p className="text-stone text-center mb-10">Select all that apply</p>
+            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 01 of 04
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  What occasions do you dress for?
+                </h2>
+                <p className="text-stone">Select all that apply</p>
+              </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {occasionOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => toggleSelection('occasions', option.id)}
-                    className={`p-6 rounded-xl border-2 text-left transition-all ${
-                      selections.occasions.includes(option.id)
-                        ? 'border-gold-muted bg-gold-muted/10'
-                        : 'border-sand hover:border-taupe'
-                    }`}
-                  >
-                    <span className="text-2xl mb-2 block">{option.icon}</span>
-                    <span className="font-medium text-charcoal-deep">{option.label}</span>
-                  </button>
-                ))}
+                {occasionOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = selections.occasions.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleSelection('occasions', option.id)}
+                      className={`p-6 text-left transition-all duration-300 border ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
+                    >
+                      <Icon size={20} className={`mb-4 ${isSelected ? 'text-gold-soft' : 'text-taupe'}`} />
+                      <span className={`font-display text-lg block mb-1 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                        {option.label}
+                      </span>
+                      <span className={`text-xs ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex justify-between mt-12">
-                <button onClick={prevStep} className="btn-secondary">
-                  <ArrowLeft size={18} />
-                  Back
+                <button
+                  onClick={prevStep}
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
                 </button>
                 <button
                   onClick={nextStep}
                   disabled={selections.occasions.length === 0}
-                  className="btn-primary disabled:opacity-50"
+                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Continue
-                  <ArrowRight size={18} />
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
+                    Continue
+                  </span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                  </span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Aesthetics */}
+          {/* ============================================
+              AESTHETICS
+              ============================================ */}
           {currentStep === 'aesthetics' && (
-            <div className="animate-fade-in-up">
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4 text-center">
-                Step 2 of 4
-              </p>
-              <h2 className="font-display text-3xl text-charcoal-deep mb-4 text-center">
-                Which aesthetic resonates with you?
-              </h2>
-              <p className="text-stone text-center mb-10">Select all that appeal to you</p>
+            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 02 of 04
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  Which aesthetic resonates with you?
+                </h2>
+                <p className="text-stone">Select all that appeal to you</p>
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {aestheticOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => toggleSelection('aesthetics', option.id)}
-                    className={`p-6 rounded-xl border-2 text-left transition-all ${
-                      selections.aesthetics.includes(option.id)
-                        ? 'border-gold-muted bg-gold-muted/10'
-                        : 'border-sand hover:border-taupe'
-                    }`}
-                  >
-                    <span className="font-display text-xl text-charcoal-deep block mb-1">
-                      {option.label}
-                    </span>
-                    <span className="text-sm text-stone">{option.desc}</span>
-                  </button>
-                ))}
+                {aestheticOptions.map((option) => {
+                  const isSelected = selections.aesthetics.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleSelection('aesthetics', option.id)}
+                      className={`p-8 text-left transition-all duration-300 border ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
+                    >
+                      <span className={`font-display text-xl block mb-2 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                        {option.label}
+                      </span>
+                      <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex justify-between mt-12">
-                <button onClick={prevStep} className="btn-secondary">
-                  <ArrowLeft size={18} />
-                  Back
+                <button
+                  onClick={prevStep}
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
                 </button>
                 <button
                   onClick={nextStep}
                   disabled={selections.aesthetics.length === 0}
-                  className="btn-primary disabled:opacity-50"
+                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Continue
-                  <ArrowRight size={18} />
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
+                    Continue
+                  </span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                  </span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Confidence */}
+          {/* ============================================
+              CONFIDENCE
+              ============================================ */}
           {currentStep === 'confidence' && (
-            <div className="animate-fade-in-up">
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4 text-center">
-                Step 3 of 4
-              </p>
-              <h2 className="font-display text-3xl text-charcoal-deep mb-4 text-center">
-                How would you describe your fashion confidence?
-              </h2>
-              <p className="text-stone text-center mb-10">This helps us tailor recommendations</p>
+            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 03 of 04
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  How do you prefer to discover?
+                </h2>
+                <p className="text-stone">This helps us tailor your experience</p>
+              </div>
 
               <div className="space-y-4">
-                {confidenceOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setSelections({ ...selections, confidence: option.id })}
-                    className={`w-full p-6 rounded-xl border-2 text-left transition-all ${
-                      selections.confidence === option.id
-                        ? 'border-gold-muted bg-gold-muted/10'
-                        : 'border-sand hover:border-taupe'
-                    }`}
-                  >
-                    <span className="font-display text-lg text-charcoal-deep block mb-1">
-                      {option.label}
-                    </span>
-                    <span className="text-sm text-stone">{option.desc}</span>
-                  </button>
-                ))}
+                {confidenceOptions.map((option, index) => {
+                  const isSelected = selections.confidence === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setSelections({ ...selections, confidence: option.id })}
+                      className={`w-full p-8 text-left transition-all duration-300 border flex items-start gap-6 ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
+                    >
+                      <span className={`font-display text-2xl ${isSelected ? 'text-gold-soft' : 'text-taupe'}`}>
+                        0{index + 1}
+                      </span>
+                      <div>
+                        <span className={`font-display text-lg block mb-1 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                          {option.label}
+                        </span>
+                        <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                          {option.desc}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex justify-between mt-12">
-                <button onClick={prevStep} className="btn-secondary">
-                  <ArrowLeft size={18} />
-                  Back
+                <button
+                  onClick={prevStep}
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
                 </button>
                 <button
                   onClick={nextStep}
                   disabled={!selections.confidence}
-                  className="btn-primary disabled:opacity-50"
+                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Continue
-                  <ArrowRight size={18} />
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
+                    Continue
+                  </span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                  </span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Budget */}
+          {/* ============================================
+              BUDGET
+              ============================================ */}
           {currentStep === 'budget' && (
-            <div className="animate-fade-in-up">
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4 text-center">
-                Step 4 of 4
-              </p>
-              <h2 className="font-display text-3xl text-charcoal-deep mb-4 text-center">
-                Would you like to set a comfort range?
-              </h2>
-              <p className="text-stone text-center mb-10">Optional — helps personalize suggestions</p>
+            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 04 of 04
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  Investment comfort range?
+                </h2>
+                <p className="text-stone">Optional — helps personalize suggestions</p>
+              </div>
 
               <div className="space-y-4">
-                {budgetOptions.map((option) => (
-                  <button
-                    key={option.id}
-                    onClick={() => setSelections({ ...selections, budget: option.id })}
-                    className={`w-full p-6 rounded-xl border-2 text-left transition-all ${
-                      selections.budget === option.id
-                        ? 'border-gold-muted bg-gold-muted/10'
-                        : 'border-sand hover:border-taupe'
-                    }`}
-                  >
-                    <span className="font-display text-lg text-charcoal-deep block mb-1">
-                      {option.label}
-                    </span>
-                    <span className="text-sm text-stone">{option.desc}</span>
-                  </button>
-                ))}
+                {budgetOptions.map((option) => {
+                  const isSelected = selections.budget === option.id;
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setSelections({ ...selections, budget: option.id })}
+                      className={`w-full p-6 text-left transition-all duration-300 border flex items-center justify-between ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
+                    >
+                      <span className={`font-display text-xl ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                        {option.label}
+                      </span>
+                      <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="flex justify-between mt-12">
-                <button onClick={prevStep} className="btn-secondary">
-                  <ArrowLeft size={18} />
-                  Back
+                <button
+                  onClick={prevStep}
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
                 </button>
-                <button onClick={nextStep} className="btn-primary">
-                  Complete Setup
-                  <Check size={18} />
+                <button
+                  onClick={nextStep}
+                  className="group inline-flex items-center gap-4"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
+                    Complete
+                  </span>
+                  <span className="w-12 h-12 bg-charcoal-deep flex items-center justify-center group-hover:bg-noir transition-all duration-300">
+                    <Check size={16} className="text-ivory-cream" />
+                  </span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Complete */}
+          {/* ============================================
+              COMPLETE
+              ============================================ */}
           {currentStep === 'complete' && (
-            <div className="text-center animate-fade-in-up">
-              <div className="w-20 h-20 bg-success rounded-full flex items-center justify-center mx-auto mb-8">
-                <Check className="w-10 h-10 text-ivory-cream" />
+            <div className={`text-center transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="w-20 h-20 bg-charcoal-deep flex items-center justify-center mx-auto mb-10">
+                <Check size={32} className="text-gold-soft" />
               </div>
-              <h2 className="font-display text-4xl text-charcoal-deep mb-6">
-                Your Fashion Identity is Ready
+
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-6">
+                Profile Complete
+              </span>
+
+              <h2 className="font-display text-[clamp(2rem,5vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-8">
+                Your Style Profile<br />is Ready
               </h2>
-              <p className="text-lg text-stone max-w-lg mx-auto mb-10">
-                Your User Fashion Agent is now active. It will learn and adapt as you explore,
-                providing personalized recommendations that resonate with your style.
+
+              <p className="text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
+                We'll curate recommendations that resonate with your preferences and evolve as you explore the collection.
               </p>
+
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/discover" className="btn-primary">
-                  Start Exploring
-                  <ArrowRight size={18} />
+                <Link
+                  href="/discover"
+                  className="group inline-flex items-center justify-center gap-4 py-4 px-8 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase">Start Exploring</span>
+                  <ArrowRight size={16} />
                 </Link>
-                <Link href="/profile" className="btn-secondary">
-                  View My Profile
+                <Link
+                  href="/profile"
+                  className="group inline-flex items-center justify-center gap-4 py-4 px-8 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase">View Profile</span>
                 </Link>
               </div>
             </div>

@@ -1,9 +1,9 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Clock, MapPin, Play, Sparkles } from 'lucide-react';
+import { ArrowRight, MapPin, X, SlidersHorizontal } from 'lucide-react';
 import { getBrandBySlug, getProductsByBrand, getStoriesByBrand } from '@/data/mock-data';
 import { notFound } from 'next/navigation';
 
@@ -11,138 +11,131 @@ interface BrandPageProps {
   params: Promise<{ slug: string }>;
 }
 
+type CategoryFilter = 'all' | 'bags' | 'clothing' | 'shoes' | 'accessories';
+
 export default function BrandPage({ params }: BrandPageProps) {
   const { slug } = use(params);
   const brand = getBrandBySlug(slug);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   if (!brand) {
     notFound();
   }
 
-  const products = getProductsByBrand(brand.id);
+  const allProducts = getProductsByBrand(brand.id);
   const stories = getStoriesByBrand(brand.id);
 
-  const explorationModes = [
-    { title: 'Heritage & History', desc: 'Journey through time', icon: Clock },
-    { title: 'Craftsmanship', desc: 'Inside the atelier', icon: Sparkles },
-    { title: 'Current Collections', desc: 'Today\'s vision', icon: ArrowRight },
-    { title: 'Iconic Pieces', desc: 'Timeless creations', icon: Play }
+  // Filter products by category
+  const filteredProducts = useMemo(() => {
+    if (categoryFilter === 'all') return allProducts;
+
+    return allProducts.filter(p => {
+      const category = p.category?.toLowerCase() || '';
+      const tags = p.tags?.map(t => t.toLowerCase()) || [];
+
+      switch (categoryFilter) {
+        case 'bags':
+          return category.includes('bag') || tags.some(t => t.includes('bag') || t.includes('handbag'));
+        case 'clothing':
+          return category.includes('clothing') || category.includes('jacket') || category.includes('coat') ||
+                 tags.some(t => t.includes('jacket') || t.includes('coat') || t.includes('dress') || t.includes('blazer'));
+        case 'shoes':
+          return category.includes('shoe') || category.includes('footwear') ||
+                 tags.some(t => t.includes('shoe') || t.includes('loafer') || t.includes('heel') || t.includes('boot'));
+        case 'accessories':
+          return category.includes('accessor') || category.includes('jewelry') ||
+                 tags.some(t => t.includes('scarf') || t.includes('belt') || t.includes('jewelry') || t.includes('watch'));
+        default:
+          return true;
+      }
+    });
+  }, [allProducts, categoryFilter]);
+
+  const categoryOptions: { id: CategoryFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'bags', label: 'Bags' },
+    { id: 'clothing', label: 'Clothing' },
+    { id: 'shoes', label: 'Shoes' },
+    { id: 'accessories', label: 'Accessories' }
   ];
 
   return (
-    <div className="min-h-screen">
-      {/* Hero Section */}
-      <section className="relative h-[80vh] min-h-[600px] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
-          <Image
-            src={brand.heroImage}
-            alt={brand.name}
-            fill
-            className="object-cover"
-            priority
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-noir/50 via-noir/30 to-noir/70" />
-        </div>
+    <div className="min-h-screen bg-ivory-cream">
+      {/* ============================================
+          HERO - Brand Introduction
+          ============================================ */}
+      <section className="relative h-[70vh] min-h-[500px] max-h-[700px] w-full overflow-hidden">
+        <Image
+          src={brand.heroImage}
+          alt={brand.name}
+          fill
+          className={`object-cover transition-all duration-[2s] ease-out ${isLoaded ? 'scale-100' : 'scale-110'}`}
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-noir/30 via-noir/20 to-noir/70" />
+        <div className="absolute inset-0 bg-gradient-to-r from-noir/60 via-noir/30 to-transparent" />
 
-        <div className="relative z-10 text-center px-6 max-w-4xl mx-auto animate-fade-in-up">
-          <p className="text-xs tracking-[0.3em] uppercase text-champagne mb-6">
-            Welcome to the Universe of
-          </p>
-          <h1 className="font-display text-5xl md:text-7xl lg:text-8xl text-ivory-cream mb-4">
-            {brand.name}
-          </h1>
-          <p className="text-xl text-sand mb-8">{brand.tagline}</p>
-          <div className="section-divider mb-8" />
-          <p className="text-taupe max-w-2xl mx-auto">
-            {brand.description}
-          </p>
-        </div>
-      </section>
+        {/* Hero Content */}
+        <div className="relative h-full flex items-end px-8 md:px-16 lg:px-24 pb-16 md:pb-20">
+          <div className={`max-w-3xl transition-all duration-1000 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/80 block mb-4">
+              Est. {brand.heritage.founded} · {brand.heritage.origin}
+            </span>
 
-      {/* AGI Concierge Welcome */}
-      <section className="py-16 bg-charcoal-deep text-ivory-cream">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <div className="w-12 h-12 rounded-full bg-gold-muted/20 flex items-center justify-center">
-              <Sparkles className="text-gold-soft" size={24} />
-            </div>
-            <span className="text-sm tracking-[0.2em] uppercase text-gold-soft">Brand AGI Concierge</span>
-          </div>
-          <p className="font-display text-2xl md:text-3xl italic text-sand leading-relaxed">
-            "Welcome to the House of {brand.name}. I'm here to guide you through our universe.
-            How would you like to explore?"
-          </p>
-        </div>
-      </section>
+            <h1 className="font-display text-[clamp(3rem,10vw,7rem)] text-ivory-cream leading-[0.9] tracking-[-0.03em] mb-6">
+              {brand.name}
+            </h1>
 
-      {/* Exploration Modes */}
-      <section className="py-20 lg:py-24 px-6 lg:px-12 bg-ivory-cream">
-        <div className="max-w-[1400px] mx-auto">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            {explorationModes.map((mode, index) => (
-              <button
-                key={index}
-                className="group bg-white p-6 lg:p-8 rounded-xl shadow-sm hover:shadow-md transition-all text-left"
-              >
-                <mode.icon className="w-8 h-8 text-gold-muted mb-4" />
-                <h3 className="font-display text-xl text-charcoal-deep mb-2 group-hover:text-gold-deep transition-colors">
-                  {mode.title}
-                </h3>
-                <p className="text-sm text-stone">{mode.desc}</p>
-              </button>
-            ))}
-          </div>
-
-          {/* Or ask anything */}
-          <div className="mt-12 text-center">
-            <p className="text-sm text-greige mb-4">Or tell me what you're looking for...</p>
-            <div className="max-w-xl mx-auto relative">
-              <input
-                type="text"
-                placeholder={`Ask anything about ${brand.name}...`}
-                className="input-luxury text-center"
-              />
-            </div>
+            <p className="text-lg md:text-xl text-ivory-cream/70 max-w-xl leading-relaxed">
+              {brand.tagline}
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Heritage Section */}
-      <section className="py-20 lg:py-32 bg-parchment">
-        <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+      {/* ============================================
+          HERITAGE - Brand Story
+          ============================================ */}
+      <section className="py-24 lg:py-32 bg-ivory-cream">
+        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24">
+          <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-center">
+            {/* Text Content */}
             <div>
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4">Heritage</p>
-              <h2 className="font-display text-3xl md:text-4xl text-charcoal-deep mb-6">
+              <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-4">
+                Heritage
+              </span>
+              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-8">
                 {brand.heritage.story.split('.')[0]}.
               </h2>
-              <div className="space-y-4 text-stone">
-                <p>{brand.heritage.story}</p>
-              </div>
+              <p className="text-stone leading-relaxed mb-10">
+                {brand.heritage.story}
+              </p>
 
-              <div className="grid grid-cols-2 gap-6 mt-10">
+              {/* Heritage Stats */}
+              <div className="flex gap-12 pt-8 border-t border-sand/50">
                 <div>
-                  <p className="font-display text-4xl text-gold-deep">{brand.heritage.founded}</p>
-                  <p className="text-sm text-greige uppercase tracking-wider">Founded</p>
+                  <p className="font-display text-4xl text-charcoal-deep mb-1">{brand.heritage.founded}</p>
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-taupe">Founded</p>
                 </div>
                 <div>
-                  <p className="font-display text-lg text-charcoal-deep">{brand.heritage.origin}</p>
-                  <p className="text-sm text-greige uppercase tracking-wider flex items-center gap-1">
-                    <MapPin size={14} /> Origin
-                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <MapPin size={16} className="text-gold-muted" />
+                    <p className="font-display text-xl text-charcoal-deep">{brand.heritage.origin}</p>
+                  </div>
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-taupe">Origin</p>
                 </div>
               </div>
-
-              <Link
-                href={`/story/${stories[0]?.slug || ''}`}
-                className="btn-secondary inline-flex mt-10"
-              >
-                Explore Our Heritage
-                <ArrowRight size={18} />
-              </Link>
             </div>
 
-            <div className="relative aspect-[4/5] rounded-xl overflow-hidden">
+            {/* Image */}
+            <div className="relative aspect-[4/5] overflow-hidden">
               <Image
                 src={brand.heroImage}
                 alt={`${brand.name} Heritage`}
@@ -154,40 +147,51 @@ export default function BrandPage({ params }: BrandPageProps) {
         </div>
       </section>
 
-      {/* Stories Section */}
+      {/* ============================================
+          STORIES - Editorial Content
+          ============================================ */}
       {stories.length > 0 && (
-        <section className="py-20 lg:py-32 px-6 lg:px-12">
-          <div className="max-w-[1800px] mx-auto">
-            <div className="text-center mb-16">
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4">Stories & Narratives</p>
-              <h2 className="font-display text-3xl md:text-4xl text-charcoal-deep">
-                From the House of {brand.name}
-              </h2>
+        <section className="py-24 lg:py-32 bg-charcoal-deep">
+          <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24">
+            {/* Section Header */}
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-16">
+              <div>
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-3">
+                  Inside the Maison
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-ivory-cream leading-[1.1] tracking-[-0.02em]">
+                  Stories
+                </h2>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {stories.map((story) => (
+            {/* Stories Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+              {stories.slice(0, 3).map((story) => (
                 <Link
                   key={story.id}
                   href={`/story/${story.slug}`}
                   className="group"
                 >
-                  <div className="relative aspect-[4/3] rounded-lg overflow-hidden mb-4">
+                  <div className="relative aspect-[4/5] overflow-hidden mb-5">
                     <Image
                       src={story.heroImage}
                       alt={story.title}
                       fill
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
-                    <div className="absolute top-4 left-4">
-                      <span className="tag-intelligence">{story.type}</span>
+                    <div className="absolute inset-0 bg-noir/20 group-hover:bg-noir/0 transition-colors duration-500" />
+                    <div className="absolute top-5 left-5">
+                      <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-noir/60 backdrop-blur-sm px-3 py-1.5">
+                        {story.type}
+                      </span>
                     </div>
                   </div>
-                  <h3 className="font-display text-xl text-charcoal-deep group-hover:text-gold-deep transition-colors mb-2">
+                  <h3 className="font-display text-xl text-ivory-cream leading-tight group-hover:text-gold-soft transition-colors mb-2">
                     {story.title}
                   </h3>
-                  <p className="text-sm text-stone line-clamp-2">{story.excerpt}</p>
-                  <p className="text-xs text-greige mt-3">{story.readTime} min read</p>
+                  <p className="text-sm text-taupe line-clamp-2 mb-3">{story.excerpt}</p>
+                  <p className="text-xs text-stone">{story.readTime} min read</p>
                 </Link>
               ))}
             </div>
@@ -195,85 +199,238 @@ export default function BrandPage({ params }: BrandPageProps) {
         </section>
       )}
 
-      {/* Products Section */}
-      <section className="py-20 lg:py-32 bg-parchment px-6 lg:px-12">
-        <div className="max-w-[1800px] mx-auto">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end mb-16 gap-6">
+      {/* ============================================
+          PRODUCTS - The Collection
+          ============================================ */}
+      <section className="py-24 lg:py-32 bg-parchment">
+        <div className="max-w-[1800px] mx-auto px-8 md:px-16 lg:px-24">
+          {/* Section Header */}
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-12 lg:mb-16">
             <div>
-              <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-4">The Collection</p>
-              <h2 className="font-display text-3xl md:text-4xl text-charcoal-deep">
+              <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-3">
+                The Collection
+              </span>
+              <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em]">
                 {brand.name} Pieces
               </h2>
+              <p className="text-sm text-stone mt-2">
+                {filteredProducts.length} piece{filteredProducts.length !== 1 ? 's' : ''}
+                {categoryFilter !== 'all' && ` in ${categoryOptions.find(c => c.id === categoryFilter)?.label}`}
+              </p>
             </div>
-            <div className="flex flex-wrap gap-4">
-              <button className="text-sm px-4 py-2 bg-charcoal-deep text-ivory-cream rounded-full">
-                All
-              </button>
-              <button className="text-sm px-4 py-2 border border-sand text-charcoal-warm rounded-full hover:border-charcoal-deep transition-colors">
-                Bags
-              </button>
-              <button className="text-sm px-4 py-2 border border-sand text-charcoal-warm rounded-full hover:border-charcoal-deep transition-colors">
-                Clothing
-              </button>
-              <button className="text-sm px-4 py-2 border border-sand text-charcoal-warm rounded-full hover:border-charcoal-deep transition-colors">
-                Accessories
-              </button>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-8">
-            {products.map((product) => (
-              <Link
-                key={product.id}
-                href={`/product/${product.slug}`}
-                className="group"
-              >
-                <div className="relative aspect-[3/4] rounded-lg overflow-hidden mb-4 bg-white">
-                  <Image
-                    src={product.images[0]?.url || ''}
-                    alt={product.name}
-                    fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  {product.availability.status === 'limited' && (
-                    <div className="absolute top-4 right-4">
-                      <span className="px-3 py-1 bg-gold-muted text-noir text-xs tracking-wider uppercase rounded-full">
-                        Limited
-                      </span>
-                    </div>
+            {/* Desktop Filters */}
+            <nav className="hidden lg:flex gap-8">
+              {categoryOptions.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => setCategoryFilter(category.id)}
+                  className={`relative text-sm tracking-[0.15em] uppercase transition-all duration-300 ${
+                    categoryFilter === category.id
+                      ? 'text-charcoal-deep'
+                      : 'text-stone hover:text-charcoal-deep'
+                  }`}
+                >
+                  {category.label}
+                  {categoryFilter === category.id && (
+                    <span className="absolute -bottom-2 left-0 right-0 h-px bg-charcoal-deep" />
                   )}
-                </div>
-                <h3 className="font-display text-lg text-charcoal-deep group-hover:text-gold-deep transition-colors">
-                  {product.name}
-                </h3>
-                <p className="text-sm text-greige mb-1">{product.tagline}</p>
-                <p className="text-sm text-stone">
-                  {product.currency === 'EUR' ? '€' : '$'}{product.price.toLocaleString()}
-                </p>
-              </Link>
-            ))}
+                </button>
+              ))}
+            </nav>
+
+            {/* Mobile Filter Toggle */}
+            <button
+              onClick={() => setShowFilters(true)}
+              className="lg:hidden group flex items-center gap-2 text-sm tracking-[0.15em] uppercase text-charcoal-deep"
+            >
+              <span>Filter</span>
+              <span className="relative">
+                <SlidersHorizontal size={16} />
+                {categoryFilter !== 'all' && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-gold-muted rounded-full" />
+                )}
+              </span>
+            </button>
           </div>
 
-          {products.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-stone">Explore our collection coming soon.</p>
+          {/* Active Filter Chip */}
+          {categoryFilter !== 'all' && (
+            <div className="mb-8 lg:hidden">
+              <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
+                {categoryOptions.find(c => c.id === categoryFilter)?.label}
+                <button onClick={() => setCategoryFilter('all')} className="hover:text-gold-deep transition-colors">
+                  <X size={12} />
+                </button>
+              </span>
+            </div>
+          )}
+
+          {/* Products Grid */}
+          {filteredProducts.length > 0 ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-10 md:gap-y-16">
+              {filteredProducts.map((product, index) => (
+                <Link
+                  key={product.id}
+                  href={`/product/${product.slug}`}
+                  className="group"
+                  onMouseEnter={() => setActiveProductHover(index)}
+                  onMouseLeave={() => setActiveProductHover(null)}
+                >
+                  <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-5">
+                    <Image
+                      src={product.images[0]?.url || ''}
+                      alt={product.name}
+                      fill
+                      className="object-cover transition-all duration-700 group-hover:scale-105"
+                    />
+
+                    {/* Hover Action */}
+                    <div className="absolute inset-0 flex items-center justify-center bg-noir/0 group-hover:bg-noir/20 transition-all duration-500">
+                      <div className={`w-14 h-14 rounded-full bg-ivory-cream flex items-center justify-center transform transition-all duration-500 ${activeProductHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
+                        <ArrowRight size={18} className="text-charcoal-deep" />
+                      </div>
+                    </div>
+
+                    {/* Limited Badge */}
+                    {product.availability.status === 'limited' && (
+                      <div className="absolute top-4 left-4">
+                        <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream px-3 py-1.5">
+                          Limited Edition
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="space-y-1.5">
+                    <h3 className="font-display text-lg md:text-xl text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors">
+                      {product.name}
+                    </h3>
+                    <p className="text-sm text-stone">
+                      €{product.price.toLocaleString()}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-24 bg-ivory-cream">
+              <p className="font-display text-2xl text-charcoal-deep mb-4">No pieces found</p>
+              <p className="text-stone mb-8 max-w-md mx-auto">
+                No {categoryOptions.find(c => c.id === categoryFilter)?.label.toLowerCase()} available from {brand.name}.
+              </p>
+              <button
+                onClick={() => setCategoryFilter('all')}
+                className="group inline-flex items-center gap-4"
+              >
+                <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep group-hover:text-gold-deep transition-colors">
+                  View All Pieces
+                </span>
+                <span className="w-12 h-12 rounded-full border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
+                  <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
+                </span>
+              </button>
             </div>
           )}
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-20 bg-charcoal-deep text-ivory-cream">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <p className="font-display text-2xl md:text-3xl italic text-sand mb-8">
-            "Would you like me to help you find something specific from {brand.name}?"
+      {/* ============================================
+          CTA - Discover More
+          ============================================ */}
+      <section className="py-24 lg:py-32 bg-noir">
+        <div className="max-w-3xl mx-auto px-8 md:px-16 text-center">
+          <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-6">
+            Continue Your Journey
+          </span>
+          <h2 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-8">
+            Explore More Maisons
+          </h2>
+          <p className="text-taupe mb-12 max-w-lg mx-auto">
+            Discover other legendary houses and their exceptional collections.
           </p>
-          <button className="btn-gold">
-            Start a Conversation
-            <Sparkles size={18} />
-          </button>
+          <Link
+            href="/discover"
+            className="group inline-flex items-center gap-5"
+          >
+            <span className="text-sm tracking-[0.2em] uppercase text-ivory-cream">
+              Discover All
+            </span>
+            <span className="w-14 h-14 rounded-full border border-gold-soft/30 flex items-center justify-center group-hover:bg-gold-soft group-hover:border-gold-soft transition-all duration-500">
+              <ArrowRight size={18} className="text-gold-soft group-hover:text-noir transition-colors duration-500" />
+            </span>
+          </Link>
         </div>
       </section>
+
+      {/* ============================================
+          MOBILE FILTER DRAWER
+          ============================================ */}
+      <div
+        className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-500 ${showFilters ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      >
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-noir/50 backdrop-blur-sm"
+          onClick={() => setShowFilters(false)}
+        />
+
+        {/* Drawer */}
+        <div
+          className={`absolute right-0 top-0 bottom-0 w-full max-w-sm bg-ivory-cream transform transition-transform duration-500 ease-out ${showFilters ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-6 border-b border-sand/30">
+            <h3 className="font-display text-xl text-charcoal-deep">Filter</h3>
+            <button
+              onClick={() => setShowFilters(false)}
+              className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-all"
+            >
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Filter Content */}
+          <div className="px-6 py-8">
+            <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Category</h4>
+            <div className="space-y-1">
+              {categoryOptions.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => {
+                    setCategoryFilter(category.id);
+                    setShowFilters(false);
+                  }}
+                  className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all ${
+                    categoryFilter === category.id
+                      ? 'text-charcoal-deep'
+                      : 'text-stone hover:text-charcoal-deep'
+                  }`}
+                >
+                  <span>{category.label}</span>
+                  {categoryFilter === category.id && (
+                    <span className="w-2 h-2 bg-gold-muted rounded-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="absolute bottom-0 left-0 right-0 px-6 py-6 border-t border-sand/30 bg-ivory-cream">
+            <button
+              onClick={() => {
+                setCategoryFilter('all');
+                setShowFilters(false);
+              }}
+              className="w-full py-4 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors border border-sand hover:border-charcoal-deep"
+            >
+              Clear Filter
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

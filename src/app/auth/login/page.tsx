@@ -1,108 +1,127 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { ArrowRight, ShoppingBag, Crown, Gem } from 'lucide-react';
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: ''
-  });
+  const [isLoaded, setIsLoaded] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Handle login
-    window.location.href = '/profile';
-  };
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   return (
     <div className="min-h-screen bg-ivory-cream flex">
-      {/* Left Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-10">
-            <h1 className="font-display text-3xl text-charcoal-deep mb-3">Welcome Back</h1>
-            <p className="text-stone">Sign in to continue your fashion journey</p>
+      {/* Left Side - Content */}
+      <div className="flex-1 flex items-center justify-center px-8 py-16 lg:px-16">
+        <div className={`w-full max-w-lg transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className="text-center mb-12">
+            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-4">
+              Welcome to Glimmora
+            </span>
+            <h1 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-4">
+              Sign In
+            </h1>
+            <p className="text-stone">Select your account type to continue</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-charcoal-deep mb-2">
-                Email
-              </label>
-              <input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="input-luxury"
-                placeholder="your@email.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-charcoal-deep mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="input-luxury pr-12"
-                  placeholder="Enter your password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-greige hover:text-charcoal-deep"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
+          {/* Role Selection Cards */}
+          <div className="space-y-6">
+            {/* Consumer Option */}
+            <Link
+              href="/auth/login/consumer"
+              className="group block w-full p-8 bg-white border border-sand hover:border-charcoal-deep transition-all duration-300"
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-14 h-14 bg-parchment flex items-center justify-center group-hover:bg-charcoal-deep transition-colors">
+                  <ShoppingBag size={24} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="font-display text-xl text-charcoal-deep">Consumer</h2>
+                    <ArrowRight size={18} className="text-taupe group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <p className="text-stone text-sm leading-relaxed">
+                    Explore curated collections, build your digital wardrobe, and receive personalized style recommendations.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="px-3 py-1 bg-parchment text-[10px] tracking-[0.1em] uppercase text-stone">
+                      Style Profile
+                    </span>
+                    <span className="px-3 py-1 bg-parchment text-[10px] tracking-[0.1em] uppercase text-stone">
+                      Wardrobe
+                    </span>
+                    <span className="px-3 py-1 bg-parchment text-[10px] tracking-[0.1em] uppercase text-stone">
+                      AI Styling
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            </Link>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" className="w-4 h-4 accent-gold-muted" />
-                <span className="text-sm text-stone">Remember me</span>
-              </label>
-              <Link href="/auth/forgot-password" className="text-sm text-gold-muted hover:text-gold-deep">
-                Forgot password?
-              </Link>
-            </div>
+            {/* UHNI Option */}
+            <Link
+              href="/auth/login/uhni"
+              className="group block w-full p-8 bg-charcoal-deep border border-charcoal-deep hover:bg-noir transition-all duration-300"
+            >
+              <div className="flex items-start gap-5">
+                <div className="w-14 h-14 bg-gold-soft/20 flex items-center justify-center">
+                  <Crown size={24} className="text-gold-soft" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <h2 className="font-display text-xl text-ivory-cream">UHNI</h2>
+                      <span className="px-2 py-0.5 bg-gold-soft/20 text-[8px] tracking-[0.2em] uppercase text-gold-soft">
+                        Exclusive
+                      </span>
+                    </div>
+                    <ArrowRight size={18} className="text-sand group-hover:text-gold-soft group-hover:translate-x-1 transition-all" />
+                  </div>
+                  <p className="text-sand text-sm leading-relaxed">
+                    Personal concierge service, autonomous shopping, private sourcing, and bespoke commissions.
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="px-3 py-1 bg-gold-soft/10 text-[10px] tracking-[0.1em] uppercase text-gold-soft/80 flex items-center gap-1.5">
+                      <Gem size={10} />
+                      Concierge
+                    </span>
+                    <span className="px-3 py-1 bg-gold-soft/10 text-[10px] tracking-[0.1em] uppercase text-gold-soft/80">
+                      Zero-UI
+                    </span>
+                    <span className="px-3 py-1 bg-gold-soft/10 text-[10px] tracking-[0.1em] uppercase text-gold-soft/80">
+                      Bespoke
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          </div>
 
-            <button type="submit" className="btn-primary w-full justify-center">
-              Sign In
-              <ArrowRight size={18} />
-            </button>
-          </form>
-
-          <div className="relative my-8">
+          {/* Divider */}
+          <div className="relative my-10">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-sand"></div>
             </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-ivory-cream text-greige">or continue with</span>
+            <div className="relative flex justify-center">
+              <span className="px-4 bg-ivory-cream text-[10px] tracking-[0.2em] uppercase text-taupe">
+                New to Glimmora?
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <button className="btn-secondary justify-center">
-              Google
-            </button>
-            <button className="btn-secondary justify-center">
-              Apple
-            </button>
-          </div>
+          <Link
+            href="/auth/register"
+            className="block w-full py-4 px-6 border border-sand text-charcoal-deep text-center hover:border-charcoal-deep transition-all duration-300"
+          >
+            <span className="text-sm tracking-[0.15em] uppercase">Create Account</span>
+          </Link>
 
-          <p className="text-center text-stone mt-8">
-            Don't have an account?{' '}
-            <Link href="/auth/register" className="text-gold-muted hover:text-gold-deep font-medium">
-              Create one
+          <p className="text-center text-taupe mt-10 text-sm">
+            UHNI membership is by invitation only.{' '}
+            <Link href="/profile/concierge" className="text-charcoal-deep hover:text-gold-muted transition-colors">
+              Learn more
             </Link>
           </p>
         </div>
@@ -117,11 +136,15 @@ export default function LoginPage() {
           }}
         />
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center text-ivory-cream max-w-md px-8">
-            <Sparkles className="w-12 h-12 mx-auto mb-6 text-gold-soft" />
-            <h2 className="font-display text-3xl mb-4">Fashion Intelligence Awaits</h2>
-            <p className="text-taupe">
-              Your User Fashion Agent remembers your preferences and continues learning with every interaction.
+          <div className="text-center text-ivory-cream max-w-md px-12">
+            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-6">
+              Curated Excellence
+            </span>
+            <h2 className="font-display text-[clamp(2rem,4vw,3rem)] leading-[1.1] tracking-[-0.02em] mb-6">
+              Your Style Journey Awaits
+            </h2>
+            <p className="text-taupe leading-relaxed">
+              Discover exceptional pieces from distinguished maisons, curated with intelligence and refined with care.
             </p>
           </div>
         </div>

@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ShoppingBag, Trash2, Check, Clock, Info, ChevronRight, Layers } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Trash2, Check, Clock, Info, ChevronRight, Layers, Crown, Zap, Settings, MessageCircle } from 'lucide-react';
 import { mockSilentCart } from '@/data/mock-data';
 import { useApp } from '@/context/AppContext';
 
 export default function SilentCartPage() {
   const router = useRouter();
-  const { addToConsiderations, showToast } = useApp();
+  const { addToConsiderations, showToast, isUHNI, autonomousSettings, concierge } = useApp();
   const [cart, setCart] = useState(mockSilentCart);
   const [approvedItems, setApprovedItems] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -109,7 +109,7 @@ export default function SilentCartPage() {
 
       <div className={`max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         {/* How It Works */}
-        <div className="bg-parchment p-6 border border-sand mb-10">
+        <div className="bg-parchment p-6 border border-sand mb-6">
           <div className="flex items-start gap-4">
             <div className="w-8 h-8 bg-charcoal-deep flex items-center justify-center flex-shrink-0">
               <span className="text-ivory-cream text-sm font-medium">?</span>
@@ -120,6 +120,61 @@ export default function SilentCartPage() {
             </div>
           </div>
         </div>
+
+        {/* UHNI: Autonomous Shopping Status */}
+        {isUHNI && autonomousSettings && (
+          <div className="bg-charcoal-deep p-6 mb-10">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gold-soft/20 flex items-center justify-center">
+                  <Zap size={20} className="text-gold-soft" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Crown size={12} className="text-gold-soft" />
+                    <span className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/70">UHNI</span>
+                  </div>
+                  <p className="text-ivory-cream font-medium">Autonomous Shopping</p>
+                </div>
+              </div>
+              <div className={`px-3 py-1 text-xs tracking-[0.1em] uppercase ${
+                autonomousSettings.enabled ? 'bg-success/20 text-success' : 'bg-stone/20 text-stone'
+              }`}>
+                {autonomousSettings.enabled ? 'Active' : 'Paused'}
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4 mb-4">
+              <div className="bg-ivory-cream/5 p-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Monthly Budget</p>
+                <p className="font-display text-xl text-ivory-cream">
+                  €{autonomousSettings.currentMonthSpend.toLocaleString()} <span className="text-sm text-taupe">/ €{autonomousSettings.monthlyBudget.toLocaleString()}</span>
+                </p>
+              </div>
+              <div className="bg-ivory-cream/5 p-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Auto-Approve Limit</p>
+                <p className="font-display text-xl text-gold-soft">€{autonomousSettings.autoApproveThreshold.toLocaleString()}</p>
+              </div>
+              <div className="bg-ivory-cream/5 p-4">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Review Mode</p>
+                <p className="font-display text-lg text-ivory-cream capitalize">{autonomousSettings.requireReviewBefore.replace('_', ' ')}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-ivory-cream/10">
+              <p className="text-sm text-taupe">
+                Items below €{autonomousSettings.autoApproveThreshold.toLocaleString()} can be auto-purchased
+              </p>
+              <Link
+                href="/profile/autonomous"
+                className="flex items-center gap-2 text-gold-soft hover:text-gold-soft/80 transition-colors"
+              >
+                <Settings size={16} />
+                <span className="text-sm">Settings</span>
+              </Link>
+            </div>
+          </div>
+        )}
 
         {cart.items.length === 0 ? (
           <div className="text-center py-20 bg-white">
@@ -222,6 +277,22 @@ export default function SilentCartPage() {
                             </span>
                           )}
                         </div>
+
+                        {/* UHNI: Auto-approve indicator */}
+                        {isUHNI && autonomousSettings?.enabled && (
+                          <div className={`mt-3 flex items-center gap-2 text-xs ${
+                            item.product.price <= autonomousSettings.autoApproveThreshold
+                              ? 'text-success'
+                              : 'text-gold-muted'
+                          }`}>
+                            <Zap size={12} />
+                            {item.product.price <= autonomousSettings.autoApproveThreshold ? (
+                              <span>Eligible for auto-purchase</span>
+                            ) : (
+                              <span>Requires approval (above €{autonomousSettings.autoApproveThreshold.toLocaleString()} threshold)</span>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Actions */}
@@ -253,29 +324,81 @@ export default function SilentCartPage() {
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                <button
-                  onClick={handleMoveToConsiderations}
-                  disabled={approvedItems.length === 0}
-                  className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ShoppingBag size={18} />
-                  <span className="text-sm tracking-[0.15em] uppercase">
-                    Move to Considerations ({approvedItems.length})
-                  </span>
-                </button>
-                <Link
-                  href="/consideration"
-                  className="flex items-center gap-2 px-6 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.1em] uppercase"
-                >
-                  View Considerations
-                  <ChevronRight size={16} />
-                </Link>
-              </div>
+              {/* UHNI: Enhanced action buttons */}
+              {isUHNI && autonomousSettings?.enabled ? (
+                <>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        showToast('Items approved for auto-purchase', 'success');
+                        // In real app, this would trigger the autonomous purchase flow
+                      }}
+                      disabled={approvedItems.length === 0}
+                      className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-success text-ivory-cream hover:bg-success/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Zap size={18} />
+                      <span className="text-sm tracking-[0.15em] uppercase">
+                        Approve & Auto-Purchase
+                      </span>
+                    </button>
+                    <button
+                      onClick={handleMoveToConsiderations}
+                      disabled={approvedItems.length === 0}
+                      className="flex items-center justify-center gap-2 px-6 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ShoppingBag size={16} />
+                      <span className="text-sm tracking-[0.1em] uppercase">Review First</span>
+                    </button>
+                  </div>
 
-              <p className="text-xs text-taupe text-center mt-6">
-                Items moved to Considerations can be reviewed before purchase
-              </p>
+                  <div className="flex gap-3 mt-3">
+                    <Link
+                      href="/profile/concierge"
+                      className="flex-1 flex items-center justify-center gap-2 py-3 border border-gold-muted/30 text-gold-muted hover:border-gold-muted transition-colors"
+                    >
+                      <MessageCircle size={16} />
+                      <span className="text-sm">Escalate to {concierge?.name?.split(' ')[0] || 'Concierge'}</span>
+                    </Link>
+                    <Link
+                      href="/consideration"
+                      className="flex items-center gap-2 px-6 py-3 text-stone hover:text-charcoal-deep transition-colors text-sm"
+                    >
+                      View Considerations
+                      <ChevronRight size={16} />
+                    </Link>
+                  </div>
+
+                  <p className="text-xs text-taupe text-center mt-6">
+                    Auto-purchased items ship immediately. Escalate to your concierge for special requests.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleMoveToConsiderations}
+                      disabled={approvedItems.length === 0}
+                      className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <ShoppingBag size={18} />
+                      <span className="text-sm tracking-[0.15em] uppercase">
+                        Move to Considerations ({approvedItems.length})
+                      </span>
+                    </button>
+                    <Link
+                      href="/consideration"
+                      className="flex items-center gap-2 px-6 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.1em] uppercase"
+                    >
+                      View Considerations
+                      <ChevronRight size={16} />
+                    </Link>
+                  </div>
+
+                  <p className="text-xs text-taupe text-center mt-6">
+                    Items moved to Considerations can be reviewed before purchase
+                  </p>
+                </>
+              )}
             </div>
           </>
         )}
