@@ -1,15 +1,21 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Lock, Shield, Truck, Check } from 'lucide-react';
-import { mockConsiderations } from '@/data/mock-data';
+import { useApp } from '@/context/AppContext';
+import type { ConsiderationItem } from '@/types';
 
 type Step = 'details' | 'payment' | 'confirmation';
 
 export default function CheckoutPage() {
+  const router = useRouter();
+  const { considerations, clearConsiderations, addOrder, showToast } = useApp();
   const [currentStep, setCurrentStep] = useState<Step>('details');
+  const [orderId, setOrderId] = useState<string>('');
+  const [orderItems, setOrderItems] = useState<ConsiderationItem[]>([]);
   const [formData, setFormData] = useState({
     email: '',
     firstName: '',
@@ -20,9 +26,20 @@ export default function CheckoutPage() {
     country: '',
     phone: ''
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  const considerations = mockConsiderations;
-  const total = considerations.reduce((sum, item) => sum + item.product.price, 0);
+  // Redirect if no items in cart (but not on confirmation step)
+  useEffect(() => {
+    if (considerations.length === 0 && currentStep !== 'confirmation' && !orderId) {
+      router.push('/consideration');
+    }
+  }, [considerations, currentStep, orderId, router]);
+
+  const total = (currentStep === 'confirmation' ? orderItems : considerations)
+    .reduce((sum, item) => sum + item.product.price, 0);
+
+  const displayItems = currentStep === 'confirmation' ? orderItems : considerations;
 
   const steps = [
     { id: 'details', label: 'Delivery Details' },
@@ -30,15 +47,86 @@ export default function CheckoutPage() {
     { id: 'confirmation', label: 'Confirmation' }
   ];
 
+  const validateField = (name: string, value: string): string => {
+    switch (name) {
+      case 'email':
+        if (!value) return 'Email is required';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Please enter a valid email';
+        return '';
+      case 'firstName':
+        if (!value) return 'First name is required';
+        if (value.length < 2) return 'First name must be at least 2 characters';
+        return '';
+      case 'lastName':
+        if (!value) return 'Last name is required';
+        if (value.length < 2) return 'Last name must be at least 2 characters';
+        return '';
+      case 'address':
+        if (!value) return 'Address is required';
+        return '';
+      case 'city':
+        if (!value) return 'City is required';
+        return '';
+      case 'postalCode':
+        if (!value) return 'Postal code is required';
+        return '';
+      case 'country':
+        if (!value) return 'Country is required';
+        return '';
+      case 'phone':
+        if (!value) return 'Phone is required';
+        if (!/^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/.test(value)) return 'Please enter a valid phone number';
+        return '';
+      default:
+        return '';
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    Object.keys(formData).forEach((key) => {
+      const error = validateField(key, formData[key as keyof typeof formData]);
+      if (error) newErrors[key] = error;
+    });
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    // Clear error when user starts typing
+    if (touched[name]) {
+      setErrors({ ...errors, [name]: validateField(name, value) });
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setTouched({ ...touched, [name]: true });
+    setErrors({ ...errors, [name]: validateField(name, value) });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentStep === 'details') {
+      // Validate form before proceeding
+      if (!validateForm()) {
+        showToast('Please fill in all required fields correctly', 'error');
+        return;
+      }
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
+      // Store items before clearing
+      setOrderItems([...considerations]);
+      // Create order and get order ID
+      const newOrderId = addOrder(considerations, total);
+      setOrderId(newOrderId);
+      // Clear the cart
+      clearConsiderations();
+      // Show success toast
+      showToast('Order placed successfully!', 'success');
+      // Move to confirmation
       setCurrentStep('confirmation');
     }
   };
@@ -100,13 +188,13 @@ export default function CheckoutPage() {
               Thank You for Your Order
             </h2>
             <p className="text-stone mb-8">
-              Order #MG-2024-78432 has been confirmed. You will receive an email confirmation shortly.
+              Order #{orderId} has been confirmed. You will receive an email confirmation shortly.
             </p>
 
             <div className="bg-white rounded-xl p-6 mb-8">
               <h3 className="font-display text-lg text-charcoal-deep mb-4">Order Summary</h3>
               <div className="space-y-4">
-                {considerations.map((item) => (
+                {displayItems.map((item) => (
                   <div key={item.id} className="flex items-center gap-4">
                     <div className="relative w-16 h-16 rounded-lg overflow-hidden">
                       <Image
@@ -164,9 +252,13 @@ export default function CheckoutPage() {
                           name="email"
                           value={formData.email}
                           onChange={handleInputChange}
-                          className="input-luxury"
+                          onBlur={handleBlur}
+                          className={`input-luxury ${errors.email && touched.email ? 'border-error' : ''}`}
                           required
                         />
+                        {errors.email && touched.email && (
+                          <p className="text-error text-sm mt-1">{errors.email}</p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -177,9 +269,13 @@ export default function CheckoutPage() {
                             name="firstName"
                             value={formData.firstName}
                             onChange={handleInputChange}
-                            className="input-luxury"
+                            onBlur={handleBlur}
+                            className={`input-luxury ${errors.firstName && touched.firstName ? 'border-error' : ''}`}
                             required
                           />
+                          {errors.firstName && touched.firstName && (
+                            <p className="text-error text-sm mt-1">{errors.firstName}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-charcoal-deep mb-2">Last Name</label>
@@ -188,9 +284,13 @@ export default function CheckoutPage() {
                             name="lastName"
                             value={formData.lastName}
                             onChange={handleInputChange}
-                            className="input-luxury"
+                            onBlur={handleBlur}
+                            className={`input-luxury ${errors.lastName && touched.lastName ? 'border-error' : ''}`}
                             required
                           />
+                          {errors.lastName && touched.lastName && (
+                            <p className="text-error text-sm mt-1">{errors.lastName}</p>
+                          )}
                         </div>
                       </div>
 
@@ -201,9 +301,13 @@ export default function CheckoutPage() {
                           name="address"
                           value={formData.address}
                           onChange={handleInputChange}
-                          className="input-luxury"
+                          onBlur={handleBlur}
+                          className={`input-luxury ${errors.address && touched.address ? 'border-error' : ''}`}
                           required
                         />
+                        {errors.address && touched.address && (
+                          <p className="text-error text-sm mt-1">{errors.address}</p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-4">
@@ -214,9 +318,13 @@ export default function CheckoutPage() {
                             name="city"
                             value={formData.city}
                             onChange={handleInputChange}
-                            className="input-luxury"
+                            onBlur={handleBlur}
+                            className={`input-luxury ${errors.city && touched.city ? 'border-error' : ''}`}
                             required
                           />
+                          {errors.city && touched.city && (
+                            <p className="text-error text-sm mt-1">{errors.city}</p>
+                          )}
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-charcoal-deep mb-2">Postal Code</label>
@@ -225,9 +333,13 @@ export default function CheckoutPage() {
                             name="postalCode"
                             value={formData.postalCode}
                             onChange={handleInputChange}
-                            className="input-luxury"
+                            onBlur={handleBlur}
+                            className={`input-luxury ${errors.postalCode && touched.postalCode ? 'border-error' : ''}`}
                             required
                           />
+                          {errors.postalCode && touched.postalCode && (
+                            <p className="text-error text-sm mt-1">{errors.postalCode}</p>
+                          )}
                         </div>
                       </div>
 
@@ -238,9 +350,13 @@ export default function CheckoutPage() {
                           name="country"
                           value={formData.country}
                           onChange={handleInputChange}
-                          className="input-luxury"
+                          onBlur={handleBlur}
+                          className={`input-luxury ${errors.country && touched.country ? 'border-error' : ''}`}
                           required
                         />
+                        {errors.country && touched.country && (
+                          <p className="text-error text-sm mt-1">{errors.country}</p>
+                        )}
                       </div>
 
                       <div>
@@ -250,9 +366,13 @@ export default function CheckoutPage() {
                           name="phone"
                           value={formData.phone}
                           onChange={handleInputChange}
-                          className="input-luxury"
+                          onBlur={handleBlur}
+                          className={`input-luxury ${errors.phone && touched.phone ? 'border-error' : ''}`}
                           required
                         />
+                        {errors.phone && touched.phone && (
+                          <p className="text-error text-sm mt-1">{errors.phone}</p>
+                        )}
                       </div>
                     </div>
 
@@ -329,7 +449,7 @@ export default function CheckoutPage() {
                 <h3 className="font-display text-lg text-charcoal-deep mb-6">Order Summary</h3>
 
                 <div className="space-y-4 border-b border-sand pb-6">
-                  {considerations.map((item) => (
+                  {displayItems.map((item) => (
                     <div key={item.id} className="flex gap-4">
                       <div className="relative w-16 h-20 rounded-lg overflow-hidden flex-shrink-0">
                         <Image

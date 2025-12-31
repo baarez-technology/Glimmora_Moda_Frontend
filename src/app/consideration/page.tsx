@@ -1,16 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, ArrowRight, Trash2, Eye, Sparkles, MapPin } from 'lucide-react';
-import { mockConsiderations } from '@/data/mock-data';
+import { useApp } from '@/context/AppContext';
 
 export default function ConsiderationPage() {
-  const [considerations, setConsiderations] = useState(mockConsiderations);
+  const { considerations, removeFromConsiderations, showToast } = useApp();
 
   const removeItem = (id: string) => {
-    setConsiderations(considerations.filter(c => c.id !== id));
+    removeFromConsiderations(id);
   };
 
   const total = considerations.reduce((sum, item) => sum + item.product.price, 0);
@@ -152,7 +151,10 @@ export default function ConsiderationPage() {
                       These pieces create a sophisticated look together. The Lady Dior bag complements
                       the classic lines of the Horsebit Loafers beautifully.
                     </p>
-                    <button className="text-sm text-gold-muted hover:text-gold-deep mt-3 flex items-center gap-1">
+                    <button
+                      onClick={() => showToast('Outfit visualization feature coming soon', 'info')}
+                      className="text-sm text-gold-muted hover:text-gold-deep mt-3 flex items-center gap-1"
+                    >
                       Visualize Together
                       <ArrowRight size={14} />
                     </button>

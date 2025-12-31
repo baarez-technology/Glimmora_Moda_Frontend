@@ -1,11 +1,12 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Clock, Share2, Bookmark, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Clock, Share2, Bookmark, BookmarkCheck, ArrowRight } from 'lucide-react';
 import { getStoryBySlug, brands, products } from '@/data/mock-data';
 import { notFound } from 'next/navigation';
+import { useApp } from '@/context/AppContext';
 
 interface StoryPageProps {
   params: Promise<{ slug: string }>;
@@ -14,6 +15,8 @@ interface StoryPageProps {
 export default function StoryPage({ params }: StoryPageProps) {
   const { slug } = use(params);
   const story = getStoryBySlug(slug);
+  const { showToast } = useApp();
+  const [isBookmarked, setIsBookmarked] = useState(false);
 
   if (!story) {
     notFound();
@@ -23,6 +26,41 @@ export default function StoryPage({ params }: StoryPageProps) {
   const relatedProducts = story.relatedProducts
     .map(id => products.find(p => p.id === id))
     .filter(Boolean);
+
+  const handleBookmark = () => {
+    setIsBookmarked(!isBookmarked);
+    if (!isBookmarked) {
+      showToast('Story saved to your reading list', 'success');
+    } else {
+      showToast('Story removed from reading list', 'info');
+    }
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: story.title,
+      text: story.excerpt,
+      url: window.location.href,
+    };
+
+    if (navigator.share && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (error) {
+        // User cancelled or share failed - copy to clipboard as fallback
+        if ((error as Error).name !== 'AbortError') {
+          copyToClipboard();
+        }
+      }
+    } else {
+      copyToClipboard();
+    }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(window.location.href);
+    showToast('Link copied to clipboard', 'success');
+  };
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -71,10 +109,18 @@ export default function StoryPage({ params }: StoryPageProps) {
       <article className="max-w-3xl mx-auto px-6 lg:px-12 py-16">
         {/* Actions */}
         <div className="flex justify-end gap-4 mb-12 pb-8 border-b border-sand">
-          <button className="p-2 text-stone hover:text-charcoal-deep transition-colors">
-            <Bookmark size={20} />
+          <button
+            onClick={handleBookmark}
+            className={`p-2 transition-colors ${isBookmarked ? 'text-gold-deep' : 'text-stone hover:text-charcoal-deep'}`}
+            aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark story'}
+          >
+            {isBookmarked ? <BookmarkCheck size={20} /> : <Bookmark size={20} />}
           </button>
-          <button className="p-2 text-stone hover:text-charcoal-deep transition-colors">
+          <button
+            onClick={handleShare}
+            className="p-2 text-stone hover:text-charcoal-deep transition-colors"
+            aria-label="Share story"
+          >
             <Share2 size={20} />
           </button>
         </div>

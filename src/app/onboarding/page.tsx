@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ArrowLeft, Sparkles, Check } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
 
 export default function OnboardingPage() {
+  const { showToast } = useApp();
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [selections, setSelections] = useState({
     occasions: [] as string[],
@@ -14,6 +16,19 @@ export default function OnboardingPage() {
     confidence: '',
     budget: ''
   });
+
+  // Load existing fashion identity from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('moda-fashion-identity');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setSelections(parsed);
+      } catch (e) {
+        console.error('Failed to parse stored fashion identity');
+      }
+    }
+  }, []);
 
   const occasionOptions = [
     { id: 'professional', label: 'Professional / Business', icon: '💼' },
@@ -57,7 +72,13 @@ export default function OnboardingPage() {
     const steps: Step[] = ['welcome', 'occasions', 'aesthetics', 'confidence', 'budget', 'complete'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1]);
+      const nextStepValue = steps[currentIndex + 1];
+      // Save to localStorage when completing the flow
+      if (nextStepValue === 'complete') {
+        localStorage.setItem('moda-fashion-identity', JSON.stringify(selections));
+        showToast('Fashion Identity saved successfully!', 'success');
+      }
+      setCurrentStep(nextStepValue);
     }
   };
 

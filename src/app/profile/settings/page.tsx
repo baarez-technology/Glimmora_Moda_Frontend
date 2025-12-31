@@ -2,15 +2,71 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield } from 'lucide-react';
+import { useApp } from '@/context/AppContext';
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { showToast } = useApp();
   const [notifications, setNotifications] = useState({
     newArrivals: true,
     priceChanges: false,
     restockAlerts: true,
     fashionInsights: true
   });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  const handleManageFashionIdentity = () => {
+    router.push('/onboarding');
+  };
+
+  const handleClearBrowsingHistory = () => {
+    localStorage.removeItem('moda-browsing-history');
+    showToast('Browsing history cleared', 'success');
+  };
+
+  const handleDownloadData = () => {
+    // Collect all user data from localStorage
+    const userData = {
+      fashionIdentity: localStorage.getItem('moda-fashion-identity'),
+      considerations: localStorage.getItem('moda-considerations'),
+      wardrobe: localStorage.getItem('moda-wardrobe'),
+      outfits: localStorage.getItem('moda-outfits'),
+      orders: localStorage.getItem('moda-orders'),
+      exportedAt: new Date().toISOString()
+    };
+
+    // Create and download JSON file
+    const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'moda-glimmora-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('Your data has been downloaded', 'success');
+  };
+
+  const handleEnable2FA = () => {
+    showToast('Two-factor authentication setup coming soon', 'info');
+  };
+
+  const handleDeleteAccount = () => {
+    // Clear all localStorage data
+    localStorage.removeItem('moda-fashion-identity');
+    localStorage.removeItem('moda-considerations');
+    localStorage.removeItem('moda-wardrobe');
+    localStorage.removeItem('moda-outfits');
+    localStorage.removeItem('moda-orders');
+    localStorage.removeItem('moda-restock-alerts');
+    localStorage.removeItem('moda-browsing-history');
+    showToast('Account data deleted', 'success');
+    setShowDeleteConfirm(false);
+    router.push('/');
+  };
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -87,7 +143,10 @@ export default function SettingsPage() {
                 <p className="font-medium text-charcoal-deep">Fashion Identity Data</p>
                 <p className="text-sm text-stone">Your preferences and style profile</p>
               </div>
-              <button className="text-sm text-gold-muted hover:text-gold-deep">
+              <button
+                onClick={handleManageFashionIdentity}
+                className="text-sm text-gold-muted hover:text-gold-deep"
+              >
                 Manage
               </button>
             </div>
@@ -96,7 +155,10 @@ export default function SettingsPage() {
                 <p className="font-medium text-charcoal-deep">Browsing History</p>
                 <p className="text-sm text-stone">Products and stories you've viewed</p>
               </div>
-              <button className="text-sm text-gold-muted hover:text-gold-deep">
+              <button
+                onClick={handleClearBrowsingHistory}
+                className="text-sm text-gold-muted hover:text-gold-deep"
+              >
                 Clear
               </button>
             </div>
@@ -105,8 +167,11 @@ export default function SettingsPage() {
                 <p className="font-medium text-charcoal-deep">Download My Data</p>
                 <p className="text-sm text-stone">Get a copy of all your data</p>
               </div>
-              <button className="text-sm text-gold-muted hover:text-gold-deep">
-                Request
+              <button
+                onClick={handleDownloadData}
+                className="text-sm text-gold-muted hover:text-gold-deep"
+              >
+                Download
               </button>
             </div>
           </div>
@@ -135,7 +200,10 @@ export default function SettingsPage() {
                 <p className="font-medium text-charcoal-deep">Two-Factor Authentication</p>
                 <p className="text-sm text-stone">Add an extra layer of security</p>
               </div>
-              <button className="text-sm text-gold-muted hover:text-gold-deep">
+              <button
+                onClick={handleEnable2FA}
+                className="text-sm text-gold-muted hover:text-gold-deep"
+              >
                 Enable
               </button>
             </div>
@@ -179,9 +247,35 @@ export default function SettingsPage() {
           <p className="text-stone mb-4">
             Permanently delete your account and all associated data. This action cannot be undone.
           </p>
-          <button className="px-4 py-2 border border-error text-error rounded hover:bg-error hover:text-ivory-cream transition-colors">
-            Delete Account
-          </button>
+
+          {!showDeleteConfirm ? (
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="px-4 py-2 border border-error text-error rounded hover:bg-error hover:text-ivory-cream transition-colors"
+            >
+              Delete Account
+            </button>
+          ) : (
+            <div className="p-4 bg-error-soft/10 rounded-lg border border-error-soft/30">
+              <p className="text-charcoal-deep font-medium mb-4">
+                Are you sure? This will permanently delete all your data.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 bg-error text-ivory-cream rounded hover:bg-error/90 transition-colors"
+                >
+                  Yes, Delete Everything
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-4 py-2 border border-sand text-charcoal-warm rounded hover:border-charcoal-deep transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
