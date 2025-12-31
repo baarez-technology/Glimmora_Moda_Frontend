@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { User, Heart, ShoppingBag, Settings, ChevronRight, Sparkles, Edit2, Calendar, Clock, MapPin } from 'lucide-react';
-import { mockUser, mockConsiderations, mockCalendarEvents } from '@/data/mock-data';
+import { mockUser, mockConsiderations, mockCalendarEvents, getMockFashionPassport } from '@/data/mock-data';
+import FashionPassport from '@/components/wardrobe/FashionPassport';
 
 export default function ProfilePage() {
   const user = mockUser;
@@ -267,6 +268,14 @@ export default function ProfilePage() {
                 </p>
               )}
             </div>
+
+            {/* Fashion Passport - Authenticity for Owned Items */}
+            {user.wardrobe.length > 0 && (
+              <div>
+                <h2 className="font-display text-xl text-charcoal-deep mb-4">Item Authenticity</h2>
+                <FashionPassport passport={getMockFashionPassport(user.wardrobe[0].productId)} />
+              </div>
+            )}
 
             {/* AGI Insight */}
             <div className="bg-sapphire-deep/5 rounded-xl p-6 border border-sapphire-subtle/20">

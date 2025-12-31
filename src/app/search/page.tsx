@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -9,7 +9,7 @@ import { products, brands, brandStories, collections } from '@/data/mock-data';
 
 type SearchTab = 'all' | 'products' | 'brands' | 'stories' | 'collections';
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
 
@@ -412,5 +412,32 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function SearchFallback() {
+  return (
+    <div className="min-h-screen bg-ivory-cream">
+      <div className="bg-white border-b border-sand">
+        <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-6">
+          <div className="relative max-w-2xl mx-auto">
+            <div className="w-full h-14 bg-parchment rounded-full animate-pulse" />
+          </div>
+        </div>
+      </div>
+      <div className="max-w-[1400px] mx-auto px-6 lg:px-12 py-8">
+        <div className="text-center py-20">
+          <div className="w-20 h-20 bg-parchment rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<SearchFallback />}>
+      <SearchContent />
+    </Suspense>
   );
 }

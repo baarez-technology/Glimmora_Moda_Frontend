@@ -1,14 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Search, Sparkles, ArrowRight } from 'lucide-react';
+import { Search, Sparkles, ArrowRight, SlidersHorizontal } from 'lucide-react';
 import { products, brands, brandStories } from '@/data/mock-data';
+import BudgetFilter from '@/components/shared/BudgetFilter';
 
 export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'products' | 'brands' | 'stories'>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [budgetMin, setBudgetMin] = useState(0);
+  const [budgetMax, setBudgetMax] = useState(50000);
+
+  // Filter products by budget
+  const filteredProducts = useMemo(() => {
+    return products.filter(p => p.price >= budgetMin && p.price <= budgetMax);
+  }, [budgetMin, budgetMax]);
 
   const occasions = [
     { id: 'evening', label: 'Evening & Events', image: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=600&q=80' },
@@ -156,13 +165,47 @@ export default function DiscoverPage() {
               <p className="text-xs tracking-[0.3em] uppercase text-gold-muted mb-2">AGI Curated</p>
               <h2 className="font-display text-2xl text-charcoal-deep">Exceptional Pieces</h2>
             </div>
-            <Link href="/collection/all" className="text-sm text-gold-muted hover:text-gold-deep flex items-center gap-1">
-              View All <ArrowRight size={14} />
-            </Link>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors ${
+                  showFilters ? 'bg-charcoal-deep text-ivory-cream' : 'bg-parchment text-charcoal-deep hover:bg-sand'
+                }`}
+              >
+                <SlidersHorizontal size={16} />
+                Filters
+              </button>
+              <Link href="/collection/all" className="text-sm text-gold-muted hover:text-gold-deep flex items-center gap-1">
+                View All <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
 
+          {/* Budget Filter */}
+          {showFilters && (
+            <div className="mb-8 p-6 bg-white rounded-xl shadow-sm">
+              <div className="max-w-md">
+                <BudgetFilter
+                  minPrice={0}
+                  maxPrice={50000}
+                  currentMin={budgetMin}
+                  currentMax={budgetMax}
+                  onChange={(min, max) => {
+                    setBudgetMin(min);
+                    setBudgetMax(max);
+                  }}
+                />
+              </div>
+              {(budgetMin > 0 || budgetMax < 50000) && (
+                <p className="text-sm text-stone mt-4">
+                  Showing {filteredProducts.length} of {products.length} products
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-            {products.slice(0, 8).map((product) => (
+            {filteredProducts.slice(0, 8).map((product) => (
               <Link
                 key={product.id}
                 href={`/product/${product.slug}`}

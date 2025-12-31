@@ -1,4 +1,4 @@
-import { Brand, Product, Collection, BrandStory, User, ConsiderationItem } from '@/types';
+import { Brand, Product, Collection, BrandStory, User, ConsiderationItem, AvailabilityIntelligence, CompleteOutfit, FitConfidence, DigitalBodyTwin, WardrobeAnalysis, FashionPassport, UserPreferences } from '@/types';
 
 // ============================================
 // BRANDS
@@ -1013,4 +1013,392 @@ export function getUpcomingEvents(days: number = 30): CalendarEvent[] {
 
 export function getEventById(id: string): CalendarEvent | undefined {
   return mockCalendarEvents.find(e => e.id === id);
+}
+
+// ============================================
+// AVAILABILITY INTELLIGENCE (G-SAIL™)
+// ============================================
+
+export function getMockAvailabilityIntelligence(productId: string): AvailabilityIntelligence {
+  const product = products.find(p => p.id === productId);
+  return {
+    productId,
+    currentStatus: product?.availability.status || 'available',
+    localConfidence: 87,
+    alternatives: [
+      {
+        type: 'geography',
+        region: 'Europe',
+        city: 'Milan',
+        availabilityConfidence: 94,
+        deliveryDays: 4,
+        priceDifference: 0,
+        reason: 'Available at the Milan flagship store with verified stock.'
+      },
+      {
+        type: 'geography',
+        region: 'Asia',
+        city: 'Tokyo',
+        availabilityConfidence: 88,
+        deliveryDays: 6,
+        priceDifference: 120,
+        reason: 'In stock at Ginza boutique. Price difference due to regional pricing.'
+      },
+      {
+        type: 'equivalent',
+        availabilityConfidence: 92,
+        reason: 'Similar silhouette and craftsmanship from the same collection.',
+        product: products.find(p => p.id !== productId && p.category === product?.category)
+      }
+    ],
+    restockPrediction: product?.availability.status === 'limited' ? {
+      estimatedDate: '2025-02-15',
+      probability: 75
+    } : undefined,
+    conciergeOption: true
+  };
+}
+
+// ============================================
+// COMPLETE OUTFITS
+// ============================================
+
+export function getMockOutfits(product: Product): CompleteOutfit[] {
+  const relatedProducts = products.filter(p => p.id !== product.id);
+
+  return [
+    {
+      id: 'outfit-1',
+      name: 'Power Professional',
+      occasion: 'Business Meeting',
+      description: 'A commanding yet refined ensemble perfect for important meetings and presentations.',
+      items: [
+        {
+          type: 'suggested',
+          productId: product.id,
+          product: product,
+          category: product.category.charAt(0).toUpperCase() + product.category.slice(1)
+        },
+        {
+          type: 'wardrobe',
+          productId: 'dior-bar-jacket',
+          product: products.find(p => p.id === 'dior-bar-jacket') || relatedProducts[0],
+          category: 'Jacket',
+          note: 'From your wardrobe'
+        },
+        {
+          type: 'suggested',
+          productId: 'gucci-horsebit-loafer',
+          product: products.find(p => p.id === 'gucci-horsebit-loafer') || relatedProducts[1],
+          category: 'Shoes'
+        }
+      ],
+      compatibilityScore: 94,
+      totalPrice: product.price + 3200 + 890,
+      agiReasoning: 'The structured lines of the Bar Jacket complement the sophistication of this piece, while the Horsebit Loafers ground the look with Italian craftsmanship. This combination projects confidence and refined taste.'
+    },
+    {
+      id: 'outfit-2',
+      name: 'Gallery Evening',
+      occasion: 'Art & Culture',
+      description: 'An artistically sophisticated look for cultural events and gallery openings.',
+      items: [
+        {
+          type: 'suggested',
+          productId: product.id,
+          product: product,
+          category: product.category.charAt(0).toUpperCase() + product.category.slice(1)
+        },
+        {
+          type: 'suggested',
+          productId: 'bottega-cassette',
+          product: products.find(p => p.id === 'bottega-cassette') || relatedProducts[2],
+          category: 'Bag',
+          note: 'The intrecciato weave adds artistic texture'
+        },
+        {
+          type: 'suggested',
+          productId: 'hermes-silk-scarf',
+          product: products.find(p => p.id === 'hermes-silk-scarf') || relatedProducts[3],
+          category: 'Accessory'
+        }
+      ],
+      compatibilityScore: 91,
+      totalPrice: product.price + 3200 + 450,
+      agiReasoning: 'For cultural environments, this ensemble balances artistic expression with understated luxury. The Bottega intrecciato weave resonates with craft appreciation, while the Hermès scarf adds a touch of heritage artistry.'
+    },
+    {
+      id: 'outfit-3',
+      name: 'Weekend Elegance',
+      occasion: 'Brunch & Leisure',
+      description: 'Effortlessly chic for relaxed yet refined weekend occasions.',
+      items: [
+        {
+          type: 'suggested',
+          productId: product.id,
+          product: product,
+          category: product.category.charAt(0).toUpperCase() + product.category.slice(1)
+        },
+        {
+          type: 'suggested',
+          productId: 'gucci-jackie-1961',
+          product: products.find(p => p.id === 'gucci-jackie-1961') || relatedProducts[0],
+          category: 'Bag',
+          note: 'Iconic relaxed sophistication'
+        }
+      ],
+      compatibilityScore: 88,
+      totalPrice: product.price + 2950,
+      agiReasoning: 'The Jackie bag\'s curved silhouette brings a relaxed elegance that perfectly complements weekend styling while maintaining an air of refined taste.'
+    }
+  ];
+}
+
+// ============================================
+// FIT CONFIDENCE
+// ============================================
+
+export const mockFitConfidence: FitConfidence = {
+  overallScore: 87,
+  suggestedSize: 'FR 38',
+  breakdown: {
+    sizeMatch: 92,
+    styleMatch: 85,
+    proportionMatch: 84
+  },
+  sizeNotes: [
+    'Based on your measurements, size FR 38 should fit comfortably through the shoulders',
+    'The structured waist will sit at your natural waistline',
+    'Sleeve length is optimal for your proportions'
+  ],
+  returnRisk: 'low',
+  recommendation: 'Based on your Body Twin profile and previous purchases, this piece should fit beautifully. The structured silhouette complements your style preferences for classic tailoring.'
+};
+
+// ============================================
+// DIGITAL BODY TWIN
+// ============================================
+
+export const mockBodyTwin: DigitalBodyTwin = {
+  id: 'bt-user-1',
+  userId: 'user-1',
+  silhouette: 'average',
+  measurements: {
+    height: 168,
+    chest: 88,
+    waist: 68,
+    hips: 96,
+    inseam: 78,
+    shoulders: 38
+  },
+  fitPreferences: {
+    tops: 'fitted',
+    bottoms: 'relaxed',
+    dresses: 'fitted'
+  },
+  proportions: {
+    shoulder: 'medium',
+    torso: 'medium',
+    legs: 'medium'
+  },
+  preferredFit: 'fitted',
+  createdAt: '2024-06-15T10:00:00Z',
+  updatedAt: '2024-12-20T14:30:00Z'
+};
+
+// ============================================
+// WARDROBE ANALYSIS
+// ============================================
+
+export const mockWardrobeAnalysis: WardrobeAnalysis = {
+  totalPieces: 24,
+  versatilityScore: 78,
+  categories: {
+    bags: 4,
+    clothing: 12,
+    shoes: 5,
+    accessories: 3
+  },
+  occasionCoverage: {
+    professional: 85,
+    evening: 70,
+    casual: 90,
+    formal: 45,
+    travel: 60
+  },
+  gaps: [
+    {
+      id: 'gap-1',
+      category: 'Evening Clutch',
+      priority: 'essential',
+      reason: 'Your wardrobe lacks a formal evening bag for black-tie events.',
+      occasionsUnlocked: ['Gala', 'Opera', 'Formal Dinner'],
+      suggestedProducts: products.filter(p => p.category === 'bags').slice(0, 2)
+    },
+    {
+      id: 'gap-2',
+      category: 'Silk Scarf',
+      priority: 'recommended',
+      reason: 'A versatile silk scarf would add styling options to your existing pieces.',
+      occasionsUnlocked: ['Professional', 'Travel', 'Art Events'],
+      suggestedProducts: products.filter(p => p.id === 'hermes-silk-scarf')
+    },
+    {
+      id: 'gap-3',
+      category: 'Classic Pumps',
+      priority: 'nice-to-have',
+      reason: 'Black pumps would complete several professional and evening ensembles.',
+      occasionsUnlocked: ['Professional', 'Evening', 'Cocktail'],
+      suggestedProducts: products.filter(p => p.category === 'shoes').slice(0, 2)
+    }
+  ],
+  styleBalance: 'Classic-Contemporary',
+  agiInsight: 'Your wardrobe shows a strong foundation in classic pieces with contemporary touches. To maximize versatility, consider adding more transitional pieces that work across multiple occasions. The current gap in formal accessories limits your evening options.'
+};
+
+// ============================================
+// FASHION PASSPORT (AUTHENTICITY)
+// ============================================
+
+// ============================================
+// USER PREFERENCES
+// ============================================
+
+export const mockUserPreferences: UserPreferences = {
+  id: 'pref-1',
+  userId: 'user-1',
+  notifications: {
+    restockAlerts: true,
+    newArrivals: false,
+    priceChanges: true,
+    outfitSuggestions: true,
+    eventReminders: true
+  },
+  privacy: {
+    shareWardrobeInsights: true,
+    allowAGILearning: true,
+    shareStylePreferences: true
+  },
+  shopping: {
+    budgetMin: 500,
+    budgetMax: 15000,
+    preferredBrands: ['bottega-veneta', 'celine', 'the-row'],
+    excludedCategories: []
+  },
+  display: {
+    currency: 'EUR',
+    measurementUnit: 'metric'
+  }
+};
+
+// ============================================
+// RESTOCK NOTIFICATIONS
+// ============================================
+
+export const mockRestockNotifications = [
+  {
+    id: 'rn-1',
+    productId: 'hermes-birkin-30',
+    product: products.find(p => p.id === 'hermes-birkin-30')!,
+    status: 'watching',
+    createdAt: '2024-12-15T10:00:00Z',
+    preferredSize: 'Birkin 30',
+    preferredColor: 'Noir'
+  },
+  {
+    id: 'rn-2',
+    productId: 'dior-lady-dior-small',
+    product: products.find(p => p.id === 'dior-lady-dior-small')!,
+    status: 'available',
+    createdAt: '2024-12-20T14:30:00Z',
+    notifiedAt: '2024-12-28T09:00:00Z',
+    preferredSize: 'Large',
+    preferredColor: 'Cherry Red'
+  },
+  {
+    id: 'rn-3',
+    productId: 'bottega-cassette',
+    product: products.find(p => p.id === 'bottega-cassette')!,
+    status: 'notified',
+    createdAt: '2024-12-10T08:00:00Z',
+    notifiedAt: '2024-12-25T11:00:00Z',
+    preferredSize: 'Medium',
+    preferredColor: 'Bottega Green'
+  }
+];
+
+// ============================================
+// SILENT CART
+// ============================================
+
+export const mockSilentCart = {
+  id: 'sc-1',
+  userId: 'user-1',
+  items: [
+    {
+      productId: 'gucci-jackie-1961',
+      product: products.find(p => p.id === 'gucci-jackie-1961')!,
+      addedAt: '2024-12-20T10:00:00Z',
+      reason: 'Browsed multiple times and matches your aesthetic preferences',
+      confidence: 88,
+      occasion: 'Gallery Opening',
+      expiresAt: '2025-01-15T23:59:59Z'
+    },
+    {
+      productId: 'hermes-silk-scarf',
+      product: products.find(p => p.id === 'hermes-silk-scarf')!,
+      addedAt: '2024-12-22T15:30:00Z',
+      reason: 'Complements items in your wardrobe and fills a style gap',
+      confidence: 92,
+      occasion: 'Business Meeting',
+      expiresAt: '2025-01-10T23:59:59Z'
+    }
+  ],
+  totalValue: (products.find(p => p.id === 'gucci-jackie-1961')?.price || 0) +
+              (products.find(p => p.id === 'hermes-silk-scarf')?.price || 0),
+  lastUpdated: '2024-12-28T10:00:00Z',
+  agiExplanation: 'Based on your browsing patterns, style preferences, and upcoming calendar events, I\'ve quietly prepared these items for your consideration. Each piece has been selected to complement your existing wardrobe and align with your aesthetic.'
+};
+
+export function getMockFashionPassport(productId: string): FashionPassport {
+  const product = products.find(p => p.id === productId);
+
+  return {
+    id: `passport-${productId}`,
+    productId,
+    serialNumber: `MGP-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    authenticity: {
+      verified: true,
+      verifiedAt: '2024-12-28T10:30:00Z',
+      verificationMethod: 'NFC chip + visual inspection'
+    },
+    provenance: {
+      createdIn: product?.materials[0]?.origin || 'France',
+      createdAt: '2024-10-15T00:00:00Z',
+      artisans: product?.craftsmanship[0]?.artisans || 1,
+      craftingHours: parseInt(product?.craftsmanship[0]?.duration?.replace(/\D/g, '') || '8')
+    },
+    materials: (product?.materials || []).map(m => ({
+      name: m.name,
+      origin: m.origin,
+      certification: m.sustainability ? 'Certified Sustainable' : undefined,
+      sustainability: m.sustainability
+    })),
+    ownership: {
+      currentOwner: 'Sophia Chen',
+      purchaseDate: '2024-12-28T00:00:00Z',
+      transferHistory: []
+    },
+    care: {
+      servicingAvailable: true,
+      warrantyExpires: '2026-12-28T00:00:00Z',
+      instructions: [
+        'Store in dust bag when not in use',
+        'Avoid exposure to direct sunlight',
+        'Clean with soft, dry cloth only',
+        'Keep away from water and moisture',
+        'Professional cleaning recommended annually'
+      ]
+    }
+  };
 }

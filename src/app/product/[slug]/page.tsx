@@ -4,8 +4,11 @@ import { use, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Heart, Share2, Sparkles, Eye, ChevronDown, MapPin, Clock, Check, X } from 'lucide-react';
-import { getProductBySlug, brands, products as allProducts } from '@/data/mock-data';
+import { getProductBySlug, brands, products as allProducts, getMockAvailabilityIntelligence, getMockOutfits, mockFitConfidence, mockBodyTwin } from '@/data/mock-data';
 import { notFound } from 'next/navigation';
+import AvailabilityIntelligence from '@/components/product/AvailabilityIntelligence';
+import OutfitSuggestions from '@/components/product/OutfitSuggestions';
+import FitConfidenceCard from '@/components/product/FitConfidenceCard';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -23,7 +26,6 @@ export default function ProductPage({ params }: ProductPageProps) {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [showIV, setShowIV] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
-  const [showAvailability, setShowAvailability] = useState(false);
 
   const brand = brands.find(b => b.id === product.brandId);
   const sizeVariants = product.variants.filter(v => v.type === 'size');
@@ -32,6 +34,10 @@ export default function ProductPage({ params }: ProductPageProps) {
   const relatedProducts = allProducts
     .filter(p => p.brandId === product.brandId && p.id !== product.id)
     .slice(0, 3);
+
+  // Get mock data for intelligent components
+  const availabilityIntelligence = getMockAvailabilityIntelligence(product.id);
+  const outfitSuggestions = getMockOutfits(product);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -174,47 +180,21 @@ export default function ProductPage({ params }: ProductPageProps) {
               </div>
             )}
 
-            {/* Availability */}
+            {/* Fit Confidence Card */}
             <div className="mb-8">
-              <button
-                onClick={() => setShowAvailability(!showAvailability)}
-                className="flex items-center justify-between w-full py-3 border-b border-sand"
-              >
-                <div className="flex items-center gap-2">
-                  <MapPin size={16} className="text-stone" />
-                  <span className="text-sm font-medium text-charcoal-deep">Check Availability</span>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`text-stone transition-transform ${showAvailability ? 'rotate-180' : ''}`}
-                />
-              </button>
+              <FitConfidenceCard
+                fitConfidence={mockFitConfidence}
+                bodyTwin={mockBodyTwin}
+                selectedSize={selectedSize}
+              />
+            </div>
 
-              {showAvailability && (
-                <div className="py-4 space-y-3">
-                  {product.availability.regions.map((region, index) => (
-                    <div key={index} className="flex items-center justify-between py-2">
-                      <div>
-                        <p className="text-sm text-charcoal-deep">{region.city}</p>
-                        <p className="text-xs text-greige">{region.deliveryDays} day delivery</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {region.available ? (
-                          <>
-                            <span className="text-sm text-success">{region.confidence}% confidence</span>
-                            <Check size={16} className="text-success" />
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-sm text-greige">Not available</span>
-                            <X size={16} className="text-error-soft" />
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* G-SAIL™ Availability Intelligence */}
+            <div className="mb-8">
+              <AvailabilityIntelligence
+                availability={availabilityIntelligence}
+                onNotifyRestock={() => alert('You will be notified when this item is back in stock.')}
+              />
             </div>
 
             {/* Actions */}
@@ -310,6 +290,9 @@ export default function ProductPage({ params }: ProductPageProps) {
           </div>
         </div>
       </section>
+
+      {/* Outfit Suggestions - Complete the Look */}
+      <OutfitSuggestions product={product} outfits={outfitSuggestions} />
 
       {/* Related Products */}
       {relatedProducts.length > 0 && (

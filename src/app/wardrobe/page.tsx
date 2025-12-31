@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Plus, Grid, List, Sparkles, Calendar, Tag } from 'lucide-react';
-import { mockUser, products } from '@/data/mock-data';
+import { mockUser, products, mockWardrobeAnalysis } from '@/data/mock-data';
+import WardrobeGapAnalysis from '@/components/wardrobe/WardrobeGapAnalysis';
 
 export default function WardrobePage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -189,28 +190,6 @@ export default function WardrobePage() {
               </button>
             </div>
 
-            {/* Wardrobe Gaps */}
-            <div className="bg-sapphire-deep/5 rounded-xl p-6 border border-sapphire-subtle/20">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles size={18} className="text-sapphire-subtle" />
-                <h3 className="font-medium text-charcoal-deep">Wardrobe Gaps</h3>
-              </div>
-              <p className="text-sm text-stone">
-                Based on your occasions, consider adding:
-              </p>
-              <ul className="mt-3 space-y-2 text-sm text-charcoal-deep">
-                <li>• Evening clutch for formal events</li>
-                <li>• Versatile silk scarf</li>
-                <li>• Classic pumps in black</li>
-              </ul>
-              <Link
-                href="/discover"
-                className="inline-flex items-center gap-1 text-sm text-sapphire-subtle hover:text-sapphire-deep mt-4"
-              >
-                Explore Suggestions
-              </Link>
-            </div>
-
             {/* Stats */}
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h3 className="font-display text-lg text-charcoal-deep mb-4">Wardrobe Stats</h3>
@@ -234,6 +213,11 @@ export default function WardrobePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Wardrobe Gap Analysis - Full Width Section */}
+        <div className="mt-12">
+          <WardrobeGapAnalysis analysis={mockWardrobeAnalysis} />
         </div>
       </div>
     </div>
