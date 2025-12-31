@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Sparkles, Shield } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield } from 'lucide-react';
 import { mockCalendarConnections } from '@/data/mock-data';
 import type { CalendarProvider } from '@/types';
 
@@ -18,21 +18,21 @@ const calendarProviders: CalendarProviderInfo[] = [
   {
     id: 'google',
     name: 'Google Calendar',
-    icon: '📅',
+    icon: 'G',
     color: 'bg-blue-500',
     description: 'Connect your Google Calendar to sync events automatically'
   },
   {
     id: 'apple',
     name: 'Apple Calendar',
-    icon: '🍎',
+    icon: 'A',
     color: 'bg-gray-800',
     description: 'Sync events from your iCloud Calendar'
   },
   {
     id: 'outlook',
     name: 'Outlook Calendar',
-    icon: '📧',
+    icon: 'O',
     color: 'bg-blue-600',
     description: 'Connect your Microsoft Outlook calendar'
   }
@@ -41,9 +41,13 @@ const calendarProviders: CalendarProviderInfo[] = [
 export default function CalendarSettingsPage() {
   const [connections, setConnections] = useState(mockCalendarConnections);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIsLoaded(true);
+  }, []);
 
   const handleConnect = (providerId: CalendarProvider) => {
-    // Simulate connection
     setConnections(prev =>
       prev.map(c =>
         c.provider === providerId
@@ -65,7 +69,6 @@ export default function CalendarSettingsPage() {
 
   const handleSync = async (providerId: CalendarProvider) => {
     setSyncing(providerId);
-    // Simulate sync delay
     await new Promise(resolve => setTimeout(resolve, 2000));
     setConnections(prev =>
       prev.map(c =>
@@ -84,62 +87,67 @@ export default function CalendarSettingsPage() {
   return (
     <div className="min-h-screen bg-ivory-cream">
       {/* Header */}
-      <div className="bg-white border-b border-sand">
-        <div className="max-w-[800px] mx-auto px-6 lg:px-12 py-8">
+      <div className="bg-charcoal-deep">
+        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
             href="/calendar"
-            className="inline-flex items-center gap-2 text-sm text-stone hover:text-charcoal-deep transition-colors mb-6"
+            className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
             Back to Style Calendar
           </Link>
 
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gold-muted/20 rounded-full flex items-center justify-center">
-              <Calendar size={20} className="text-gold-deep" />
+          <div className={`flex items-center gap-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <div className="w-14 h-14 bg-gold-soft/20 flex items-center justify-center">
+              <Calendar size={28} className="text-gold-soft" />
             </div>
             <div>
-              <h1 className="font-display text-2xl md:text-3xl text-charcoal-deep">
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-2">
+                Integrations
+              </span>
+              <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
                 Calendar Settings
               </h1>
-              <p className="text-stone">Connect your calendars for personalized outfit suggestions</p>
+              <p className="text-sand mt-2">Connect your calendars for personalized outfit suggestions</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-[800px] mx-auto px-6 lg:px-12 py-8 space-y-8">
+      <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 space-y-8 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         {/* How It Works */}
-        <div className="bg-sapphire-deep/5 rounded-xl p-6 border border-sapphire-subtle/20">
-          <div className="flex items-start gap-3">
-            <Sparkles size={20} className="text-sapphire-mist flex-shrink-0 mt-0.5" />
+        <div className="bg-parchment p-6 border border-sand">
+          <div className="flex items-start gap-4">
+            <div className="w-8 h-8 bg-charcoal-deep flex items-center justify-center flex-shrink-0">
+              <span className="text-ivory-cream text-sm font-medium">?</span>
+            </div>
             <div>
-              <h3 className="font-medium text-charcoal-deep mb-2">How Style Calendar Works</h3>
-              <ul className="space-y-2 text-sm text-stone">
-                <li className="flex items-start gap-2">
-                  <span className="text-sapphire-mist">1.</span>
+              <h3 className="font-medium text-charcoal-deep mb-3">How Style Calendar Works</h3>
+              <ol className="space-y-2 text-sm text-stone">
+                <li className="flex items-start gap-3">
+                  <span className="text-charcoal-deep font-medium">01</span>
                   Connect your calendar to sync upcoming events
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-sapphire-mist">2.</span>
-                  Our Fashion Intelligence analyzes each event type, venue, and weather
+                <li className="flex items-start gap-3">
+                  <span className="text-charcoal-deep font-medium">02</span>
+                  Our system analyzes each event type, venue, and weather
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-sapphire-mist">3.</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-charcoal-deep font-medium">03</span>
                   Receive personalized outfit suggestions combining your wardrobe with new pieces
                 </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-sapphire-mist">4.</span>
+                <li className="flex items-start gap-3">
+                  <span className="text-charcoal-deep font-medium">04</span>
                   Save looks and add items to your considerations with one click
                 </li>
-              </ul>
+              </ol>
             </div>
           </div>
         </div>
 
         {/* Connected Calendars */}
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="font-display text-xl text-charcoal-deep mb-6">Calendar Connections</h2>
+        <div className="bg-white p-8">
+          <h2 className="font-display text-xl text-charcoal-deep mb-8">Calendar Connections</h2>
 
           <div className="space-y-4">
             {calendarProviders.map((provider) => {
@@ -149,20 +157,20 @@ export default function CalendarSettingsPage() {
               return (
                 <div
                   key={provider.id}
-                  className={`p-4 rounded-xl border transition-all ${
+                  className={`p-5 border transition-all ${
                     isConnected ? 'border-success/30 bg-success/5' : 'border-sand'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 ${provider.color} rounded-xl flex items-center justify-center text-2xl`}>
+                      <div className={`w-12 h-12 ${provider.color} flex items-center justify-center text-white font-bold`}>
                         {provider.icon}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <h3 className="font-medium text-charcoal-deep">{provider.name}</h3>
                           {isConnected && (
-                            <span className="flex items-center gap-1 px-2 py-0.5 bg-success/20 text-success text-xs rounded-full">
+                            <span className="flex items-center gap-1 px-2 py-0.5 bg-success/20 text-success text-xs">
                               <Check size={12} />
                               Connected
                             </span>
@@ -171,7 +179,7 @@ export default function CalendarSettingsPage() {
                         {isConnected && connection?.email ? (
                           <p className="text-sm text-stone">{connection.email}</p>
                         ) : (
-                          <p className="text-sm text-greige">{provider.description}</p>
+                          <p className="text-sm text-taupe">{provider.description}</p>
                         )}
                       </div>
                     </div>
@@ -198,7 +206,7 @@ export default function CalendarSettingsPage() {
                       ) : (
                         <button
                           onClick={() => handleConnect(provider.id)}
-                          className="flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream rounded-lg text-sm hover:bg-noir transition-colors"
+                          className="flex items-center gap-2 px-5 py-2 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
                         >
                           <Plus size={16} />
                           Connect
@@ -208,8 +216,8 @@ export default function CalendarSettingsPage() {
                   </div>
 
                   {isConnected && connection?.lastSynced && (
-                    <div className="mt-3 pt-3 border-t border-sand/50 flex items-center justify-between text-sm">
-                      <span className="text-greige">
+                    <div className="mt-4 pt-4 border-t border-sand/50 flex items-center justify-between text-sm">
+                      <span className="text-taupe">
                         Last synced: {new Date(connection.lastSynced).toLocaleString()}
                       </span>
                       {connection.calendarsSelected && (
@@ -226,61 +234,54 @@ export default function CalendarSettingsPage() {
         </div>
 
         {/* Manual Event */}
-        <div className="bg-white rounded-xl p-6 shadow-sm">
+        <div className="bg-white p-8">
           <h2 className="font-display text-xl text-charcoal-deep mb-4">Add Event Manually</h2>
-          <p className="text-stone text-sm mb-4">
+          <p className="text-stone text-sm mb-6">
             Don't want to connect a calendar? You can add events manually to get outfit suggestions.
           </p>
-          <button className="btn-secondary">
-            <Plus size={18} />
+          <button className="flex items-center gap-2 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.15em] uppercase">
+            <Plus size={16} />
             Add Manual Event
           </button>
         </div>
 
         {/* Preferences */}
-        <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="font-display text-xl text-charcoal-deep mb-6">Suggestion Preferences</h2>
+        <div className="bg-white p-8">
+          <h2 className="font-display text-xl text-charcoal-deep mb-8">Suggestion Preferences</h2>
 
-          <div className="space-y-4">
-            <label className="flex items-center justify-between p-4 bg-parchment rounded-lg cursor-pointer">
-              <div>
-                <p className="font-medium text-charcoal-deep">Include weather in suggestions</p>
-                <p className="text-sm text-stone">Factor in weather conditions for outfit recommendations</p>
-              </div>
-              <input type="checkbox" defaultChecked className="w-5 h-5 rounded border-sand text-gold-muted focus:ring-gold-muted" />
-            </label>
-
-            <label className="flex items-center justify-between p-4 bg-parchment rounded-lg cursor-pointer">
-              <div>
-                <p className="font-medium text-charcoal-deep">Prioritize wardrobe items</p>
-                <p className="text-sm text-stone">Show items from your Digital Wardrobe first</p>
-              </div>
-              <input type="checkbox" defaultChecked className="w-5 h-5 rounded border-sand text-gold-muted focus:ring-gold-muted" />
-            </label>
-
-            <label className="flex items-center justify-between p-4 bg-parchment rounded-lg cursor-pointer">
-              <div>
-                <p className="font-medium text-charcoal-deep">Daily outfit reminders</p>
-                <p className="text-sm text-stone">Get a notification with outfit ideas for tomorrow's events</p>
-              </div>
-              <input type="checkbox" className="w-5 h-5 rounded border-sand text-gold-muted focus:ring-gold-muted" />
-            </label>
-
-            <label className="flex items-center justify-between p-4 bg-parchment rounded-lg cursor-pointer">
-              <div>
-                <p className="font-medium text-charcoal-deep">Suggest new pieces</p>
-                <p className="text-sm text-stone">Include product recommendations to complete your looks</p>
-              </div>
-              <input type="checkbox" defaultChecked className="w-5 h-5 rounded border-sand text-gold-muted focus:ring-gold-muted" />
-            </label>
+          <div className="space-y-1">
+            {[
+              { label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations', checked: true },
+              { label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first', checked: true },
+              { label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events", checked: false },
+              { label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks', checked: true }
+            ].map((item, index) => (
+              <label key={index} className="flex items-center justify-between p-5 bg-parchment cursor-pointer">
+                <div>
+                  <p className="font-medium text-charcoal-deep">{item.label}</p>
+                  <p className="text-sm text-stone">{item.desc}</p>
+                </div>
+                <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${
+                  item.checked
+                    ? 'border-charcoal-deep bg-charcoal-deep'
+                    : 'border-sand'
+                }`}>
+                  {item.checked && (
+                    <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </div>
+              </label>
+            ))}
           </div>
         </div>
 
         {/* Privacy Note */}
-        <div className="flex items-start gap-3 p-4 bg-parchment rounded-xl text-sm">
+        <div className="flex items-start gap-4 p-6 bg-parchment border border-sand text-sm">
           <Shield size={18} className="text-stone flex-shrink-0 mt-0.5" />
           <div className="text-stone">
-            <p className="font-medium text-charcoal-deep mb-1">Your privacy matters</p>
+            <p className="font-medium text-charcoal-deep mb-2">Your privacy matters</p>
             <p>
               We only read event titles, times, and locations to provide outfit suggestions.
               Your calendar data is never shared or used for advertising.
