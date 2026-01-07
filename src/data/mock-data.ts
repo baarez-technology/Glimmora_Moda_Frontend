@@ -11,7 +11,7 @@ export const brands: Brand[] = [
     slug: 'dior',
     tagline: 'The Art of Elegance Since 1946',
     description: 'Founded by Christian Dior, the House of Dior has been setting the standard for haute couture and ready-to-wear fashion for over seven decades.',
-    heroImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1920&q=80',
     logoUrl: '/images/brands/dior-logo.svg',
     heritage: {
       founded: 1946,
@@ -28,7 +28,7 @@ export const brands: Brand[] = [
     slug: 'gucci',
     tagline: 'Redefining Luxury for the Modern World',
     description: 'From Florence to the world, Gucci represents the pinnacle of Italian craftsmanship combined with contemporary vision.',
-    heroImage: 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=1920&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&q=80',
     logoUrl: '/images/brands/gucci-logo.svg',
     heritage: {
       founded: 1921,
@@ -45,7 +45,7 @@ export const brands: Brand[] = [
     slug: 'bottega-veneta',
     tagline: 'When Your Own Initials Are Enough',
     description: 'Known for its signature intrecciato weave, Bottega Veneta epitomizes understated luxury and exceptional craftsmanship.',
-    heroImage: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=1920&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1920&q=80',
     logoUrl: '/images/brands/bottega-logo.svg',
     heritage: {
       founded: 1966,
@@ -62,7 +62,7 @@ export const brands: Brand[] = [
     slug: 'hermes',
     tagline: 'Artisan Contemporary Since 1837',
     description: 'From equestrian beginnings to global luxury house, Hermès represents the finest in French savoir-faire.',
-    heroImage: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=1920&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=1920&q=80',
     logoUrl: '/images/brands/hermes-logo.svg',
     heritage: {
       founded: 1837,
@@ -79,7 +79,7 @@ export const brands: Brand[] = [
     slug: 'louis-vuitton',
     tagline: 'The Art of Travel',
     description: 'From legendary trunks to contemporary fashion, Louis Vuitton continues to inspire journeys both physical and imaginary.',
-    heroImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=1920&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=1920&q=80',
     logoUrl: '/images/brands/lv-logo.svg',
     heritage: {
       founded: 1854,
