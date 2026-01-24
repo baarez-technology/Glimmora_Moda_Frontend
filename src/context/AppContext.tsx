@@ -2,36 +2,25 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity } from '@/types';
-import { products, mockCalendarEvents, mockUserTier, mockConcierge, mockAutonomousSettings, mockSourcingRequests, mockBespokeOrders, mockAutonomousActivity } from '@/data/mock-data';
+import { mockCalendarEvents } from '@/data/mock-data';
 
-// Toast types
-export interface Toast {
-  id: string;
-  message: string;
-  type: 'success' | 'error' | 'info';
-  duration?: number;
-}
+// Import focused hooks
+import {
+  useToasts,
+  useConsiderations,
+  useWardrobeState,
+  useSavedOutfits,
+  useRestockAlerts,
+  useOrders,
+  useUHNIFeatures,
+  type Toast,
+  type SavedOutfit,
+  type RestockAlert,
+  type OrderRecord
+} from './hooks';
 
-// Saved outfit type
-export interface SavedOutfit {
-  id: string;
-  name: string;
-  eventId?: string;
-  items: string[]; // product IDs
-  savedAt: string;
-}
-
-// Restock alert type
-export interface RestockAlert {
-  id: string;
-  productId: string;
-  product: Product;
-  preferredSize?: string;
-  preferredColor?: string;
-  status: 'watching' | 'available' | 'notified';
-  createdAt: string;
-  notifiedAt?: string;
-}
+// Re-export types for backwards compatibility
+export type { Toast, SavedOutfit, RestockAlert, OrderRecord };
 
 interface AppContextType {
   // Considerations (Cart)
@@ -46,6 +35,10 @@ interface AppContextType {
   addToWardrobe: (product: Product) => void;
   removeFromWardrobe: (id: string) => void;
   isInWardrobe: (productId: string) => boolean;
+
+  // Wishlist (TODO: Implement full wishlist functionality)
+  wishlist: WardrobeItem[];
+  removeFromWishlist: (id: string) => void;
 
   // Saved Outfits
   savedOutfits: SavedOutfit[];
@@ -73,6 +66,7 @@ interface AppContextType {
   // UHNI Features
   userTier: UserTier;
   isUHNI: boolean;
+  isHydrated: boolean;
   concierge: PersonalConcierge | null;
   autonomousSettings: AutonomousShoppingSettings | null;
   sourcingRequests: SourcingRequest[];
@@ -80,63 +74,101 @@ interface AppContextType {
   autonomousActivity: AutonomousActivity[];
   updateAutonomousSettings: (settings: Partial<AutonomousShoppingSettings>) => void;
   setUserRole: (tier: UserTier) => void;
-}
-
-export interface OrderRecord {
-  id: string;
-  items: ConsiderationItem[];
-  total: number;
-  status: 'confirmed' | 'processing' | 'shipped' | 'delivered';
-  createdAt: string;
-  estimatedDelivery: string;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  // Initialize state from localStorage or defaults
-  const [considerations, setConsiderations] = useState<ConsiderationItem[]>([]);
-  const [wardrobe, setWardrobe] = useState<WardrobeItem[]>([]);
-  const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
-  const [restockAlerts, setRestockAlerts] = useState<RestockAlert[]>([]);
-  const [orders, setOrders] = useState<OrderRecord[]>([]);
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const [calendarEvents] = useState<CalendarEvent[]>(mockCalendarEvents);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [calendarEvents] = useState<CalendarEvent[]>(mockCalendarEvents);
 
-  // UHNI State - Load from localStorage or default to mock data
-  const [userTier, setUserTier] = useState<UserTier>('standard');
-  const isUHNI = userTier === 'uhni';
+  // Wishlist state (TODO: Move to dedicated hook)
+  const [wishlist, setWishlist] = useState<WardrobeItem[]>([]);
 
-  // Load user tier from localStorage on mount
-  useEffect(() => {
-    const storedTier = localStorage.getItem('moda-user-tier') as UserTier | null;
-    if (storedTier && ['standard', 'preferred', 'uhni'].includes(storedTier)) {
-      setUserTier(storedTier);
+  // Toast notifications
+  const { toasts, showToast, dismissToast } = useToasts();
+
+  // Safe localStorage save helper
+  const safeLocalStorageSave = useCallback((key: string, value: unknown) => {
+    if (!isHydrated) return;
+
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.error(`Failed to save ${key} to localStorage:`, error);
+
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        showToast('Storage limit reached. Please clear some data.', 'error');
+      } else {
+        showToast('Failed to save data. Please try again.', 'error');
+      }
     }
-  }, []);
+  }, [isHydrated, showToast]);
 
-  // UHNI-specific data (only loaded for UHNI users)
-  const concierge = isUHNI ? mockConcierge : null;
-  const [autonomousSettings, setAutonomousSettings] = useState<AutonomousShoppingSettings | null>(null);
-  const [sourcingRequests] = useState<SourcingRequest[]>(mockSourcingRequests);
-  const [bespokeOrders] = useState<BespokeOrder[]>(mockBespokeOrders);
-  const [autonomousActivity] = useState<AutonomousActivity[]>(mockAutonomousActivity);
+  // Domain-specific hooks
+  const {
+    considerations,
+    setConsiderations,
+    addToConsiderations,
+    removeFromConsiderations,
+    clearConsiderations,
+    isInConsiderations,
+    persistConsiderations
+  } = useConsiderations({ showToast, safeLocalStorageSave });
 
-  // Update autonomous settings when tier changes
-  useEffect(() => {
-    if (isUHNI) {
-      setAutonomousSettings(mockAutonomousSettings);
-    } else {
-      setAutonomousSettings(null);
-    }
-  }, [isUHNI]);
+  const {
+    wardrobe,
+    setWardrobe,
+    initializeWardrobe,
+    addToWardrobe,
+    removeFromWardrobe,
+    isInWardrobe,
+    persistWardrobe
+  } = useWardrobeState({ showToast, safeLocalStorageSave });
 
-  // Function to set user tier (called from login)
-  const setUserRole = (tier: UserTier) => {
-    setUserTier(tier);
-    localStorage.setItem('moda-user-tier', tier);
-  };
+  const {
+    savedOutfits,
+    setSavedOutfits,
+    saveOutfit,
+    removeOutfit,
+    persistOutfits
+  } = useSavedOutfits({ showToast, safeLocalStorageSave });
+
+  const {
+    restockAlerts,
+    setRestockAlerts,
+    addRestockAlert,
+    removeRestockAlert,
+    hasRestockAlert,
+    persistAlerts
+  } = useRestockAlerts({ showToast, safeLocalStorageSave });
+
+  const {
+    orders,
+    setOrders,
+    addOrder,
+    persistOrders
+  } = useOrders({ safeLocalStorageSave });
+
+  const {
+    userTier,
+    isUHNI,
+    concierge,
+    autonomousSettings,
+    sourcingRequests,
+    bespokeOrders,
+    autonomousActivity,
+    setUserRole,
+    updateAutonomousSettings,
+    logout
+  } = useUHNIFeatures({ showToast });
+
+  // Wishlist functions (TODO: Move to dedicated hook)
+  const removeFromWishlist = useCallback((id: string) => {
+    setWishlist(prev => prev.filter(w => w.id !== id));
+    showToast('Removed from wishlist', 'info');
+  }, [showToast]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -151,23 +183,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (storedConsiderations) {
           setConsiderations(JSON.parse(storedConsiderations));
         }
-        if (storedWardrobe) {
-          setWardrobe(JSON.parse(storedWardrobe));
-        } else {
-          // Initialize with first product from mock data for demo
-          const diorProduct = products.find(p => p.brandName === 'Dior');
-          if (diorProduct) {
-            setWardrobe([{
-              id: 'wardrobe-1',
-              productId: diorProduct.id,
-              product: diorProduct,
-              addedAt: new Date().toISOString(),
-              wearCount: 5,
-              lastWorn: '2024-01-15',
-              outfitCompatibility: ['professional', 'evening']
-            }]);
-          }
-        }
+
+        initializeWardrobe(storedWardrobe);
+
         if (storedOutfits) {
           setSavedOutfits(JSON.parse(storedOutfits));
         }
@@ -184,241 +202,83 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     loadFromStorage();
-  }, []);
+  }, [setConsiderations, initializeWardrobe, setSavedOutfits, setRestockAlerts, setOrders]);
 
-  // Save to localStorage when state changes
+  // Persist state changes to localStorage
   useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem('moda-considerations', JSON.stringify(considerations));
-    }
-  }, [considerations, isHydrated]);
+    persistConsiderations(considerations);
+  }, [considerations, persistConsiderations]);
 
   useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem('moda-wardrobe', JSON.stringify(wardrobe));
-    }
-  }, [wardrobe, isHydrated]);
+    persistWardrobe(wardrobe);
+  }, [wardrobe, persistWardrobe]);
 
   useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem('moda-outfits', JSON.stringify(savedOutfits));
-    }
-  }, [savedOutfits, isHydrated]);
+    persistOutfits(savedOutfits);
+  }, [savedOutfits, persistOutfits]);
 
   useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem('moda-restock-alerts', JSON.stringify(restockAlerts));
-    }
-  }, [restockAlerts, isHydrated]);
+    persistAlerts(restockAlerts);
+  }, [restockAlerts, persistAlerts]);
 
   useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem('moda-orders', JSON.stringify(orders));
-    }
-  }, [orders, isHydrated]);
-
-  // Toast notification functions
-  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = `toast-${Date.now()}`;
-    setToasts(prev => [...prev, { id, message, type }]);
-
-    // Auto-dismiss after 3 seconds
-    setTimeout(() => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-    }, 3000);
-  }, []);
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(t => t.id !== id));
-  }, []);
-
-  // Considerations functions
-  const addToConsiderations = useCallback((
-    product: Product,
-    variants?: { size?: string; color?: string },
-    agiNote?: string
-  ) => {
-    const existingIndex = considerations.findIndex(c => c.productId === product.id);
-
-    if (existingIndex >= 0) {
-      // Update existing item
-      setConsiderations(prev => prev.map((item, index) =>
-        index === existingIndex
-          ? { ...item, selectedVariants: variants || item.selectedVariants, agiNote: agiNote || item.agiNote }
-          : item
-      ));
-      showToast('Updated in your considerations', 'info');
-    } else {
-      // Add new item
-      const newItem: ConsiderationItem = {
-        id: `consideration-${Date.now()}`,
-        productId: product.id,
-        product,
-        addedAt: new Date().toISOString(),
-        selectedVariants: variants || {},
-        agiNote
-      };
-      setConsiderations(prev => [...prev, newItem]);
-      showToast(`${product.name} added to considerations`, 'success');
-    }
-  }, [considerations, showToast]);
-
-  const removeFromConsiderations = useCallback((id: string) => {
-    setConsiderations(prev => {
-      const item = prev.find(c => c.id === id);
-      if (item) {
-        showToast(`${item.product.name} removed from considerations`, 'info');
-      }
-      return prev.filter(c => c.id !== id);
-    });
-  }, [showToast]);
-
-  const clearConsiderations = useCallback(() => {
-    setConsiderations([]);
-  }, []);
-
-  const isInConsiderations = useCallback((productId: string) => {
-    return considerations.some(c => c.productId === productId);
-  }, [considerations]);
-
-  // Wardrobe functions
-  const addToWardrobe = useCallback((product: Product) => {
-    if (wardrobe.some(w => w.productId === product.id)) {
-      showToast('Already in your wardrobe', 'info');
-      return;
-    }
-
-    const newItem: WardrobeItem = {
-      id: `wardrobe-${Date.now()}`,
-      productId: product.id,
-      product,
-      addedAt: new Date().toISOString(),
-      wearCount: 0,
-      outfitCompatibility: []
-    };
-    setWardrobe(prev => [...prev, newItem]);
-    showToast(`${product.name} added to wardrobe`, 'success');
-  }, [wardrobe, showToast]);
-
-  const removeFromWardrobe = useCallback((id: string) => {
-    setWardrobe(prev => {
-      const item = prev.find(w => w.id === id);
-      if (item) {
-        showToast(`${item.product.name} removed from wardrobe`, 'info');
-      }
-      return prev.filter(w => w.id !== id);
-    });
-  }, [showToast]);
-
-  const isInWardrobe = useCallback((productId: string) => {
-    return wardrobe.some(w => w.productId === productId);
-  }, [wardrobe]);
-
-  // Saved Outfits functions
-  const saveOutfit = useCallback((name: string, productIds: string[], eventId?: string) => {
-    const newOutfit: SavedOutfit = {
-      id: `outfit-${Date.now()}`,
-      name,
-      eventId,
-      items: productIds,
-      savedAt: new Date().toISOString()
-    };
-    setSavedOutfits(prev => [...prev, newOutfit]);
-    showToast(`"${name}" outfit saved`, 'success');
-  }, [showToast]);
-
-  const removeOutfit = useCallback((id: string) => {
-    setSavedOutfits(prev => prev.filter(o => o.id !== id));
-    showToast('Outfit removed', 'info');
-  }, [showToast]);
-
-  // Restock Alerts functions
-  const addRestockAlert = useCallback((product: Product, size?: string, color?: string) => {
-    if (restockAlerts.some(a => a.productId === product.id)) {
-      showToast('Already watching this item', 'info');
-      return;
-    }
-
-    const newAlert: RestockAlert = {
-      id: `alert-${Date.now()}`,
-      productId: product.id,
-      product,
-      preferredSize: size,
-      preferredColor: color,
-      status: 'watching',
-      createdAt: new Date().toISOString()
-    };
-    setRestockAlerts(prev => [...prev, newAlert]);
-    showToast('You will be notified when available', 'success');
-  }, [restockAlerts, showToast]);
-
-  const removeRestockAlert = useCallback((id: string) => {
-    setRestockAlerts(prev => prev.filter(a => a.id !== id));
-    showToast('Alert removed', 'info');
-  }, [showToast]);
-
-  const hasRestockAlert = useCallback((productId: string) => {
-    return restockAlerts.some(a => a.productId === productId);
-  }, [restockAlerts]);
-
-  // Order functions
-  const addOrder = useCallback((items: ConsiderationItem[], total: number) => {
-    const orderId = `MG-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-    const deliveryDate = new Date();
-    deliveryDate.setDate(deliveryDate.getDate() + 5);
-
-    const newOrder: OrderRecord = {
-      id: orderId,
-      items,
-      total,
-      status: 'confirmed',
-      createdAt: new Date().toISOString(),
-      estimatedDelivery: deliveryDate.toISOString()
-    };
-    setOrders(prev => [newOrder, ...prev]);
-    return orderId;
-  }, []);
-
-  // UHNI: Update autonomous shopping settings
-  const updateAutonomousSettings = useCallback((settings: Partial<AutonomousShoppingSettings>) => {
-    if (!isUHNI || !autonomousSettings) return;
-    setAutonomousSettings(prev => prev ? { ...prev, ...settings } : null);
-    showToast('Settings updated', 'success');
-  }, [isUHNI, autonomousSettings, showToast]);
+    persistOrders(orders);
+  }, [orders, persistOrders]);
 
   return (
     <AppContext.Provider value={{
+      // Considerations
       considerations,
       addToConsiderations,
       removeFromConsiderations,
       clearConsiderations,
       isInConsiderations,
+
+      // Wardrobe
       wardrobe,
       addToWardrobe,
       removeFromWardrobe,
       isInWardrobe,
+
+      // Wishlist
+      wishlist,
+      removeFromWishlist,
+
+      // Outfits
       savedOutfits,
       saveOutfit,
       removeOutfit,
+
+      // Alerts
       restockAlerts,
       addRestockAlert,
       removeRestockAlert,
       hasRestockAlert,
+
+      // Calendar
       calendarEvents,
+
+      // Toasts
       toasts,
       showToast,
       dismissToast,
+
+      // Orders
       orders,
       addOrder,
+
+      // UHNI
       userTier,
       isUHNI,
+      isHydrated,
       concierge,
       autonomousSettings,
       sourcingRequests,
       bespokeOrders,
       autonomousActivity,
       updateAutonomousSettings,
-      setUserRole
+      setUserRole,
+      logout
     }}>
       {children}
     </AppContext.Provider>
