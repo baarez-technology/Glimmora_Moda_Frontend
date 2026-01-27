@@ -4,6 +4,9 @@ import { useState, useCallback } from 'react';
 import type { Product, WardrobeItem } from '@/types';
 import { products } from '@/data/mock-data';
 
+// Counter to ensure unique IDs even when called multiple times in the same millisecond
+let wardrobeCounter = 0;
+
 interface UseWardrobeStateProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   safeLocalStorageSave: (key: string, value: unknown) => void;
@@ -39,8 +42,9 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
         return prev;
       }
 
+      wardrobeCounter += 1;
       const newItem: WardrobeItem = {
-        id: `wardrobe-${Date.now()}`,
+        id: `wardrobe-${Date.now()}-${wardrobeCounter}`,
         productId: product.id,
         product,
         addedAt: new Date().toISOString(),

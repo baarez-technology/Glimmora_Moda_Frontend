@@ -8,6 +8,9 @@ interface UseConsiderationsProps {
   safeLocalStorageSave: (key: string, value: unknown) => void;
 }
 
+// Counter to ensure unique IDs even when called multiple times in the same millisecond
+let considerationCounter = 0;
+
 export function useConsiderations({ showToast, safeLocalStorageSave }: UseConsiderationsProps) {
   const [considerations, setConsiderations] = useState<ConsiderationItem[]>([]);
 
@@ -30,8 +33,9 @@ export function useConsiderations({ showToast, safeLocalStorageSave }: UseConsid
         return updated;
       } else {
         // Add new item
+        considerationCounter += 1;
         const newItem: ConsiderationItem = {
-          id: `consideration-${Date.now()}`,
+          id: `consideration-${Date.now()}-${considerationCounter}`,
           productId: product.id,
           product,
           addedAt: new Date().toISOString(),

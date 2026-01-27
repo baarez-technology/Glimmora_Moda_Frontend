@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 export interface Toast {
   id: string;
@@ -9,11 +9,15 @@ export interface Toast {
   duration?: number;
 }
 
+// Counter to ensure unique IDs even when called multiple times in the same millisecond
+let toastCounter = 0;
+
 export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
-    const id = `toast-${Date.now()}`;
+    toastCounter += 1;
+    const id = `toast-${Date.now()}-${toastCounter}`;
     setToasts(prev => [...prev, { id, message, type }]);
 
     // Auto-dismiss after 3 seconds

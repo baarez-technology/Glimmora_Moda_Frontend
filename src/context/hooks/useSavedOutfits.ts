@@ -2,6 +2,9 @@
 
 import { useState, useCallback } from 'react';
 
+// Counter to ensure unique IDs even when called multiple times in the same millisecond
+let outfitCounter = 0;
+
 export interface SavedOutfit {
   id: string;
   name: string;
@@ -19,8 +22,9 @@ export function useSavedOutfits({ showToast, safeLocalStorageSave }: UseSavedOut
   const [savedOutfits, setSavedOutfits] = useState<SavedOutfit[]>([]);
 
   const saveOutfit = useCallback((name: string, productIds: string[], eventId?: string) => {
+    outfitCounter += 1;
     const newOutfit: SavedOutfit = {
-      id: `outfit-${Date.now()}`,
+      id: `outfit-${Date.now()}-${outfitCounter}`,
       name,
       eventId,
       items: productIds,

@@ -3,6 +3,9 @@
 import { useState, useCallback } from 'react';
 import type { Product } from '@/types';
 
+// Counter to ensure unique IDs even when called multiple times in the same millisecond
+let alertCounter = 0;
+
 export interface RestockAlert {
   id: string;
   productId: string;
@@ -29,8 +32,9 @@ export function useRestockAlerts({ showToast, safeLocalStorageSave }: UseRestock
         return prev;
       }
 
+      alertCounter += 1;
       const newAlert: RestockAlert = {
-        id: `alert-${Date.now()}`,
+        id: `alert-${Date.now()}-${alertCounter}`,
         productId: product.id,
         product,
         preferredSize: size,
