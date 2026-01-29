@@ -20,6 +20,11 @@ export default function BrandPage({ params }: BrandPageProps) {
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set());
+
+  const handleImageLoad = (imageId: string) => {
+    setLoadedImages(prev => new Set(prev).add(imageId));
+  };
 
   useEffect(() => {
     setIsLoaded(true);
@@ -32,31 +37,46 @@ export default function BrandPage({ params }: BrandPageProps) {
   const allProducts = getProductsByBrand(brand.id);
   const stories = getStoriesByBrand(brand.id);
 
+  // Helper function to check if product matches a category
+  const matchesCategory = (p: typeof allProducts[0], cat: CategoryFilter): boolean => {
+    if (cat === 'all') return true;
+
+    const category = p.category?.toLowerCase() || '';
+    const tags = p.tags?.map(t => t.toLowerCase()) || [];
+
+    switch (cat) {
+      case 'bags':
+        return category.includes('bag') || tags.some(t => t.includes('bag') || t.includes('handbag'));
+      case 'clothing':
+        return category.includes('clothing') || category.includes('jacket') || category.includes('coat') ||
+               tags.some(t => t.includes('jacket') || t.includes('coat') || t.includes('dress') || t.includes('blazer'));
+      case 'shoes':
+        return category.includes('shoe') || category.includes('footwear') ||
+               tags.some(t => t.includes('shoe') || t.includes('loafer') || t.includes('heel') || t.includes('boot'));
+      case 'accessories':
+        return category.includes('accessor') || category.includes('jewelry') ||
+               tags.some(t => t.includes('scarf') || t.includes('belt') || t.includes('jewelry') || t.includes('watch'));
+      default:
+        return true;
+    }
+  };
+
   // Filter products by category
   const filteredProducts = useMemo(() => {
     if (categoryFilter === 'all') return allProducts;
-
-    return allProducts.filter(p => {
-      const category = p.category?.toLowerCase() || '';
-      const tags = p.tags?.map(t => t.toLowerCase()) || [];
-
-      switch (categoryFilter) {
-        case 'bags':
-          return category.includes('bag') || tags.some(t => t.includes('bag') || t.includes('handbag'));
-        case 'clothing':
-          return category.includes('clothing') || category.includes('jacket') || category.includes('coat') ||
-                 tags.some(t => t.includes('jacket') || t.includes('coat') || t.includes('dress') || t.includes('blazer'));
-        case 'shoes':
-          return category.includes('shoe') || category.includes('footwear') ||
-                 tags.some(t => t.includes('shoe') || t.includes('loafer') || t.includes('heel') || t.includes('boot'));
-        case 'accessories':
-          return category.includes('accessor') || category.includes('jewelry') ||
-                 tags.some(t => t.includes('scarf') || t.includes('belt') || t.includes('jewelry') || t.includes('watch'));
-        default:
-          return true;
-      }
-    });
+    return allProducts.filter(p => matchesCategory(p, categoryFilter));
   }, [allProducts, categoryFilter]);
+
+  // Calculate counts for each category
+  const categoryCounts = useMemo(() => {
+    return {
+      all: allProducts.length,
+      bags: allProducts.filter(p => matchesCategory(p, 'bags')).length,
+      clothing: allProducts.filter(p => matchesCategory(p, 'clothing')).length,
+      shoes: allProducts.filter(p => matchesCategory(p, 'shoes')).length,
+      accessories: allProducts.filter(p => matchesCategory(p, 'accessories')).length,
+    };
+  }, [allProducts]);
 
   const categoryOptions: { id: CategoryFilter; label: string }[] = [
     { id: 'all', label: 'All' },
@@ -136,11 +156,18 @@ export default function BrandPage({ params }: BrandPageProps) {
 
             {/* Image */}
             <div className="relative aspect-[4/5] overflow-hidden">
+              {/* Skeleton loader */}
+              {!loadedImages.has('heritage') && (
+                <div className="absolute inset-0 bg-gradient-to-br from-sand/30 to-champagne/30 animate-pulse" />
+              )}
               <Image
                 src={brand.heroImage}
                 alt={`${brand.name} Heritage`}
                 fill
-                className="object-cover"
+                className={`object-cover transition-opacity duration-500 ${
+                  loadedImages.has('heritage') ? 'opacity-100' : 'opacity-0'
+                }`}
+                onLoad={() => handleImageLoad('heritage')}
               />
             </div>
           </div>
@@ -163,6 +190,17 @@ export default function BrandPage({ params }: BrandPageProps) {
                   Stories
                 </h2>
               </div>
+              {stories.length > 3 && (
+                <Link
+                  href="/stories"
+                  className="group inline-flex items-center gap-3"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase text-gold-soft/70 group-hover:text-gold-soft transition-colors">
+                    All Stories ({stories.length})
+                  </span>
+                  <ArrowRight size={14} className="text-gold-soft/70 group-hover:text-gold-soft group-hover:translate-x-1 transition-all" />
+                </Link>
+              )}
             </div>
 
             {/* Stories Grid */}
@@ -174,11 +212,18 @@ export default function BrandPage({ params }: BrandPageProps) {
                   className="group"
                 >
                   <div className="relative aspect-[4/5] overflow-hidden mb-5">
+                    {/* Skeleton loader */}
+                    {!loadedImages.has(`story-${story.id}`) && (
+                      <div className="absolute inset-0 bg-charcoal-warm animate-pulse" />
+                    )}
                     <Image
                       src={story.heroImage}
                       alt={story.title}
                       fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      className={`object-cover transition-all duration-700 group-hover:scale-105 ${
+                        loadedImages.has(`story-${story.id}`) ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => handleImageLoad(`story-${story.id}`)}
                     />
                     <div className="absolute inset-0 bg-noir/20 group-hover:bg-noir/0 transition-colors duration-500" />
                     <div className="absolute top-5 left-5">
@@ -221,22 +266,32 @@ export default function BrandPage({ params }: BrandPageProps) {
 
             {/* Desktop Filters */}
             <nav className="hidden lg:flex gap-8">
-              {categoryOptions.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setCategoryFilter(category.id)}
-                  className={`relative text-sm tracking-[0.15em] uppercase transition-all duration-300 ${
-                    categoryFilter === category.id
-                      ? 'text-charcoal-deep'
-                      : 'text-stone hover:text-charcoal-deep'
-                  }`}
-                >
-                  {category.label}
-                  {categoryFilter === category.id && (
-                    <span className="absolute -bottom-2 left-0 right-0 h-px bg-charcoal-deep" />
-                  )}
-                </button>
-              ))}
+              {categoryOptions.map((category) => {
+                const count = categoryCounts[category.id];
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setCategoryFilter(category.id)}
+                    className={`relative text-sm tracking-[0.15em] uppercase transition-all duration-300 ${
+                      categoryFilter === category.id
+                        ? 'text-charcoal-deep'
+                        : 'text-stone hover:text-charcoal-deep'
+                    }`}
+                  >
+                    {category.label}
+                    {category.id !== 'all' && (
+                      <span className={`ml-1.5 text-[10px] ${
+                        count === 0 ? 'text-taupe/50' : ''
+                      }`}>
+                        ({count})
+                      </span>
+                    )}
+                    {categoryFilter === category.id && (
+                      <span className="absolute -bottom-2 left-0 right-0 h-px bg-charcoal-deep" />
+                    )}
+                  </button>
+                );
+              })}
             </nav>
 
             {/* Mobile Filter Toggle */}
@@ -278,11 +333,18 @@ export default function BrandPage({ params }: BrandPageProps) {
                   onMouseLeave={() => setActiveProductHover(null)}
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-5">
+                    {/* Skeleton loader */}
+                    {!loadedImages.has(`product-${product.id}`) && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-sand/50 to-champagne/50 animate-pulse" />
+                    )}
                     <Image
                       src={product.images[0]?.url || ''}
                       alt={product.name}
                       fill
-                      className="object-cover transition-all duration-700 group-hover:scale-105"
+                      className={`object-cover transition-all duration-700 group-hover:scale-105 ${
+                        loadedImages.has(`product-${product.id}`) ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => handleImageLoad(`product-${product.id}`)}
                     />
 
                     {/* Hover Action */}
@@ -395,25 +457,35 @@ export default function BrandPage({ params }: BrandPageProps) {
           <div className="px-6 py-8">
             <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Category</h4>
             <div className="space-y-1">
-              {categoryOptions.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => {
-                    setCategoryFilter(category.id);
-                    setShowFilters(false);
-                  }}
-                  className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all ${
-                    categoryFilter === category.id
-                      ? 'text-charcoal-deep'
-                      : 'text-stone hover:text-charcoal-deep'
-                  }`}
-                >
-                  <span>{category.label}</span>
-                  {categoryFilter === category.id && (
-                    <span className="w-2 h-2 bg-gold-muted rounded-full" />
-                  )}
-                </button>
-              ))}
+              {categoryOptions.map((category) => {
+                const count = categoryCounts[category.id];
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => {
+                      setCategoryFilter(category.id);
+                      setShowFilters(false);
+                    }}
+                    className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all ${
+                      categoryFilter === category.id
+                        ? 'text-charcoal-deep'
+                        : 'text-stone hover:text-charcoal-deep'
+                    }`}
+                  >
+                    <span>
+                      {category.label}
+                      {category.id !== 'all' && (
+                        <span className={`ml-2 text-xs ${count === 0 ? 'text-taupe/50' : 'text-taupe'}`}>
+                          ({count})
+                        </span>
+                      )}
+                    </span>
+                    {categoryFilter === category.id && (
+                      <span className="w-2 h-2 bg-gold-muted rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

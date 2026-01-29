@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Sparkles, User, ArrowRight } from 'lucide-react';
-import { ExploreAwarePrice } from '@/components/shared/ExploreModeWrapper';
+import { Sparkles, User, ArrowRight, ChevronRight } from 'lucide-react';
 import type { Product, Brand, FashionIdentity } from '@/types';
 
 interface PersonalizationMatch {
@@ -26,6 +25,27 @@ export default function ProductInfo({
 }: ProductInfoProps) {
   return (
     <>
+      {/* Breadcrumb Navigation */}
+      <nav className="flex items-center gap-2 mb-8 text-xs">
+        <Link
+          href="/"
+          className="text-taupe hover:text-charcoal-deep transition-colors"
+        >
+          Home
+        </Link>
+        <ChevronRight size={12} className="text-sand" />
+        <Link
+          href={`/brand/${brand?.slug || ''}`}
+          className="text-taupe hover:text-charcoal-deep transition-colors"
+        >
+          {brand?.name}
+        </Link>
+        <ChevronRight size={12} className="text-sand" />
+        <span className="text-charcoal-deep font-medium truncate max-w-[150px]">
+          {product.name}
+        </span>
+      </nav>
+
       {/* Brand & Category */}
       <div className="flex items-center gap-3 mb-6">
         <Link
@@ -47,10 +67,9 @@ export default function ProductInfo({
       <p className="text-lg text-stone mb-8">{product.tagline}</p>
 
       {/* Price */}
-      <ExploreAwarePrice
-        price={product.price}
-        className="font-display text-2xl text-charcoal-deep mb-4"
-      />
+      <div className="font-display text-2xl text-charcoal-deep mb-4">
+        €{product.price.toLocaleString()}
+      </div>
 
       {/* Personalization Badge */}
       {personalizationMatch && personalizationMatch.score >= 50 && (
