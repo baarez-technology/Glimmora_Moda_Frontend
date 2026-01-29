@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity } from '@/types';
+import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity } from '@/types';
 import { mockCalendarEvents } from '@/data/mock-data';
 
 // Import focused hooks
@@ -13,6 +13,7 @@ import {
   useRestockAlerts,
   useOrders,
   useUHNIFeatures,
+  useFashionIdentity,
   type Toast,
   type SavedOutfit,
   type RestockAlert,
@@ -23,6 +24,10 @@ import {
 export type { Toast, SavedOutfit, RestockAlert, OrderRecord };
 
 interface AppContextType {
+  // Fashion Identity (Style Profile)
+  fashionIdentity: FashionIdentity | null;
+  updateFashionIdentity: (identity: FashionIdentity) => void;
+
   // Considerations (Cart)
   considerations: ConsiderationItem[];
   addToConsiderations: (product: Product, variants?: { size?: string; color?: string }, agiNote?: string) => void;
@@ -152,6 +157,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } = useOrders({ safeLocalStorageSave });
 
   const {
+    fashionIdentity,
+    setFashionIdentity,
+    updateFashionIdentity,
+    persistFashionIdentity,
+    initializeFashionIdentity
+  } = useFashionIdentity({ showToast, safeLocalStorageSave });
+
+  const {
     userTier,
     isUHNI,
     concierge,
@@ -179,6 +192,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const storedOutfits = localStorage.getItem('moda-outfits');
         const storedAlerts = localStorage.getItem('moda-restock-alerts');
         const storedOrders = localStorage.getItem('moda-orders');
+        const storedFashionIdentity = localStorage.getItem('moda-fashion-identity');
 
         if (storedConsiderations) {
           setConsiderations(JSON.parse(storedConsiderations));
@@ -195,6 +209,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (storedOrders) {
           setOrders(JSON.parse(storedOrders));
         }
+
+        initializeFashionIdentity(storedFashionIdentity);
       } catch (error) {
         console.error('Error loading from localStorage:', error);
       }
@@ -202,7 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     loadFromStorage();
-  }, [setConsiderations, initializeWardrobe, setSavedOutfits, setRestockAlerts, setOrders]);
+  }, [setConsiderations, initializeWardrobe, setSavedOutfits, setRestockAlerts, setOrders, initializeFashionIdentity]);
 
   // Persist state changes to localStorage
   useEffect(() => {
@@ -225,8 +241,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     persistOrders(orders);
   }, [orders, persistOrders]);
 
+  useEffect(() => {
+    persistFashionIdentity(fashionIdentity);
+  }, [fashionIdentity, persistFashionIdentity]);
+
   return (
     <AppContext.Provider value={{
+      // Fashion Identity
+      fashionIdentity,
+      updateFashionIdentity,
+
       // Considerations
       considerations,
       addToConsiderations,

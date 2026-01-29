@@ -5,3 +5,4 @@ export { useSavedOutfits, type SavedOutfit } from './useSavedOutfits';
 export { useRestockAlerts, type RestockAlert } from './useRestockAlerts';
 export { useOrders, type OrderRecord } from './useOrders';
 export { useUHNIFeatures } from './useUHNIFeatures';
+export { useFashionIdentity } from './useFashionIdentity';

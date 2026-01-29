@@ -8,32 +8,41 @@ import { useApp } from '@/context/AppContext';
 type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
 
 export default function OnboardingPage() {
-  const { showToast } = useApp();
+  const { showToast, fashionIdentity, updateFashionIdentity } = useApp();
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
   const [isLoaded, setIsLoaded] = useState(false);
+  const [hasExistingProfile, setHasExistingProfile] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   const [selections, setSelections] = useState({
     occasions: [] as string[],
     aesthetics: [] as string[],
-    confidence: '',
-    budget: ''
+    confidenceLevel: '' as 'decisive' | 'guided' | 'advisory' | '',
+    budgetRange: undefined as { min: number; max: number } | undefined
   });
 
+  // Load existing fashion identity from AppContext on mount (only once)
   useEffect(() => {
-    setIsLoaded(true);
-  }, []);
+    // Only initialize once to prevent re-triggering during the flow
+    if (isInitialized) return;
 
-  // Load existing fashion identity from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem('moda-fashion-identity');
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSelections(parsed);
-      } catch (e) {
-        console.error('Failed to parse stored fashion identity');
+    if (fashionIdentity) {
+      // Check if user has meaningful existing preferences
+      const hasPrefs = fashionIdentity.occasions?.length > 0 || fashionIdentity.aesthetics?.length > 0 || fashionIdentity.confidenceLevel;
+      if (hasPrefs) {
+        setSelections({
+          occasions: fashionIdentity.occasions || [],
+          aesthetics: fashionIdentity.aesthetics || [],
+          confidenceLevel: (fashionIdentity.confidenceLevel || '') as 'decisive' | 'guided' | 'advisory' | '',
+          budgetRange: fashionIdentity.budgetRange
+        });
+        setHasExistingProfile(true);
+        // Skip welcome screen and go directly to first step for editing
+        setCurrentStep('occasions');
       }
     }
-  }, []);
+    setIsInitialized(true);
+    setIsLoaded(true);
+  }, [fashionIdentity, isInitialized]);
 
   const occasionOptions = [
     { id: 'professional', label: 'Professional', desc: 'Business meetings & work', icon: Briefcase },
@@ -58,11 +67,11 @@ export default function OnboardingPage() {
   ];
 
   const budgetOptions = [
-    { id: 'no-limit', label: 'No preference', desc: 'Show me everything' },
-    { id: 'under-1000', label: 'Up to €1,000', desc: 'Per piece' },
-    { id: '1000-5000', label: '€1,000 — €5,000', desc: 'Per piece' },
-    { id: '5000-plus', label: '€5,000+', desc: 'Investment pieces' }
-  ];
+    { id: 'no-limit', label: 'No preference', desc: 'Show me everything', range: undefined },
+    { id: 'under-1000', label: 'Up to €1,000', desc: 'Per piece', range: { min: 0, max: 1000 } },
+    { id: '1000-5000', label: '€1,000 — €5,000', desc: 'Per piece', range: { min: 1000, max: 5000 } },
+    { id: '5000-plus', label: '€5,000+', desc: 'Investment pieces', range: { min: 5000, max: Infinity } }
+  ] as const;
 
   const toggleSelection = (type: 'occasions' | 'aesthetics', id: string) => {
     setSelections(prev => ({
@@ -79,8 +88,18 @@ export default function OnboardingPage() {
     if (currentIndex < steps.length - 1) {
       const nextStepValue = steps[currentIndex + 1];
       if (nextStepValue === 'complete') {
-        localStorage.setItem('moda-fashion-identity', JSON.stringify(selections));
-        showToast('Style profile saved successfully', 'success');
+        // Create complete FashionIdentity object matching the type schema
+        const newFashionIdentity = {
+          occasions: selections.occasions,
+          aesthetics: selections.aesthetics,
+          confidenceLevel: selections.confidenceLevel,
+          budgetRange: selections.budgetRange,
+          primaryLocation: fashionIdentity?.primaryLocation || 'Paris',
+          travelDestinations: fashionIdentity?.travelDestinations || []
+        };
+
+        // Update through AppContext (which also persists to localStorage)
+        updateFashionIdentity(newFashionIdentity);
       }
       setCurrentStep(nextStepValue);
     }
@@ -141,20 +160,29 @@ export default function OnboardingPage() {
                 This takes just a moment.
               </p>
 
-              <button
-                onClick={nextStep}
-                className="group inline-flex items-center gap-5"
-              >
-                <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">
-                  Begin
-                </span>
-                <span className="w-14 h-14 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
-                  <ArrowRight size={18} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
-                </span>
-              </button>
+              <div className="flex flex-col items-center gap-6">
+                <button
+                  onClick={nextStep}
+                  className="group inline-flex items-center gap-5"
+                >
+                  <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">
+                    Begin
+                  </span>
+                  <span className="w-14 h-14 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
+                    <ArrowRight size={18} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
+                  </span>
+                </button>
+
+                <Link
+                  href="/discover"
+                  className="text-sm text-stone hover:text-charcoal-deep transition-colors underline"
+                >
+                  Skip for now, start browsing
+                </Link>
+              </div>
 
               <p className="text-xs text-taupe mt-10 tracking-wide">
-                You can update these preferences anytime
+                You can update these preferences anytime in your profile
               </p>
             </div>
           )}
@@ -304,11 +332,11 @@ export default function OnboardingPage() {
 
               <div className="space-y-4">
                 {confidenceOptions.map((option, index) => {
-                  const isSelected = selections.confidence === option.id;
+                  const isSelected = selections.confidenceLevel === option.id;
                   return (
                     <button
                       key={option.id}
-                      onClick={() => setSelections({ ...selections, confidence: option.id })}
+                      onClick={() => setSelections({ ...selections, confidenceLevel: option.id as 'decisive' | 'guided' | 'advisory' })}
                       className={`w-full p-8 text-left transition-all duration-300 border flex items-start gap-6 ${
                         isSelected
                           ? 'border-charcoal-deep bg-charcoal-deep'
@@ -341,7 +369,7 @@ export default function OnboardingPage() {
                 </button>
                 <button
                   onClick={nextStep}
-                  disabled={!selections.confidence}
+                  disabled={!selections.confidenceLevel}
                   className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
@@ -372,11 +400,11 @@ export default function OnboardingPage() {
 
               <div className="space-y-4">
                 {budgetOptions.map((option) => {
-                  const isSelected = selections.budget === option.id;
+                  const isSelected = JSON.stringify(selections.budgetRange) === JSON.stringify(option.range);
                   return (
                     <button
                       key={option.id}
-                      onClick={() => setSelections({ ...selections, budget: option.id })}
+                      onClick={() => setSelections({ ...selections, budgetRange: option.range })}
                       className={`w-full p-6 text-left transition-all duration-300 border flex items-center justify-between ${
                         isSelected
                           ? 'border-charcoal-deep bg-charcoal-deep'
