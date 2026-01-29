@@ -79,13 +79,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserTier('standard');
     setIsBrand(false);
     try {
+      // Clear authentication data
       localStorage.removeItem('moda-user-tier');
       localStorage.removeItem('moda-brand-mode');
-      // Clear other user-specific data on logout
-      localStorage.removeItem('moda-considerations');
+
+      // Clear sensitive account-specific data
       localStorage.removeItem('moda-wardrobe');
-      localStorage.removeItem('moda-wishlist');
       localStorage.removeItem('moda-orders');
+
+      // NOTE: We intentionally KEEP these for better UX:
+      // - moda-considerations: Users' curated wishlist persists for aspirational browsing
+      // - moda-wishlist: Same reason - don't lose their saved items
     } catch (error) {
       console.error('Failed to clear localStorage on logout:', error);
     }
