@@ -103,7 +103,7 @@ export default function ProductInfo({
       {/* No Profile CTA */}
       {!fashionIdentity && (
         <Link
-          href="/profile/style"
+          href="/onboarding"
           className="mb-6 p-4 bg-parchment flex items-center justify-between group hover:bg-champagne/50 transition-colors"
         >
           <div className="flex items-center gap-3">

@@ -1,16 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, User, Heart, Menu, X } from 'lucide-react';
+import { Search, User, Heart, Menu, X, LogOut, Settings } from 'lucide-react';
 import { brands } from '@/data/mock-data';
+import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function Header() {
   const router = useRouter();
+  const { considerations, userTier, isUHNI, showToast } = useApp();
+  const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const accountRef = useRef<HTMLDivElement>(null);
+
+  const handleLogout = () => {
+    setIsAccountOpen(false);
+    // Navigate to homepage first, then logout after a brief delay
+    // This prevents race condition with protected page auth guards
+    router.replace('/');
+    setTimeout(() => {
+      logout();
+      showToast('You have been signed out', 'success');
+    }, 100);
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,11 +38,50 @@ export default function Header() {
     }
   };
 
+  // ESC key handler and click outside handler
+  useEffect(() => {
+    const handleEscKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isSearchOpen) {
+          setIsSearchOpen(false);
+          setSearchQuery('');
+        }
+        if (isMenuOpen) {
+          setIsMenuOpen(false);
+        }
+        if (isAccountOpen) {
+          setIsAccountOpen(false);
+        }
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
+        setIsAccountOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSearchOpen, isMenuOpen, isAccountOpen]);
+
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-ivory-cream/95 backdrop-blur-sm border-b border-sand/30">
       <div className="max-w-[1800px] mx-auto">
         {/* Top Bar */}
-        <div className="hidden lg:flex justify-center py-2 border-b border-sand/20">
+        <div className="hidden lg:flex justify-between items-center px-12 py-2 border-b border-sand/20">
+          <div className="flex items-center gap-3">
+            {/* Tier Badge - Only show for UHNI members */}
+            {isUHNI && (
+              <span className="text-[10px] tracking-[0.25em] uppercase px-3 py-1 bg-gold-muted/20 text-gold-deep border border-gold-muted/30">
+                UHNI Member
+              </span>
+            )}
+          </div>
           <p className="text-xs tracking-[0.2em] text-stone uppercase">
             Experience-First Luxury Commerce
           </p>
@@ -104,19 +160,71 @@ export default function Header() {
               aria-label="Considerations"
             >
               <Heart size={20} />
-              <span className="absolute -top-1 -right-1 w-4 h-4 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
-                2
-              </span>
+              {considerations.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
+                  {considerations.length}
+                </span>
+              )}
             </Link>
 
-            {/* Account */}
-            <Link
-              href="/profile"
-              className="hidden lg:flex p-2 text-charcoal-warm hover:text-noir transition-colors"
-              aria-label="Account"
-            >
-              <User size={20} />
-            </Link>
+            {/* Account Dropdown */}
+            <div ref={accountRef} className="relative hidden lg:block">
+              <button
+                onClick={() => setIsAccountOpen(!isAccountOpen)}
+                className="p-2 text-charcoal-warm hover:text-noir transition-colors relative"
+                aria-label="Account"
+              >
+                <User size={20} />
+                {/* UHNI indicator dot */}
+                {isHydrated && isAuthenticated && isUHNI && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-gold-deep rounded-full border border-ivory-cream" title="UHNI Member" />
+                )}
+              </button>
+
+              {/* Account Dropdown Menu */}
+              {isAccountOpen && (
+                <div className="absolute top-full right-0 pt-2">
+                  <div className="bg-white shadow-lg min-w-[200px] border border-sand/30">
+                    {isHydrated && isAuthenticated ? (
+                      <>
+                        <Link
+                          href="/profile"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
+                        >
+                          <User size={16} />
+                          <span>My Profile</span>
+                        </Link>
+                        <Link
+                          href="/profile/settings"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
+                        >
+                          <Settings size={16} />
+                          <span>Settings</span>
+                        </Link>
+                        <button
+                          onClick={handleLogout}
+                          className="w-full flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors"
+                        >
+                          <LogOut size={16} />
+                          <span>Sign Out</span>
+                        </button>
+                      </>
+                    ) : (
+                      <Link
+                        href="/auth/login"
+                        onClick={() => setIsAccountOpen(false)}
+                        className="flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors"
+                      >
+                        <User size={16} />
+                        <span>Sign In</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -149,8 +257,30 @@ export default function Header() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 right-0 bg-white shadow-lg animate-slide-up">
+          <div className="lg:hidden absolute top-full left-0 right-0 bg-white shadow-lg animate-slide-up max-h-[80vh] overflow-y-auto">
             <nav className="p-6 space-y-6">
+              {/* User Tier Badge & Quick Stats */}
+              <div className="pb-4 border-b border-sand/30">
+                <div className="flex items-center justify-between mb-4">
+                  {/* Tier Badge - Only show for UHNI members */}
+                  {isUHNI && (
+                    <span className="text-[9px] tracking-[0.25em] uppercase px-3 py-1.5 bg-gold-muted/20 text-gold-deep border border-gold-muted/30">
+                      UHNI Member
+                    </span>
+                  )}
+                  {considerations.length > 0 && (
+                    <Link
+                      href="/consideration"
+                      className="flex items-center gap-2 text-sm text-charcoal-deep"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Heart size={16} />
+                      <span>{considerations.length} item{considerations.length !== 1 ? 's' : ''}</span>
+                    </Link>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <p className="text-xs tracking-[0.15em] uppercase text-greige mb-4">Brand Universes</p>
                 <div className="space-y-3 pl-4">
@@ -182,19 +312,54 @@ export default function Header() {
                   Collections
                 </Link>
                 <Link
-                  href="/profile"
-                  className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
+                  href="/consideration"
+                  className="flex items-center justify-between text-sm tracking-[0.1em] uppercase text-charcoal-warm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  My Profile
+                  <span>Considerations</span>
+                  {considerations.length > 0 && (
+                    <span className="text-xs bg-gold-muted/20 text-gold-deep px-2 py-1">
+                      {considerations.length}
+                    </span>
+                  )}
                 </Link>
-                <Link
-                  href="/wardrobe"
-                  className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  My Wardrobe
-                </Link>
+
+                {/* Account Section - Different for logged in vs guest */}
+                {isHydrated && isAuthenticated ? (
+                  <>
+                    <Link
+                      href="/profile"
+                      className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      My Profile
+                    </Link>
+                    <Link
+                      href="/wardrobe"
+                      className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      My Wardrobe
+                    </Link>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setIsMenuOpen(false);
+                      }}
+                      className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm text-left"
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <Link
+                    href="/auth/login"
+                    className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Sign In
+                  </Link>
+                )}
               </div>
             </nav>
           </div>
