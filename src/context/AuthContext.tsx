@@ -10,6 +10,7 @@ interface AuthContextType {
   isBrand: boolean; // For brand partner portal access
   isAuthenticated: boolean;
   isHydrated: boolean; // Indicates if auth state loaded from localStorage
+  isLoggingOut: boolean; // Flag to prevent auth redirects during logout
   setUserRole: (tier: UserTier) => void;
   setBrandMode: (isBrand: boolean) => void;
   logout: () => void;
@@ -21,6 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userTier, setUserTier] = useState<UserTier>('standard');
   const [isBrand, setIsBrand] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Computed values
   const isUHNI = userTier === 'uhni';
@@ -76,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    // Set logging out flag first to prevent auth redirects
+    setIsLoggingOut(true);
     setUserTier('standard');
     setIsBrand(false);
     try {
@@ -93,6 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Failed to clear localStorage on logout:', error);
     }
+
+    // Reset logging out flag after a brief delay
+    setTimeout(() => setIsLoggingOut(false), 500);
   };
 
   return (
@@ -104,6 +111,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isBrand,
         isAuthenticated,
         isHydrated,
+        isLoggingOut,
         setUserRole,
         setBrandMode,
         logout

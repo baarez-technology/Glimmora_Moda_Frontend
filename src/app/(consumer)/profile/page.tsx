@@ -11,18 +11,18 @@ import { useAuth } from '@/context/AuthContext';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, isHydrated } = useAuth();
+  const { isAuthenticated, isHydrated, isLoggingOut } = useAuth();
   const { considerations, wardrobe, calendarEvents, orders, isUHNI, concierge, sourcingRequests, bespokeOrders, autonomousSettings, fashionIdentity } = useApp();
   const user = { ...mockUser, fashionIdentity };
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (but not during logout - let Header handle navigation)
   useEffect(() => {
-    if (isHydrated && !isAuthenticated) {
+    if (isHydrated && !isAuthenticated && !isLoggingOut) {
       router.push('/auth/login/consumer?redirect=/profile');
     }
-  }, [isAuthenticated, isHydrated, router]);
+  }, [isAuthenticated, isHydrated, isLoggingOut, router]);
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
