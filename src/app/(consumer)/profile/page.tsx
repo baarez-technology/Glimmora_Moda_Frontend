@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User, Heart, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers } from 'lucide-react';
+import { User, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers } from 'lucide-react';
 import { mockUser } from '@/data/mock-data';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -43,18 +43,13 @@ export default function ProfilePage() {
   }
 
   // Standard nav items for all users
+  // Note: Considerations removed - accessible via heart icon in header
   const baseNavItems = [
     {
       href: '/wardrobe',
       icon: ShoppingBag,
       title: 'Digital Wardrobe',
       subtitle: `${wardrobe.length} pieces`,
-    },
-    {
-      href: '/consideration',
-      icon: Heart,
-      title: 'Considerations',
-      subtitle: `${considerations.length} items`,
     },
     {
       href: '/profile/silent-cart',
@@ -146,12 +141,6 @@ export default function ProfilePage() {
                 <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">
                   Member Since 2024
                 </span>
-                {isUHNI && (
-                  <span className="flex items-center gap-1.5 px-3 py-1 bg-gold-soft/20 text-gold-soft text-[10px] tracking-[0.3em] uppercase">
-                    <Crown size={10} />
-                    UHNI
-                  </span>
-                )}
               </div>
               <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-3">
                 {user.name}
@@ -188,44 +177,24 @@ export default function ProfilePage() {
               </span>
 
               <nav className="space-y-1">
-                {navItems.map((item) => {
-                  const isUHNIItem = item.isUHNI === true;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`group flex items-center justify-between p-5 border-b transition-colors ${
-                        isUHNIItem
-                          ? 'border-gold-soft/30 hover:bg-gold-soft/5 bg-gold-soft/[0.02]'
-                          : 'border-sand/50 hover:bg-parchment'
-                      }`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 flex items-center justify-center transition-colors ${
-                          isUHNIItem
-                            ? 'bg-gold-soft/10 group-hover:bg-gold-soft/20'
-                            : 'bg-parchment group-hover:bg-ivory-cream'
-                        }`}>
-                          <item.icon size={18} className={isUHNIItem ? 'text-gold-muted' : 'text-stone'} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-charcoal-deep">{item.title}</p>
-                            {isUHNIItem && (
-                              <span className="text-[8px] tracking-[0.2em] uppercase text-gold-muted px-1.5 py-0.5 bg-gold-soft/10">
-                                UHNI
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-taupe">{item.subtitle}</p>
-                        </div>
+                {navItems.map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className="group flex items-center justify-between p-5 border-b border-sand/50 hover:bg-parchment transition-colors"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 flex items-center justify-center bg-parchment group-hover:bg-ivory-cream transition-colors">
+                        <item.icon size={18} className="text-stone" />
                       </div>
-                      <ArrowRight size={16} className={`group-hover:translate-x-1 transition-all ${
-                        isUHNIItem ? 'text-gold-muted/50 group-hover:text-gold-muted' : 'text-taupe group-hover:text-charcoal-deep'
-                      }`} />
-                    </Link>
-                  );
-                })}
+                      <div>
+                        <p className="font-medium text-charcoal-deep">{item.title}</p>
+                        <p className="text-sm text-taupe">{item.subtitle}</p>
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className="text-taupe group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
+                  </Link>
+                ))}
               </nav>
 
               {/* Upcoming Event */}

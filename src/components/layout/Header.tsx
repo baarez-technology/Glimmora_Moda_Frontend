@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, User, Heart, Menu, X, LogOut, Settings } from 'lucide-react';
+import { User, Heart, Menu, X, LogOut, Settings } from 'lucide-react';
 import { brands } from '@/data/mock-data';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -13,9 +13,7 @@ export default function Header() {
   const { considerations, userTier, isUHNI, showToast } = useApp();
   const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const accountRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = () => {
@@ -29,23 +27,10 @@ export default function Header() {
     }, 100);
   };
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setIsSearchOpen(false);
-      setSearchQuery('');
-    }
-  };
-
   // ESC key handler and click outside handler
   useEffect(() => {
     const handleEscKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isSearchOpen) {
-          setIsSearchOpen(false);
-          setSearchQuery('');
-        }
         if (isMenuOpen) {
           setIsMenuOpen(false);
         }
@@ -67,21 +52,13 @@ export default function Header() {
       window.removeEventListener('keydown', handleEscKey);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isSearchOpen, isMenuOpen, isAccountOpen]);
+  }, [isMenuOpen, isAccountOpen]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-ivory-cream/95 backdrop-blur-sm border-b border-sand/30">
       <div className="max-w-[1800px] mx-auto">
         {/* Top Bar */}
-        <div className="hidden lg:flex justify-between items-center px-12 py-2 border-b border-sand/20">
-          <div className="flex items-center gap-3">
-            {/* Tier Badge - Only show for UHNI members */}
-            {isUHNI && (
-              <span className="text-[10px] tracking-[0.25em] uppercase px-3 py-1 bg-gold-muted/20 text-gold-deep border border-gold-muted/30">
-                UHNI Member
-              </span>
-            )}
-          </div>
+        <div className="hidden lg:flex justify-center items-center px-12 py-2 border-b border-sand/20 relative">
           <p className="text-xs tracking-[0.2em] text-stone uppercase">
             Experience-First Luxury Commerce
           </p>
@@ -144,15 +121,6 @@ export default function Header() {
 
           {/* Navigation Right */}
           <div className="flex items-center gap-4 lg:gap-6">
-            {/* Search */}
-            <button
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className="p-2 text-charcoal-warm hover:text-noir transition-colors"
-              aria-label="Search"
-            >
-              <Search size={20} />
-            </button>
-
             {/* Consideration Space */}
             <Link
               href="/consideration"
@@ -228,58 +196,23 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Search Overlay */}
-        {isSearchOpen && (
-          <div className="absolute top-full left-0 right-0 bg-white shadow-lg p-6 animate-fade-in">
-            <div className="max-w-2xl mx-auto relative">
-              <form onSubmit={handleSearch}>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="What are you looking for today?"
-                  className="input-luxury text-center text-lg"
-                  autoFocus
-                />
-                <p className="text-center text-sm text-stone mt-4">
-                  Try: "Evening bag" or "Gucci" or "Silk"
-                </p>
-              </form>
-              <button
-                onClick={() => setIsSearchOpen(false)}
-                className="absolute -top-2 right-0 text-stone hover:text-noir"
-              >
-                <X size={20} />
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Mobile Menu */}
         {isMenuOpen && (
           <div className="lg:hidden absolute top-full left-0 right-0 bg-white shadow-lg animate-slide-up max-h-[80vh] overflow-y-auto">
             <nav className="p-6 space-y-6">
-              {/* User Tier Badge & Quick Stats */}
-              <div className="pb-4 border-b border-sand/30">
-                <div className="flex items-center justify-between mb-4">
-                  {/* Tier Badge - Only show for UHNI members */}
-                  {isUHNI && (
-                    <span className="text-[9px] tracking-[0.25em] uppercase px-3 py-1.5 bg-gold-muted/20 text-gold-deep border border-gold-muted/30">
-                      UHNI Member
-                    </span>
-                  )}
-                  {considerations.length > 0 && (
-                    <Link
-                      href="/consideration"
-                      className="flex items-center gap-2 text-sm text-charcoal-deep"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <Heart size={16} />
-                      <span>{considerations.length} item{considerations.length !== 1 ? 's' : ''}</span>
-                    </Link>
-                  )}
+              {/* Quick Stats */}
+              {considerations.length > 0 && (
+                <div className="pb-4 border-b border-sand/30">
+                  <Link
+                    href="/consideration"
+                    className="flex items-center gap-2 text-sm text-charcoal-deep"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <Heart size={16} />
+                    <span>{considerations.length} item{considerations.length !== 1 ? 's' : ''}</span>
+                  </Link>
                 </div>
-              </div>
+              )}
 
               <div>
                 <p className="text-xs tracking-[0.15em] uppercase text-greige mb-4">Brand Universes</p>
