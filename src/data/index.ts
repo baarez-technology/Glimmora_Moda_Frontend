@@ -99,7 +99,19 @@ export {
   mockBespokeOrders,
   mockAutonomousActivity,
   mockUHNIProfile,
-  getUHNIProfile
+  getUHNIProfile,
+  // Private Collections
+  mockPrivateCollections,
+  // UHNI Pricing
+  mockPriceNegotiations,
+  mockPriceOffers,
+  mockPriceAlerts,
+  mockPricingTiers,
+  mockPricingSummary,
+  // Enhanced G-SAIL
+  mockUHNIAvailabilitySearches,
+  mockGlobalNetworkStats,
+  mockRestockPredictions
 } from './uhni';
 
 // ============================================
@@ -153,7 +165,6 @@ export {
   mockInspirationBoards,
   getInspirationBoards,
   getInspirationBoardById,
-  defaultExploreMode,
   performVisualSearch,
   performVisualSearchByImage,
   bodyVisualizationPresets,

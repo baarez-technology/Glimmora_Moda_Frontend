@@ -128,7 +128,21 @@ export {
   type PrivateCollection,
   type AutonomousActivityType,
   type AutonomousActivity,
-  type UHNIProfile
+  type UHNIProfile,
+  // Pricing & Negotiation
+  type NegotiationStatus,
+  type PriceNegotiation,
+  type UHNIPriceOffer,
+  type UHNIPriceAlert,
+  type UHNIPricingTier,
+  type UHNIPricingSummary,
+  // Enhanced G-SAIL
+  type AvailabilitySearchStatus,
+  type AvailabilitySearchPriority,
+  type UHNIAvailabilitySearch,
+  type EnhancedAlternative,
+  type GlobalNetworkStats,
+  type RestockPrediction
 } from './uhni';
 
 // ============================================
@@ -162,7 +176,6 @@ export {
 export {
   type VisualSearchQuery,
   type VisualSearchResult,
-  type ExploreMode,
   type BoardItemType,
   type BoardItem,
   type InspirationBoard

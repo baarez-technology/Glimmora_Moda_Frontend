@@ -5,7 +5,16 @@ import type {
   SourcingRequest,
   BespokeOrder,
   UHNIProfile,
-  AutonomousActivity
+  AutonomousActivity,
+  PrivateCollection,
+  PriceNegotiation,
+  UHNIPriceOffer,
+  UHNIPriceAlert,
+  UHNIPricingTier,
+  UHNIPricingSummary,
+  UHNIAvailabilitySearch,
+  GlobalNetworkStats,
+  RestockPrediction
 } from '@/types';
 import { products } from './products';
 
@@ -272,3 +281,327 @@ export function getUHNIProfile(): UHNIProfile | null {
   }
   return null;
 }
+
+// ============================================
+// PRIVATE COLLECTIONS
+// ============================================
+
+export const mockPrivateCollections: PrivateCollection[] = [
+  {
+    id: 'dior-private-2025',
+    name: 'Dior Haute Couture Preview Spring 2025',
+    brandId: 'dior',
+    brandName: 'Dior',
+    description: 'An exclusive first look at the upcoming Haute Couture collection, featuring revolutionary silhouettes inspired by the architecture of Tadao Ando.',
+    heroImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
+    accessLevel: 'uhni_only',
+    products: products.filter(p => p.brandId === 'dior').slice(0, 3),
+    previewDate: '2025-01-20',
+    releaseDate: '2025-03-15',
+    invitationRequired: false,
+    hasAccess: true
+  },
+  {
+    id: 'hermes-invitation',
+    name: 'Hermès Les Métiers d\'Art',
+    brandId: 'hermes',
+    brandName: 'Hermès',
+    description: 'A celebration of the exceptional craftsmanship from the Hermès ateliers. Limited edition pieces showcasing rare leathers and techniques.',
+    heroImage: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    accessLevel: 'invitation',
+    products: products.filter(p => p.brandId === 'hermes').slice(0, 4),
+    previewDate: '2025-02-01',
+    releaseDate: '2025-04-01',
+    invitationRequired: true,
+    hasAccess: true
+  },
+  {
+    id: 'chanel-limited',
+    name: 'Chanel N°5 Centenary Collection',
+    brandId: 'chanel',
+    brandName: 'Chanel',
+    description: 'A limited capsule collection commemorating 100 years of the iconic N°5 fragrance, featuring jewelry and accessories with subtle fragrance bottle motifs.',
+    heroImage: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800',
+    accessLevel: 'request',
+    products: [],
+    previewDate: '2025-02-15',
+    releaseDate: '2025-05-05',
+    invitationRequired: false,
+    hasAccess: false
+  },
+  {
+    id: 'bottega-archive',
+    name: 'Bottega Veneta Archive Revival',
+    brandId: 'bottega-veneta',
+    brandName: 'Bottega Veneta',
+    description: 'Rare archive pieces reissued in limited quantities. Each piece comes with a certificate of authenticity and archival documentation.',
+    heroImage: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=800',
+    accessLevel: 'uhni_only',
+    products: products.filter(p => p.brandId === 'bottega-veneta').slice(0, 2),
+    previewDate: '2025-01-10',
+    releaseDate: '2025-02-28',
+    invitationRequired: false,
+    hasAccess: true
+  }
+];
+
+// ============================================
+// UHNI PRICING & NEGOTIATION
+// ============================================
+
+export const mockPriceNegotiations: PriceNegotiation[] = [
+  {
+    id: 'neg-1',
+    productId: 'hermes-birkin-30',
+    productName: 'Birkin 30 Togo Gold',
+    productImage: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    brandName: 'Hermès',
+    originalPrice: 21500,
+    proposedPrice: 19500,
+    counterOffer: 20200,
+    status: 'counter_offered',
+    conciergeNotes: [
+      'Based on your history with the brand, we\'ve secured a special consideration.',
+      'Counter offer includes complimentary leather care kit and priority servicing.'
+    ],
+    createdAt: '2025-01-15T10:00:00Z',
+    expiresAt: '2025-02-01T23:59:59Z'
+  },
+  {
+    id: 'neg-2',
+    productId: 'dior-bar-jacket',
+    productName: 'Bar Jacket Custom',
+    productImage: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800',
+    brandName: 'Dior',
+    originalPrice: 12500,
+    proposedPrice: 11000,
+    status: 'pending',
+    conciergeNotes: [
+      'Negotiation in progress with the Dior atelier.',
+      'Expected response within 48 hours.'
+    ],
+    createdAt: '2025-01-25T14:30:00Z',
+    expiresAt: '2025-02-10T23:59:59Z'
+  }
+];
+
+export const mockPriceOffers: UHNIPriceOffer[] = [
+  {
+    id: 'offer-1',
+    type: 'brand',
+    targetId: 'gucci',
+    targetName: 'Gucci Loyalty Reward',
+    targetImage: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800',
+    discountType: 'percentage',
+    discountValue: 15,
+    validFrom: '2025-01-01',
+    validUntil: '2025-02-28',
+    claimed: false,
+    conditions: ['Valid on full-price items', 'Minimum purchase €2,000']
+  },
+  {
+    id: 'offer-2',
+    type: 'collection',
+    targetId: 'dior-spring-2025',
+    targetName: 'Dior Spring 2025 Preview',
+    targetImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
+    discountType: 'fixed',
+    discountValue: 500,
+    validFrom: '2025-01-15',
+    validUntil: '2025-03-01',
+    claimed: false,
+    conditions: ['Valid on first purchase from collection', 'Cannot combine with other offers']
+  },
+  {
+    id: 'offer-3',
+    type: 'product',
+    targetId: 'bottega-cassette',
+    targetName: 'Bottega Cassette Bag',
+    targetImage: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=800',
+    discountType: 'percentage',
+    discountValue: 10,
+    validFrom: '2025-01-20',
+    validUntil: '2025-02-15',
+    claimed: false,
+    conditions: ['Limited to one per client']
+  }
+];
+
+export const mockPriceAlerts: UHNIPriceAlert[] = [
+  {
+    id: 'alert-1',
+    productId: 'lv-speedy-25',
+    productName: 'Speedy Bandoulière 25',
+    productImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800',
+    brandName: 'Louis Vuitton',
+    targetPrice: 1400,
+    currentPrice: 1590,
+    triggered: false,
+    createdAt: '2025-01-10T09:00:00Z'
+  },
+  {
+    id: 'alert-2',
+    productId: 'gucci-horsebit-loafer',
+    productName: 'Horsebit Loafer',
+    productImage: 'https://images.unsplash.com/photo-1614252369475-531eba835eb1?w=800',
+    brandName: 'Gucci',
+    targetPrice: 800,
+    currentPrice: 890,
+    triggered: false,
+    createdAt: '2025-01-18T11:30:00Z'
+  }
+];
+
+export const mockPricingTiers: UHNIPricingTier[] = [
+  {
+    tier: 'standard',
+    label: 'Standard',
+    description: 'Standard retail pricing with seasonal promotions',
+    benefits: ['Access to public sales', 'Standard shipping rates', 'General customer service']
+  },
+  {
+    tier: 'preferred',
+    label: 'Preferred',
+    description: 'Enhanced pricing with loyalty benefits',
+    benefits: ['Early access to sales', 'Free standard shipping', 'Priority customer service', 'Birthday discount (5%)'],
+    averageDiscount: 5
+  },
+  {
+    tier: 'uhni',
+    label: 'UHNI Private',
+    description: 'Exclusive pricing with concierge negotiation',
+    benefits: [
+      'Private negotiation on any item',
+      'Pre-release pricing locks',
+      'Bundle discount optimization',
+      'Complimentary global shipping',
+      'Dedicated concierge pricing support',
+      'Price match guarantee across regions'
+    ],
+    averageDiscount: 12
+  }
+];
+
+export const mockPricingSummary: UHNIPricingSummary = {
+  lifetimeSavings: 47850,
+  activeNegotiations: 2,
+  pendingOffers: 3,
+  priceAlertsSet: 2
+};
+
+// ============================================
+// ENHANCED G-SAIL (GLOBAL SOURCING)
+// ============================================
+
+export const mockUHNIAvailabilitySearches: UHNIAvailabilitySearch[] = [
+  {
+    id: 'search-1',
+    productId: 'hermes-kelly-28',
+    productName: 'Kelly 28 Sellier Noir',
+    productImage: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    brandName: 'Hermès',
+    status: 'found',
+    priority: 'high',
+    createdAt: '2025-01-20T08:00:00Z',
+    conciergeAssigned: true,
+    alternatives: [
+      {
+        id: 'alt-1',
+        type: 'geography',
+        region: 'Europe',
+        city: 'Paris',
+        boutiqueName: 'Hermès Faubourg Saint-Honoré',
+        availabilityConfidence: 94,
+        deliveryDays: 3,
+        priceDifference: 0,
+        reason: 'Available at flagship store. Priority allocation secured.',
+        holdAvailable: true,
+        holdExpiresAt: '2025-02-01T18:00:00Z',
+        conciergeNote: 'Highly recommended - pristine condition, verified in person.',
+        verifiedAt: '2025-01-28T10:00:00Z'
+      },
+      {
+        id: 'alt-2',
+        type: 'geography',
+        region: 'Asia',
+        city: 'Tokyo',
+        boutiqueName: 'Hermès Ginza',
+        availabilityConfidence: 87,
+        deliveryDays: 5,
+        priceDifference: 150,
+        reason: 'In stock at Ginza boutique. Regional pricing applies.',
+        holdAvailable: true,
+        holdExpiresAt: '2025-02-02T12:00:00Z',
+        verifiedAt: '2025-01-27T14:00:00Z'
+      }
+    ]
+  },
+  {
+    id: 'search-2',
+    productId: 'dior-saddle-vintage',
+    productName: 'Saddle Bag Vintage 2000',
+    productImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800',
+    brandName: 'Dior',
+    status: 'searching',
+    priority: 'standard',
+    createdAt: '2025-01-25T11:00:00Z',
+    conciergeAssigned: true,
+    alternatives: []
+  },
+  {
+    id: 'search-3',
+    productId: 'bottega-pouch-large',
+    productName: 'The Pouch Large',
+    productImage: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=800',
+    brandName: 'Bottega Veneta',
+    status: 'secured',
+    priority: 'urgent',
+    createdAt: '2025-01-18T09:00:00Z',
+    conciergeAssigned: true,
+    alternatives: [
+      {
+        id: 'alt-3',
+        type: 'geography',
+        region: 'Europe',
+        city: 'Milan',
+        boutiqueName: 'Bottega Veneta Via Montenapoleone',
+        availabilityConfidence: 100,
+        deliveryDays: 4,
+        priceDifference: -80,
+        reason: 'Secured and held for you. Ready for shipment.',
+        holdAvailable: false,
+        conciergeNote: 'Item secured on Jan 26. Awaiting your confirmation to ship.',
+        verifiedAt: '2025-01-26T16:00:00Z'
+      }
+    ]
+  }
+];
+
+export const mockGlobalNetworkStats: GlobalNetworkStats = {
+  activeSearches: 3,
+  regionsConnected: 47,
+  boutiquesNetwork: 1250,
+  averageDeliveryDays: 4.2,
+  successRate: 94.7
+};
+
+export const mockRestockPredictions: RestockPrediction[] = [
+  {
+    productId: 'hermes-constance-mini',
+    productName: 'Constance Mini 18',
+    productImage: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    brandName: 'Hermès',
+    estimatedDate: '2025-02-15',
+    probability: 78,
+    alertEnabled: true
+  },
+  {
+    productId: 'dior-book-tote',
+    productName: 'Book Tote Medium',
+    productImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800',
+    brandName: 'Dior',
+    estimatedDate: '2025-02-08',
+    probability: 85,
+    alertEnabled: false
+  }
+];

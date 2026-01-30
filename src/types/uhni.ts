@@ -202,3 +202,119 @@ export interface UHNIProfile {
     specialRequests: string[];
   };
 }
+
+// ============================================
+// UHNI Pricing & Negotiation Types
+// ============================================
+
+export type NegotiationStatus = 'pending' | 'approved' | 'counter_offered' | 'declined' | 'accepted';
+
+export interface PriceNegotiation {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  brandName: string;
+  originalPrice: number;
+  proposedPrice: number;
+  counterOffer?: number;
+  status: NegotiationStatus;
+  conciergeNotes: string[];
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface UHNIPriceOffer {
+  id: string;
+  type: 'product' | 'collection' | 'brand';
+  targetId: string;
+  targetName: string;
+  targetImage?: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  validFrom: string;
+  validUntil: string;
+  claimed: boolean;
+  conditions?: string[];
+}
+
+export interface UHNIPriceAlert {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  brandName: string;
+  targetPrice: number;
+  currentPrice: number;
+  triggered: boolean;
+  createdAt: string;
+}
+
+export interface UHNIPricingTier {
+  tier: 'standard' | 'preferred' | 'uhni';
+  label: string;
+  description: string;
+  benefits: string[];
+  averageDiscount?: number;
+}
+
+export interface UHNIPricingSummary {
+  lifetimeSavings: number;
+  activeNegotiations: number;
+  pendingOffers: number;
+  priceAlertsSet: number;
+}
+
+// ============================================
+// Enhanced G-SAIL (Global Sourcing) Types
+// ============================================
+
+export type AvailabilitySearchStatus = 'searching' | 'found' | 'secured' | 'unavailable';
+export type AvailabilitySearchPriority = 'standard' | 'high' | 'urgent';
+
+export interface UHNIAvailabilitySearch {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  brandName: string;
+  status: AvailabilitySearchStatus;
+  priority: AvailabilitySearchPriority;
+  createdAt: string;
+  alternatives: EnhancedAlternative[];
+  conciergeAssigned: boolean;
+}
+
+export interface EnhancedAlternative {
+  id: string;
+  type: 'geography' | 'equivalent';
+  region: string;
+  city: string;
+  boutiqueName?: string;
+  availabilityConfidence: number;
+  deliveryDays: number;
+  priceDifference: number;
+  reason: string;
+  holdAvailable: boolean;
+  holdExpiresAt?: string;
+  conciergeNote?: string;
+  verifiedAt: string;
+}
+
+export interface GlobalNetworkStats {
+  activeSearches: number;
+  regionsConnected: number;
+  boutiquesNetwork: number;
+  averageDeliveryDays: number;
+  successRate: number;
+}
+
+export interface RestockPrediction {
+  productId: string;
+  productName: string;
+  productImage: string;
+  brandName: string;
+  estimatedDate: string;
+  probability: number;
+  alertEnabled: boolean;
+}

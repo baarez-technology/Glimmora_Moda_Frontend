@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers } from 'lucide-react';
+import { User, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers, Sparkles, Archive, DollarSign, Globe } from 'lucide-react';
 import { mockUser } from '@/data/mock-data';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -99,6 +99,34 @@ export default function ProfilePage() {
       icon: Gem,
       title: 'Bespoke Orders',
       subtitle: bespokeOrders.length > 0 ? `${bespokeOrders.length} in progress` : 'Commission pieces',
+      isUHNI: true,
+    },
+    {
+      href: '/uhni/private-collections',
+      icon: Sparkles,
+      title: 'Private Collections',
+      subtitle: '4 collections available',
+      isUHNI: true,
+    },
+    {
+      href: '/uhni/heritage-archive',
+      icon: Archive,
+      title: 'Heritage Archive',
+      subtitle: '5 brands',
+      isUHNI: true,
+    },
+    {
+      href: '/uhni/pricing',
+      icon: DollarSign,
+      title: 'Private Pricing',
+      subtitle: '3 offers available',
+      isUHNI: true,
+    },
+    {
+      href: '/uhni/global-sourcing',
+      icon: Globe,
+      title: 'Global Sourcing',
+      subtitle: '3 active searches',
       isUHNI: true,
     },
   ] : [];
