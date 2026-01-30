@@ -1,0 +1,237 @@
+'use client';
+
+import { useState } from 'react';
+import Link from 'next/link';
+import { ChevronRight, Search, Filter, Package, Clock, Truck, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useBrand } from '@/context/BrandContext';
+import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
+import type { OrderStatus } from '@/types/brand-portal';
+
+export default function OrdersPage() {
+  const { orders } = useBrand();
+  const [filter, setFilter] = useState<'all' | OrderStatus>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredOrders = orders.filter(order => {
+    const matchesFilter = filter === 'all' || order.status === filter;
+    const matchesSearch = searchQuery === '' ||
+      order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.customer.name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
+
+  const formatCurrency = (value: number) => {
+    return `€${value.toLocaleString()}`;
+  };
+
+  const formatDate = (timestamp: string) => {
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusIcon = (status: OrderStatus) => {
+    switch (status) {
+      case 'pending': return AlertCircle;
+      case 'confirmed': return Clock;
+      case 'processing': return Package;
+      case 'shipped': return Truck;
+      case 'delivered': return CheckCircle;
+      case 'cancelled': return XCircle;
+      default: return Package;
+    }
+  };
+
+  const getStatusBadge = (status: OrderStatus) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-warning/10 text-warning';
+      case 'confirmed':
+        return 'bg-info/10 text-info';
+      case 'processing':
+        return 'bg-gold-soft/20 text-gold-deep';
+      case 'shipped':
+        return 'bg-info/10 text-info';
+      case 'delivered':
+        return 'bg-success/10 text-success';
+      case 'cancelled':
+        return 'bg-error/10 text-error';
+      default:
+        return 'bg-taupe/20 text-stone';
+    }
+  };
+
+  const getTierBadge = (tier?: string) => {
+    switch (tier) {
+      case 'uhni':
+        return 'bg-gold-soft/20 text-gold-deep';
+      case 'preferred':
+        return 'bg-champagne/30 text-gold-muted';
+      default:
+        return 'bg-parchment text-stone';
+    }
+  };
+
+  const statusCounts = {
+    all: orders.length,
+    pending: orders.filter(o => o.status === 'pending').length,
+    confirmed: orders.filter(o => o.status === 'confirmed').length,
+    processing: orders.filter(o => o.status === 'processing').length,
+    shipped: orders.filter(o => o.status === 'shipped').length,
+    delivered: orders.filter(o => o.status === 'delivered').length,
+    cancelled: orders.filter(o => o.status === 'cancelled').length
+  };
+
+  return (
+    <div>
+      <BrandPageHeader
+        title="Orders"
+        subtitle={`${filteredOrders.length} order${filteredOrders.length !== 1 ? 's' : ''}`}
+      />
+
+      <div className="p-8 space-y-6">
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
+          {[
+            { value: 'all' as const, label: 'All' },
+            { value: 'pending' as const, label: 'Pending' },
+            { value: 'confirmed' as const, label: 'Confirmed' },
+            { value: 'processing' as const, label: 'Processing' },
+            { value: 'shipped' as const, label: 'Shipped' },
+            { value: 'delivered' as const, label: 'Delivered' }
+          ].map(tab => (
+            <button
+              key={tab.value}
+              onClick={() => setFilter(tab.value)}
+              className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
+                filter === tab.value
+                  ? 'bg-white text-charcoal-deep'
+                  : 'text-stone hover:text-charcoal-deep'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-[10px] ${filter === tab.value ? 'text-taupe' : 'text-taupe/60'}`}>
+                {statusCounts[tab.value]}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div className="relative max-w-md">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-taupe" />
+          <input
+            type="text"
+            placeholder="Search by order number or customer..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+          />
+        </div>
+
+        {/* Orders List */}
+        {filteredOrders.length === 0 ? (
+          <div className="bg-white border border-sand/50 p-12 text-center">
+            <p className="text-stone">No orders found</p>
+          </div>
+        ) : (
+          <div className="bg-white border border-sand/50">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-sand/30">
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Order
+                    </th>
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Customer
+                    </th>
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Items
+                    </th>
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Boutique
+                    </th>
+                    <th className="text-right px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Total
+                    </th>
+                    <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Status
+                    </th>
+                    <th className="px-6 py-4"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-sand/30">
+                  {filteredOrders.map(order => {
+                    const StatusIcon = getStatusIcon(order.status);
+                    return (
+                      <tr key={order.id} className="hover:bg-parchment/30 transition-colors">
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="text-sm font-medium text-charcoal-deep">#{order.orderNumber}</p>
+                            <p className="text-xs text-taupe">{formatDate(order.createdAt)}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-parchment rounded-full flex items-center justify-center text-xs text-stone">
+                              {order.customer.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-sm text-charcoal-deep">{order.customer.name}</p>
+                              {order.customer.tier && (
+                                <span className={`text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 ${getTierBadge(order.customer.tier)}`}>
+                                  {order.customer.tier}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-charcoal-deep">
+                            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                          </p>
+                          <p className="text-xs text-taupe truncate max-w-[200px]">
+                            {order.items.map(i => i.productName).join(', ')}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-charcoal-deep">{order.boutique}</p>
+                          <p className="text-xs text-taupe">{order.region}</p>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <p className="text-sm font-medium text-charcoal-deep">
+                            {formatCurrency(order.total)}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(order.status)}`}>
+                              <StatusIcon size={12} />
+                              {order.status}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <Link
+                            href={`/brand/orders/${order.id}`}
+                            className="inline-flex items-center gap-1 text-xs text-stone hover:text-charcoal-deep transition-colors"
+                          >
+                            View <ChevronRight size={14} />
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

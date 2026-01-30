@@ -1,0 +1,405 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import {
+  ArrowLeft,
+  Save,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Eye,
+  ShoppingCart,
+  DollarSign,
+  Clock,
+  MapPin,
+  AlertTriangle
+} from 'lucide-react';
+import { useBrand } from '@/context/BrandContext';
+import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
+import { MetricCard } from '@/components/brand/MetricCard';
+import type { BrandProductStatus } from '@/types/brand-portal';
+import type { ProductCategory } from '@/types/product';
+
+export default function EditProductPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { getProductById, updateProduct } = useBrand();
+
+  const productId = params.id as string;
+  const product = getProductById(productId);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    sku: '',
+    price: '',
+    category: 'bags' as ProductCategory,
+    description: '',
+    tagline: '',
+    status: 'draft' as BrandProductStatus
+  });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  useEffect(() => {
+    if (product) {
+      setFormData({
+        name: product.name,
+        sku: product.sku,
+        price: product.price.toString(),
+        category: product.category,
+        description: product.description,
+        tagline: product.tagline,
+        status: product.status
+      });
+    }
+  }, [product]);
+
+  if (!product) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-stone">Product not found</p>
+        <Link
+          href="/brand/products"
+          className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
+        >
+          <ArrowLeft size={16} /> Back to Products
+        </Link>
+      </div>
+    );
+  }
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      updateProduct(productId, {
+        name: formData.name,
+        sku: formData.sku,
+        price: parseFloat(formData.price) || product.price,
+        category: formData.category,
+        description: formData.description,
+        tagline: formData.tagline,
+        status: formData.status
+      });
+      setHasChanges(false);
+    } catch (error) {
+      console.error('Failed to save:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-EU', {
+      style: 'currency',
+      currency: product.currency,
+      minimumFractionDigits: 0
+    }).format(value);
+  };
+
+  const isLowStock = product.totalStock > 0 && product.totalStock <= 10;
+  const categories: ProductCategory[] = ['bags', 'clothing', 'shoes', 'accessories', 'jewelry', 'watches'];
+
+  return (
+    <div>
+      <BrandPageHeader
+        title={product.name}
+        breadcrumbs={[
+          { label: 'Products', href: '/brand/products' },
+          { label: product.name }
+        ]}
+        actions={
+          <div className="flex items-center gap-3">
+            <SecondaryButton href="/brand/products" icon={ArrowLeft}>
+              Back
+            </SecondaryButton>
+            <PrimaryButton onClick={handleSave} icon={Save} disabled={isSaving || !hasChanges}>
+              {isSaving ? 'Saving...' : 'Save Changes'}
+            </PrimaryButton>
+          </div>
+        }
+      />
+
+      <div className="p-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Basic Info */}
+            <section className="bg-white border border-sand/50 p-6 space-y-6">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+                Basic Information
+              </h2>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="col-span-2">
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Product Name
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    SKU
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.sku}
+                    onChange={(e) => handleChange('sku', e.target.value.toUpperCase())}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors uppercase"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Price (EUR)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.price}
+                    onChange={(e) => handleChange('price', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Category
+                  </label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleChange('category', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>
+                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Status
+                  </label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => handleChange('status', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="published">Published</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            {/* Description */}
+            <section className="bg-white border border-sand/50 p-6 space-y-6">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+                Description
+              </h2>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Tagline
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.tagline}
+                    onChange={(e) => handleChange('tagline', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => handleChange('description', e.target.value)}
+                    rows={4}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* Regional Stock */}
+            <section className="bg-white border border-sand/50 p-6">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4 mb-6">
+                Regional Stock
+              </h2>
+
+              {product.regionalStock.length === 0 ? (
+                <p className="text-sm text-stone text-center py-4">No stock data available</p>
+              ) : (
+                <div className="space-y-3">
+                  {product.regionalStock.map((stock, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between py-3 border-b border-sand/30 last:border-0"
+                    >
+                      <div className="flex items-center gap-3">
+                        <MapPin size={16} className="text-taupe" />
+                        <div>
+                          <p className="text-sm text-charcoal-deep">{stock.city}</p>
+                          <p className="text-xs text-taupe">{stock.region}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-sm font-medium ${
+                          stock.units <= stock.lowStockThreshold ? 'text-warning' : 'text-charcoal-deep'
+                        }`}>
+                          {stock.units} units
+                        </p>
+                        {stock.units <= stock.lowStockThreshold && (
+                          <p className="text-xs text-warning flex items-center gap-1">
+                            <AlertTriangle size={10} /> Below threshold
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Product Image */}
+            <div className="bg-white border border-sand/50 p-4">
+              <div className="aspect-square bg-parchment relative overflow-hidden">
+                {product.images[0] ? (
+                  <Image
+                    src={product.images[0].url}
+                    alt={product.images[0].alt}
+                    fill
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-taupe text-sm">
+                    No image
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Performance Metrics */}
+            <div className="bg-white border border-sand/50 p-6">
+              <h3 className="text-sm font-medium text-charcoal-deep mb-4">Performance</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-stone flex items-center gap-2">
+                    <Eye size={14} /> Views
+                  </span>
+                  <span className="text-sm text-charcoal-deep">
+                    {product.performanceMetrics.views.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-stone flex items-center gap-2">
+                    <ShoppingCart size={14} /> Add to Cart
+                  </span>
+                  <span className="text-sm text-charcoal-deep">
+                    {product.performanceMetrics.addToCart.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-stone flex items-center gap-2">
+                    <DollarSign size={14} /> Purchases
+                  </span>
+                  <span className="text-sm text-charcoal-deep">
+                    {product.performanceMetrics.purchases.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-stone flex items-center gap-2">
+                    <TrendingUp size={14} /> Conversion
+                  </span>
+                  <span className="text-sm text-charcoal-deep">
+                    {product.performanceMetrics.conversionRate.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-stone flex items-center gap-2">
+                    <Clock size={14} /> Avg Decision Time
+                  </span>
+                  <span className="text-sm text-charcoal-deep">
+                    {product.performanceMetrics.avgTimeToDecision}h
+                  </span>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-sand/50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-stone">Demand Score</span>
+                  <span className={`text-sm font-medium ${
+                    product.demandScore >= 80 ? 'text-success' :
+                    product.demandScore >= 50 ? 'text-charcoal-deep' :
+                    'text-warning'
+                  }`}>
+                    {product.demandScore}/100
+                  </span>
+                </div>
+                <div className="h-2 bg-parchment overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${
+                      product.demandScore >= 80 ? 'bg-success' :
+                      product.demandScore >= 50 ? 'bg-gold-muted' :
+                      'bg-warning'
+                    }`}
+                    style={{ width: `${product.demandScore}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Stock Summary */}
+            <div className="bg-white border border-sand/50 p-6">
+              <h3 className="text-sm font-medium text-charcoal-deep mb-4">Stock Summary</h3>
+              <div className="text-center py-4">
+                <p className={`text-3xl font-display ${isLowStock ? 'text-warning' : 'text-charcoal-deep'}`}>
+                  {product.totalStock}
+                </p>
+                <p className="text-xs text-stone mt-1">Total Units</p>
+                {isLowStock && (
+                  <p className="text-xs text-warning mt-2 flex items-center justify-center gap-1">
+                    <AlertTriangle size={12} /> Low stock alert
+                  </p>
+                )}
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-sand/50">
+                <p className="text-xs text-stone mb-2">Revenue (All Time)</p>
+                <p className="text-xl font-display text-charcoal-deep">
+                  {formatCurrency(product.performanceMetrics.revenue)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

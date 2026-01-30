@@ -1,0 +1,275 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ArrowLeft, Upload, Plus, X, Save } from 'lucide-react';
+import { useBrand } from '@/context/BrandContext';
+
+export default function EditCollectionPage() {
+  const params = useParams();
+  const router = useRouter();
+  const { getCollectionById, products } = useBrand();
+
+  const collectionId = params.id as string;
+  const collection = getCollectionById(collectionId);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    season: 'Spring/Summer',
+    year: new Date().getFullYear().toString(),
+    status: 'draft' as 'draft' | 'published' | 'archived'
+  });
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (collection) {
+      setFormData({
+        name: collection.name,
+        description: collection.description,
+        season: collection.season,
+        year: collection.year.toString(),
+        status: collection.status
+      });
+      setSelectedProducts(collection.productIds);
+    }
+  }, [collection]);
+
+  if (!collection) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-stone">Collection not found</p>
+        <Link
+          href="/brand/collections"
+          className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
+        >
+          <ArrowLeft size={16} /> Back to Collections
+        </Link>
+      </div>
+    );
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real app, this would update the collection in the backend
+    console.log('Updating collection:', { ...formData, products: selectedProducts });
+    router.push(`/brand/collections/${collectionId}`);
+  };
+
+  const toggleProduct = (productId: string) => {
+    setSelectedProducts(prev =>
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="bg-white border-b border-sand px-8 py-6">
+        <nav className="flex items-center gap-2 text-sm mb-4">
+          <Link href="/brand/collections" className="text-taupe hover:text-charcoal-deep transition-colors">
+            Collections
+          </Link>
+          <span className="text-taupe">/</span>
+          <Link href={`/brand/collections/${collectionId}`} className="text-taupe hover:text-charcoal-deep transition-colors">
+            {collection.name}
+          </Link>
+          <span className="text-taupe">/</span>
+          <span className="text-charcoal-deep">Edit</span>
+        </nav>
+
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl text-charcoal-deep">Edit Collection</h1>
+          <Link
+            href={`/brand/collections/${collectionId}`}
+            className="flex items-center gap-2 px-4 py-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
+          >
+            <ArrowLeft size={16} />
+            Cancel
+          </Link>
+        </div>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleSubmit} className="p-8 max-w-4xl">
+        <div className="space-y-8">
+          {/* Basic Information */}
+          <div className="bg-white border border-sand/50 p-6">
+            <h2 className="font-display text-lg text-charcoal-deep mb-6">Basic Information</h2>
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">
+                  Collection Name *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  placeholder="e.g., Spring/Summer 2025"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">
+                    Season *
+                  </label>
+                  <select
+                    value={formData.season}
+                    onChange={(e) => setFormData({ ...formData, season: e.target.value })}
+                    className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
+                  >
+                    <option value="Spring/Summer">Spring/Summer</option>
+                    <option value="Autumn/Winter">Autumn/Winter</option>
+                    <option value="Resort">Resort</option>
+                    <option value="Pre-Fall">Pre-Fall</option>
+                    <option value="Permanent">Permanent</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">
+                    Year *
+                  </label>
+                  <select
+                    value={formData.year}
+                    onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                    className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
+                  >
+                    {[2024, 2025, 2026].map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">
+                  Status
+                </label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' | 'archived' })}
+                  className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-white border border-sand/50 p-6">
+            <h2 className="font-display text-lg text-charcoal-deep mb-6">Description</h2>
+
+            <div>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">
+                Collection Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                rows={4}
+                className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                placeholder="Describe the collection, its inspiration, and key themes..."
+              />
+            </div>
+          </div>
+
+          {/* Hero Image */}
+          <div className="bg-white border border-sand/50 p-6">
+            <h2 className="font-display text-lg text-charcoal-deep mb-6">Hero Image</h2>
+
+            {collection.heroImage ? (
+              <div className="relative aspect-[16/9] bg-parchment mb-4">
+                <img
+                  src={collection.heroImage}
+                  alt={collection.name}
+                  className="w-full h-full object-cover"
+                />
+                <button
+                  type="button"
+                  className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-charcoal-deep transition-colors"
+                >
+                  Change Image
+                </button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-sand hover:border-taupe transition-colors p-8">
+                <div className="text-center">
+                  <Upload size={32} className="mx-auto text-taupe mb-3" />
+                  <p className="text-sm text-stone mb-1">Drop image here or click to upload</p>
+                  <p className="text-xs text-taupe">PNG, JPG up to 10MB</p>
+                  <button
+                    type="button"
+                    className="mt-4 px-4 py-2 text-sm text-charcoal-deep border border-sand hover:border-charcoal-deep transition-colors"
+                  >
+                    Select File
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Products */}
+          <div className="bg-white border border-sand/50 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-display text-lg text-charcoal-deep">Products</h2>
+              <span className="text-sm text-taupe">{selectedProducts.length} selected</span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
+              {products.map(product => (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => toggleProduct(product.id)}
+                  className={`p-3 border text-left transition-all ${
+                    selectedProducts.includes(product.id)
+                      ? 'border-charcoal-deep bg-parchment'
+                      : 'border-sand/50 hover:border-sand'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium text-charcoal-deep truncate">{product.name}</p>
+                    {selectedProducts.includes(product.id) ? (
+                      <X size={14} className="text-charcoal-deep flex-shrink-0" />
+                    ) : (
+                      <Plus size={14} className="text-taupe flex-shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-xs text-taupe">{product.sku}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-end gap-4">
+            <Link
+              href={`/brand/collections/${collectionId}`}
+              className="px-6 py-3 text-sm text-stone hover:text-charcoal-deep transition-colors"
+            >
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
+            >
+              <Save size={16} />
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  );
+}
