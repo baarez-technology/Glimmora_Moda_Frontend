@@ -86,6 +86,13 @@ interface BrandContextType {
 
   sourcingRequests: SourcingRequest[];
   getSourcingRequestById: (id: string) => SourcingRequest | undefined;
+  submitSourcingOption: (requestId: string, option: {
+    customDescription: string;
+    price: number;
+    condition: 'new' | 'like_new' | 'excellent' | 'good';
+    source?: string;
+    conciergeRecommendation?: string;
+  }) => void;
 
   heritageEvents: HeritageEvent[];
   getHeritageEventById: (id: string) => HeritageEvent | undefined;
@@ -309,6 +316,35 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return sourcingRequests.find(r => r.id === id);
   }, [sourcingRequests]);
 
+  const submitSourcingOption = useCallback((requestId: string, option: {
+    customDescription: string;
+    price: number;
+    condition: 'new' | 'like_new' | 'excellent' | 'good';
+    source?: string;
+    conciergeRecommendation?: string;
+  }) => {
+    setSourcingRequests(prev => prev.map(request => {
+      if (request.id !== requestId) return request;
+
+      const newOption = {
+        id: `option-${Date.now()}`,
+        customDescription: option.customDescription,
+        source: option.source || 'Brand Inventory',
+        condition: option.condition,
+        price: option.price,
+        conciergeRecommendation: option.conciergeRecommendation,
+        images: []
+      };
+
+      return {
+        ...request,
+        foundOptions: [...request.foundOptions, newOption],
+        status: request.status === 'pending' ? 'sourcing' : request.status,
+        updatedAt: new Date().toISOString()
+      };
+    }));
+  }, []);
+
   const getHeritageEventById = useCallback((id: string): HeritageEvent | undefined => {
     return heritageEvents.find(e => e.id === id);
   }, [heritageEvents]);
@@ -399,6 +435,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         createPrivateCollection,
         sourcingRequests,
         getSourcingRequestById,
+        submitSourcingOption,
         heritageEvents,
         getHeritageEventById,
         createHeritageEvent,

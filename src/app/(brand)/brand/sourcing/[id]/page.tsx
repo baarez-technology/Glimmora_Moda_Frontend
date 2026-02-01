@@ -21,8 +21,15 @@ import type { SourcingRequestStatus, SourcingRequestType } from '@/types/uhni';
 
 export default function SourcingRequestDetailPage() {
   const params = useParams();
-  const { getSourcingRequestById, products } = useBrand();
+  const { getSourcingRequestById, submitSourcingOption } = useBrand();
   const [showSubmitForm, setShowSubmitForm] = useState(false);
+  const [formData, setFormData] = useState({
+    description: '',
+    price: '',
+    condition: 'new' as 'new' | 'like_new' | 'excellent' | 'good',
+    source: '',
+    recommendation: ''
+  });
 
   const requestId = params.id as string;
   const request = getSourcingRequestById(requestId);
@@ -106,6 +113,28 @@ export default function SourcingRequestDetailPage() {
 
   const daysUntilDeadline = getDaysUntilDeadline(request.deadline);
   const canSubmit = request.status === 'pending' || request.status === 'sourcing';
+
+  const handleSubmitOption = () => {
+    if (!formData.description || !formData.price) return;
+
+    submitSourcingOption(requestId, {
+      customDescription: formData.description,
+      price: parseFloat(formData.price),
+      condition: formData.condition,
+      source: formData.source || undefined,
+      conciergeRecommendation: formData.recommendation || undefined
+    });
+
+    // Reset form and hide it
+    setFormData({
+      description: '',
+      price: '',
+      condition: 'new',
+      source: '',
+      recommendation: ''
+    });
+    setShowSubmitForm(false);
+  };
 
   return (
     <div>
@@ -267,6 +296,8 @@ export default function SourcingRequestDetailPage() {
                     </label>
                     <textarea
                       rows={3}
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Describe the item you can source..."
                       className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                     />
@@ -280,6 +311,8 @@ export default function SourcingRequestDetailPage() {
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
                         <input
                           type="number"
+                          value={formData.price}
+                          onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
                           placeholder="0"
                           className="w-full pl-8 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                         />
@@ -289,7 +322,11 @@ export default function SourcingRequestDetailPage() {
                       <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
                         Condition *
                       </label>
-                      <select className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors">
+                      <select
+                        value={formData.condition}
+                        onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as typeof formData.condition }))}
+                        className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                      >
                         <option value="new">New</option>
                         <option value="like_new">Like New</option>
                         <option value="excellent">Excellent</option>
@@ -303,6 +340,8 @@ export default function SourcingRequestDetailPage() {
                     </label>
                     <input
                       type="text"
+                      value={formData.source}
+                      onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value }))}
                       placeholder="e.g., Paris Flagship Boutique"
                       className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                     />
@@ -313,12 +352,18 @@ export default function SourcingRequestDetailPage() {
                     </label>
                     <textarea
                       rows={2}
+                      value={formData.recommendation}
+                      onChange={(e) => setFormData(prev => ({ ...prev, recommendation: e.target.value }))}
                       placeholder="Why is this option a good match?"
                       className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                     />
                   </div>
                   <div className="flex justify-end">
-                    <button className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors">
+                    <button
+                      onClick={handleSubmitOption}
+                      disabled={!formData.description || !formData.price}
+                      className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       Submit Option
                     </button>
                   </div>
