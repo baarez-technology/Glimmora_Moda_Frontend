@@ -11,7 +11,15 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  ShoppingBag
+  ShoppingBag,
+  Scissors,
+  MessageSquare,
+  Lock,
+  Search,
+  Clock,
+  BookOpen,
+  Gift,
+  Calendar
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 
@@ -43,9 +51,27 @@ const navigation: NavSection[] = [
     ]
   },
   {
+    title: 'UHNI Services',
+    items: [
+      { label: 'Bespoke Orders', href: '/brand/bespoke', icon: Scissors },
+      { label: 'Negotiations', href: '/brand/negotiations', icon: MessageSquare },
+      { label: 'Private Collections', href: '/brand/private-collections', icon: Lock },
+      { label: 'Sourcing Requests', href: '/brand/sourcing', icon: Search }
+    ]
+  },
+  {
+    title: 'Content',
+    items: [
+      { label: 'Heritage', href: '/brand/heritage', icon: Clock },
+      { label: 'Stories', href: '/brand/stories', icon: BookOpen },
+      { label: 'UHNI Offers', href: '/brand/offers', icon: Gift }
+    ]
+  },
+  {
     title: 'Insights',
     items: [
-      { label: 'Analytics', href: '/brand/analytics', icon: BarChart3 }
+      { label: 'Analytics', href: '/brand/analytics', icon: BarChart3 },
+      { label: 'Styling Sessions', href: '/brand/styling-sessions', icon: Calendar }
     ]
   },
   {

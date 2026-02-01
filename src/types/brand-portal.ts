@@ -330,3 +330,103 @@ export interface QuickAction {
   icon: string;
   description?: string;
 }
+
+// ============================================
+// UHNI FEATURE TYPES (Re-export from uhni.ts)
+// ============================================
+
+export type {
+  BespokeOrder,
+  BespokeOrderStatus,
+  BespokeOrderType,
+  BespokeSpecification,
+  BespokeTimelineStep,
+  PriceNegotiation,
+  NegotiationStatus,
+  PrivateCollection,
+  PrivateCollectionAccess,
+  SourcingRequest,
+  SourcingRequestStatus,
+  SourcingRequestType,
+  SourcingOption,
+  SourcingNote,
+  UHNIPriceOffer,
+  UserTier
+} from './uhni';
+
+// ============================================
+// HERITAGE EVENTS
+// ============================================
+
+export type HeritageEventSignificance = 'milestone' | 'collection' | 'innovation' | 'cultural' | 'collaboration' | 'award';
+
+export interface HeritageEvent {
+  id: string;
+  brandId: string;
+  year: number;
+  title: string;
+  description: string;
+  longDescription?: string;
+  image?: string;
+  significance: HeritageEventSignificance;
+  relatedProducts?: string[];
+  videoUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// BRAND STORIES
+// ============================================
+
+export type BrandStoryType = 'heritage' | 'craftsmanship' | 'collection' | 'artisan';
+export type BrandStoryStatus = 'draft' | 'published';
+
+export interface StorySection {
+  id: string;
+  type: 'text' | 'image' | 'video' | 'quote' | 'timeline';
+  content: string;
+  caption?: string;
+  mediaUrl?: string;
+}
+
+export interface BrandStory {
+  id: string;
+  brandId: string;
+  title: string;
+  type: BrandStoryType;
+  excerpt: string;
+  content: StorySection[];
+  heroImage: string;
+  publishedAt?: string;
+  status: BrandStoryStatus;
+  relatedProducts: string[];
+  readTime: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// STYLING SESSIONS
+// ============================================
+
+export type StylingSessionType = 'virtual' | 'in_store' | 'home';
+export type StylingSessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+
+export interface StylingSession {
+  id: string;
+  brandId: string;
+  scheduledAt: string;
+  duration: number;
+  type: StylingSessionType;
+  status: StylingSessionStatus;
+  notes?: string;
+  customerId: string;
+  customerName: string;
+  customerEmail: string;
+  customerTier: 'standard' | 'preferred' | 'uhni';
+  location?: string;
+  stylistName?: string;
+  createdAt: string;
+  updatedAt: string;
+}

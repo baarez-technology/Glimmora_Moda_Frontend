@@ -14,8 +14,19 @@ import type {
   DemandSignal,
   RecentActivity,
   InventoryAlert,
-  BrandOrder
+  BrandOrder,
+  HeritageEvent,
+  BrandStory,
+  StylingSession
 } from '@/types/brand-portal';
+
+import type {
+  BespokeOrder,
+  PriceNegotiation,
+  PrivateCollection,
+  SourcingRequest,
+  UHNIPriceOffer
+} from '@/types/uhni';
 
 // ============================================
 // BRAND PARTNER DATA
@@ -1297,4 +1308,673 @@ export function getBrandOrderByNumber(orderNumber: string): BrandOrder | undefin
 
 export function getBrandOrdersByStatus(status: BrandOrder['status']): BrandOrder[] {
   return mockBrandOrders.filter(o => o.status === status);
+}
+
+// ============================================
+// BESPOKE ORDERS DATA
+// ============================================
+
+export const mockBespokeOrders: BespokeOrder[] = [
+  {
+    id: 'bespoke-001',
+    brandId: 'dior',
+    brandName: 'Dior',
+    type: 'made_to_measure',
+    title: 'Custom Bar Jacket',
+    description: 'Made-to-measure Bar Jacket with personalized monogram and custom fabric selection.',
+    specifications: [
+      { category: 'Fabric', label: 'Material', value: 'Wool-Silk Blend', notes: 'Custom ivory shade' },
+      { category: 'Fabric', label: 'Lining', value: 'Silk Jacquard', notes: 'CD monogram pattern' },
+      { category: 'Design', label: 'Button Style', value: 'Pearl CD Buttons' },
+      { category: 'Design', label: 'Monogram', value: 'I.M.', notes: 'Interior label' }
+    ],
+    measurements: {
+      chest: 88,
+      waist: 68,
+      hips: 92,
+      shoulders: 38,
+      sleeves: 60,
+      length: 58
+    },
+    status: 'production',
+    timeline: [
+      { id: 'step-1', stage: 'consultation', title: 'Initial Consultation', description: 'Design preferences and measurements', status: 'completed', completedAt: '2024-01-05T10:00:00Z' },
+      { id: 'step-2', stage: 'design_approval', title: 'Design Approval', description: 'Final design and fabric selection', status: 'completed', completedAt: '2024-01-12T14:00:00Z' },
+      { id: 'step-3', stage: 'production', title: 'Production', description: 'Artisan crafting in Paris atelier', status: 'current', estimatedDate: '2024-02-15T00:00:00Z' },
+      { id: 'step-4', stage: 'fitting', title: 'First Fitting', description: 'In-store fitting appointment', status: 'upcoming', estimatedDate: '2024-02-20T00:00:00Z' },
+      { id: 'step-5', stage: 'final_adjustments', title: 'Final Adjustments', description: 'Any necessary alterations', status: 'upcoming', estimatedDate: '2024-02-25T00:00:00Z' },
+      { id: 'step-6', stage: 'complete', title: 'Complete', description: 'Ready for collection', status: 'upcoming', estimatedDate: '2024-03-01T00:00:00Z' }
+    ],
+    estimatedCompletion: '2024-03-01',
+    price: 8500,
+    depositPaid: 4250,
+    depositPercentage: 50,
+    atelierContact: 'atelier.paris@dior.com',
+    progressImages: [
+      'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80'
+    ],
+    createdAt: '2024-01-05T10:00:00Z',
+    updatedAt: '2024-01-28T16:00:00Z'
+  },
+  {
+    id: 'bespoke-002',
+    brandId: 'dior',
+    brandName: 'Dior',
+    type: 'custom_design',
+    title: 'Bespoke Evening Gown',
+    description: 'One-of-a-kind evening gown for Monaco Gala, inspired by vintage Dior archives.',
+    specifications: [
+      { category: 'Design', label: 'Silhouette', value: 'A-Line Ball Gown' },
+      { category: 'Fabric', label: 'Primary', value: 'Silk Duchess Satin', notes: 'Midnight blue' },
+      { category: 'Fabric', label: 'Overlay', value: 'French Lace', notes: 'Hand-embroidered' },
+      { category: 'Detail', label: 'Embellishment', value: 'Crystal beading' },
+      { category: 'Detail', label: 'Train', value: 'Cathedral length' }
+    ],
+    measurements: {
+      bust: 86,
+      waist: 66,
+      hips: 90,
+      length: 150
+    },
+    status: 'design_approval',
+    timeline: [
+      { id: 'step-1', stage: 'consultation', title: 'Initial Consultation', description: 'Vision and inspiration discussion', status: 'completed', completedAt: '2024-01-20T11:00:00Z' },
+      { id: 'step-2', stage: 'design_approval', title: 'Design Approval', description: 'Sketch review and fabric selection', status: 'current', estimatedDate: '2024-02-01T00:00:00Z' },
+      { id: 'step-3', stage: 'production', title: 'Production', description: 'Haute Couture creation', status: 'upcoming', estimatedDate: '2024-03-15T00:00:00Z' },
+      { id: 'step-4', stage: 'fitting', title: 'Fittings', description: 'Multiple fitting sessions', status: 'upcoming', estimatedDate: '2024-03-25T00:00:00Z' },
+      { id: 'step-5', stage: 'final_adjustments', title: 'Final Adjustments', description: 'Perfect finishing', status: 'upcoming', estimatedDate: '2024-04-05T00:00:00Z' },
+      { id: 'step-6', stage: 'complete', title: 'Complete', description: 'Ready for Monaco Gala', status: 'upcoming', estimatedDate: '2024-04-15T00:00:00Z' }
+    ],
+    estimatedCompletion: '2024-04-15',
+    price: 45000,
+    depositPaid: 22500,
+    depositPercentage: 50,
+    atelierContact: 'haute.couture@dior.com',
+    progressImages: [],
+    createdAt: '2024-01-20T11:00:00Z',
+    updatedAt: '2024-01-25T14:00:00Z'
+  },
+  {
+    id: 'bespoke-003',
+    brandId: 'dior',
+    brandName: 'Dior',
+    type: 'modification',
+    title: 'Lady Dior Customization',
+    description: 'Personalized Lady Dior bag with custom hardware and monogram.',
+    specifications: [
+      { category: 'Base', label: 'Model', value: 'Lady Dior Medium' },
+      { category: 'Material', label: 'Leather', value: 'Lambskin', notes: 'Powder pink' },
+      { category: 'Hardware', label: 'Metal', value: 'Champagne Gold' },
+      { category: 'Personalization', label: 'Charms', value: 'Custom D.I.O.R. + initials E.W.' }
+    ],
+    status: 'fitting',
+    timeline: [
+      { id: 'step-1', stage: 'consultation', title: 'Consultation', description: 'Customization options', status: 'completed', completedAt: '2024-01-10T15:00:00Z' },
+      { id: 'step-2', stage: 'design_approval', title: 'Design Confirmation', description: 'Final specifications approved', status: 'completed', completedAt: '2024-01-14T10:00:00Z' },
+      { id: 'step-3', stage: 'production', title: 'Production', description: 'Custom creation', status: 'completed', completedAt: '2024-01-25T16:00:00Z' },
+      { id: 'step-4', stage: 'fitting', title: 'Quality Check', description: 'Final inspection and presentation', status: 'current', estimatedDate: '2024-01-30T00:00:00Z' },
+      { id: 'step-5', stage: 'complete', title: 'Complete', description: 'Ready for delivery', status: 'upcoming', estimatedDate: '2024-02-01T00:00:00Z' }
+    ],
+    estimatedCompletion: '2024-02-01',
+    price: 6200,
+    depositPaid: 6200,
+    depositPercentage: 100,
+    progressImages: [
+      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80'
+    ],
+    createdAt: '2024-01-10T15:00:00Z',
+    updatedAt: '2024-01-28T09:00:00Z'
+  }
+];
+
+// ============================================
+// PRICE NEGOTIATIONS DATA
+// ============================================
+
+export const mockPriceNegotiations: PriceNegotiation[] = [
+  {
+    id: 'neg-001',
+    productId: 'dior-lady-dior-small',
+    productName: 'Lady Dior Small',
+    productImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80',
+    brandName: 'Dior',
+    originalPrice: 4900,
+    proposedPrice: 4200,
+    status: 'pending',
+    conciergeNotes: [
+      'UHNI client with 5-year purchase history',
+      'Lifetime value exceeds €250,000',
+      'Considering bulk purchase of 3 items'
+    ],
+    createdAt: '2024-01-28T10:00:00Z',
+    expiresAt: '2024-02-04T10:00:00Z'
+  },
+  {
+    id: 'neg-002',
+    productId: 'dior-book-tote',
+    productName: 'Book Tote Large',
+    productImage: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=400&q=80',
+    brandName: 'Dior',
+    originalPrice: 3100,
+    proposedPrice: 2600,
+    counterOffer: 2850,
+    status: 'counter_offered',
+    conciergeNotes: [
+      'New UHNI client',
+      'First luxury purchase',
+      'High potential for repeat business'
+    ],
+    createdAt: '2024-01-25T14:00:00Z',
+    expiresAt: '2024-02-01T14:00:00Z'
+  },
+  {
+    id: 'neg-003',
+    productId: 'dior-bar-jacket',
+    productName: 'Bar Jacket',
+    productImage: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80',
+    brandName: 'Dior',
+    originalPrice: 3200,
+    proposedPrice: 2800,
+    status: 'approved',
+    conciergeNotes: [
+      'VIP client attending Fashion Week',
+      'Will be photographed in the piece',
+      'Strong brand ambassador potential'
+    ],
+    createdAt: '2024-01-20T09:00:00Z',
+    expiresAt: '2024-01-27T09:00:00Z'
+  },
+  {
+    id: 'neg-004',
+    productId: 'dior-saddle-bag',
+    productName: 'Saddle Bag',
+    productImage: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=400&q=80',
+    brandName: 'Dior',
+    originalPrice: 3500,
+    proposedPrice: 2500,
+    status: 'declined',
+    conciergeNotes: [
+      'Requested discount exceeds policy limits',
+      'Suggested alternative from outlet collection'
+    ],
+    createdAt: '2024-01-22T11:00:00Z',
+    expiresAt: '2024-01-29T11:00:00Z'
+  }
+];
+
+// ============================================
+// PRIVATE COLLECTIONS DATA
+// ============================================
+
+export const mockPrivateCollections: PrivateCollection[] = [
+  {
+    id: 'priv-col-001',
+    name: 'Atelier Exclusives 2024',
+    brandId: 'dior',
+    brandName: 'Dior',
+    description: 'A curated selection of limited-edition pieces available exclusively to our most valued clients. Each item is numbered and comes with a certificate of authenticity.',
+    heroImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
+    accessLevel: 'uhni_only',
+    products: [],
+    previewDate: '2024-02-01T00:00:00Z',
+    releaseDate: '2024-02-15T00:00:00Z',
+    invitationRequired: false,
+    hasAccess: true
+  },
+  {
+    id: 'priv-col-002',
+    name: 'Heritage Archive Revival',
+    brandId: 'dior',
+    brandName: 'Dior',
+    description: 'Reimagined classics from the Dior archives, meticulously recreated using original techniques and materials.',
+    heroImage: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=1200&q=80',
+    accessLevel: 'invitation',
+    products: [],
+    previewDate: '2024-03-01T00:00:00Z',
+    releaseDate: '2024-03-15T00:00:00Z',
+    invitationRequired: true,
+    hasAccess: false
+  },
+  {
+    id: 'priv-col-003',
+    name: 'Artisan Series: Japanese Craft',
+    brandId: 'dior',
+    brandName: 'Dior',
+    description: 'A collaboration with Japanese master artisans, featuring traditional techniques applied to Dior classics.',
+    heroImage: 'https://images.unsplash.com/photo-1528360983277-13d401cdc186?w=1200&q=80',
+    accessLevel: 'request',
+    products: [],
+    previewDate: '2024-04-01T00:00:00Z',
+    releaseDate: '2024-04-20T00:00:00Z',
+    invitationRequired: false,
+    hasAccess: false
+  }
+];
+
+// ============================================
+// SOURCING REQUESTS DATA
+// ============================================
+
+export const mockBrandSourcingRequests: SourcingRequest[] = [
+  {
+    id: 'source-001',
+    type: 'specific_item',
+    status: 'sourcing',
+    title: 'Vintage Lady Dior (1997)',
+    description: 'Client seeking original Lady Dior from the Princess Diana era. Preferably in black lambskin with gold hardware. Museum-quality condition preferred.',
+    referenceImages: [
+      'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80'
+    ],
+    budget: {
+      min: 8000,
+      max: 15000,
+      flexible: true
+    },
+    deadline: '2024-03-15T00:00:00Z',
+    conciergeNotes: [
+      { id: 'note-1', author: 'concierge', content: 'Client is a collector specializing in vintage Dior. Very knowledgeable about authenticity markers.', timestamp: '2024-01-20T10:00:00Z' }
+    ],
+    foundOptions: [
+      {
+        id: 'opt-001',
+        customDescription: 'Vintage Lady Dior Medium (1998), Black Cannage Lambskin',
+        source: 'Verified Vintage Partner - Paris',
+        condition: 'excellent',
+        price: 12500,
+        originalPrice: 2800,
+        provenance: 'Original purchase from Avenue Montaigne boutique',
+        availableUntil: '2024-02-15T00:00:00Z',
+        conciergeRecommendation: 'Highly recommend - excellent provenance and condition',
+        images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80']
+      }
+    ],
+    createdAt: '2024-01-20T10:00:00Z',
+    updatedAt: '2024-01-28T14:00:00Z'
+  },
+  {
+    id: 'source-002',
+    type: 'occasion',
+    status: 'pending',
+    title: 'Met Gala 2024 Ensemble',
+    description: 'Client attending Met Gala requires complete look. Theme: "Garden of Time". Open to both current collection and archive pieces.',
+    budget: {
+      min: 50000,
+      max: 150000,
+      flexible: true
+    },
+    deadline: '2024-04-01T00:00:00Z',
+    occasion: 'Met Gala 2024',
+    conciergeNotes: [
+      { id: 'note-1', author: 'concierge', content: 'A-list client with significant media presence. This is a PR opportunity.', timestamp: '2024-01-25T09:00:00Z' }
+    ],
+    foundOptions: [],
+    createdAt: '2024-01-25T09:00:00Z',
+    updatedAt: '2024-01-25T09:00:00Z'
+  },
+  {
+    id: 'source-003',
+    type: 'category',
+    status: 'options_found',
+    title: 'Statement Jewelry for Anniversary',
+    description: 'Client seeking exceptional Dior fine jewelry piece for 25th wedding anniversary gift. Preference for pieces with sapphires or diamonds.',
+    budget: {
+      min: 20000,
+      max: 50000,
+      flexible: false
+    },
+    deadline: '2024-02-14T00:00:00Z',
+    occasion: 'Anniversary',
+    conciergeNotes: [
+      { id: 'note-1', author: 'concierge', content: 'Time-sensitive - anniversary is Feb 14th', timestamp: '2024-01-22T11:00:00Z' }
+    ],
+    foundOptions: [
+      {
+        id: 'opt-002',
+        customDescription: 'Dior Rose des Vents Necklace - White Gold & Diamonds',
+        source: 'Dior Fine Jewelry - Place Vendôme',
+        condition: 'new',
+        price: 35000,
+        availableUntil: '2024-02-10T00:00:00Z',
+        conciergeRecommendation: 'Beautiful piece, timeless design',
+        images: ['https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=400&q=80']
+      },
+      {
+        id: 'opt-003',
+        customDescription: 'Dior et Moi Sapphire & Diamond Ring',
+        source: 'Dior Fine Jewelry - Place Vendôme',
+        condition: 'new',
+        price: 42000,
+        availableUntil: '2024-02-10T00:00:00Z',
+        conciergeRecommendation: 'Exceptional piece, very limited availability',
+        images: ['https://images.unsplash.com/photo-1605100804763-247f67b3557e?w=400&q=80']
+      }
+    ],
+    createdAt: '2024-01-22T11:00:00Z',
+    updatedAt: '2024-01-27T15:00:00Z'
+  }
+];
+
+// ============================================
+// HERITAGE EVENTS DATA
+// ============================================
+
+export const mockHeritageEvents: HeritageEvent[] = [
+  {
+    id: 'heritage-001',
+    brandId: 'dior',
+    year: 1947,
+    title: 'The New Look',
+    description: 'Christian Dior revolutionizes fashion with his debut collection.',
+    longDescription: 'On February 12, 1947, Christian Dior presented his first collection at 30 Avenue Montaigne. The "Corolle" line, nicknamed the "New Look" by Harper\'s Bazaar editor Carmel Snow, featured rounded shoulders, cinched waists, and full skirts that used up to 20 meters of fabric. This revolutionary silhouette marked a dramatic departure from wartime austerity and established Dior as a defining force in haute couture.',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80',
+    significance: 'milestone',
+    relatedProducts: ['dior-bar-jacket'],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'heritage-002',
+    brandId: 'dior',
+    year: 1995,
+    title: 'Lady Dior is Born',
+    description: 'The iconic Lady Dior bag is created and named after Princess Diana.',
+    longDescription: 'Originally named "Chouchou," this quilted handbag became an instant icon when Princess Diana began carrying it in 1995. The bag was officially renamed "Lady Dior" in her honor in 1996. Its distinctive cannage quilting, inspired by the Napoleon III chairs used in Dior\'s first fashion show, and the iconic D.I.O.R. charms have made it one of the most recognizable luxury bags in the world.',
+    image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80',
+    significance: 'collection',
+    relatedProducts: ['dior-lady-dior-small'],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'heritage-003',
+    brandId: 'dior',
+    year: 1999,
+    title: 'The Saddle Bag Debut',
+    description: 'John Galliano introduces the revolutionary Saddle Bag.',
+    longDescription: 'Creative Director John Galliano introduced the Saddle Bag in his Spring 2000 collection. Its distinctive curved shape, inspired by equestrian saddles, challenged conventional bag design and became a defining accessory of the early 2000s. The bag was relaunched in 2018 and continues to be a bestseller.',
+    image: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=800&q=80',
+    significance: 'innovation',
+    relatedProducts: ['dior-saddle-bag'],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'heritage-004',
+    brandId: 'dior',
+    year: 2017,
+    title: 'Maria Grazia Chiuri Appointment',
+    description: 'First female Creative Director in Dior\'s history.',
+    longDescription: 'Maria Grazia Chiuri becomes the first woman to lead Dior\'s creative direction, bringing a feminist perspective to the house. Her debut collection featured the now-iconic "We Should All Be Feminists" T-shirt, and she introduced the Book Tote, which has become a modern Dior classic.',
+    image: 'https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=800&q=80',
+    significance: 'milestone',
+    relatedProducts: ['dior-book-tote'],
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
+  },
+  {
+    id: 'heritage-005',
+    brandId: 'dior',
+    year: 2022,
+    title: 'Sustainability Initiative',
+    description: 'Launch of eco-responsible practices across all ateliers.',
+    longDescription: 'Dior announces comprehensive sustainability commitments, including the use of 85% traceable materials and the elimination of single-use plastics. The brand also launches partnerships with artisan communities worldwide to preserve traditional craftsmanship.',
+    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&q=80',
+    significance: 'innovation',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z'
+  }
+];
+
+// ============================================
+// BRAND STORIES DATA
+// ============================================
+
+export const mockBrandStories: BrandStory[] = [
+  {
+    id: 'story-001',
+    brandId: 'dior',
+    title: 'The Art of Cannage',
+    type: 'craftsmanship',
+    excerpt: 'Discover the intricate craft behind Dior\'s signature quilted pattern, a technique perfected over seven decades.',
+    content: [
+      { id: 'sec-1', type: 'text', content: 'The Cannage pattern, inspired by the Napoleon III chairs used in Christian Dior\'s first fashion show in 1947, has become one of the most recognizable design elements in luxury fashion.' },
+      { id: 'sec-2', type: 'image', content: '', mediaUrl: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&q=80', caption: 'Lady Dior featuring the iconic Cannage quilting' },
+      { id: 'sec-3', type: 'text', content: 'Each Lady Dior bag requires over 3 hours of meticulous hand-stitching to create the perfect quilted pattern. The artisans in our Florentine workshops have trained for years to master this technique.' },
+      { id: 'sec-4', type: 'quote', content: 'Every stitch tells a story of dedication and artistry that spans generations.', caption: 'Master Artisan, Dior Leather Goods Atelier' }
+    ],
+    heroImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=1200&q=80',
+    publishedAt: '2024-01-15T10:00:00Z',
+    status: 'published',
+    relatedProducts: ['dior-lady-dior-small'],
+    readTime: 5,
+    createdAt: '2024-01-10T10:00:00Z',
+    updatedAt: '2024-01-15T10:00:00Z'
+  },
+  {
+    id: 'story-002',
+    brandId: 'dior',
+    title: 'The Bar Jacket: 75 Years of Revolution',
+    type: 'heritage',
+    excerpt: 'How one jacket changed fashion forever and continues to inspire designers today.',
+    content: [
+      { id: 'sec-1', type: 'text', content: 'When Christian Dior presented his Bar Jacket in 1947, he didn\'t just create a garment—he created a revolution. The jacket\'s nipped waist and padded hips celebrated femininity in a way that post-war fashion had forgotten.' },
+      { id: 'sec-2', type: 'image', content: '', mediaUrl: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&q=80', caption: 'The timeless silhouette of the Bar Jacket' },
+      { id: 'sec-3', type: 'timeline', content: '1947: Original debut | 1997: 50th anniversary edition | 2017: Maria Grazia Chiuri\'s reinterpretation | 2022: 75th anniversary celebration' }
+    ],
+    heroImage: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=1200&q=80',
+    publishedAt: '2024-01-20T10:00:00Z',
+    status: 'published',
+    relatedProducts: ['dior-bar-jacket'],
+    readTime: 7,
+    createdAt: '2024-01-18T10:00:00Z',
+    updatedAt: '2024-01-20T10:00:00Z'
+  },
+  {
+    id: 'story-003',
+    brandId: 'dior',
+    title: 'Meet the Artisan: Marie-Claire\'s 40 Years',
+    type: 'artisan',
+    excerpt: 'A portrait of dedication: one woman\'s four-decade journey as a Dior seamstress.',
+    content: [
+      { id: 'sec-1', type: 'text', content: 'Marie-Claire Dubois joined the Dior atelier in 1984, fresh from her apprenticeship in Lyon. Today, at 62, she is one of the most respected "petites mains" in haute couture.' },
+      { id: 'sec-2', type: 'quote', content: 'I have sewn gowns for princesses, movie stars, and brides. But every piece receives the same love and attention. That is what Dior means to me.', caption: 'Marie-Claire Dubois, Master Seamstress' },
+      { id: 'sec-3', type: 'image', content: '', mediaUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=80', caption: 'The Dior atelier where Marie-Claire creates her masterpieces' }
+    ],
+    heroImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
+    status: 'draft',
+    relatedProducts: [],
+    readTime: 6,
+    createdAt: '2024-01-25T10:00:00Z',
+    updatedAt: '2024-01-28T10:00:00Z'
+  },
+  {
+    id: 'story-004',
+    brandId: 'dior',
+    title: 'Spring/Summer 2024: A Garden in Bloom',
+    type: 'collection',
+    excerpt: 'Explore the inspirations behind Maria Grazia Chiuri\'s latest collection.',
+    content: [
+      { id: 'sec-1', type: 'text', content: 'For Spring/Summer 2024, Maria Grazia Chiuri drew inspiration from the gardens of Christian Dior\'s childhood home in Granville. The collection features botanical prints, delicate embroidery, and a palette of garden greens and floral hues.' },
+      { id: 'sec-2', type: 'image', content: '', mediaUrl: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800&q=80', caption: 'Floral motifs dominate the Spring/Summer 2024 collection' }
+    ],
+    heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1200&q=80',
+    publishedAt: '2024-01-22T10:00:00Z',
+    status: 'published',
+    relatedProducts: ['dior-j-adore-dress'],
+    readTime: 4,
+    createdAt: '2024-01-20T10:00:00Z',
+    updatedAt: '2024-01-22T10:00:00Z'
+  }
+];
+
+// ============================================
+// UHNI PRICE OFFERS DATA
+// ============================================
+
+export const mockUHNIOffers: UHNIPriceOffer[] = [
+  {
+    id: 'offer-001',
+    type: 'product',
+    targetId: 'dior-lady-dior-small',
+    targetName: 'Lady Dior Small',
+    targetImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80',
+    discountType: 'percentage',
+    discountValue: 15,
+    validFrom: '2024-02-01T00:00:00Z',
+    validUntil: '2024-02-14T23:59:59Z',
+    claimed: false,
+    conditions: ['UHNI tier only', 'One per client', 'Not combinable with other offers']
+  },
+  {
+    id: 'offer-002',
+    type: 'collection',
+    targetId: 'col-icons',
+    targetName: 'Icons Collection',
+    targetImage: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80',
+    discountType: 'percentage',
+    discountValue: 10,
+    validFrom: '2024-01-15T00:00:00Z',
+    validUntil: '2024-02-28T23:59:59Z',
+    claimed: true,
+    conditions: ['Minimum purchase €5,000', 'UHNI tier only']
+  },
+  {
+    id: 'offer-003',
+    type: 'brand',
+    targetId: 'dior',
+    targetName: 'Dior',
+    targetImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80',
+    discountType: 'fixed',
+    discountValue: 500,
+    validFrom: '2024-02-10T00:00:00Z',
+    validUntil: '2024-02-17T23:59:59Z',
+    claimed: false,
+    conditions: ['Valentine\'s Day Special', 'Minimum purchase €3,000', 'Complimentary gift wrapping included']
+  }
+];
+
+// ============================================
+// STYLING SESSIONS DATA
+// ============================================
+
+export const mockStylingSessions: StylingSession[] = [
+  {
+    id: 'session-001',
+    brandId: 'dior',
+    scheduledAt: '2024-02-01T10:00:00Z',
+    duration: 90,
+    type: 'in_store',
+    status: 'scheduled',
+    notes: 'Client interested in complete wardrobe refresh for Spring season. Focus on professional attire.',
+    customerId: 'cust-001',
+    customerName: 'Isabelle Moreau',
+    customerEmail: 'isabelle.moreau@email.com',
+    customerTier: 'uhni',
+    location: 'Dior 30 Avenue Montaigne, Paris',
+    stylistName: 'Sophie Beaumont',
+    createdAt: '2024-01-20T10:00:00Z',
+    updatedAt: '2024-01-20T10:00:00Z'
+  },
+  {
+    id: 'session-002',
+    brandId: 'dior',
+    scheduledAt: '2024-02-03T14:00:00Z',
+    duration: 60,
+    type: 'virtual',
+    status: 'scheduled',
+    notes: 'Virtual consultation for evening wear selection. Client based in Tokyo.',
+    customerId: 'cust-002',
+    customerName: 'Yuki Tanaka',
+    customerEmail: 'yuki.tanaka@email.jp',
+    customerTier: 'preferred',
+    stylistName: 'Marie Laurent',
+    createdAt: '2024-01-22T10:00:00Z',
+    updatedAt: '2024-01-22T10:00:00Z'
+  },
+  {
+    id: 'session-003',
+    brandId: 'dior',
+    scheduledAt: '2024-02-05T11:00:00Z',
+    duration: 120,
+    type: 'home',
+    status: 'scheduled',
+    notes: 'Home visit for trunk show preview. Selection of 15 pieces from upcoming collection.',
+    customerId: 'cust-004',
+    customerName: 'Emma Williams',
+    customerEmail: 'emma.williams@email.com',
+    customerTier: 'uhni',
+    location: '725 Fifth Avenue, New York, NY',
+    stylistName: 'Pierre Dubois',
+    createdAt: '2024-01-25T10:00:00Z',
+    updatedAt: '2024-01-25T10:00:00Z'
+  },
+  {
+    id: 'session-004',
+    brandId: 'dior',
+    scheduledAt: '2024-01-25T15:00:00Z',
+    duration: 90,
+    type: 'in_store',
+    status: 'completed',
+    notes: 'Bridal consultation - mother of the bride outfit selection. Purchased Bar Jacket and accessories.',
+    customerId: 'cust-003',
+    customerName: 'Sophia Romano',
+    customerEmail: 'sophia.romano@email.it',
+    customerTier: 'standard',
+    location: 'Dior Via Montenapoleone, Milan',
+    stylistName: 'Giulia Ferretti',
+    createdAt: '2024-01-15T10:00:00Z',
+    updatedAt: '2024-01-25T17:00:00Z'
+  },
+  {
+    id: 'session-005',
+    brandId: 'dior',
+    scheduledAt: '2024-01-28T10:00:00Z',
+    duration: 60,
+    type: 'virtual',
+    status: 'cancelled',
+    notes: 'Client had schedule conflict - to be rescheduled',
+    customerId: 'cust-005',
+    customerName: 'Chen Wei',
+    customerEmail: 'chen.wei@email.cn',
+    customerTier: 'preferred',
+    stylistName: 'Li Wei',
+    createdAt: '2024-01-18T10:00:00Z',
+    updatedAt: '2024-01-27T09:00:00Z'
+  }
+];
+
+// ============================================
+// HELPER FUNCTIONS FOR NEW DATA
+// ============================================
+
+export function getBespokeOrderById(id: string): BespokeOrder | undefined {
+  return mockBespokeOrders.find(o => o.id === id);
+}
+
+export function getNegotiationById(id: string): PriceNegotiation | undefined {
+  return mockPriceNegotiations.find(n => n.id === id);
+}
+
+export function getPrivateCollectionById(id: string): PrivateCollection | undefined {
+  return mockPrivateCollections.find(c => c.id === id);
+}
+
+export function getSourcingRequestById(id: string): SourcingRequest | undefined {
+  return mockBrandSourcingRequests.find(r => r.id === id);
+}
+
+export function getHeritageEventById(id: string): HeritageEvent | undefined {
+  return mockHeritageEvents.find(e => e.id === id);
+}
+
+export function getBrandStoryById(id: string): BrandStory | undefined {
+  return mockBrandStories.find(s => s.id === id);
+}
+
+export function getUHNIOfferById(id: string): UHNIPriceOffer | undefined {
+  return mockUHNIOffers.find(o => o.id === id);
+}
+
+export function getStylingSessionById(id: string): StylingSession | undefined {
+  return mockStylingSessions.find(s => s.id === id);
 }
