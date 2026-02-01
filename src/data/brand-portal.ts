@@ -1446,8 +1446,8 @@ export const mockPriceNegotiations: PriceNegotiation[] = [
       'Lifetime value exceeds €250,000',
       'Considering bulk purchase of 3 items'
     ],
-    createdAt: '2024-01-28T10:00:00Z',
-    expiresAt: '2024-02-04T10:00:00Z'
+    createdAt: '2026-01-28T10:00:00Z',
+    expiresAt: '2026-02-15T10:00:00Z'
   },
   {
     id: 'neg-002',
@@ -1464,8 +1464,8 @@ export const mockPriceNegotiations: PriceNegotiation[] = [
       'First luxury purchase',
       'High potential for repeat business'
     ],
-    createdAt: '2024-01-25T14:00:00Z',
-    expiresAt: '2024-02-01T14:00:00Z'
+    createdAt: '2026-01-25T14:00:00Z',
+    expiresAt: '2026-02-10T14:00:00Z'
   },
   {
     id: 'neg-003',
@@ -1861,7 +1861,7 @@ export const mockStylingSessions: StylingSession[] = [
   {
     id: 'session-001',
     brandId: 'dior',
-    scheduledAt: '2024-02-01T10:00:00Z',
+    scheduledAt: '2026-02-05T10:00:00Z',
     duration: 90,
     type: 'in_store',
     status: 'scheduled',
@@ -1878,7 +1878,7 @@ export const mockStylingSessions: StylingSession[] = [
   {
     id: 'session-002',
     brandId: 'dior',
-    scheduledAt: '2024-02-03T14:00:00Z',
+    scheduledAt: '2026-02-08T14:00:00Z',
     duration: 60,
     type: 'virtual',
     status: 'scheduled',
@@ -1894,7 +1894,7 @@ export const mockStylingSessions: StylingSession[] = [
   {
     id: 'session-003',
     brandId: 'dior',
-    scheduledAt: '2024-02-05T11:00:00Z',
+    scheduledAt: '2026-02-10T11:00:00Z',
     duration: 120,
     type: 'home',
     status: 'scheduled',
