@@ -171,22 +171,3 @@ export {
   getVisualizationPreset
 } from './discovery';
 
-// ============================================
-// BRAND PARTNER
-// ============================================
-export {
-  mockBrandPartner,
-  mockBrandDashboardStats,
-  mockBrandBespokeRequests,
-  mockBrandAnalytics,
-  mockBrandCollections,
-  mockBrandAGIConfig,
-  getBrandPartner,
-  getBrandDashboardStats,
-  getBrandBespokeRequests,
-  getBrandBespokeRequestById,
-  getBrandAnalytics,
-  getBrandCollections,
-  getBrandCollectionById,
-  getBrandAGIConfig
-} from './brand-partner';

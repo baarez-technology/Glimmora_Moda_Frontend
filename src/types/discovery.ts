@@ -32,18 +32,6 @@ export interface VisualSearchResult {
 }
 
 // ============================================
-// Explore Mode
-// ============================================
-
-export interface ExploreMode {
-  enabled: boolean;
-  hidesPrices: boolean;
-  hidesAddToCart: boolean;
-  hidesAvailability: boolean;
-  focusOnStorytelling: boolean;
-}
-
-// ============================================
 // Inspiration Boards
 // ============================================
 

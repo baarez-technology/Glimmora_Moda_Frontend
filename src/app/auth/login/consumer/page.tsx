@@ -1,9 +1,10 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function ConsumerLoginPage() {
+function ConsumerLoginRedirect() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -25,5 +26,22 @@ export default function ConsumerLoginPage() {
         <p className="text-stone text-sm">Redirecting to login...</p>
       </div>
     </div>
+  );
+}
+
+export default function ConsumerLoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-stone text-sm">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <ConsumerLoginRedirect />
+    </Suspense>
   );
 }

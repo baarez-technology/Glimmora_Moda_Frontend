@@ -89,10 +89,12 @@ export default function OnboardingPage() {
       const nextStepValue = steps[currentIndex + 1];
       if (nextStepValue === 'complete') {
         // Create complete FashionIdentity object matching the type schema
+        // Use default value for empty confidenceLevel
+        const confidenceLevel = selections.confidenceLevel || 'guided';
         const newFashionIdentity = {
           occasions: selections.occasions,
           aesthetics: selections.aesthetics,
-          confidenceLevel: selections.confidenceLevel,
+          confidenceLevel: confidenceLevel as 'decisive' | 'guided' | 'advisory',
           budgetRange: selections.budgetRange,
           primaryLocation: fashionIdentity?.primaryLocation || 'Paris',
           travelDestinations: fashionIdentity?.travelDestinations || []

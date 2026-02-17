@@ -1,4 +1,4 @@
-import type { InspirationBoard, ExploreMode, VisualSearchResult, Product } from '@/types';
+import type { InspirationBoard, VisualSearchResult, Product } from '@/types';
 import { products } from './products';
 
 // ============================================
@@ -46,18 +46,6 @@ export function getInspirationBoards(): InspirationBoard[] {
 export function getInspirationBoardById(id: string): InspirationBoard | undefined {
   return mockInspirationBoards.find(b => b.id === id);
 }
-
-// ============================================
-// EXPLORE MODE
-// ============================================
-
-export const defaultExploreMode: ExploreMode = {
-  enabled: false,
-  hidesPrices: true,
-  hidesAddToCart: true,
-  hidesAvailability: true,
-  focusOnStorytelling: true
-};
 
 // ============================================
 // VISUAL SEARCH

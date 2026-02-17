@@ -1,0 +1,19 @@
+{
+  "existing_features": [],
+  "tech_stack": [
+    "Next.js",
+    "TypeScript"
+  ],
+  "target_audience": null,
+  "planned_features": [],
+  "graph_hints": {},
+  "config": {
+    "enabled_types": [
+      "ui_ux_improvements"
+    ],
+    "include_roadmap_context": true,
+    "include_kanban_context": true,
+    "max_ideas_per_type": 5
+  },
+  "created_at": "2026-01-20T17:52:55.451852"
+}

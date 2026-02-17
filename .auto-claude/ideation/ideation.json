@@ -1,0 +1,29 @@
+{
+  "id": "ideation-20260120-114423",
+  "project_id": "/Users/kavi/Baarez-Projects/Moda-Glimmora-new-v2",
+  "config": {
+    "enabled_types": [
+      "ui_ux_improvements"
+    ],
+    "include_roadmap_context": true,
+    "include_kanban_context": true,
+    "max_ideas_per_type": 5
+  },
+  "ideas": [],
+  "project_context": {
+    "existing_features": [],
+    "tech_stack": [
+      "Next.js",
+      "TypeScript"
+    ],
+    "target_audience": null,
+    "planned_features": []
+  },
+  "summary": {
+    "total_ideas": 0,
+    "by_type": {},
+    "by_status": {}
+  },
+  "generated_at": "2026-01-20T11:44:23.454887",
+  "updated_at": "2026-01-20T17:52:56.985110"
+}

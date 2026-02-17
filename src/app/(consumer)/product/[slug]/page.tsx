@@ -85,11 +85,14 @@ export default function ProductPage({ params }: ProductPageProps) {
               sizeVariants={state.sizeVariants}
               selectedSize={state.selectedSize}
               inConsiderations={state.inConsiderations}
+              inWardrobe={state.inWardrobe}
               watchingRestock={state.watchingRestock}
               showIntelligence={state.showIntelligence}
               onShowIntelligence={() => state.setShowIntelligence(!state.showIntelligence)}
               onAddToConsiderations={state.handleAddToConsiderations}
               onRemoveFromConsiderations={state.handleRemoveFromConsiderations}
+              onAddToWardrobe={state.handleAddToWardrobe}
+              onRemoveFromWardrobe={state.handleRemoveFromWardrobe}
               onShare={state.handleShare}
               onNotifyRestock={state.handleNotifyRestock}
               onShowConcierge={() => state.setShowConcierge(true)}

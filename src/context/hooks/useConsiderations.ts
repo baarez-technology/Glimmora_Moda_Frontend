@@ -19,44 +19,41 @@ export function useConsiderations({ showToast, safeLocalStorageSave }: UseConsid
     variants?: { size?: string; color?: string },
     agiNote?: string
   ) => {
-    setConsiderations(prev => {
-      const existingIndex = prev.findIndex(c => c.productId === product.id);
+    // Check if already in considerations before updating state
+    const alreadyInConsiderations = considerations.some(c => c.productId === product.id);
 
-      if (existingIndex >= 0) {
-        // Update existing item
-        const updated = prev.map((item, index) =>
-          index === existingIndex
-            ? { ...item, selectedVariants: variants || item.selectedVariants, agiNote: agiNote || item.agiNote }
-            : item
-        );
-        showToast('Updated in your considerations', 'info');
-        return updated;
-      } else {
-        // Add new item
-        considerationCounter += 1;
-        const newItem: ConsiderationItem = {
-          id: `consideration-${Date.now()}-${considerationCounter}`,
-          productId: product.id,
-          product,
-          addedAt: new Date().toISOString(),
-          selectedVariants: variants || {},
-          agiNote
-        };
-        showToast(`${product.name} added to considerations`, 'success');
-        return [...prev, newItem];
-      }
-    });
-  }, [showToast]);
+    if (alreadyInConsiderations) {
+      // Update existing item
+      setConsiderations(prev => prev.map(item =>
+        item.productId === product.id
+          ? { ...item, selectedVariants: variants || item.selectedVariants, agiNote: agiNote || item.agiNote }
+          : item
+      ));
+      showToast('Updated in your considerations', 'info');
+    } else {
+      // Add new item
+      considerationCounter += 1;
+      const newItem: ConsiderationItem = {
+        id: `consideration-${Date.now()}-${considerationCounter}`,
+        productId: product.id,
+        product,
+        addedAt: new Date().toISOString(),
+        selectedVariants: variants || {},
+        agiNote
+      };
+      setConsiderations(prev => [...prev, newItem]);
+      showToast(`${product.name} added to considerations`, 'success');
+    }
+  }, [showToast, considerations]);
 
   const removeFromConsiderations = useCallback((id: string) => {
-    setConsiderations(prev => {
-      const item = prev.find(c => c.id === id);
-      if (item) {
-        showToast(`${item.product.name} removed from considerations`, 'info');
-      }
-      return prev.filter(c => c.id !== id);
-    });
-  }, [showToast]);
+    // Find item before updating state to get the name for toast
+    const item = considerations.find(c => c.id === id);
+    setConsiderations(prev => prev.filter(c => c.id !== id));
+    if (item) {
+      showToast(`${item.product.name} removed from considerations`, 'info');
+    }
+  }, [showToast, considerations]);
 
   const clearConsiderations = useCallback(() => {
     setConsiderations([]);

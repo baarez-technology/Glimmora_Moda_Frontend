@@ -41,7 +41,10 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     addRestockAlert,
     hasRestockAlert,
     showToast,
-    wardrobe
+    wardrobe,
+    addToWardrobe,
+    removeFromWardrobe,
+    isInWardrobe
   } = useApp();
 
   // UI State
@@ -68,6 +71,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const inConsiderations = isInConsiderations(product.id);
   const considerationItem = considerations.find(c => c.productId === product.id);
   const watchingRestock = hasRestockAlert(product.id);
+  const inWardrobe = isInWardrobe(product.id);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -167,6 +171,17 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     setSizeError(false);
   }, []);
 
+  const handleAddToWardrobe = useCallback(() => {
+    addToWardrobe(product);
+  }, [product, addToWardrobe]);
+
+  const handleRemoveFromWardrobe = useCallback(() => {
+    const wardrobeItem = wardrobe.find(w => w.product.id === product.id);
+    if (wardrobeItem) {
+      removeFromWardrobe(wardrobeItem.id);
+    }
+  }, [product.id, wardrobe, removeFromWardrobe]);
+
   // Related products
   const relatedProducts = useMemo(() => {
     return allProducts
@@ -193,6 +208,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     sizeVariants,
     colorVariants,
     inConsiderations,
+    inWardrobe,
     watchingRestock,
     relatedProducts,
 
@@ -210,6 +226,8 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     prevImage,
     handleAddToConsiderations,
     handleRemoveFromConsiderations,
+    handleAddToWardrobe,
+    handleRemoveFromWardrobe,
     handleNotifyRestock,
     handleShare,
     showToast,

@@ -36,35 +36,35 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
   }, []);
 
   const addToWardrobe = useCallback((product: Product) => {
-    setWardrobe(prev => {
-      if (prev.some(w => w.productId === product.id)) {
-        showToast('Already in your wardrobe', 'info');
-        return prev;
-      }
+    // Check if already in wardrobe before updating state
+    const alreadyInWardrobe = wardrobe.some(w => w.productId === product.id);
 
-      wardrobeCounter += 1;
-      const newItem: WardrobeItem = {
-        id: `wardrobe-${Date.now()}-${wardrobeCounter}`,
-        productId: product.id,
-        product,
-        addedAt: new Date().toISOString(),
-        wearCount: 0,
-        outfitCompatibility: []
-      };
-      showToast(`${product.name} added to wardrobe`, 'success');
-      return [...prev, newItem];
-    });
-  }, [showToast]);
+    if (alreadyInWardrobe) {
+      showToast('Already in your wardrobe', 'info');
+      return;
+    }
+
+    wardrobeCounter += 1;
+    const newItem: WardrobeItem = {
+      id: `wardrobe-${Date.now()}-${wardrobeCounter}`,
+      productId: product.id,
+      product,
+      addedAt: new Date().toISOString(),
+      wearCount: 0,
+      outfitCompatibility: []
+    };
+
+    setWardrobe(prev => [...prev, newItem]);
+    showToast(`${product.name} added to wardrobe`, 'success');
+  }, [showToast, wardrobe]);
 
   const removeFromWardrobe = useCallback((id: string) => {
-    setWardrobe(prev => {
-      const item = prev.find(w => w.id === id);
-      if (item) {
-        showToast(`${item.product.name} removed from wardrobe`, 'info');
-      }
-      return prev.filter(w => w.id !== id);
-    });
-  }, [showToast]);
+    const item = wardrobe.find(w => w.id === id);
+    setWardrobe(prev => prev.filter(w => w.id !== id));
+    if (item) {
+      showToast(`${item.product.name} removed from wardrobe`, 'info');
+    }
+  }, [showToast, wardrobe]);
 
   const isInWardrobe = useCallback((productId: string) => {
     return wardrobe.some(w => w.productId === productId);

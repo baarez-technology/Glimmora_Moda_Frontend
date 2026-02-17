@@ -241,23 +241,3 @@ export {
   type ShareSettings
 } from './sharing';
 
-// ============================================
-// BRAND PARTNER TYPES
-// ============================================
-export {
-  type BrandPartner,
-  type BrandDashboardStats,
-  type BrandBespokeNote,
-  type BrandBespokeRequest,
-  type DemandSignal,
-  type RegionalInsight,
-  type VIPDemandForecast,
-  type BoutiquePerformance,
-  type BrandAnalytics,
-  type BrandCollectionPerformance,
-  type BrandCollection,
-  type AGIConciergePersonality,
-  type AGIResponseTemplate,
-  type AGIEscalationRule,
-  type BrandAGIConfig
-} from './brand-partner';

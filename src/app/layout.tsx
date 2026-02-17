@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Header from '@/components/layout/Header';
-import Footer from '@/components/layout/Footer';
-import AGIConcierge from '@/components/shared/AGIConcierge';
+import ConditionalLayout from '@/components/layout/ConditionalLayout';
 import ToastContainer from '@/components/shared/Toast';
 import { AppProvider } from '@/context/AppContext';
+import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
   title: 'ModaGlimmora | Experience-First Luxury Commerce',
@@ -20,15 +19,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-ivory-cream">
-        <AppProvider>
-          <Header />
-          <main className="pt-[72px] lg:pt-[104px]">
-            {children}
-          </main>
-          <Footer />
-          <AGIConcierge />
-          <ToastContainer />
-        </AppProvider>
+        <AuthProvider>
+          <AppProvider>
+            <ConditionalLayout>
+              {children}
+            </ConditionalLayout>
+            <ToastContainer />
+          </AppProvider>
+        </AuthProvider>
       </body>
     </html>
   );

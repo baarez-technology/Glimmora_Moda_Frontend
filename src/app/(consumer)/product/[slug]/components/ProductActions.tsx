@@ -1,7 +1,6 @@
 'use client';
 
-import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle } from 'lucide-react';
-import ExploreModeWrapper from '@/components/shared/ExploreModeWrapper';
+import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag } from 'lucide-react';
 import type { Product, ProductVariant } from '@/types';
 
 interface ProductActionsProps {
@@ -9,9 +8,12 @@ interface ProductActionsProps {
   sizeVariants: ProductVariant[];
   selectedSize: string | null;
   inConsiderations: boolean;
+  inWardrobe: boolean;
   watchingRestock: boolean;
   onAddToConsiderations: () => void;
   onRemoveFromConsiderations: () => void;
+  onAddToWardrobe: () => void;
+  onRemoveFromWardrobe: () => void;
   onShare: () => void;
   onNotifyRestock: () => void;
   onShowIV: () => void;
@@ -26,9 +28,12 @@ export default function ProductActions({
   sizeVariants,
   selectedSize,
   inConsiderations,
+  inWardrobe,
   watchingRestock,
   onAddToConsiderations,
   onRemoveFromConsiderations,
+  onAddToWardrobe,
+  onRemoveFromWardrobe,
   onShare,
   onNotifyRestock,
   onShowIV,
@@ -98,33 +103,51 @@ export default function ProductActions({
 
       {/* Main Actions */}
       <div className="space-y-4">
-        <ExploreModeWrapper>
-          {inConsiderations ? (
-            <button
-              onClick={onRemoveFromConsiderations}
-              className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-warm"
-            >
-              <Check size={18} />
-              <span className="text-sm tracking-[0.15em] uppercase">In Your Considerations</span>
-            </button>
-          ) : (
-            <button
-              onClick={onAddToConsiderations}
-              disabled={sizeVariants.length > 0 && !selectedSize}
-              className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-warm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-charcoal-deep"
-              title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
-            >
-              <span className="text-sm tracking-[0.15em] uppercase">Add to Considerations</span>
-              <Heart size={18} />
-            </button>
-          )}
-        </ExploreModeWrapper>
+        {inConsiderations ? (
+          <button
+            onClick={onRemoveFromConsiderations}
+            className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-warm"
+          >
+            <Check size={18} />
+            <span className="text-sm tracking-[0.15em] uppercase">In Your Considerations</span>
+          </button>
+        ) : (
+          <button
+            onClick={onAddToConsiderations}
+            disabled={sizeVariants.length > 0 && !selectedSize}
+            className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-warm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-charcoal-deep"
+            title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
+          >
+            <span className="text-sm tracking-[0.15em] uppercase">Add to Considerations</span>
+            <Heart size={18} />
+          </button>
+        )}
 
         {/* Helper text when size is required */}
         {sizeVariants.length > 0 && !selectedSize && !inConsiderations && (
           <p className="text-xs text-center text-stone">
             Please select a size to continue
           </p>
+        )}
+
+        {/* Add to Wardrobe - I Own This */}
+        {inWardrobe ? (
+          <button
+            onClick={onRemoveFromWardrobe}
+            className="group w-full py-3 px-6 bg-success/10 border border-success/30 text-success flex items-center justify-center gap-3 transition-all duration-300 hover:bg-success/20"
+          >
+            <Check size={16} />
+            <span className="text-sm tracking-[0.15em] uppercase">In My Wardrobe</span>
+          </button>
+        ) : (
+          <button
+            onClick={onAddToWardrobe}
+            className="group w-full py-3 px-6 border border-gold-muted/50 text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 hover:border-gold-muted"
+            title="Add this piece to your Digital Wardrobe"
+          >
+            <ShoppingBag size={16} className="text-gold-muted" />
+            <span className="text-sm tracking-[0.15em] uppercase">I Own This</span>
+          </button>
         )}
 
         <div className="flex gap-3">

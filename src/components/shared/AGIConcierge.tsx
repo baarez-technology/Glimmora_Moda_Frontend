@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { MessageCircle, X, Send, Sparkles, Calendar } from 'lucide-react';
 import { mockCalendarEvents } from '@/data/mock-data';
+import VoiceInput from '@/components/shared/VoiceInput';
 
 interface Message {
   id: string;
@@ -114,6 +115,10 @@ export default function AGIConcierge() {
     setInput(suggestion);
   };
 
+  const handleVoiceInput = (transcript: string) => {
+    setInput(transcript);
+  };
+
   return (
     <>
       {/* Toggle Button */}
@@ -203,6 +208,7 @@ export default function AGIConcierge() {
                 placeholder="Ask me anything..."
                 className="flex-1 px-4 py-2.5 bg-parchment border-none rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gold-muted/50"
               />
+              <VoiceInput onTranscript={handleVoiceInput} className="scale-90" />
               <button
                 onClick={handleSend}
                 disabled={!input.trim()}

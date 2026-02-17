@@ -1,23 +1,26 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
-type DemoTier = 'consumer' | 'uhni';
+type DemoTier = 'consumer' | 'uhni' | 'brand';
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect') || '/';
+  const initialMode = searchParams.get('mode');
   const { showToast, setUserRole: setAppUserRole } = useApp();
   const { setUserRole: setAuthUserRole } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<DemoTier>('consumer');
+  const [selectedTier, setSelectedTier] = useState<DemoTier>(
+    initialMode === 'brand' ? 'brand' : 'consumer'
+  );
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -35,20 +38,29 @@ export default function LoginPage() {
     // Simulate brief loading for UX
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Set user role based on selected demo tier
-    // Update both contexts to keep them in sync
-    const tier = selectedTier === 'uhni' ? 'uhni' : 'preferred';
-    setAuthUserRole(tier);  // For authentication state
-    setAppUserRole(tier);   // For UHNI features
-
-    if (selectedTier === 'uhni') {
-      showToast('Welcome back. Your personal concierge is available.', 'success');
+    if (selectedTier === 'brand') {
+      // Brand partner login
+      // Set brand auth in localStorage
+      localStorage.setItem('moda-brand-auth', 'true');
+      showToast('Welcome to the Brand Portal.', 'success');
+      router.push('/brand');
     } else {
-      showToast('Welcome back to ModaGlimmora!', 'success');
-    }
+      // Consumer/UHNI login
+      // Set user role based on selected demo tier
+      // Update both contexts to keep them in sync
+      const tier = selectedTier === 'uhni' ? 'uhni' : 'preferred';
+      setAuthUserRole(tier);  // For authentication state
+      setAppUserRole(tier);   // For UHNI features
 
-    // Redirect to the original destination or home
-    router.push(redirectUrl);
+      if (selectedTier === 'uhni') {
+        showToast('Welcome back. Your personal concierge is available.', 'success');
+      } else {
+        showToast('Welcome back to ModaGlimmora!', 'success');
+      }
+
+      // Redirect to the original destination or home
+      router.push(redirectUrl);
+    }
   };
 
   return (
@@ -70,18 +82,31 @@ export default function LoginPage() {
               </h2>
             </Link>
             <p className="text-[10px] tracking-[0.5em] uppercase text-gold-soft mb-6">
-              Experience-First Luxury Commerce
+              {selectedTier === 'brand' ? 'Brand Partner Portal' : 'Experience-First Luxury Commerce'}
             </p>
             <p className="text-sand leading-relaxed mb-10">
-              The world's first AGI-native fashion universe. Where intelligence meets elegance,
-              and every interaction is crafted for distinction.
+              {selectedTier === 'brand'
+                ? 'Manage your products, track performance, and access demand intelligence through our B2B platform.'
+                : 'The world\'s first AGI-native fashion universe. Where intelligence meets elegance, and every interaction is crafted for distinction.'}
             </p>
             <div className="flex items-center justify-center gap-8 text-taupe text-sm">
-              <span>Curated Excellence</span>
-              <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
-              <span>Zero Dark Patterns</span>
-              <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
-              <span>Privacy First</span>
+              {selectedTier === 'brand' ? (
+                <>
+                  <span>Real-time Analytics</span>
+                  <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
+                  <span>Global Inventory</span>
+                  <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
+                  <span>Demand Signals</span>
+                </>
+              ) : (
+                <>
+                  <span>Curated Excellence</span>
+                  <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
+                  <span>Zero Dark Patterns</span>
+                  <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
+                  <span>Privacy First</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -101,9 +126,13 @@ export default function LoginPage() {
 
           <div className="text-center mb-10">
             <h1 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-4">
-              Welcome Back
+              {selectedTier === 'brand' ? 'Brand Portal' : 'Welcome Back'}
             </h1>
-            <p className="text-stone">Sign in to your personalized fashion experience</p>
+            <p className="text-stone">
+              {selectedTier === 'brand'
+                ? 'Sign in to manage your brand on ModaGlimmora'
+                : 'Sign in to your personalized fashion experience'}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -116,7 +145,7 @@ export default function LoginPage() {
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                placeholder="your@email.com"
+                placeholder={selectedTier === 'brand' ? 'partner@brand.com' : 'your@email.com'}
                 required
               />
             </div>
@@ -149,11 +178,11 @@ export default function LoginPage() {
               <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-4">
                 Demo Mode — Select Experience
               </p>
-              <div className="flex gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => setSelectedTier('consumer')}
-                  className={`flex-1 p-4 border transition-all duration-300 ${
+                  className={`p-4 border transition-all duration-300 ${
                     selectedTier === 'consumer'
                       ? 'border-charcoal-deep bg-white'
                       : 'border-sand/50 hover:border-sand'
@@ -163,12 +192,12 @@ export default function LoginPage() {
                   <p className={`text-sm font-medium ${selectedTier === 'consumer' ? 'text-charcoal-deep' : 'text-stone'}`}>
                     Consumer
                   </p>
-                  <p className="text-[10px] text-taupe mt-1">Standard experience</p>
+                  <p className="text-[10px] text-taupe mt-1">Standard</p>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedTier('uhni')}
-                  className={`flex-1 p-4 border transition-all duration-300 ${
+                  className={`p-4 border transition-all duration-300 ${
                     selectedTier === 'uhni'
                       ? 'border-gold-deep bg-gold-soft/10'
                       : 'border-sand/50 hover:border-gold-muted/50'
@@ -176,9 +205,24 @@ export default function LoginPage() {
                 >
                   <Crown size={20} className={`mx-auto mb-2 ${selectedTier === 'uhni' ? 'text-gold-deep' : 'text-stone'}`} />
                   <p className={`text-sm font-medium ${selectedTier === 'uhni' ? 'text-gold-deep' : 'text-stone'}`}>
-                    UHNI Member
+                    UHNI
                   </p>
-                  <p className="text-[10px] text-taupe mt-1">Exclusive experience</p>
+                  <p className="text-[10px] text-taupe mt-1">Exclusive</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTier('brand')}
+                  className={`p-4 border transition-all duration-300 ${
+                    selectedTier === 'brand'
+                      ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
+                      : 'border-sand/50 hover:border-sand'
+                  }`}
+                >
+                  <Building2 size={20} className={`mx-auto mb-2 ${selectedTier === 'brand' ? 'text-ivory-cream' : 'text-stone'}`} />
+                  <p className={`text-sm font-medium ${selectedTier === 'brand' ? 'text-ivory-cream' : 'text-stone'}`}>
+                    Brand
+                  </p>
+                  <p className={`text-[10px] mt-1 ${selectedTier === 'brand' ? 'text-sand' : 'text-taupe'}`}>Partner</p>
                 </button>
               </div>
             </div>
@@ -189,6 +233,8 @@ export default function LoginPage() {
               className={`w-full py-4 px-6 flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed ${
                 selectedTier === 'uhni'
                   ? 'bg-gold-deep text-white hover:bg-gold-deep/90'
+                  : selectedTier === 'brand'
+                  ? 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
                   : 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
               }`}
             >
@@ -197,11 +243,15 @@ export default function LoginPage() {
                   <div className={`w-4 h-4 border-2 border-t-transparent rounded-full animate-spin ${
                     selectedTier === 'uhni' ? 'border-white' : 'border-ivory-cream'
                   }`} />
-                  <span className="text-sm tracking-[0.15em] uppercase">Signing In...</span>
+                  <span className="text-sm tracking-[0.15em] uppercase">
+                    {selectedTier === 'brand' ? 'Accessing Portal...' : 'Signing In...'}
+                  </span>
                 </>
               ) : (
                 <>
-                  <span className="text-sm tracking-[0.15em] uppercase">Sign In</span>
+                  <span className="text-sm tracking-[0.15em] uppercase">
+                    {selectedTier === 'brand' ? 'Access Portal' : 'Sign In'}
+                  </span>
                   <ArrowRight size={16} />
                 </>
               )}
@@ -209,18 +259,51 @@ export default function LoginPage() {
 
             {/* Demo hint */}
             <p className="text-center text-taupe text-xs">
-              Demo mode: Use any email and password to explore
+              {selectedTier === 'brand'
+                ? 'Demo mode: Access the Dior brand partner dashboard'
+                : 'Demo mode: Use any email and password to explore'}
             </p>
           </form>
 
           <p className="text-center text-stone mt-10">
-            Don't have an account?{' '}
-            <Link href="/auth/register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
-              Create account
-            </Link>
+            {selectedTier === 'brand' ? (
+              <>
+                Not a brand partner?{' '}
+                <button
+                  onClick={() => setSelectedTier('consumer')}
+                  className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors"
+                >
+                  Shop as customer
+                </button>
+              </>
+            ) : (
+              <>
+                Don't have an account?{' '}
+                <Link href="/auth/register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
+                  Create account
+                </Link>
+              </>
+            )}
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-stone text-sm">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

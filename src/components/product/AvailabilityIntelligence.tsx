@@ -41,6 +41,7 @@ export default function AvailabilityIntelligence({ availability, onNotifyRestock
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full p-4 flex items-center justify-between hover:bg-parchment/50 transition-colors"
+        title="Global Stock & Availability Intelligence Layer - Real-time inventory tracking across boutiques worldwide"
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gold-muted/20 rounded-full flex items-center justify-center">

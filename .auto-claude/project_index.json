@@ -1,0 +1,40 @@
+{
+  "project_root": "/Users/kavi/Baarez-Projects/Moda-Glimmora-new-v2",
+  "project_type": "single",
+  "services": {
+    "main": {
+      "name": "main",
+      "path": "/Users/kavi/Baarez-Projects/Moda-Glimmora-new-v2",
+      "language": "TypeScript",
+      "framework": "Next.js",
+      "type": "frontend",
+      "package_manager": "npm",
+      "default_port": 3000,
+      "styling": "Tailwind CSS",
+      "dev_command": "npm run dev",
+      "key_directories": {
+        "src": {
+          "path": "src",
+          "purpose": "Source code"
+        }
+      },
+      "dependencies": [
+        "@types/node",
+        "@types/react",
+        "autoprefixer",
+        "lucide-react",
+        "next",
+        "postcss",
+        "react",
+        "react-dom",
+        "tailwindcss",
+        "typescript"
+      ],
+      "dev_dependencies": []
+    }
+  },
+  "infrastructure": {},
+  "conventions": {
+    "typescript": true
+  }
+}

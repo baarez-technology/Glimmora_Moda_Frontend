@@ -10,6 +10,7 @@ export interface OrderRecord {
   status: 'confirmed' | 'processing' | 'shipped' | 'delivered';
   createdAt: string;
   estimatedDelivery: string;
+  trackingNumber?: string;
 }
 
 interface UseOrdersProps {

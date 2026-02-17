@@ -1,10 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Check } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
 
-export default function RegisterPage() {
+function RegisterForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
+  const { setUserRole } = useAuth();
+  const { showToast } = useApp();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -21,7 +29,17 @@ export default function RegisterPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    window.location.href = '/onboarding';
+    // Set user as authenticated (standard tier for new users)
+    setUserRole('standard');
+    showToast('Account created successfully!', 'success');
+
+    // If there's a redirect URL (e.g., from checkout), go to onboarding then checkout
+    // Otherwise just go to onboarding
+    if (redirectUrl) {
+      // Store redirect for after onboarding
+      localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+    }
+    router.push('/onboarding');
   };
 
   const benefits = [
@@ -210,5 +228,22 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-stone text-sm">Loading...</p>
+          </div>
+        </div>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
   );
 }

@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity } from '@/types';
-import { mockCalendarEvents } from '@/data/mock-data';
+import { baseCalendarEvents } from '@/data/calendar';
+import { generateOutfitSuggestions } from '@/lib/outfit-intelligence';
 
 // Import focused hooks
 import {
@@ -86,7 +87,6 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
-  const [calendarEvents] = useState<CalendarEvent[]>(mockCalendarEvents);
 
   // Wishlist state (TODO: Move to dedicated hook)
   const [wishlist, setWishlist] = useState<WardrobeItem[]>([]);
@@ -131,6 +131,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     isInWardrobe,
     persistWardrobe
   } = useWardrobeState({ showToast, safeLocalStorageSave });
+
+  // Generate dynamic calendar events with outfit suggestions based on wardrobe
+  const calendarEvents = useMemo<CalendarEvent[]>(() => {
+    return baseCalendarEvents.map(event => ({
+      ...event,
+      outfitSuggestions: generateOutfitSuggestions(event as CalendarEvent, wardrobe)
+    }));
+  }, [wardrobe]);
 
   const {
     savedOutfits,

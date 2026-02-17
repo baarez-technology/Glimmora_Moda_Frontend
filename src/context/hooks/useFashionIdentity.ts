@@ -11,7 +11,7 @@ const STORAGE_KEY = 'moda-fashion-identity';
 
 export function useFashionIdentity({ showToast, safeLocalStorageSave }: UseFashionIdentityProps) {
   // Initialize with mockUser data as default
-  const [fashionIdentity, setFashionIdentityState] = useState<FashionIdentity | null>(mockUser.fashionIdentity);
+  const [fashionIdentity, setFashionIdentityState] = useState<FashionIdentity | null>(mockUser.fashionIdentity ?? null);
 
   const setFashionIdentity = useCallback((identity: FashionIdentity | null) => {
     setFashionIdentityState(identity);
@@ -42,7 +42,7 @@ export function useFashionIdentity({ showToast, safeLocalStorageSave }: UseFashi
       }
     }
     // If no valid stored data, keep using mockUser default
-    setFashionIdentityState(mockUser.fashionIdentity);
+    setFashionIdentityState(mockUser.fashionIdentity ?? null);
   }, []);
 
   return {

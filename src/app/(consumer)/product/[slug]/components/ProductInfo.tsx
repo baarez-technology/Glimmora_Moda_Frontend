@@ -35,13 +35,13 @@ export default function ProductInfo({
         </Link>
         <ChevronRight size={12} className="text-sand" />
         <Link
-          href={`/brand/${brand?.slug || ''}`}
+          href="/discover"
           className="text-taupe hover:text-charcoal-deep transition-colors"
         >
-          {brand?.name}
+          Discover
         </Link>
         <ChevronRight size={12} className="text-sand" />
-        <span className="text-charcoal-deep font-medium truncate max-w-[150px]">
+        <span className="text-charcoal-deep font-medium truncate max-w-[200px]">
           {product.name}
         </span>
       </nav>
