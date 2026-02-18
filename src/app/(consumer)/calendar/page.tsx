@@ -22,9 +22,9 @@ import {
   Users,
   Star
 } from 'lucide-react';
-import { mockCalendarConnections } from '@/data/mock-data';
+import * as calendarService from '@/services/calendar.service';
 import { useApp } from '@/context/AppContext';
-import type { CalendarEvent, EventType } from '@/types';
+import type { CalendarEvent, CalendarConnection, EventType } from '@/types';
 
 const eventTypeIcons: Record<EventType, React.ReactNode> = {
   business_meeting: <Briefcase size={16} />,
@@ -79,6 +79,7 @@ export default function CalendarPage() {
   const [selectedSuggestion, setSelectedSuggestion] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
+  const [calendarConnections, setCalendarConnections] = useState<CalendarConnection[]>([]);
 
   // Get the selected event from the current calendarEvents (which updates when wardrobe changes)
   const selectedEvent = selectedEventId
@@ -87,9 +88,14 @@ export default function CalendarPage() {
 
   useEffect(() => {
     setIsLoaded(true);
+    const loadConnections = async () => {
+      const response = await calendarService.getCalendarConnections();
+      setCalendarConnections(response.data);
+    };
+    loadConnections();
   }, []);
 
-  const connectedCalendar = mockCalendarConnections.find(c => c.connected);
+  const connectedCalendar = calendarConnections.find(c => c.connected);
 
   const handleSaveOutfit = () => {
     if (!selectedEvent || !selectedEvent.outfitSuggestions?.[selectedSuggestion]) return;

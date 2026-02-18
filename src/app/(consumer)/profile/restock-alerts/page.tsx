@@ -4,14 +4,21 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Bell, BellOff, Trash2, Check, Clock, ExternalLink, ArrowRight } from 'lucide-react';
-import { mockRestockNotifications } from '@/data/mock-data';
+import * as userService from '@/services/user.service';
 
 export default function RestockAlertsPage() {
-  const [notifications, setNotifications] = useState(mockRestockNotifications);
+  const [notifications, setNotifications] = useState<Awaited<ReturnType<typeof userService.getRestockNotifications>>['data']>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadNotifications = async () => {
+      const response = await userService.getRestockNotifications();
+      setNotifications(response.data);
+      setLoading(false);
+      setIsLoaded(true);
+    };
+    loadNotifications();
   }, []);
 
   const handleRemove = (id: string) => {
@@ -38,6 +45,14 @@ export default function RestockAlertsPage() {
 
   const watchingCount = notifications.filter(n => n.status === 'watching').length;
   const availableCount = notifications.filter(n => n.status === 'available').length;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

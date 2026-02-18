@@ -89,6 +89,9 @@ export default function StoryDetailPage() {
             <SecondaryButton href="/brand/stories" icon={ArrowLeft}>
               Back
             </SecondaryButton>
+            <PrimaryButton href={`/brand/stories/${story.id}/edit`} icon={Edit}>
+              Edit
+            </PrimaryButton>
             {story.status === 'draft' ? (
               <PrimaryButton onClick={handlePublish}>
                 Publish

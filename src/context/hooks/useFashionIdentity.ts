@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { FashionIdentity } from '@/types';
-import { mockUser } from '@/data/mock-data';
+import * as userService from '@/services/user.service';
 
 interface UseFashionIdentityProps {
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -10,8 +10,16 @@ interface UseFashionIdentityProps {
 const STORAGE_KEY = 'moda-fashion-identity';
 
 export function useFashionIdentity({ showToast, safeLocalStorageSave }: UseFashionIdentityProps) {
-  // Initialize with mockUser data as default
-  const [fashionIdentity, setFashionIdentityState] = useState<FashionIdentity | null>(mockUser.fashionIdentity ?? null);
+  const [fashionIdentity, setFashionIdentityState] = useState<FashionIdentity | null>(null);
+
+  // Load default fashion identity from service on mount
+  useEffect(() => {
+    userService.getFashionIdentity().then(response => {
+      if (response.success) {
+        setFashionIdentityState(prev => prev ?? response.data);
+      }
+    }).catch(() => { /* keep null */ });
+  }, []);
 
   const setFashionIdentity = useCallback((identity: FashionIdentity | null) => {
     setFashionIdentityState(identity);
@@ -41,8 +49,7 @@ export function useFashionIdentity({ showToast, safeLocalStorageSave }: UseFashi
         console.error('Failed to parse stored fashion identity:', e);
       }
     }
-    // If no valid stored data, keep using mockUser default
-    setFashionIdentityState(mockUser.fashionIdentity ?? null);
+    // If no valid stored data, service default will be loaded via useEffect
   }, []);
 
   return {

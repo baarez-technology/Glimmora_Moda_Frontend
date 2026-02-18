@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { Product, WardrobeItem } from '@/types';
-import { products } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 
 // Counter to ensure unique IDs even when called multiple times in the same millisecond
 let wardrobeCounter = 0;
@@ -19,19 +19,23 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
     if (storedWardrobe) {
       setWardrobe(JSON.parse(storedWardrobe));
     } else {
-      // Initialize with first product from mock data for demo
-      const diorProduct = products.find(p => p.brandName === 'Dior');
-      if (diorProduct) {
-        setWardrobe([{
-          id: 'wardrobe-1',
-          productId: diorProduct.id,
-          product: diorProduct,
-          addedAt: new Date().toISOString(),
-          wearCount: 5,
-          lastWorn: '2024-01-15',
-          outfitCompatibility: ['professional', 'evening']
-        }]);
-      }
+      // Demo: seed wardrobe with one product for showcase
+      productService.getAllProducts().then(response => {
+        if (response.success) {
+          const diorProduct = response.data.find(p => p.brandName === 'Dior');
+          if (diorProduct) {
+            setWardrobe([{
+              id: 'wardrobe-1',
+              productId: diorProduct.id,
+              product: diorProduct,
+              addedAt: new Date().toISOString(),
+              wearCount: 5,
+              lastWorn: '2024-01-15',
+              outfitCompatibility: ['professional', 'evening']
+            }]);
+          }
+        }
+      }).catch(() => { /* start with empty wardrobe */ });
     }
   }, []);
 

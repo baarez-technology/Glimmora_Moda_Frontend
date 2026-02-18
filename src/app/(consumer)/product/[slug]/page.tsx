@@ -1,9 +1,9 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { getProductBySlug } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 import { notFound } from 'next/navigation';
 import ImmersiveVisualization from '@/components/product/ImmersiveVisualization';
 import OutfitSuggestions from '@/components/product/OutfitSuggestions';
@@ -21,19 +21,13 @@ import {
   ProductConcierge,
   ProductIntelligencePanel
 } from './components';
+import type { Product } from '@/types';
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
 }
 
-export default function ProductPage({ params }: ProductPageProps) {
-  const { slug } = use(params);
-  const product = getProductBySlug(slug);
-
-  if (!product) {
-    notFound();
-  }
-
+function ProductPageContent({ product }: { product: Product }) {
   // Use custom hooks for state management
   const state = useProductPageState({ product });
 
@@ -43,7 +37,8 @@ export default function ProductPage({ params }: ProductPageProps) {
     sizeVariants: state.sizeVariants,
     fashionIdentity: state.fashionIdentity,
     wardrobe: state.wardrobe,
-    brand: state.brand
+    brand: state.brand,
+    allProducts: state.allProducts
   });
 
   return (
@@ -190,4 +185,42 @@ export default function ProductPage({ params }: ProductPageProps) {
       />
     </div>
   );
+}
+
+export default function ProductPage({ params }: ProductPageProps) {
+  const { slug } = use(params);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await productService.getProductBySlug(slug);
+        setProduct(res.data ?? null);
+      } catch (error) {
+        console.error('Failed to load product:', error);
+        setProduct(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-stone tracking-wider">Loading</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!product) {
+    notFound();
+  }
+
+  return <ProductPageContent product={product} />;
 }

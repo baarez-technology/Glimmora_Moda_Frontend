@@ -16,12 +16,14 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
+import { useApp } from '@/context/AppContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { BespokeOrderStatus, BespokeOrderType } from '@/types/uhni';
 
 export default function BespokeOrderDetailPage() {
   const params = useParams();
   const { getBespokeOrderById, updateBespokeOrderStatus } = useBrand();
+  const { showToast } = useApp();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
@@ -292,7 +294,10 @@ export default function BespokeOrderDetailPage() {
                   <Camera size={18} className="text-stone" />
                   <h2 className="font-medium text-charcoal-deep">Progress Images</h2>
                 </div>
-                <button className="text-xs text-charcoal-deep hover:text-gold-muted transition-colors">
+                <button
+                  onClick={() => showToast('File upload will be available when backend is connected', 'info')}
+                  className="text-xs text-charcoal-deep hover:text-gold-muted transition-colors"
+                >
                   + Add Image
                 </button>
               </div>

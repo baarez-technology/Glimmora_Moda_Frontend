@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -17,11 +17,15 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
-// TODO: Move to types file and add to AppContext when gift registry feature is implemented
 interface RegistryItem {
   id: string;
   productId: string;
-  product: any; // TODO: Import Product type
+  product: {
+    name: string;
+    brandName: string;
+    price: number;
+    images: { url: string }[];
+  };
   priority: 'high' | 'medium' | 'low';
   quantity: number;
   purchased: number;
@@ -39,18 +43,95 @@ interface GiftRegistry {
   shareLink?: string;
 }
 
+const STORAGE_KEY = 'moda-gift-registries';
+
+function loadRegistries(): GiftRegistry[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRegistries(registries: GiftRegistry[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(registries));
+}
+
 export default function GiftRegistryPage() {
-  // TODO: Add gift registry functionality to AppContext
-  const {} = useApp();
-  const giftRegistries: GiftRegistry[] = [];
-  const createGiftRegistry = (name: string, eventType: string, eventDate: string, description?: string) => {};
-  const addToRegistry = (registryId: string, productId: string) => {};
-  const removeFromRegistry = (registryId: string, itemId: string) => {};
-  const updateRegistryItem = (registryId: string, itemId: string, updates: any) => {};
-  const deleteRegistry = (registryId: string) => {};
+  const { showToast } = useApp();
+  const [giftRegistries, setGiftRegistries] = useState<GiftRegistry[]>([]);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    setGiftRegistries(loadRegistries());
+    setIsHydrated(true);
+  }, []);
+
+  // Persist on every change (after hydration)
+  useEffect(() => {
+    if (isHydrated) {
+      saveRegistries(giftRegistries);
+    }
+  }, [giftRegistries, isHydrated]);
+
+  const createGiftRegistry = useCallback((name: string, eventType: string, eventDate: string, description?: string) => {
+    const newRegistry: GiftRegistry = {
+      id: `reg-${Date.now()}`,
+      name,
+      eventType: eventType as GiftRegistry['eventType'],
+      eventDate,
+      description,
+      items: [],
+      shareLink: `${typeof window !== 'undefined' ? window.location.origin : ''}/gift-registry/reg-${Date.now()}`
+    };
+    setGiftRegistries(prev => [...prev, newRegistry]);
+    showToast('Gift registry created', 'success');
+  }, [showToast]);
+
+  const deleteRegistry = useCallback((registryId: string) => {
+    setGiftRegistries(prev => prev.filter(r => r.id !== registryId));
+    showToast('Registry deleted', 'success');
+  }, [showToast]);
+
+  const removeFromRegistry = useCallback((registryId: string, itemId: string) => {
+    setGiftRegistries(prev => prev.map(r => {
+      if (r.id !== registryId) return r;
+      return { ...r, items: r.items.filter(i => i.id !== itemId) };
+    }));
+    showToast('Item removed from registry', 'success');
+  }, [showToast]);
+
+  const updateRegistryItem = useCallback((registryId: string, itemId: string, updates: Partial<RegistryItem>) => {
+    setGiftRegistries(prev => prev.map(r => {
+      if (r.id !== registryId) return r;
+      return {
+        ...r,
+        items: r.items.map(i => {
+          if (i.id !== itemId) return i;
+          return { ...i, ...updates };
+        })
+      };
+    }));
+  }, []);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRegistry, setSelectedRegistry] = useState<GiftRegistry | null>(null);
+
+  // Keep selectedRegistry in sync with state
+  useEffect(() => {
+    if (selectedRegistry) {
+      const updated = giftRegistries.find(r => r.id === selectedRegistry.id);
+      if (updated) {
+        setSelectedRegistry(updated);
+      } else {
+        setSelectedRegistry(null);
+      }
+    }
+  }, [giftRegistries, selectedRegistry?.id]);
 
   // Form state for creating registry
   const [formData, setFormData] = useState({
@@ -84,14 +165,14 @@ export default function GiftRegistryPage() {
           text: `Check out my gift registry for ${registry.name}`,
           url: registry.shareLink || ''
         });
-      } catch (err) {
-        console.log('Share cancelled');
+      } catch {
+        // Share cancelled
       }
     } else {
       // Fallback: copy to clipboard
       if (registry.shareLink) {
         navigator.clipboard.writeText(registry.shareLink);
-        alert('Link copied to clipboard!');
+        showToast('Link copied to clipboard', 'success');
       }
     }
   };
@@ -171,7 +252,7 @@ export default function GiftRegistryPage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {giftRegistries.map((registry) => {
               const totalItems = registry.items.length;
-              const purchasedItems = registry.items.filter(i => i.purchased).length;
+              const purchasedItems = registry.items.filter(i => i.purchased > 0).length;
               const completionPercent = totalItems > 0 ? (purchasedItems / totalItems) * 100 : 0;
 
               return (
@@ -402,7 +483,7 @@ export default function GiftRegistryPage() {
                               {item.product.name}
                             </h3>
                             <p className="text-sm text-stone">
-                              €{item.product.price.toLocaleString()} × {item.quantity}
+                              &euro;{item.product.price.toLocaleString()} &times; {item.quantity}
                             </p>
                           </div>
 
@@ -420,7 +501,7 @@ export default function GiftRegistryPage() {
                             {item.priority} priority
                           </span>
 
-                          {item.purchased ? (
+                          {item.purchased > 0 ? (
                             <span className="px-2 py-1 bg-green-100 text-green-700 text-xs tracking-wider uppercase flex items-center gap-1">
                               <Check size={12} />
                               Purchased
@@ -430,7 +511,7 @@ export default function GiftRegistryPage() {
                             <button
                               onClick={() =>
                                 updateRegistryItem(selectedRegistry.id, item.id, {
-                                  purchased: true,
+                                  purchased: 1,
                                   purchasedBy: 'Guest'
                                 })
                               }

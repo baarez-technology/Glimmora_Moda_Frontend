@@ -7,7 +7,8 @@ import { ArrowLeft, MapPin, Calendar, Sun, Cloud, Thermometer, Check, Plus, Spar
 import Link from 'next/link';
 import Image from 'next/image';
 import { Trip, PackingItem, Product } from '@/types';
-import { products, getPackingRecommendations } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
+import * as intelligenceService from '@/services/intelligence.service';
 
 const sampleTrips: Trip[] = [
   {
@@ -55,8 +56,11 @@ export default function TripDetailPage() {
         setTrip(foundTrip);
         // Generate packing list if empty
         if (!foundTrip.packingList || foundTrip.packingList.length === 0) {
-          const generated = getPackingRecommendations(foundTrip);
-          setPackingList(generated);
+          const loadPacking = async () => {
+            const response = await intelligenceService.getPackingRecommendations(foundTrip);
+            setPackingList(response.data);
+          };
+          loadPacking();
         } else {
           setPackingList(foundTrip.packingList);
         }
@@ -67,14 +71,19 @@ export default function TripDetailPage() {
   // Get recommendations
   useEffect(() => {
     if (trip) {
-      // Filter products based on trip attributes
-      const filtered = products.filter(p => {
-        if (trip.activities.includes('beach')) {
-          return p.category === 'clothing' || p.category === 'accessories';
-        }
-        return true;
-      }).slice(0, 6);
-      setRecommendations(filtered);
+      const loadProducts = async () => {
+        const response = await productService.getAllProducts();
+        const allProducts = response.data;
+        // Filter products based on trip attributes
+        const filtered = allProducts.filter(p => {
+          if (trip.activities.includes('beach')) {
+            return p.category === 'clothing' || p.category === 'accessories';
+          }
+          return true;
+        }).slice(0, 6);
+        setRecommendations(filtered);
+      };
+      loadProducts();
     }
   }, [trip]);
 

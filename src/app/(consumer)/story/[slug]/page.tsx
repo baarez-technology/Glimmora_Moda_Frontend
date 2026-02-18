@@ -4,9 +4,11 @@ import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clock, Share2, Bookmark, BookmarkCheck, ArrowRight } from 'lucide-react';
-import { getStoryBySlug, brands, products, brandStories as allStories } from '@/data/mock-data';
+import * as brandService from '@/services/brand.service';
+import * as productService from '@/services/product.service';
 import { notFound } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import type { Product, Brand, BrandStory } from '@/types';
 
 interface StoryPageProps {
   params: Promise<{ slug: string }>;
@@ -14,15 +16,46 @@ interface StoryPageProps {
 
 export default function StoryPage({ params }: StoryPageProps) {
   const { slug } = use(params);
-  const story = getStoryBySlug(slug);
   const { showToast } = useApp();
+  const [story, setStory] = useState<BrandStory | null>(null);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [allStories, setAllStories] = useState<BrandStory[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
 
   useEffect(() => {
-    setIsLoaded(true);
-  }, []);
+    async function loadData() {
+      try {
+        const [storyRes, brandsRes, productsRes, storiesRes] = await Promise.all([
+          brandService.getStoryBySlug(slug),
+          brandService.getAllBrands(),
+          productService.getAllProducts(),
+          brandService.getAllStories(),
+        ]);
+        setStory(storyRes.data ?? null);
+        setBrands(brandsRes.data ?? []);
+        setProducts(productsRes.data ?? []);
+        setAllStories(storiesRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load story data:', error);
+      } finally {
+        setLoading(false);
+        setIsLoaded(true);
+      }
+    }
+    loadData();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (!story) {
     notFound();

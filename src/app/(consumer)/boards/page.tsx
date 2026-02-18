@@ -5,64 +5,81 @@ import { motion } from 'framer-motion';
 import { Grid, Plus, Lock, Globe, Sparkles, Heart, MoreHorizontal, X } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { InspirationBoard } from '@/types';
-import { products } from '@/data/mock-data';
+import { InspirationBoard, Product } from '@/types';
+import * as productService from '@/services/product.service';
 
-const sampleBoards: InspirationBoard[] = [
-  {
-    id: 'board-1',
-    name: 'Spring Essentials',
-    description: 'Fresh looks for the new season',
-    coverImage: products[0]?.images[0]?.url || '',
-    items: products.slice(0, 4).map((p, i) => ({
-      id: `item-${i}`,
-      type: 'product' as const,
-      referenceId: p.id,
-      imageUrl: p.images[0]?.url || '',
-      title: p.name,
-      addedAt: new Date().toISOString(),
-      note: ''
-    })),
-    isPrivate: true,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'board-2',
-    name: 'Evening Elegance',
-    description: 'Sophisticated pieces for special occasions',
-    coverImage: products[3]?.images[0]?.url || '',
-    items: products.slice(3, 6).map((p, i) => ({
-      id: `item-${i}`,
-      type: 'product' as const,
-      referenceId: p.id,
-      imageUrl: p.images[0]?.url || '',
-      title: p.name,
-      addedAt: new Date().toISOString(),
-      note: ''
-    })),
-    isPrivate: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
+function buildSampleBoards(products: Product[]): InspirationBoard[] {
+  return [
+    {
+      id: 'board-1',
+      name: 'Spring Essentials',
+      description: 'Fresh looks for the new season',
+      coverImage: products[0]?.images[0]?.url || '',
+      items: products.slice(0, 4).map((p, i) => ({
+        id: `item-${i}`,
+        type: 'product' as const,
+        referenceId: p.id,
+        imageUrl: p.images[0]?.url || '',
+        title: p.name,
+        addedAt: new Date().toISOString(),
+        note: ''
+      })),
+      isPrivate: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    },
+    {
+      id: 'board-2',
+      name: 'Evening Elegance',
+      description: 'Sophisticated pieces for special occasions',
+      coverImage: products[3]?.images[0]?.url || '',
+      items: products.slice(3, 6).map((p, i) => ({
+        id: `item-${i}`,
+        type: 'product' as const,
+        referenceId: p.id,
+        imageUrl: p.images[0]?.url || '',
+        title: p.name,
+        addedAt: new Date().toISOString(),
+        note: ''
+      })),
+      isPrivate: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }
+  ];
+}
 
 export default function BoardsPage() {
+  const [products, setProducts] = useState<Product[]>([]);
   const [boards, setBoards] = useState<InspirationBoard[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [newBoardDescription, setNewBoardDescription] = useState('');
 
-  // Load boards from localStorage
+  // Load products from service and boards from localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('modaglimmora_boards');
-      if (saved) {
-        setBoards(JSON.parse(saved));
-      } else {
-        setBoards(sampleBoards);
+    async function loadData() {
+      try {
+        const productsRes = await productService.getAllProducts();
+        const loadedProducts = productsRes.data ?? [];
+        setProducts(loadedProducts);
+
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('modaglimmora_boards');
+          if (saved) {
+            setBoards(JSON.parse(saved));
+          } else {
+            setBoards(buildSampleBoards(loadedProducts));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load products:', error);
+      } finally {
+        setLoading(false);
       }
     }
+    loadData();
   }, []);
 
   // Save boards to localStorage
@@ -95,6 +112,14 @@ export default function BoardsPage() {
   const deleteBoard = (boardId: string) => {
     setBoards(prev => prev.filter(b => b.id !== boardId));
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

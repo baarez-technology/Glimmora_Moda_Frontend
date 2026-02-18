@@ -7,10 +7,11 @@ export function middleware(request: NextRequest) {
   // Get user tier from cookie or header (for now, we'll use a workaround with localStorage check on client)
   // In a real app, this would check an HTTP-only cookie with session token
 
-  // For UHNI portal routes - all routes under /uhni/* are protected by (uhni)/layout.tsx
+  // UHNI portal routes (/uhni/*) are tier-gated:
+  // - Client-side: (uhni)/layout.tsx reads userTier from AuthContext and redirects non-UHNI users
+  // - Server-side (future): Replace this with JWT/session cookie check for userTier === 'uhni'
+  // - Currently frontend-only, so server middleware just passes through
   if (pathname.startsWith('/uhni')) {
-    // The (uhni)/layout.tsx will handle auth guard
-    // This middleware just allows the request to proceed
     return NextResponse.next();
   }
 

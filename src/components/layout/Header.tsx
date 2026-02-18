@@ -4,9 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Heart, Menu, X, LogOut, Settings } from 'lucide-react';
-import { brands } from '@/data/mock-data';
+import * as brandService from '@/services/brand.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import type { Brand } from '@/types';
 
 export default function Header() {
   const router = useRouter();
@@ -14,7 +15,17 @@ export default function Header() {
   const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
+
+  // Load brands from service on mount
+  useEffect(() => {
+    brandService.getAllBrands().then((res) => {
+      if (res.success && res.data) {
+        setBrands(res.data);
+      }
+    });
+  }, []);
 
   const handleLogout = () => {
     setIsAccountOpen(false);

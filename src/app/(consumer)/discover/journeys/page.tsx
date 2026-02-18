@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Compass, Palette, Globe, Gem, History, ArrowRight, Clock, MapPin } from 'lucide-react';
 import Link from 'next/link';
-import { culturalJourneys } from '@/data/mock-data';
+import * as intelligenceService from '@/services/intelligence.service';
+import type { CulturalJourney } from '@/types/heritage';
 
 const journeyTypeConfig: Record<string, {
   icon: React.ReactNode;
@@ -59,6 +60,23 @@ const defaultJourneyConfig = {
 };
 
 export default function JourneysPage() {
+  const [culturalJourneys, setCulturalJourneys] = useState<CulturalJourney[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const journeysRes = await intelligenceService.getCulturalJourneys();
+        setCulturalJourneys(journeysRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load cultural journeys:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
   // Group journeys by type
   const journeysByType = culturalJourneys.reduce((acc, journey) => {
     if (!acc[journey.type]) {
@@ -66,7 +84,15 @@ export default function JourneysPage() {
     }
     acc[journey.type].push(journey);
     return acc;
-  }, {} as Record<string, typeof culturalJourneys>);
+  }, {} as Record<string, CulturalJourney[]>);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

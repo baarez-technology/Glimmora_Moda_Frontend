@@ -21,7 +21,7 @@ import { MetricCard } from '@/components/brand/MetricCard';
 export default function BrandDashboardPage() {
   const { partner, products, analytics, inventory, recentActivity } = useBrand();
 
-  if (!partner) return null;
+  if (!partner || !analytics || !inventory) return null;
 
   // Calculate metrics
   const publishedProducts = products.filter(p => p.status === 'published').length;

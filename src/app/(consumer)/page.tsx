@@ -4,16 +4,48 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import { brands, getFeaturedProducts, getFeaturedStories } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
+import * as brandService from '@/services/brand.service';
+import type { Product, Brand, BrandStory } from '@/types';
 
 export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
-  const featuredProducts = getFeaturedProducts();
-  const featuredStories = getFeaturedStories();
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [featuredStories, setFeaturedStories] = useState<BrandStory[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    async function loadData() {
+      try {
+        const [brandsRes, productsRes, storiesRes] = await Promise.all([
+          brandService.getAllBrands(),
+          productService.getFeaturedProducts(),
+          brandService.getFeaturedStories(),
+        ]);
+        setBrands(brandsRes.data ?? []);
+        setFeaturedProducts(productsRes.data ?? []);
+        setFeaturedStories(storiesRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load home page data:', error);
+      } finally {
+        setLoading(false);
+        setIsLoaded(true);
+      }
+    }
+    loadData();
   }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-noir flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-ivory-cream/50 tracking-wider">Loading</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-noir overflow-x-hidden">

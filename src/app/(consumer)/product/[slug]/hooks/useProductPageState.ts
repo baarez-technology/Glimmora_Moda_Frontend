@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
-import { brands, products as allProducts } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
+import * as brandService from '@/services/brand.service';
 import type {
   Product,
+  Brand,
   DigitalBodyTwin,
   FashionIdentity,
   AvailabilityIntelligence,
@@ -64,14 +66,35 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const [bodyTwin, setBodyTwin] = useState<DigitalBodyTwin | undefined>(undefined);
   const [fashionIdentity, setFashionIdentity] = useState<FashionIdentity | null>(null);
 
+  // Service Data
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+
   // Derived Data
-  const brand = useMemo(() => brands.find(b => b.id === product.brandId), [product.brandId]);
+  const brand = useMemo(() => allBrands.find(b => b.id === product.brandId), [product.brandId, allBrands]);
   const sizeVariants = useMemo(() => product.variants.filter(v => v.type === 'size'), [product.variants]);
   const colorVariants = useMemo(() => product.variants.filter(v => v.type === 'color'), [product.variants]);
   const inConsiderations = isInConsiderations(product.id);
   const considerationItem = considerations.find(c => c.productId === product.id);
   const watchingRestock = hasRestockAlert(product.id);
   const inWardrobe = isInWardrobe(product.id);
+
+  // Load service data and user data
+  useEffect(() => {
+    async function loadServiceData() {
+      try {
+        const [brandsRes, productsRes] = await Promise.all([
+          brandService.getAllBrands(),
+          productService.getAllProducts(),
+        ]);
+        setAllBrands(brandsRes.data ?? []);
+        setAllProducts(productsRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load product page service data:', error);
+      }
+    }
+    loadServiceData();
+  }, []);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -187,7 +210,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     return allProducts
       .filter(p => p.brandId === product.brandId && p.id !== product.id)
       .slice(0, 4);
-  }, [product]);
+  }, [product, allProducts]);
 
   return {
     // State
@@ -211,6 +234,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     inWardrobe,
     watchingRestock,
     relatedProducts,
+    allProducts,
 
     // Setters
     setSelectedSize: handleSizeSelect,
@@ -236,12 +260,13 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
 }
 
 // Separate hook for computed intelligence data
-export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, brand }: {
+export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, brand, allProducts }: {
   product: Product;
   sizeVariants: Product['variants'];
   fashionIdentity: FashionIdentity | null;
   wardrobe: { product: Product }[];
   brand?: { name: string } | null;
+  allProducts: Product[];
 }) {
   // G-SAIL™ Availability Intelligence
   const availabilityIntelligence: AvailabilityIntelligence = useMemo(() => ({
@@ -275,7 +300,7 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
       probability: 78
     } : undefined,
     conciergeOption: product.availability.status !== 'available'
-  }), [product]);
+  }), [product, allProducts]);
 
   // Fit Confidence
   const fitConfidence: FitConfidence = useMemo(() => {
@@ -334,7 +359,7 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
         agiReasoning: `The ${product.name} anchors this professional look with authority.`
       }
     ];
-  }, [product]);
+  }, [product, allProducts]);
 
   // Personalization Match
   const personalizationMatch: PersonalizationMatch | null = useMemo(() => {

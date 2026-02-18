@@ -20,6 +20,15 @@ export default function InventoryPage() {
   const { inventory } = useBrand();
   const [expandedRegions, setExpandedRegions] = useState<string[]>(['Europe', 'Asia', 'Americas']);
 
+  if (!inventory) {
+    return (
+      <div className="p-8 text-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-stone text-sm">Loading inventory data...</p>
+      </div>
+    );
+  }
+
   const toggleRegion = (region: string) => {
     setExpandedRegions(prev =>
       prev.includes(region)
@@ -68,7 +77,7 @@ export default function InventoryPage() {
     }
   };
 
-  const activeAlerts = inventory.alerts.filter(a => !a.resolvedAt);
+  const activeAlerts = inventory?.alerts.filter(a => !a.resolvedAt) ?? [];
 
   return (
     <div>

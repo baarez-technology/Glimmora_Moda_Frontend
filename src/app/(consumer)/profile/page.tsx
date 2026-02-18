@@ -4,16 +4,18 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers, Sparkles, Archive, DollarSign, Globe } from 'lucide-react';
-import { mockUser } from '@/data/mock-data';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers, Sparkles, Archive, DollarSign, Globe } from 'lucide-react';
+import * as userService from '@/services/user.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import type { User } from '@/types';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated, isLoggingOut } = useAuth();
   const { considerations, wardrobe, calendarEvents, orders, isUHNI, concierge, sourcingRequests, bespokeOrders, autonomousSettings, fashionIdentity } = useApp();
-  const user = { ...mockUser, fashionIdentity };
+  const [userData, setUserData] = useState<User | null>(null);
+  const user = userData ? { ...userData, fashionIdentity } : null;
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
 
@@ -26,12 +28,17 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
-      setIsLoaded(true);
+      const loadUser = async () => {
+        const response = await userService.getCurrentUser();
+        setUserData(response.data);
+        setIsLoaded(true);
+      };
+      loadUser();
     }
   }, [isHydrated, isAuthenticated]);
 
-  // Show loading while checking auth
-  if (!isHydrated || !isAuthenticated) {
+  // Show loading while checking auth or loading user data
+  if (!isHydrated || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
@@ -160,7 +167,7 @@ export default function ProfilePage() {
           <div className={`flex flex-col md:flex-row items-center md:items-end gap-8 md:gap-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Avatar */}
             <div className="w-28 h-28 bg-charcoal-warm flex items-center justify-center border border-gold-soft/20">
-              <User size={48} className="text-gold-soft/60" />
+              <UserIcon size={48} className="text-gold-soft/60" />
             </div>
 
             {/* Info */}

@@ -22,50 +22,42 @@ import type {
   SourcingRequest,
   UHNIPriceOffer
 } from '@/types/uhni';
-import {
-  mockBrandPartner,
-  mockBrandProducts,
-  mockBrandCollections,
-  mockGlobalInventory,
-  mockBrandAnalytics,
-  mockRecentActivity,
-  mockBrandOrders,
-  mockBespokeOrders,
-  mockPriceNegotiations,
-  mockPrivateCollections,
-  mockBrandSourcingRequests,
-  mockHeritageEvents,
-  mockBrandStories,
-  mockUHNIOffers,
-  mockStylingSessions
-} from '@/data/brand-portal';
+import * as brandPortalService from '@/services/brand-portal.service';
 
 interface BrandContextType {
   // Brand Partner
   partner: BrandPartner | null;
   isAuthenticated: boolean;
   isHydrated: boolean;
+  isLoading: boolean;
+  error: string | null;
 
   // Products
   products: BrandProduct[];
   getProductById: (id: string) => BrandProduct | undefined;
   updateProduct: (id: string, updates: Partial<BrandProduct>) => void;
   createProduct: (product: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'>) => BrandProduct;
+  deleteProduct: (id: string) => void;
 
   // Collections
   collections: BrandCollection[];
   getCollectionById: (id: string) => BrandCollection | undefined;
+<<<<<<< HEAD
+  createCollection: (collection: Omit<BrandCollection, 'id'>) => BrandCollection;
+  updateCollection: (id: string, updates: Partial<BrandCollection>) => void;
+=======
   deleteCollection: (id: string) => void;
+>>>>>>> main
 
   // Orders
   orders: BrandOrder[];
   getOrderById: (id: string) => BrandOrder | undefined;
 
   // Inventory
-  inventory: GlobalInventoryOverview;
+  inventory: GlobalInventoryOverview | null;
 
   // Analytics
-  analytics: BrandAnalytics;
+  analytics: BrandAnalytics | null;
 
   // Recent Activity
   recentActivity: RecentActivity[];
@@ -84,6 +76,7 @@ interface BrandContextType {
   privateCollections: PrivateCollection[];
   getPrivateCollectionById: (id: string) => PrivateCollection | undefined;
   createPrivateCollection: (collection: Omit<PrivateCollection, 'id'>) => PrivateCollection;
+  updatePrivateCollection: (id: string, updates: Partial<PrivateCollection>) => void;
 
   sourcingRequests: SourcingRequest[];
   getSourcingRequestById: (id: string) => SourcingRequest | undefined;
@@ -111,6 +104,7 @@ interface BrandContextType {
   stylingSessions: StylingSession[];
   getStylingSessionById: (id: string) => StylingSession | undefined;
   updateStylingSessionStatus: (id: string, status: StylingSession['status']) => void;
+  createStylingSession: (session: Omit<StylingSession, 'id'>) => void;
 
   // Auth
   loginAsBrand: () => void;
@@ -121,13 +115,15 @@ const BrandContext = createContext<BrandContextType | undefined>(undefined);
 
 export function BrandProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [partner, setPartner] = useState<BrandPartner | null>(null);
   const [products, setProducts] = useState<BrandProduct[]>([]);
   const [collections, setCollections] = useState<BrandCollection[]>([]);
   const [orders, setOrders] = useState<BrandOrder[]>([]);
-  const [inventory, setInventory] = useState<GlobalInventoryOverview>(mockGlobalInventory);
-  const [analytics, setAnalytics] = useState<BrandAnalytics>(mockBrandAnalytics);
+  const [inventory, setInventory] = useState<GlobalInventoryOverview | null>(null);
+  const [analytics, setAnalytics] = useState<BrandAnalytics | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
 
   // UHNI Feature State
@@ -140,65 +136,66 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [uhniOffers, setUhniOffers] = useState<UHNIPriceOffer[]>([]);
   const [stylingSessions, setStylingSessions] = useState<StylingSession[]>([]);
 
+  // Load all brand data from service
+  const loadBrandData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await brandPortalService.getBrandDashboardData();
+      if (response.success) {
+        const d = response.data;
+        setPartner(d.partner);
+        setProducts(d.products);
+        setCollections(d.collections);
+        setOrders(d.orders);
+        setInventory(d.inventory);
+        setAnalytics(d.analytics);
+        setRecentActivity(d.recentActivity);
+        setBespokeOrders(d.bespokeOrders);
+        setPriceNegotiations(d.priceNegotiations);
+        setPrivateCollections(d.privateCollections);
+        setSourcingRequests(d.sourcingRequests);
+        setHeritageEvents(d.heritageEvents);
+        setBrandStories(d.brandStories);
+        setUhniOffers(d.uhniOffers);
+        setStylingSessions(d.stylingSessions);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load brand data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   // Load from localStorage on mount
   useEffect(() => {
     try {
       const storedAuth = localStorage.getItem('moda-brand-auth');
       if (storedAuth === 'true') {
         setIsAuthenticated(true);
-        setPartner(mockBrandPartner);
-        setProducts(mockBrandProducts);
-        setCollections(mockBrandCollections);
-        setOrders(mockBrandOrders);
-        setInventory(mockGlobalInventory);
-        setAnalytics(mockBrandAnalytics);
-        setRecentActivity(mockRecentActivity);
-        // Load UHNI features
-        setBespokeOrders(mockBespokeOrders);
-        setPriceNegotiations(mockPriceNegotiations);
-        setPrivateCollections(mockPrivateCollections);
-        setSourcingRequests(mockBrandSourcingRequests);
-        setHeritageEvents(mockHeritageEvents);
-        setBrandStories(mockBrandStories);
-        setUhniOffers(mockUHNIOffers);
-        setStylingSessions(mockStylingSessions);
+        loadBrandData();
       }
-    } catch (error) {
-      console.error('Failed to load brand auth state:', error);
+    } catch (err) {
+      console.error('Failed to load brand auth state:', err);
     }
     setIsHydrated(true);
-  }, []);
+  }, [loadBrandData]);
 
   // Save auth state to localStorage
   useEffect(() => {
     if (isHydrated) {
       try {
         localStorage.setItem('moda-brand-auth', isAuthenticated.toString());
-      } catch (error) {
-        console.error('Failed to save brand auth state:', error);
+      } catch (err) {
+        console.error('Failed to save brand auth state:', err);
       }
     }
   }, [isAuthenticated, isHydrated]);
 
   const loginAsBrand = useCallback(() => {
     setIsAuthenticated(true);
-    setPartner(mockBrandPartner);
-    setProducts(mockBrandProducts);
-    setCollections(mockBrandCollections);
-    setOrders(mockBrandOrders);
-    setInventory(mockGlobalInventory);
-    setAnalytics(mockBrandAnalytics);
-    setRecentActivity(mockRecentActivity);
-    // Load UHNI features
-    setBespokeOrders(mockBespokeOrders);
-    setPriceNegotiations(mockPriceNegotiations);
-    setPrivateCollections(mockPrivateCollections);
-    setSourcingRequests(mockBrandSourcingRequests);
-    setHeritageEvents(mockHeritageEvents);
-    setBrandStories(mockBrandStories);
-    setUhniOffers(mockUHNIOffers);
-    setStylingSessions(mockStylingSessions);
-  }, []);
+    loadBrandData();
+  }, [loadBrandData]);
 
   const logout = useCallback(() => {
     setIsAuthenticated(false);
@@ -206,8 +203,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setProducts([]);
     setCollections([]);
     setOrders([]);
+    setInventory(null);
+    setAnalytics(null);
     setRecentActivity([]);
-    // Clear UHNI features
     setBespokeOrders([]);
     setPriceNegotiations([]);
     setPrivateCollections([]);
@@ -218,10 +216,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setStylingSessions([]);
     try {
       localStorage.removeItem('moda-brand-auth');
-    } catch (error) {
-      console.error('Failed to clear brand auth:', error);
+    } catch (err) {
+      console.error('Failed to clear brand auth:', err);
     }
   }, []);
+
+  // ============================================
+  // Products
+  // ============================================
 
   const getProductById = useCallback((id: string): BrandProduct | undefined => {
     return products.find(p => p.id === id);
@@ -233,22 +235,54 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         ? { ...p, ...updates, updatedAt: new Date().toISOString() }
         : p
     ));
+    brandPortalService.updateBrandProduct(id, updates).catch(console.error);
   }, []);
 
   const createProduct = useCallback((productData: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'>): BrandProduct => {
     const newProduct: BrandProduct = {
       ...productData,
-      id: `dior-${Date.now()}`,
+      id: `bp-product-${Date.now()}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     setProducts(prev => [newProduct, ...prev]);
+    brandPortalService.createBrandProduct(productData).catch(console.error);
     return newProduct;
   }, []);
+
+  const deleteProduct = useCallback((id: string) => {
+    setProducts(prev => prev.filter(p => p.id !== id));
+    brandPortalService.deleteBrandProduct(id).catch(console.error);
+  }, []);
+
+  // ============================================
+  // Collections
+  // ============================================
 
   const getCollectionById = useCallback((id: string): BrandCollection | undefined => {
     return collections.find(c => c.id === id);
   }, [collections]);
+
+  const createCollection = useCallback((collectionData: Omit<BrandCollection, 'id'>): BrandCollection => {
+    const newCollection: BrandCollection = {
+      ...collectionData,
+      id: `bp-collection-${Date.now()}`,
+    };
+    setCollections(prev => [newCollection, ...prev]);
+    brandPortalService.createBrandCollection(collectionData).catch(console.error);
+    return newCollection;
+  }, []);
+
+  const updateCollection = useCallback((id: string, updates: Partial<BrandCollection>) => {
+    setCollections(prev => prev.map(c =>
+      c.id === id ? { ...c, ...updates } : c
+    ));
+    brandPortalService.updateBrandCollection(id, updates).catch(console.error);
+  }, []);
+
+  // ============================================
+  // Orders
+  // ============================================
 
   const deleteCollection = useCallback((id: string) => {
     setCollections(prev => prev.map(c =>
@@ -260,7 +294,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return orders.find(o => o.id === id);
   }, [orders]);
 
-  // UHNI Feature Methods
+  // ============================================
+  // UHNI Features
+  // ============================================
+
   const getBespokeOrderById = useCallback((id: string): BespokeOrder | undefined => {
     return bespokeOrders.find(o => o.id === id);
   }, [bespokeOrders]);
@@ -282,6 +319,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       });
       return { ...order, status, timeline: updatedTimeline, updatedAt: new Date().toISOString() };
     }));
+    brandPortalService.updateBespokeOrderStatus(id, status).catch(console.error);
   }, []);
 
   const getNegotiationById = useCallback((id: string): PriceNegotiation | undefined => {
@@ -292,18 +330,21 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setPriceNegotiations(prev => prev.map(n =>
       n.id === id ? { ...n, counterOffer: amount, status: 'counter_offered' as NegotiationStatus } : n
     ));
+    brandPortalService.submitCounterOffer(id, amount).catch(console.error);
   }, []);
 
   const approveNegotiation = useCallback((id: string) => {
     setPriceNegotiations(prev => prev.map(n =>
       n.id === id ? { ...n, status: 'approved' as NegotiationStatus } : n
     ));
+    brandPortalService.approveNegotiation(id).catch(console.error);
   }, []);
 
   const declineNegotiation = useCallback((id: string) => {
     setPriceNegotiations(prev => prev.map(n =>
       n.id === id ? { ...n, status: 'declined' as NegotiationStatus } : n
     ));
+    brandPortalService.declineNegotiation(id).catch(console.error);
   }, []);
 
   const getPrivateCollectionById = useCallback((id: string): PrivateCollection | undefined => {
@@ -316,7 +357,15 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       id: `priv-col-${Date.now()}`
     };
     setPrivateCollections(prev => [newCollection, ...prev]);
+    brandPortalService.createPrivateCollection(collection).catch(console.error);
     return newCollection;
+  }, []);
+
+  const updatePrivateCollection = useCallback((id: string, updates: Partial<PrivateCollection>) => {
+    setPrivateCollections(prev => prev.map(c =>
+      c.id === id ? { ...c, ...updates } : c
+    ));
+    brandPortalService.updatePrivateCollection(id, updates).catch(console.error);
   }, []);
 
   const getSourcingRequestById = useCallback((id: string): SourcingRequest | undefined => {
@@ -332,7 +381,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   }) => {
     setSourcingRequests(prev => prev.map(request => {
       if (request.id !== requestId) return request;
-
       const newOption = {
         id: `option-${Date.now()}`,
         customDescription: option.customDescription,
@@ -342,7 +390,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         conciergeRecommendation: option.conciergeRecommendation,
         images: []
       };
-
       return {
         ...request,
         foundOptions: [...request.foundOptions, newOption],
@@ -350,6 +397,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         updatedAt: new Date().toISOString()
       };
     }));
+    brandPortalService.submitSourcingOption(requestId, {
+      description: option.customDescription,
+      price: option.price,
+      condition: option.condition,
+      source: option.source,
+    }).catch(console.error);
   }, []);
 
   const getHeritageEventById = useCallback((id: string): HeritageEvent | undefined => {
@@ -364,6 +417,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString()
     };
     setHeritageEvents(prev => [...prev, newEvent].sort((a, b) => b.year - a.year));
+    brandPortalService.createHeritageEvent(event).catch(console.error);
     return newEvent;
   }, []);
 
@@ -379,6 +433,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString()
     };
     setBrandStories(prev => [newStory, ...prev]);
+    brandPortalService.createBrandStory(story).catch(console.error);
     return newStory;
   }, []);
 
@@ -386,6 +441,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setBrandStories(prev => prev.map(s =>
       s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
     ));
+    brandPortalService.updateBrandStory(id, updates).catch(console.error);
   }, []);
 
   const getUHNIOfferById = useCallback((id: string): UHNIPriceOffer | undefined => {
@@ -398,6 +454,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       id: `offer-${Date.now()}`
     };
     setUhniOffers(prev => [newOffer, ...prev]);
+    brandPortalService.createUHNIOffer(offer).catch(console.error);
     return newOffer;
   }, []);
 
@@ -409,6 +466,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setStylingSessions(prev => prev.map(s =>
       s.id === id ? { ...s, status, updatedAt: new Date().toISOString() } : s
     ));
+    brandPortalService.updateStylingSessionStatus(id, status).catch(console.error);
+  }, []);
+
+  const createStylingSession = useCallback((session: Omit<StylingSession, 'id'>) => {
+    const newSession: StylingSession = {
+      ...session,
+      id: `styling-${Date.now()}`
+    };
+    setStylingSessions(prev => [newSession, ...prev]);
+    brandPortalService.createStylingSession(session).catch(console.error);
   }, []);
 
   return (
@@ -417,12 +484,17 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         partner,
         isAuthenticated,
         isHydrated,
+        isLoading,
+        error,
         products,
         getProductById,
         updateProduct,
         createProduct,
+        deleteProduct,
         collections,
         getCollectionById,
+        createCollection,
+        updateCollection,
         deleteCollection,
         orders,
         getOrderById,
@@ -441,6 +513,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         privateCollections,
         getPrivateCollectionById,
         createPrivateCollection,
+        updatePrivateCollection,
         sourcingRequests,
         getSourcingRequestById,
         submitSourcingOption,
@@ -457,6 +530,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         stylingSessions,
         getStylingSessionById,
         updateStylingSessionStatus,
+        createStylingSession,
         // Auth
         loginAsBrand,
         logout

@@ -4,19 +4,24 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Home, Search } from 'lucide-react';
-import { products } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
+import type { Product } from '@/types';
 
 export default function NotFound() {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [recommendedProducts, setRecommendedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadProducts = async () => {
+      const response = await productService.getAllProducts();
+      const shuffled = response.data
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 4);
+      setRecommendedProducts(shuffled);
+      setIsLoaded(true);
+    };
+    loadProducts();
   }, []);
-
-  // Get random product recommendations
-  const recommendedProducts = products
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 4);
 
   return (
     <div className="min-h-screen bg-ivory-cream flex flex-col">

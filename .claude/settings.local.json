@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where:*)",
+      "Bash(python3:*)",
+      "Bash(python -c:*)",
+      "Bash(pip install:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(npx next build:*)"
+    ]
+  }
+}

@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, ChevronLeft, ChevronRight, Plus, Sparkles, X } from 'lucide-react';
 import Image from 'next/image';
-import { products } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 import { Product } from '@/types';
 
 interface DayPlan {
@@ -22,6 +22,39 @@ const occasions = [
   { id: 'special', label: 'Special Event', icon: '✨' }
 ];
 
+const STORAGE_KEY = 'moda-weekly-planner';
+
+// Serialize plan for storage (store product IDs only to save space)
+interface StoredDayPlan {
+  date: string;
+  outfits: {
+    occasion: string;
+    productIds: string[];
+  }[];
+}
+
+function savePlanToStorage(weekPlan: DayPlan[]) {
+  if (typeof window === 'undefined') return;
+  const storable: StoredDayPlan[] = weekPlan.map(day => ({
+    date: day.date,
+    outfits: day.outfits.map(outfit => ({
+      occasion: outfit.occasion,
+      productIds: outfit.products.map(p => p.id)
+    }))
+  }));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(storable));
+}
+
+function loadPlanFromStorage(): StoredDayPlan[] | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PlannerPage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
     const today = new Date();
@@ -31,7 +64,18 @@ export default function PlannerPage() {
   });
 
   const [weekPlan, setWeekPlan] = useState<DayPlan[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [showProductPicker, setShowProductPicker] = useState<{ dayIndex: number; occasionIndex: number } | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Load products from service
+  useEffect(() => {
+    productService.getAllProducts().then(response => {
+      if (response.success) {
+        setAllProducts(response.data);
+      }
+    }).catch(console.error);
+  }, []);
 
   // Generate week days
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -40,8 +84,34 @@ export default function PlannerPage() {
     return date;
   });
 
-  // Initialize week plan
+  // Initialize week plan — try to restore from storage first
   useEffect(() => {
+    const weekKey = currentWeekStart.toISOString();
+    const stored = loadPlanFromStorage();
+
+    if (stored && stored.length > 0 && stored[0].date) {
+      // Check if stored plan matches current week
+      const storedFirstDate = new Date(stored[0].date).toDateString();
+      const currentFirstDate = weekDays[0].toDateString();
+
+      if (storedFirstDate === currentFirstDate && allProducts.length > 0) {
+        // Restore plan with full product objects
+        const restoredPlan: DayPlan[] = stored.map(storedDay => ({
+          date: storedDay.date,
+          outfits: storedDay.outfits.map(outfit => ({
+            occasion: outfit.occasion,
+            products: outfit.productIds
+              .map(id => allProducts.find(p => p.id === id))
+              .filter((p): p is Product => p !== undefined)
+          }))
+        }));
+        setWeekPlan(restoredPlan);
+        setIsHydrated(true);
+        return;
+      }
+    }
+
+    // Initialize fresh plan
     const plan = weekDays.map(date => ({
       date: date.toISOString(),
       outfits: occasions.slice(0, 2).map(occ => ({
@@ -50,7 +120,15 @@ export default function PlannerPage() {
       }))
     }));
     setWeekPlan(plan);
-  }, [currentWeekStart]);
+    setIsHydrated(true);
+  }, [currentWeekStart, allProducts.length]);
+
+  // Persist plan changes to localStorage
+  useEffect(() => {
+    if (isHydrated && weekPlan.length > 0) {
+      savePlanToStorage(weekPlan);
+    }
+  }, [weekPlan, isHydrated]);
 
   const navigateWeek = (direction: 'prev' | 'next') => {
     const newStart = new Date(currentWeekStart);
@@ -60,10 +138,17 @@ export default function PlannerPage() {
 
   const addProductToSlot = (dayIndex: number, occasionIndex: number, product: Product) => {
     setWeekPlan(prev => {
-      const updated = [...prev];
-      if (!updated[dayIndex].outfits[occasionIndex].products.find(p => p.id === product.id)) {
-        updated[dayIndex].outfits[occasionIndex].products.push(product);
-      }
+      const updated = prev.map((day, di) => {
+        if (di !== dayIndex) return day;
+        return {
+          ...day,
+          outfits: day.outfits.map((outfit, oi) => {
+            if (oi !== occasionIndex) return outfit;
+            if (outfit.products.find(p => p.id === product.id)) return outfit;
+            return { ...outfit, products: [...outfit.products, product] };
+          })
+        };
+      });
       return updated;
     });
     setShowProductPicker(null);
@@ -71,9 +156,16 @@ export default function PlannerPage() {
 
   const removeProductFromSlot = (dayIndex: number, occasionIndex: number, productId: string) => {
     setWeekPlan(prev => {
-      const updated = [...prev];
-      updated[dayIndex].outfits[occasionIndex].products =
-        updated[dayIndex].outfits[occasionIndex].products.filter(p => p.id !== productId);
+      const updated = prev.map((day, di) => {
+        if (di !== dayIndex) return day;
+        return {
+          ...day,
+          outfits: day.outfits.map((outfit, oi) => {
+            if (oi !== occasionIndex) return outfit;
+            return { ...outfit, products: outfit.products.filter(p => p.id !== productId) };
+          })
+        };
+      });
       return updated;
     });
   };
@@ -229,7 +321,7 @@ export default function PlannerPage() {
                 Based on your wardrobe and upcoming events, here are some outfit combinations that would work well for your week.
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {products.slice(0, 4).map((product) => (
+                {allProducts.slice(0, 4).map((product) => (
                   <div key={product.id} className="bg-white rounded-lg p-3 border border-stone/10">
                     <div className="aspect-square bg-stone/5 rounded overflow-hidden relative mb-2">
                       <Image
@@ -273,7 +365,7 @@ export default function PlannerPage() {
 
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-80px)]">
               <div className="grid grid-cols-3 gap-4">
-                {products.map((product) => (
+                {allProducts.map((product) => (
                   <button
                     key={product.id}
                     onClick={() => addProductToSlot(showProductPicker.dayIndex, showProductPicker.occasionIndex, product)}

@@ -13,6 +13,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
+  const { getCollectionById, updateCollection, products } = useBrand();
   const { getCollectionById } = useBrand();
 
   const collectionId = params.id as string;
@@ -98,6 +99,15 @@ export default function EditCollectionPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    updateCollection(collectionId, {
+      name: formData.name,
+      description: formData.description,
+      season: formData.season,
+      year: parseInt(formData.year),
+      status: formData.status,
+      productIds: selectedProducts,
+      productCount: selectedProducts.length,
+    });
     // In a real app, this would update the collection in the backend
     console.log('Updating collection:', formData);
     router.push(`/brand/collections/${collectionId}`);
