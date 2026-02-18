@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, User, Check, ChevronRight, Shield, Save } from 'lucide-react';
-import { mockBodyTwin } from '@/data/mock-data';
+import * as userService from '@/services/user.service';
 import { useApp } from '@/context/AppContext';
 import type { DigitalBodyTwin } from '@/types';
 
@@ -23,27 +23,40 @@ const proportionOptions = {
 
 const fitOptions = ['fitted', 'regular', 'relaxed', 'oversized'];
 
+const defaultBodyTwin: DigitalBodyTwin = {
+  id: 'body-twin-default',
+  userId: 'user-default',
+  silhouette: 'average',
+  proportions: { shoulder: 'medium', torso: 'medium', legs: 'medium' },
+  preferredFit: 'regular',
+  fitPreferences: { tops: 'relaxed', bottoms: 'relaxed', dresses: 'relaxed' },
+  measurements: {},
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+};
+
 export default function BodyTwinPage() {
   const { showToast } = useApp();
-  const [bodyTwin, setBodyTwin] = useState<DigitalBodyTwin>(mockBodyTwin);
+  const [bodyTwin, setBodyTwin] = useState<DigitalBodyTwin>(defaultBodyTwin);
   const [activeStep, setActiveStep] = useState(0);
   const [saved, setSaved] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load existing Body Twin data on mount
   useEffect(() => {
-    setIsLoaded(true);
-
-    try {
-      const storedBodyTwin = localStorage.getItem('moda-body-twin');
-      if (storedBodyTwin) {
-        const parsed = JSON.parse(storedBodyTwin);
-        setBodyTwin(parsed);
+    const loadBodyTwin = async () => {
+      try {
+        const response = await userService.getBodyTwin();
+        if (response.data) {
+          setBodyTwin(response.data);
+        }
+      } catch (error) {
+        console.error('Failed to load body twin:', error);
+        showToast('Could not load your Body Twin data', 'error');
       }
-    } catch (error) {
-      console.error('Failed to load body twin:', error);
-      showToast('Could not load your Body Twin data', 'error');
-    }
+      setIsLoaded(true);
+    };
+    loadBodyTwin();
   }, [showToast]);
 
   const steps = [

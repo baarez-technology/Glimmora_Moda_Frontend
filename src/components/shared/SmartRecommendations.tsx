@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Sparkles, TrendingUp, Heart, Star } from 'lucide-react';
-import { products } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 import { useApp } from '@/context/AppContext';
 import type { Product } from '@/types';
 
@@ -24,6 +24,16 @@ export default function SmartRecommendations({
   variant = 'grid'
 }: SmartRecommendationsProps) {
   const { wardrobe, wishlist, considerations } = useApp();
+  const [products, setProducts] = useState<Product[]>([]);
+
+  // Load products from service on mount
+  useEffect(() => {
+    productService.getAllProducts().then((res) => {
+      if (res.success && res.data) {
+        setProducts(res.data);
+      }
+    });
+  }, []);
 
   // Generate smart recommendations
   const recommendations = useMemo(() => {
@@ -102,7 +112,7 @@ export default function SmartRecommendations({
       .slice(0, maxItems);
 
     return scoredProducts;
-  }, [wardrobe, wishlist, considerations, currentProduct, maxItems]);
+  }, [products, wardrobe, wishlist, considerations, currentProduct, maxItems]);
 
   if (recommendations.length === 0) {
     return null;

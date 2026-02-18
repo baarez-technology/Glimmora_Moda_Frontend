@@ -2,8 +2,10 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity } from '@/types';
-import { baseCalendarEvents } from '@/data/calendar';
 import { generateOutfitSuggestions } from '@/lib/outfit-intelligence';
+import * as calendarService from '@/services/calendar.service';
+import * as productService from '@/services/product.service';
+import { useAuth } from './AuthContext';
 
 // Import focused hooks
 import {
@@ -88,6 +90,9 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Auth state — single source of truth from AuthContext
+  const { userTier, isUHNI, setUserRole, logout } = useAuth();
+
   // Wishlist state (TODO: Move to dedicated hook)
   const [wishlist, setWishlist] = useState<WardrobeItem[]>([]);
 
@@ -132,13 +137,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     persistWardrobe
   } = useWardrobeState({ showToast, safeLocalStorageSave });
 
+  // Calendar events loaded from service
+  const [baseCalendarEvents, setBaseCalendarEvents] = useState<CalendarEvent[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    calendarService.getCalendarEvents().then(response => {
+      if (response.success) setBaseCalendarEvents(response.data);
+    }).catch(console.error);
+    productService.getAllProducts().then(response => {
+      if (response.success) setAllProducts(response.data);
+    }).catch(console.error);
+  }, []);
+
   // Generate dynamic calendar events with outfit suggestions based on wardrobe
   const calendarEvents = useMemo<CalendarEvent[]>(() => {
     return baseCalendarEvents.map(event => ({
       ...event,
-      outfitSuggestions: generateOutfitSuggestions(event as CalendarEvent, wardrobe)
+      outfitSuggestions: generateOutfitSuggestions(event as CalendarEvent, wardrobe, allProducts)
     }));
-  }, [wardrobe]);
+  }, [baseCalendarEvents, wardrobe, allProducts]);
 
   const {
     savedOutfits,
@@ -173,17 +191,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   } = useFashionIdentity({ showToast, safeLocalStorageSave });
 
   const {
-    userTier,
-    isUHNI,
     concierge,
     autonomousSettings,
     sourcingRequests,
     bespokeOrders,
     autonomousActivity,
-    setUserRole,
     updateAutonomousSettings,
-    logout
-  } = useUHNIFeatures({ showToast });
+  } = useUHNIFeatures({ isUHNI, showToast });
 
   // Wishlist functions (TODO: Move to dedicated hook)
   const removeFromWishlist = useCallback((id: string) => {

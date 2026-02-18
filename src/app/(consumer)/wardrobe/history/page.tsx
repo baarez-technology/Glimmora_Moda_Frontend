@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, Star, MessageCircle, ThumbsUp, ThumbsDown, Camera, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { products } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 import { OutfitFeedback, Product } from '@/types';
 
 interface OutfitHistoryEntry {
@@ -16,63 +16,67 @@ interface OutfitHistoryEntry {
   feedback?: OutfitFeedback;
 }
 
-const sampleHistory: OutfitHistoryEntry[] = [
-  {
-    id: 'outfit-1',
-    date: '2024-01-20',
-    occasion: 'Business Meeting',
-    productIds: [products[0]?.id, products[2]?.id].filter(Boolean),
-    feedback: {
-      id: 'fb-1',
-      outfitId: 'outfit-1',
-      outfitItems: [products[0]?.id, products[2]?.id].filter(Boolean),
-      wornDate: '2024-01-20',
-      rating: 5 as const,
+function buildSampleHistory(products: Product[]): OutfitHistoryEntry[] {
+  return [
+    {
+      id: 'outfit-1',
+      date: '2024-01-20',
+      occasion: 'Business Meeting',
+      productIds: [products[0]?.id, products[2]?.id].filter(Boolean),
       feedback: {
-        comfort: 5,
-        appropriateness: 5,
-        confidence: 5,
-        compliments: 3,
-        wouldWearAgain: true
-      },
-      occasion: 'business-meeting',
-      notes: 'Received so many compliments! Perfect for the client presentation.',
-      createdAt: '2024-01-20T18:00:00Z'
-    }
-  },
-  {
-    id: 'outfit-2',
-    date: '2024-01-18',
-    occasion: 'Dinner Date',
-    productIds: [products[1]?.id, products[3]?.id].filter(Boolean),
-    feedback: {
-      id: 'fb-2',
-      outfitId: 'outfit-2',
-      outfitItems: [products[1]?.id, products[3]?.id].filter(Boolean),
-      wornDate: '2024-01-18',
-      rating: 4 as const,
+        id: 'fb-1',
+        outfitId: 'outfit-1',
+        outfitItems: [products[0]?.id, products[2]?.id].filter(Boolean),
+        wornDate: '2024-01-20',
+        rating: 5 as const,
+        feedback: {
+          comfort: 5,
+          appropriateness: 5,
+          confidence: 5,
+          compliments: 3,
+          wouldWearAgain: true
+        },
+        occasion: 'business-meeting',
+        notes: 'Received so many compliments! Perfect for the client presentation.',
+        createdAt: '2024-01-20T18:00:00Z'
+      }
+    },
+    {
+      id: 'outfit-2',
+      date: '2024-01-18',
+      occasion: 'Dinner Date',
+      productIds: [products[1]?.id, products[3]?.id].filter(Boolean),
       feedback: {
-        comfort: 4,
-        appropriateness: 5,
-        confidence: 5,
-        compliments: 2,
-        wouldWearAgain: true
-      },
-      occasion: 'romantic-dinner',
-      notes: 'Felt very elegant. The shoes were a bit tight after a few hours.',
-      createdAt: '2024-01-18T22:00:00Z'
+        id: 'fb-2',
+        outfitId: 'outfit-2',
+        outfitItems: [products[1]?.id, products[3]?.id].filter(Boolean),
+        wornDate: '2024-01-18',
+        rating: 4 as const,
+        feedback: {
+          comfort: 4,
+          appropriateness: 5,
+          confidence: 5,
+          compliments: 2,
+          wouldWearAgain: true
+        },
+        occasion: 'romantic-dinner',
+        notes: 'Felt very elegant. The shoes were a bit tight after a few hours.',
+        createdAt: '2024-01-18T22:00:00Z'
+      }
+    },
+    {
+      id: 'outfit-3',
+      date: '2024-01-15',
+      occasion: 'Weekend Brunch',
+      productIds: [products[0]?.id].filter(Boolean)
     }
-  },
-  {
-    id: 'outfit-3',
-    date: '2024-01-15',
-    occasion: 'Weekend Brunch',
-    productIds: [products[0]?.id].filter(Boolean)
-  }
-];
+  ];
+}
 
 export default function WardrobeHistoryPage() {
+  const [products, setProducts] = useState<Product[]>([]);
   const [history, setHistory] = useState<OutfitHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedEntry, setSelectedEntry] = useState<OutfitHistoryEntry | null>(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [feedbackData, setFeedbackData] = useState({
@@ -84,13 +88,26 @@ export default function WardrobeHistoryPage() {
   });
 
   useEffect(() => {
-    // Load from localStorage or use sample data
-    const saved = localStorage.getItem('modaglimmora_outfit_history');
-    if (saved) {
-      setHistory(JSON.parse(saved));
-    } else {
-      setHistory(sampleHistory);
+    async function loadData() {
+      try {
+        const productsRes = await productService.getAllProducts();
+        const loadedProducts = productsRes.data ?? [];
+        setProducts(loadedProducts);
+
+        // Load from localStorage or use sample data
+        const saved = localStorage.getItem('modaglimmora_outfit_history');
+        if (saved) {
+          setHistory(JSON.parse(saved));
+        } else {
+          setHistory(buildSampleHistory(loadedProducts));
+        }
+      } catch (error) {
+        console.error('Failed to load products:', error);
+      } finally {
+        setLoading(false);
+      }
     }
+    loadData();
   }, []);
 
   const getProductsForEntry = (entry: OutfitHistoryEntry): Product[] => {
@@ -152,6 +169,14 @@ export default function WardrobeHistoryPage() {
       </div>
     </div>
   );
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

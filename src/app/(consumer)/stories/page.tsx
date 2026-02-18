@@ -1,16 +1,44 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
-import { getFeaturedStories } from '@/data/mock-data';
+import * as brandService from '@/services/brand.service';
+import type { BrandStory } from '@/types';
 
 function safeImageSrc(src: string | undefined) {
   return src && src.length > 0 ? src : 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1600&q=90';
 }
 
 export default function StoriesIndexPage() {
-  const stories = getFeaturedStories();
+  const [stories, setStories] = useState<BrandStory[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await brandService.getFeaturedStories();
+        setStories(res.data ?? []);
+      } catch (error) {
+        console.error('Failed to load stories:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-stone tracking-wider">Loading</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

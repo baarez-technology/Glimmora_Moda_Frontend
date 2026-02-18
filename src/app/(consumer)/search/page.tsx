@@ -5,7 +5,10 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, X, SlidersHorizontal, ArrowRight } from 'lucide-react';
-import { products, brands, brandStories, collections } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
+import * as brandService from '@/services/brand.service';
+import * as collectionService from '@/services/collection.service';
+import type { Product, Brand, BrandStory, Collection } from '@/types';
 
 type SearchTab = 'all' | 'products' | 'brands' | 'stories' | 'collections';
 
@@ -20,9 +23,33 @@ function SearchContent() {
   const [showFilters, setShowFilters] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    async function loadData() {
+      try {
+        const [productsRes, brandsRes, storiesRes, collectionsRes] = await Promise.all([
+          productService.getAllProducts(),
+          brandService.getAllBrands(),
+          brandService.getAllStories(),
+          collectionService.getAllCollections(),
+        ]);
+        setProducts(productsRes.data ?? []);
+        setBrands(brandsRes.data ?? []);
+        setBrandStories(storiesRes.data ?? []);
+        setCollections(collectionsRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load search page data:', error);
+      } finally {
+        setDataLoading(false);
+        setIsLoaded(true);
+      }
+    }
+    loadData();
   }, []);
 
   // Update query when URL changes
@@ -70,7 +97,7 @@ function SearchContent() {
       stories: matchedStories,
       collections: matchedCollections
     };
-  }, [query, priceRange, selectedBrands]);
+  }, [query, priceRange, selectedBrands, products, brands, brandStories, collections]);
 
   const totalResults = results.products.length + results.brands.length + results.stories.length + results.collections.length;
 
@@ -89,6 +116,17 @@ function SearchContent() {
         : [...prev, brandId]
     );
   };
+
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-stone tracking-wider">Loading</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

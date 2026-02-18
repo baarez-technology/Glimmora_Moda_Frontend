@@ -5,7 +5,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal } from 'lucide-react';
-import { products, brands, brandStories } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
+import * as brandService from '@/services/brand.service';
+import type { Product, Brand, BrandStory } from '@/types';
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
@@ -21,9 +23,30 @@ function DiscoverContent() {
   const [selectedMood, setSelectedMood] = useState<string | null>(moodParam);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    async function loadData() {
+      try {
+        const [productsRes, brandsRes, storiesRes] = await Promise.all([
+          productService.getAllProducts(),
+          brandService.getAllBrands(),
+          brandService.getAllStories(),
+        ]);
+        setProducts(productsRes.data ?? []);
+        setBrands(brandsRes.data ?? []);
+        setBrandStories(storiesRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load discover page data:', error);
+      } finally {
+        setDataLoading(false);
+        setIsLoaded(true);
+      }
+    }
+    loadData();
   }, []);
 
   const budgetRanges: Record<string, { min: number; max: number }> = {
@@ -74,19 +97,19 @@ function DiscoverContent() {
 
       return true;
     });
-  }, [budgetRange, searchQuery, selectedOccasion, selectedMood]);
+  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, products]);
 
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
     const query = searchQuery.toLowerCase();
     return brands.filter(b => b.name.toLowerCase().includes(query));
-  }, [searchQuery]);
+  }, [searchQuery, brands]);
 
   const filteredStories = useMemo(() => {
     if (!searchQuery) return brandStories;
     const query = searchQuery.toLowerCase();
     return brandStories.filter(s => s.title.toLowerCase().includes(query));
-  }, [searchQuery]);
+  }, [searchQuery, brandStories]);
 
   const clearFilters = () => {
     setSelectedOccasion(null);
@@ -117,6 +140,17 @@ function DiscoverContent() {
     { id: '1500-5000', label: '€1,500 - €5,000' },
     { id: '5000-plus', label: '€5,000+' }
   ];
+
+  if (dataLoading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sm text-stone tracking-wider">Loading</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-ivory-cream">

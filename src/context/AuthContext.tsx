@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { UserTier } from '@/types';
+import * as authService from '@/services/auth.service';
 
 interface AuthContextType {
   userTier: UserTier;
@@ -25,30 +26,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isUHNI = userTier === 'uhni';
   const isAuthenticated = userTier !== 'standard';
 
-  // Load user tier from localStorage on mount with error handling
+  // Load session on mount via service
   useEffect(() => {
-    try {
-      const storedTier = localStorage.getItem('moda-user-tier') as UserTier | null;
-      if (storedTier && ['standard', 'preferred', 'uhni'].includes(storedTier)) {
-        setUserTier(storedTier);
+    authService.getCurrentSession().then(response => {
+      if (response.success && response.data && response.data.userTier !== 'standard') {
+        setUserTier(response.data.userTier);
       }
-    } catch (error) {
-      console.error('Failed to load user tier from localStorage:', error);
-      // Clear corrupted data
-      localStorage.removeItem('moda-user-tier');
-    } finally {
+    }).catch(() => {
+      // Failed to load session, stay as standard
+    }).finally(() => {
       setIsHydrated(true);
-    }
+    });
   }, []);
 
-  // Save user tier to localStorage when it changes
+  // Persist tier changes to localStorage
   useEffect(() => {
     if (isHydrated) {
-      try {
-        localStorage.setItem('moda-user-tier', userTier);
-      } catch (error) {
-        console.error('Failed to save user tier to localStorage:', error);
-      }
+      localStorage.setItem('moda-user-tier', userTier);
     }
   }, [userTier, isHydrated]);
 
@@ -57,25 +51,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
-    // Set logging out flag first to prevent auth redirects
     setIsLoggingOut(true);
     setUserTier('standard');
-    try {
-      // Clear authentication data
-      localStorage.removeItem('moda-user-tier');
-
-      // Clear sensitive account-specific data
-      localStorage.removeItem('moda-wardrobe');
-      localStorage.removeItem('moda-orders');
-
-      // NOTE: We intentionally KEEP these for better UX:
-      // - moda-considerations: Users' curated wishlist persists for aspirational browsing
-      // - moda-wishlist: Same reason - don't lose their saved items
-    } catch (error) {
-      console.error('Failed to clear localStorage on logout:', error);
-    }
-
-    // Reset logging out flag after a brief delay
+    authService.logout().catch(console.error);
     setTimeout(() => setIsLoggingOut(false), 500);
   };
 

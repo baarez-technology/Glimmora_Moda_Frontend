@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield } from 'lucide-react';
-import { mockCalendarConnections } from '@/data/mock-data';
-import type { CalendarProvider } from '@/types';
+import * as calendarService from '@/services/calendar.service';
+import type { CalendarConnection, CalendarProvider } from '@/types';
 
 interface CalendarProviderInfo {
   id: CalendarProvider;
@@ -39,12 +39,19 @@ const calendarProviders: CalendarProviderInfo[] = [
 ];
 
 export default function CalendarSettingsPage() {
-  const [connections, setConnections] = useState(mockCalendarConnections);
+  const [connections, setConnections] = useState<CalendarConnection[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadConnections = async () => {
+      const response = await calendarService.getCalendarConnections();
+      setConnections(response.data);
+      setLoading(false);
+      setIsLoaded(true);
+    };
+    loadConnections();
   }, []);
 
   const handleConnect = (providerId: CalendarProvider) => {
@@ -83,6 +90,14 @@ export default function CalendarSettingsPage() {
   const getConnection = (providerId: CalendarProvider) => {
     return connections.find(c => c.provider === providerId);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

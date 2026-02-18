@@ -5,21 +5,29 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ShoppingBag, Trash2, Check, Clock, Info, ChevronRight, Layers, Crown, Zap, Settings, MessageCircle } from 'lucide-react';
-import { mockSilentCart } from '@/data/mock-data';
+import * as userService from '@/services/user.service';
 import { useApp } from '@/context/AppContext';
 
 export default function SilentCartPage() {
   const router = useRouter();
   const { addToConsiderations, showToast, isUHNI, autonomousSettings, concierge } = useApp();
-  const [cart, setCart] = useState(mockSilentCart);
+  const [cart, setCart] = useState<Awaited<ReturnType<typeof userService.getSilentCart>>['data'] | null>(null);
   const [approvedItems, setApprovedItems] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadSilentCart = async () => {
+      const response = await userService.getSilentCart();
+      setCart(response.data);
+      setLoading(false);
+      setIsLoaded(true);
+    };
+    loadSilentCart();
   }, []);
 
   const handleRemove = (productId: string) => {
+    if (!cart) return;
     setCart({
       ...cart,
       items: cart.items.filter(item => item.productId !== productId),
@@ -38,6 +46,7 @@ export default function SilentCartPage() {
   };
 
   const handleApproveAll = () => {
+    if (!cart) return;
     if (approvedItems.length === cart.items.length) {
       setApprovedItems([]);
     } else {
@@ -45,11 +54,8 @@ export default function SilentCartPage() {
     }
   };
 
-  const approvedTotal = cart.items
-    .filter(item => approvedItems.includes(item.productId))
-    .reduce((sum, item) => sum + item.product.price, 0);
-
   const handleMoveToConsiderations = () => {
+    if (!cart) return;
     const itemsToMove = cart.items.filter(item => approvedItems.includes(item.productId));
 
     if (itemsToMove.length === 0) {
@@ -76,6 +82,18 @@ export default function SilentCartPage() {
     setApprovedItems([]);
     router.push('/consideration');
   };
+
+  if (loading || !cart) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
+
+  const approvedTotal = cart.items
+    .filter(item => approvedItems.includes(item.productId))
+    .reduce((sum, item) => sum + item.product.price, 0);
 
   return (
     <div className="min-h-screen bg-ivory-cream">

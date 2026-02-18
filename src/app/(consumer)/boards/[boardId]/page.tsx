@@ -7,32 +7,46 @@ import { ArrowLeft, Grid, Lock, Globe, Share2, Trash2, Plus, X, Heart, ExternalL
 import Image from 'next/image';
 import Link from 'next/link';
 import { InspirationBoard, BoardItem, Product } from '@/types';
-import { products } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 
 export default function BoardDetailPage() {
   const params = useParams();
   const router = useRouter();
   const boardId = params.boardId as string;
 
+  const [products, setProducts] = useState<Product[]>([]);
   const [board, setBoard] = useState<InspirationBoard | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  // Load board from localStorage
+  // Load products from service and board from localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('modaglimmora_boards');
-      if (saved) {
-        const boards = JSON.parse(saved) as InspirationBoard[];
-        const foundBoard = boards.find(b => b.id === boardId);
-        if (foundBoard) {
-          setBoard(foundBoard);
-          setEditName(foundBoard.name);
-          setEditDescription(foundBoard.description || '');
+    async function loadData() {
+      try {
+        const productsRes = await productService.getAllProducts();
+        setProducts(productsRes.data ?? []);
+
+        if (typeof window !== 'undefined') {
+          const saved = localStorage.getItem('modaglimmora_boards');
+          if (saved) {
+            const boards = JSON.parse(saved) as InspirationBoard[];
+            const foundBoard = boards.find(b => b.id === boardId);
+            if (foundBoard) {
+              setBoard(foundBoard);
+              setEditName(foundBoard.name);
+              setEditDescription(foundBoard.description || '');
+            }
+          }
         }
+      } catch (error) {
+        console.error('Failed to load products:', error);
+      } finally {
+        setLoading(false);
       }
     }
+    loadData();
   }, [boardId]);
 
   const saveBoard = (updatedBoard: InspirationBoard) => {
@@ -86,10 +100,10 @@ export default function BoardDetailPage() {
     }
   };
 
-  if (!board) {
+  if (loading || !board) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
-        <p className="text-stone/60">Loading board...</p>
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
       </div>
     );
   }

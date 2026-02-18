@@ -3,17 +3,24 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Settings, Bell, Lock, ShoppingBag, Monitor, Save, Check, RotateCcw, Shield } from 'lucide-react';
-import { mockUserPreferences } from '@/data/mock-data';
+import * as userService from '@/services/user.service';
 import type { UserPreferences } from '@/types';
 
 export default function PreferencesPage() {
-  const [preferences, setPreferences] = useState<UserPreferences>(mockUserPreferences);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [initialPreferences, setInitialPreferences] = useState<UserPreferences | null>(null);
   const [saved, setSaved] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadPreferences = async () => {
+      const response = await userService.getUserPreferences();
+      setPreferences(response.data);
+      setInitialPreferences(response.data);
+      setIsLoaded(true);
+    };
+    loadPreferences();
   }, []);
 
   const updatePreference = <T extends keyof UserPreferences>(
@@ -21,13 +28,16 @@ export default function PreferencesPage() {
     key: keyof UserPreferences[T],
     value: UserPreferences[T][keyof UserPreferences[T]]
   ) => {
-    setPreferences((prev) => ({
-      ...prev,
-      [category]: {
-        ...(prev[category] as object),
-        [key]: value
-      }
-    }));
+    setPreferences((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        [category]: {
+          ...(prev[category] as object),
+          [key]: value
+        }
+      };
+    });
     setHasChanges(true);
   };
 
@@ -38,9 +48,19 @@ export default function PreferencesPage() {
   };
 
   const handleReset = () => {
-    setPreferences(mockUserPreferences);
+    if (initialPreferences) {
+      setPreferences(initialPreferences);
+    }
     setHasChanges(false);
   };
+
+  if (!preferences) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">

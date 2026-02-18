@@ -8,7 +8,7 @@ import Image from 'next/image';
 import ImageUploader from '@/components/search/ImageUploader';
 import VisualSearchResults from '@/components/search/VisualSearchResults';
 import { VisualSearchResult } from '@/types';
-import { performVisualSearch } from '@/data/mock-data';
+import * as productService from '@/services/product.service';
 
 export default function VisualSearchPage() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,9 +22,9 @@ export default function VisualSearchPage() {
     // Simulate processing delay
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Use mock visual search function
-    const searchResults = performVisualSearch(imageData);
-    setResults(searchResults);
+    // Use product service visual search
+    const response = await productService.performVisualSearch(imageData);
+    setResults(response.data);
     setHasSearched(true);
     setIsProcessing(false);
   }, []);

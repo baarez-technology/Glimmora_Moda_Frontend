@@ -15,12 +15,14 @@ import {
   DollarSign,
   Clock,
   MapPin,
-  AlertTriangle
+  AlertTriangle,
+  Settings2
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
-import type { BrandProductStatus } from '@/types/brand-portal';
+import { StockManagementModal } from '@/components/brand/StockManagementModal';
+import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
 import type { ProductCategory } from '@/types/product';
 
 export default function EditProductPage() {
@@ -43,6 +45,7 @@ export default function EditProductPage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
 
   useEffect(() => {
     if (product) {
@@ -95,6 +98,14 @@ export default function EditProductPage() {
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
     setHasChanges(true);
+  };
+
+  const handleStockSave = (updatedStock: RegionalStock[]) => {
+    const newTotal = updatedStock.reduce((sum, s) => sum + s.units, 0);
+    updateProduct(productId, {
+      regionalStock: updatedStock,
+      totalStock: newTotal,
+    });
   };
 
   const formatCurrency = (value: number) => {
@@ -246,12 +257,29 @@ export default function EditProductPage() {
 
             {/* Regional Stock */}
             <section className="bg-white border border-sand/50 p-6">
-              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4 mb-6">
-                Regional Stock
-              </h2>
+              <div className="flex items-center justify-between border-b border-sand/50 pb-4 mb-6">
+                <h2 className="font-medium text-charcoal-deep">
+                  Regional Stock
+                </h2>
+                <button
+                  onClick={() => setIsStockModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 border border-sand text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+                >
+                  <Settings2 size={14} /> Manage Stock
+                </button>
+              </div>
 
               {product.regionalStock.length === 0 ? (
-                <p className="text-sm text-stone text-center py-4">No stock data available</p>
+                <div className="text-center py-8">
+                  <MapPin size={28} className="text-taupe mx-auto mb-3" />
+                  <p className="text-sm text-stone">No stock locations configured</p>
+                  <button
+                    onClick={() => setIsStockModalOpen(true)}
+                    className="mt-3 text-xs tracking-wider uppercase text-charcoal-deep hover:text-gold-muted transition-colors"
+                  >
+                    + Add stock locations
+                  </button>
+                </div>
               ) : (
                 <div className="space-y-3">
                   {product.regionalStock.map((stock, idx) => (
@@ -283,6 +311,15 @@ export default function EditProductPage() {
                 </div>
               )}
             </section>
+
+            {/* Stock Management Modal */}
+            <StockManagementModal
+              isOpen={isStockModalOpen}
+              onClose={() => setIsStockModalOpen(false)}
+              productName={product.name}
+              regionalStock={product.regionalStock}
+              onSave={handleStockSave}
+            />
           </div>
 
           {/* Sidebar */}

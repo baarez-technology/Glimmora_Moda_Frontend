@@ -9,7 +9,7 @@ import { useBrand } from '@/context/BrandContext';
 export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
-  const { getCollectionById, products } = useBrand();
+  const { getCollectionById, updateCollection, products } = useBrand();
 
   const collectionId = params.id as string;
   const collection = getCollectionById(collectionId);
@@ -52,8 +52,15 @@ export default function EditCollectionPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would update the collection in the backend
-    console.log('Updating collection:', { ...formData, products: selectedProducts });
+    updateCollection(collectionId, {
+      name: formData.name,
+      description: formData.description,
+      season: formData.season,
+      year: parseInt(formData.year),
+      status: formData.status,
+      productIds: selectedProducts,
+      productCount: selectedProducts.length,
+    });
     router.push(`/brand/collections/${collectionId}`);
   };
 

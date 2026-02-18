@@ -4,8 +4,11 @@ import { use, useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, X, SlidersHorizontal } from 'lucide-react';
-import { getCollectionBySlug, products as allProducts, brands } from '@/data/mock-data';
+import * as collectionService from '@/services/collection.service';
+import * as productService from '@/services/product.service';
+import * as brandService from '@/services/brand.service';
 import { notFound } from 'next/navigation';
+import type { Product, Brand, Collection } from '@/types';
 
 interface CollectionPageProps {
   params: Promise<{ slug: string }>;
@@ -15,15 +18,35 @@ type CategoryFilter = 'all' | 'bags' | 'clothing' | 'shoes' | 'accessories';
 
 export default function CollectionPage({ params }: CollectionPageProps) {
   const { slug } = use(params);
-  const collection = getCollectionBySlug(slug);
+  const [collection, setCollection] = useState<Collection | null>(null);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
 
   useEffect(() => {
-    setIsLoaded(true);
-  }, []);
+    async function loadData() {
+      try {
+        const [collectionRes, productsRes, brandsRes] = await Promise.all([
+          collectionService.getCollectionBySlug(slug),
+          productService.getAllProducts(),
+          brandService.getAllBrands(),
+        ]);
+        setCollection(collectionRes.data ?? null);
+        setAllProducts(productsRes.data ?? []);
+        setBrands(brandsRes.data ?? []);
+      } catch (error) {
+        console.error('Failed to load collection data:', error);
+      } finally {
+        setLoading(false);
+        setIsLoaded(true);
+      }
+    }
+    loadData();
+  }, [slug]);
 
   // If no specific collection found, show all products
   const isAllProducts = slug === 'all';
@@ -54,6 +77,14 @@ export default function CollectionPage({ params }: CollectionPageProps) {
       }
     });
   }, [baseProducts, categoryFilter]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (!collection && !isAllProducts) {
     notFound();

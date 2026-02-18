@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MessageCircle, X, Send, Sparkles, Calendar } from 'lucide-react';
-import { mockCalendarEvents } from '@/data/mock-data';
+import * as calendarService from '@/services/calendar.service';
 import VoiceInput from '@/components/shared/VoiceInput';
+import type { CalendarEvent } from '@/types';
 
 interface Message {
   id: string;
@@ -13,24 +14,12 @@ interface Message {
   hasCalendarLink?: boolean;
 }
 
-// Get the next upcoming event
-const getNextEvent = () => {
-  const today = new Date();
-  return mockCalendarEvents.find(event => new Date(event.date) >= today);
+const defaultInitialMessage: Message = {
+  id: '1',
+  role: 'assistant',
+  content: 'Welcome to ModaGlimmora. I\'m your Fashion Intelligence guide. How may I assist you in discovering something exceptional today?',
+  hasCalendarLink: false
 };
-
-const nextEvent = getNextEvent();
-
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    role: 'assistant',
-    content: nextEvent
-      ? `Welcome to ModaGlimmora. I noticed you have "${nextEvent.title}" coming up on ${new Date(nextEvent.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. I've prepared outfit suggestions for you. How may I assist you today?`
-      : 'Welcome to ModaGlimmora. I\'m your Fashion Intelligence guide. How may I assist you in discovering something exceptional today?',
-    hasCalendarLink: !!nextEvent
-  }
-];
 
 const suggestions = [
   'What should I wear to my next event?',
@@ -41,8 +30,28 @@ const suggestions = [
 
 export default function AGIConcierge() {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<Message[]>([defaultInitialMessage]);
   const [input, setInput] = useState('');
+  const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null);
+
+  // Load calendar events from service on mount
+  useEffect(() => {
+    calendarService.getCalendarEvents().then((res) => {
+      if (res.success && res.data) {
+        const today = new Date();
+        const upcoming = res.data.find(event => new Date(event.date) >= today);
+        if (upcoming) {
+          setNextEvent(upcoming);
+          setMessages([{
+            id: '1',
+            role: 'assistant',
+            content: `Welcome to ModaGlimmora. I noticed you have "${upcoming.title}" coming up on ${new Date(upcoming.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. I've prepared outfit suggestions for you. How may I assist you today?`,
+            hasCalendarLink: true
+          }]);
+        }
+      }
+    });
+  }, []);
 
   const handleSend = () => {
     if (!input.trim()) return;

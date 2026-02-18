@@ -33,7 +33,7 @@ export default function BodyVisualization({
   // Load user's body twin silhouette from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined' && !initialConfig?.silhouette) {
-      const savedBodyTwin = localStorage.getItem('modaglimmora_bodytwin');
+      const savedBodyTwin = localStorage.getItem('moda-body-twin');
       if (savedBodyTwin) {
         try {
           const bodyTwin: DigitalBodyTwin = JSON.parse(savedBodyTwin);

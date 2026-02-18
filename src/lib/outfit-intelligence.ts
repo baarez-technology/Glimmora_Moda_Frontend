@@ -10,7 +10,6 @@
 import type { Product, ProductCategory } from '@/types';
 import type { CalendarEvent, OutfitSuggestion, OutfitItem } from '@/types';
 import type { WardrobeItem } from '@/types';
-import { products } from '@/data/products';
 
 // ============================================
 // OCCASION MAPPING
@@ -121,7 +120,8 @@ function getCategoryLabel(category: ProductCategory): string {
  */
 export function generateOutfitSuggestions(
   event: CalendarEvent,
-  wardrobe: WardrobeItem[]
+  wardrobe: WardrobeItem[],
+  products: Product[] = []
 ): OutfitSuggestion[] {
   const formality = dressCodeFormality[event.dressCode || 'smart_casual'] || 2;
   const neededCategories = categoriesNeededByFormality[formality] || ['bags', 'shoes'];

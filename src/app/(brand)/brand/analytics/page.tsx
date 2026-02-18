@@ -22,6 +22,21 @@ export default function AnalyticsPage() {
   const { analytics } = useBrand();
   const [period, setPeriod] = useState<TimePeriod>('30d');
 
+  const periodLabels: Record<TimePeriod, string> = {
+    '7d': 'Last 7 Days',
+    '30d': 'Last 30 Days',
+    '90d': 'Last 90 Days',
+    '12m': 'Last 12 Months'
+  };
+
+  if (!analytics) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-stone">Loading analytics...</p>
+      </div>
+    );
+  }
+
   const formatCurrency = (value: number) => {
     if (value >= 1000000) {
       return `€${(value / 1000000).toFixed(2)}M`;
@@ -59,7 +74,7 @@ export default function AnalyticsPage() {
     <div>
       <BrandPageHeader
         title="Analytics"
-        subtitle={`Performance data for ${analytics.period.label}`}
+        subtitle={`Performance data for ${periodLabels[period]}`}
       >
         {/* Period Selector */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit">

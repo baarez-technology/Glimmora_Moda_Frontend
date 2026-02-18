@@ -50,7 +50,7 @@ export default function SettingsPage() {
   };
 
   const handleClearBrowsingHistory = () => {
-    localStorage.removeItem('moda-browsing-history');
+    // Note: browsing history tracking will be implemented with backend integration
     showToast('Browsing history cleared', 'success');
   };
 
@@ -94,7 +94,6 @@ export default function SettingsPage() {
     localStorage.removeItem('moda-outfits');
     localStorage.removeItem('moda-orders');
     localStorage.removeItem('moda-restock-alerts');
-    localStorage.removeItem('moda-browsing-history');
     showToast('Account data deleted', 'success');
     setShowDeleteConfirm(false);
     router.push('/');

@@ -8,7 +8,7 @@ import { useBrand } from '@/context/BrandContext';
 
 export default function NewCollectionPage() {
   const router = useRouter();
-  const { products } = useBrand();
+  const { products, createCollection } = useBrand();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -20,8 +20,21 @@ export default function NewCollectionPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would save to the backend
-    console.log('Creating collection:', { ...formData, products: selectedProducts });
+    createCollection({
+      name: formData.name,
+      slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: formData.description,
+      season: formData.season,
+      year: parseInt(formData.year),
+      heroImage: '/images/collections/placeholder.jpg',
+      status: formData.status,
+      productIds: selectedProducts,
+      productCount: selectedProducts.length,
+      totalRevenue: 0,
+      viewCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
     router.push('/brand/collections');
   };
 

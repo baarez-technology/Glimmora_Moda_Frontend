@@ -1,11 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Palette, Globe, Gem, History } from 'lucide-react';
 import Link from 'next/link';
-import { culturalJourneys } from '@/data/mock-data';
+import * as intelligenceService from '@/services/intelligence.service';
 import JourneyPath from '@/components/discover/JourneyPath';
+import type { CulturalJourney } from '@/types/heritage';
 
 const journeyTypeConfig = {
   art: {
@@ -40,13 +42,33 @@ export default function JourneyTypePage() {
   const type = params.type as string;
   const selectedJourneyId = searchParams.get('journey');
 
+  const [typeJourneys, setTypeJourneys] = useState<CulturalJourney[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadJourneys = async () => {
+      setLoading(true);
+      const response = await intelligenceService.getCulturalJourneysByType(type);
+      setTypeJourneys(response.data);
+      setLoading(false);
+    };
+    loadJourneys();
+  }, [type]);
+
   const config = journeyTypeConfig[type as keyof typeof journeyTypeConfig] || journeyTypeConfig.art;
-  const typeJourneys = culturalJourneys.filter(j => j.type === type);
 
   // Find selected journey or default to first
   const selectedJourney = selectedJourneyId
     ? typeJourneys.find(j => j.id === selectedJourneyId) || typeJourneys[0]
     : typeJourneys[0];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
 
   if (typeJourneys.length === 0) {
     return (
