@@ -42,8 +42,12 @@ interface BrandContextType {
   // Collections
   collections: BrandCollection[];
   getCollectionById: (id: string) => BrandCollection | undefined;
+<<<<<<< HEAD
   createCollection: (collection: Omit<BrandCollection, 'id'>) => BrandCollection;
   updateCollection: (id: string, updates: Partial<BrandCollection>) => void;
+=======
+  deleteCollection: (id: string) => void;
+>>>>>>> main
 
   // Orders
   orders: BrandOrder[];
@@ -280,6 +284,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   // Orders
   // ============================================
 
+  const deleteCollection = useCallback((id: string) => {
+    setCollections(prev => prev.map(c =>
+      c.id === id ? { ...c, isDeleted: true, updatedAt: new Date().toISOString() } : c
+    ));
+  }, []);
+
   const getOrderById = useCallback((id: string): BrandOrder | undefined => {
     return orders.find(o => o.id === id);
   }, [orders]);
@@ -485,6 +495,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         getCollectionById,
         createCollection,
         updateCollection,
+        deleteCollection,
         orders,
         getOrderById,
         inventory,

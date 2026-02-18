@@ -1,16 +1,19 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Edit2, Eye, ShoppingBag, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Edit2, Eye, ShoppingBag, TrendingUp, Trash2 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { ProductListItem } from '@/components/brand/ProductCard';
 
 export default function CollectionDetailPage() {
   const params = useParams();
-  const { getCollectionById, products } = useBrand();
+  const router = useRouter();
+  const { getCollectionById, deleteCollection, products } = useBrand();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const collectionId = params.id as string;
   const collection = getCollectionById(collectionId);
@@ -28,6 +31,11 @@ export default function CollectionDetailPage() {
       </div>
     );
   }
+
+  const handleDelete = () => {
+    deleteCollection(collectionId);
+    router.push('/brand/collections');
+  };
 
   // Get products in this collection
   const collectionProducts = products.filter(p => collection.productIds.includes(p.id));
@@ -71,6 +79,13 @@ export default function CollectionDetailPage() {
             <SecondaryButton href={`/brand/collections/${collectionId}/edit`} icon={Edit2}>
               Edit Collection
             </SecondaryButton>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
           </div>
         }
       />
@@ -215,6 +230,39 @@ export default function CollectionDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowDeleteModal(false)}
+          />
+          <div className="relative bg-white border border-sand p-8 max-w-md w-full mx-4">
+            <h3 className="font-display text-xl text-charcoal-deep mb-3">Delete Collection</h3>
+            <p className="text-stone text-sm leading-relaxed mb-2">
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{collection.name}</span>?
+            </p>
+            <p className="text-taupe text-xs mb-6">
+              This collection will be removed from your dashboard. This action can be restored by an administrator.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-5 py-2.5 text-sm text-stone hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-5 py-2.5 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors"
+              >
+                Delete Collection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

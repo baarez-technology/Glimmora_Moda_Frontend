@@ -1,15 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Upload, Plus, X, Save } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowLeft, Upload, Save } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
+
+const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
   const { getCollectionById, updateCollection, products } = useBrand();
+  const { getCollectionById } = useBrand();
 
   const collectionId = params.id as string;
   const collection = getCollectionById(collectionId);
@@ -21,7 +26,10 @@ export default function EditCollectionPage() {
     year: new Date().getFullYear().toString(),
     status: 'draft' as 'draft' | 'published' | 'archived'
   });
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [heroImage, setHeroImage] = useState<File | null>(null);
+  const [heroPreview, setHeroPreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (collection) {
@@ -32,9 +40,48 @@ export default function EditCollectionPage() {
         year: collection.year.toString(),
         status: collection.status
       });
-      setSelectedProducts(collection.productIds);
+      if (collection.heroImage) {
+        setHeroPreview(collection.heroImage);
+      }
     }
   }, [collection]);
+
+  const validateAndSetImage = (file: File) => {
+    setImageError(null);
+
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      setImageError('Invalid file type. Please upload a PNG, JPG, or WebP image.');
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setImageError(`File too large. Maximum size is 10MB (yours: ${(file.size / (1024 * 1024)).toFixed(1)}MB).`);
+      return;
+    }
+
+    setHeroImage(file);
+    const url = URL.createObjectURL(file);
+    setHeroPreview(url);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) validateAndSetImage(file);
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (file) validateAndSetImage(file);
+  };
+
+  const removeImage = () => {
+    if (heroPreview && heroImage) URL.revokeObjectURL(heroPreview);
+    setHeroImage(null);
+    setHeroPreview(null);
+    setImageError(null);
+  };
 
   if (!collection) {
     return (
@@ -61,15 +108,9 @@ export default function EditCollectionPage() {
       productIds: selectedProducts,
       productCount: selectedProducts.length,
     });
+    // In a real app, this would update the collection in the backend
+    console.log('Updating collection:', formData);
     router.push(`/brand/collections/${collectionId}`);
-  };
-
-  const toggleProduct = (productId: string) => {
-    setSelectedProducts(prev =>
-      prev.includes(productId)
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
   };
 
   return (
@@ -195,26 +236,57 @@ export default function EditCollectionPage() {
           <div className="bg-white border border-sand/50 p-6">
             <h2 className="font-display text-lg text-charcoal-deep mb-6">Hero Image</h2>
 
-            {collection.heroImage ? (
-              <div className="relative aspect-[16/9] bg-parchment mb-4">
-                <img
-                  src={collection.heroImage}
-                  alt={collection.name}
-                  className="w-full h-full object-cover"
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
+            {heroPreview ? (
+              <div className="relative group">
+                <Image
+                  src={heroPreview}
+                  alt="Hero preview"
+                  width={800}
+                  height={400}
+                  className="w-full h-64 object-cover border border-sand"
+                  unoptimized
                 />
-                <button
-                  type="button"
-                  className="absolute top-3 right-3 p-2 bg-white/90 hover:bg-white text-charcoal-deep transition-colors"
-                >
-                  Change Image
-                </button>
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 text-sm bg-white text-charcoal-deep hover:bg-parchment transition-colors"
+                  >
+                    Replace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    className="px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors"
+                  >
+                    Remove
+                  </button>
+                </div>
+                {heroImage && (
+                  <p className="mt-2 text-xs text-taupe">
+                    {heroImage.name} ({(heroImage.size / (1024 * 1024)).toFixed(1)}MB)
+                  </p>
+                )}
               </div>
             ) : (
-              <div className="border-2 border-dashed border-sand hover:border-taupe transition-colors p-8">
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-sand hover:border-taupe transition-colors p-8 cursor-pointer"
+              >
                 <div className="text-center">
                   <Upload size={32} className="mx-auto text-taupe mb-3" />
                   <p className="text-sm text-stone mb-1">Drop image here or click to upload</p>
-                  <p className="text-xs text-taupe">PNG, JPG up to 10MB</p>
+                  <p className="text-xs text-taupe">PNG, JPG, WebP up to 10MB</p>
                   <button
                     type="button"
                     className="mt-4 px-4 py-2 text-sm text-charcoal-deep border border-sand hover:border-charcoal-deep transition-colors"
@@ -224,39 +296,10 @@ export default function EditCollectionPage() {
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Products */}
-          <div className="bg-white border border-sand/50 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-lg text-charcoal-deep">Products</h2>
-              <span className="text-sm text-taupe">{selectedProducts.length} selected</span>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
-              {products.map(product => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => toggleProduct(product.id)}
-                  className={`p-3 border text-left transition-all ${
-                    selectedProducts.includes(product.id)
-                      ? 'border-charcoal-deep bg-parchment'
-                      : 'border-sand/50 hover:border-sand'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-charcoal-deep truncate">{product.name}</p>
-                    {selectedProducts.includes(product.id) ? (
-                      <X size={14} className="text-charcoal-deep flex-shrink-0" />
-                    ) : (
-                      <Plus size={14} className="text-taupe flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-taupe">{product.sku}</p>
-                </button>
-              ))}
-            </div>
+            {imageError && (
+              <p className="mt-3 text-sm text-red-600">{imageError}</p>
+            )}
           </div>
 
           {/* Actions */}

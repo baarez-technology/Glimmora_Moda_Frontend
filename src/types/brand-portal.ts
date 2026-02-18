@@ -114,6 +114,7 @@ export interface BrandCollection {
   productCount: number;
   totalRevenue: number;
   viewCount: number;
+  isDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
