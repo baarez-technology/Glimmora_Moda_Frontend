@@ -12,6 +12,13 @@ interface ProductCardProps {
 
 export function ProductCard({ product, showMetrics = true }: ProductCardProps) {
   const getStatusBadge = () => {
+    if (product.isDeleted) {
+      return (
+        <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-red-100 text-red-600">
+          Deleted
+        </span>
+      );
+    }
     switch (product.status) {
       case 'published':
         return (
@@ -190,6 +197,7 @@ export function ProductListItem({ product }: { product: BrandProduct }) {
 // Grid card version
 export function ProductGridCard({ product }: { product: BrandProduct }) {
   const getStatusBadge = () => {
+    if (product.isDeleted) return 'bg-red-100 text-red-600';
     switch (product.status) {
       case 'published':
         return 'bg-success/10 text-success';
@@ -221,7 +229,7 @@ export function ProductGridCard({ product }: { product: BrandProduct }) {
         )}
         <div className="absolute top-3 right-3">
           <span className={`px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge()}`}>
-            {product.status}
+            {product.isDeleted ? 'Deleted' : product.status}
           </span>
         </div>
       </div>

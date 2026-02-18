@@ -135,15 +135,16 @@ export default function EditProductPage() {
         ]}
         actions={
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center gap-2 px-4 py-3 text-xs tracking-wide text-error hover:bg-error/5 border border-transparent hover:border-error/20 transition-colors"
-            >
-              <Trash2 size={16} /> Delete
-            </button>
             <SecondaryButton href="/brand/products" icon={ArrowLeft}>
               Back
             </SecondaryButton>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
             <PrimaryButton onClick={handleSave} icon={Save} disabled={isSaving || !hasChanges}>
               {isSaving ? 'Saving...' : 'Save Changes'}
             </PrimaryButton>
@@ -452,31 +453,29 @@ export default function EditProductPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50"
             onClick={() => setShowDeleteConfirm(false)}
           />
-          <div className="relative bg-white w-full max-w-md shadow-2xl p-8">
-            <div className="text-center mb-6">
-              <div className="w-14 h-14 bg-error/10 flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} className="text-error" />
-              </div>
-              <h3 className="font-display text-xl text-charcoal-deep mb-2">Delete Product</h3>
-              <p className="text-sm text-stone">
-                Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.name}</span>? This action cannot be undone.
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
+          <div className="relative bg-white border border-sand p-8 max-w-md w-full mx-4">
+            <h3 className="font-display text-xl text-charcoal-deep mb-3">Delete Product</h3>
+            <p className="text-stone text-sm leading-relaxed mb-2">
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.name}</span>?
+            </p>
+            <p className="text-taupe text-xs mb-6">
+              This product will be removed from your dashboard. This action can be restored by an administrator.
+            </p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-5 py-3 border border-sand text-xs tracking-wider uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+                className="px-5 py-2.5 text-sm text-stone hover:text-charcoal-deep transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 px-5 py-3 bg-error text-white text-xs tracking-wider uppercase hover:bg-error/90 transition-colors"
+                className="px-5 py-2.5 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors"
               >
                 Delete Product
               </button>

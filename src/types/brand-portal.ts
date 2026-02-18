@@ -93,6 +93,7 @@ export interface BrandProduct extends Product {
   regionalStock: RegionalStock[];
   demandScore: number; // 0-100
   performanceMetrics: ProductPerformance;
+  isDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }

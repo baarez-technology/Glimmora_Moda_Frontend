@@ -357,6 +357,17 @@ export async function createHeritageEvent(
   });
 }
 
+export async function updateHeritageEvent(
+  id: string,
+  updates: Partial<HeritageEvent>
+): Promise<ApiResponse<HeritageEvent>> {
+  return apiRequest<HeritageEvent>(`/api/brand-portal/heritage-events/${id}`, {
+    method: 'PATCH',
+    body: updates,
+    mockHandler: () => ({ ...updates, id } as HeritageEvent),
+  });
+}
+
 // ============================================
 // Brand Stories
 // ============================================
