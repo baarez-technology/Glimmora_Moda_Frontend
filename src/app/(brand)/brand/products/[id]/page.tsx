@@ -28,7 +28,7 @@ import type { ProductCategory } from '@/types/product';
 export default function EditProductPage() {
   const params = useParams();
   const router = useRouter();
-  const { getProductById, updateProduct } = useBrand();
+  const { getProductById, updateProduct, deleteProduct } = useBrand();
 
   const productId = params.id as string;
   const product = getProductById(productId);
@@ -46,6 +46,7 @@ export default function EditProductPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (product) {
@@ -108,6 +109,11 @@ export default function EditProductPage() {
     });
   };
 
+  const handleDelete = () => {
+    deleteProduct(productId);
+    router.push('/brand/products');
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-EU', {
       style: 'currency',
@@ -129,6 +135,12 @@ export default function EditProductPage() {
         ]}
         actions={
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-2 px-4 py-3 text-xs tracking-wide text-error hover:bg-error/5 border border-transparent hover:border-error/20 transition-colors"
+            >
+              <Trash2 size={16} /> Delete
+            </button>
             <SecondaryButton href="/brand/products" icon={ArrowLeft}>
               Back
             </SecondaryButton>
@@ -437,6 +449,41 @@ export default function EditProductPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm"
+            onClick={() => setShowDeleteConfirm(false)}
+          />
+          <div className="relative bg-white w-full max-w-md shadow-2xl p-8">
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-error/10 flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-error" />
+              </div>
+              <h3 className="font-display text-xl text-charcoal-deep mb-2">Delete Product</h3>
+              <p className="text-sm text-stone">
+                Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.name}</span>? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 px-5 py-3 border border-sand text-xs tracking-wider uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="flex-1 px-5 py-3 bg-error text-white text-xs tracking-wider uppercase hover:bg-error/90 transition-colors"
+              >
+                Delete Product
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

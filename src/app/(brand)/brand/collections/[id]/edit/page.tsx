@@ -14,7 +14,6 @@ export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
   const { getCollectionById, updateCollection, products } = useBrand();
-  const { getCollectionById } = useBrand();
 
   const collectionId = params.id as string;
   const collection = getCollectionById(collectionId);
@@ -105,8 +104,8 @@ export default function EditCollectionPage() {
       season: formData.season,
       year: parseInt(formData.year),
       status: formData.status,
-      productIds: selectedProducts,
-      productCount: selectedProducts.length,
+      productIds: collection.productIds,
+      productCount: collection.productIds.length,
     });
     // In a real app, this would update the collection in the backend
     console.log('Updating collection:', formData);

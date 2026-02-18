@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Upload } from 'lucide-react';
+import { useBrand } from '@/context/BrandContext';
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -72,8 +73,8 @@ export default function NewCollectionPage() {
       year: parseInt(formData.year),
       heroImage: '/images/collections/placeholder.jpg',
       status: formData.status,
-      productIds: selectedProducts,
-      productCount: selectedProducts.length,
+      productIds: [],
+      productCount: 0,
       totalRevenue: 0,
       viewCount: 0,
       createdAt: new Date().toISOString(),
