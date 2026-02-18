@@ -357,6 +357,17 @@ export async function createHeritageEvent(
   });
 }
 
+export async function updateHeritageEvent(
+  id: string,
+  updates: Partial<HeritageEvent>
+): Promise<ApiResponse<HeritageEvent>> {
+  return apiRequest<HeritageEvent>(`/api/brand-portal/heritage-events/${id}`, {
+    method: 'PATCH',
+    body: updates,
+    mockHandler: () => ({ ...updates, id } as HeritageEvent),
+  });
+}
+
 // ============================================
 // Brand Stories
 // ============================================
@@ -394,6 +405,13 @@ export async function updateBrandStory(
       if (!existing) throw new ApiError('NOT_FOUND', `Story ${id} not found`, 404);
       return { ...existing, ...updates, updatedAt: new Date().toISOString() };
     },
+  });
+}
+
+export async function deleteBrandStory(id: string): Promise<ApiResponse<void>> {
+  return apiRequest<void>(`/api/brand-portal/stories/${id}`, {
+    method: 'DELETE',
+    mockHandler: () => undefined as void,
   });
 }
 

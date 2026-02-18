@@ -8,7 +8,7 @@ import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHead
 import { ProductCard, ProductGridCard } from '@/components/brand/ProductCard';
 import type { BrandProduct, BrandProductStatus } from '@/types/brand-portal';
 
-type FilterTab = 'all' | 'published' | 'draft' | 'low-stock';
+type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'deleted';
 type ViewMode = 'list' | 'grid';
 
 export default function ProductsPage() {
@@ -21,13 +21,18 @@ export default function ProductsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
+  const activeProducts = useMemo(() => products.filter(p => !p.isDeleted), [products]);
+  const deletedProducts = useMemo(() => products.filter(p => p.isDeleted), [products]);
+
   const categories = useMemo(() => {
-    const cats = new Set(products.map(p => p.category));
+    const cats = new Set(activeProducts.map(p => p.category));
     return ['all', ...Array.from(cats)];
-  }, [products]);
+  }, [activeProducts]);
 
   const filteredProducts = useMemo(() => {
-    let result = [...products];
+    if (filter === 'deleted') return deletedProducts;
+
+    let result = [...activeProducts];
 
     // Apply status filter
     switch (filter) {
@@ -58,13 +63,14 @@ export default function ProductsPage() {
     }
 
     return result;
-  }, [products, filter, categoryFilter, search]);
+  }, [activeProducts, deletedProducts, filter, categoryFilter, search]);
 
   const filterTabs: { value: FilterTab; label: string; count: number }[] = [
-    { value: 'all', label: 'All', count: products.length },
-    { value: 'published', label: 'Published', count: products.filter(p => p.status === 'published').length },
-    { value: 'draft', label: 'Draft', count: products.filter(p => p.status === 'draft').length },
-    { value: 'low-stock', label: 'Low Stock', count: products.filter(p => p.totalStock > 0 && p.totalStock <= 10).length }
+    { value: 'all', label: 'All', count: activeProducts.length },
+    { value: 'published', label: 'Published', count: activeProducts.filter(p => p.status === 'published').length },
+    { value: 'draft', label: 'Draft', count: activeProducts.filter(p => p.status === 'draft').length },
+    { value: 'low-stock', label: 'Low Stock', count: activeProducts.filter(p => p.totalStock > 0 && p.totalStock <= 10).length },
+    { value: 'deleted', label: 'Deleted', count: deletedProducts.length }
   ];
 
   return (

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2 } from 'lucide-react';
+import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2, Pencil } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { HeritageEventSignificance } from '@/types/brand-portal';
@@ -12,7 +12,7 @@ type FilterTab = 'all' | 'deleted' | HeritageEventSignificance;
 export default function HeritagePage() {
   const { heritageEvents, deleteHeritageEvent } = useBrand();
   const [filter, setFilter] = useState<FilterTab>('all');
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const activeEvents = heritageEvents.filter(e => !e.isDeleted);
   const deletedEvents = heritageEvents.filter(e => e.isDeleted);
@@ -23,14 +23,7 @@ export default function HeritagePage() {
         return filter === 'all' || event.significance === filter;
       });
 
-  const handleDelete = (id: string) => {
-    if (confirmDeleteId === id) {
-      deleteHeritageEvent(id);
-      setConfirmDeleteId(null);
-    } else {
-      setConfirmDeleteId(id);
-    }
-  };
+  const deleteTarget = deleteTargetId ? heritageEvents.find(e => e.id === deleteTargetId) : null;
 
   // Sort by year descending
   const sortedEvents = [...filteredEvents].sort((a, b) => b.year - a.year);
@@ -148,7 +141,6 @@ export default function HeritagePage() {
                 {sortedEvents.map((event) => {
                   const SignificanceIcon = getSignificanceIcon(event.significance);
                   const isDeleted = event.isDeleted;
-                  const isConfirming = confirmDeleteId === event.id;
                   return (
                     <div key={event.id} className={`relative flex gap-6 ${isDeleted ? 'opacity-60' : ''}`}>
                       {/* Year marker */}
@@ -172,13 +164,16 @@ export default function HeritagePage() {
                               </div>
                               <h3 className={`font-medium ${isDeleted ? 'text-stone line-through' : 'text-charcoal-deep'}`}>{event.title}</h3>
                               <p className="text-sm text-stone mt-1">{event.description}</p>
+                              {event.longDescription && (
+                                <p className="text-sm text-taupe mt-2 leading-relaxed">{event.longDescription}</p>
+                              )}
                               {event.relatedProducts && event.relatedProducts.length > 0 && (
                                 <p className="text-xs text-taupe mt-2">
                                   {event.relatedProducts.length} related product{event.relatedProducts.length !== 1 ? 's' : ''}
                                 </p>
                               )}
                             </div>
-                            <div className="flex items-start gap-3 flex-shrink-0">
+                            <div className="flex items-center gap-3 flex-shrink-0">
                               {event.image && (
                                 <div className="w-24 h-24 bg-parchment">
                                   <img
@@ -189,18 +184,22 @@ export default function HeritagePage() {
                                 </div>
                               )}
                               {!isDeleted && (
-                                <button
-                                  onClick={() => handleDelete(event.id)}
-                                  onMouseLeave={() => setConfirmDeleteId(null)}
-                                  title={isConfirming ? 'Click again to confirm' : 'Delete event'}
-                                  className={`p-2 rounded-sm transition-colors ${
-                                    isConfirming
-                                      ? 'bg-red-50 text-red-500'
-                                      : 'text-taupe hover:text-red-500 hover:bg-red-50/50'
-                                  }`}
-                                >
-                                  <Trash2 size={14} />
-                                </button>
+                                <div className="flex flex-col gap-1.5">
+                                  <Link
+                                    href={`/brand/heritage/${event.id}/edit`}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep/50 transition-colors"
+                                  >
+                                    <Pencil size={12} />
+                                    Edit
+                                  </Link>
+                                  <button
+                                    onClick={() => setDeleteTargetId(event.id)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-red-600 hover:border-red-200 hover:bg-red-50/50 transition-colors"
+                                  >
+                                    <Trash2 size={12} />
+                                    Delete
+                                  </button>
+                                </div>
                               )}
                             </div>
                           </div>
@@ -214,6 +213,38 @@ export default function HeritagePage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-noir/40">
+          <div className="bg-white p-8 max-w-md w-full mx-4 border border-sand">
+            <h3 className="font-display text-lg text-charcoal-deep mb-3">Delete Heritage Event</h3>
+            <p className="text-sm text-stone mb-2">
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{deleteTarget.title}</span>?
+            </p>
+            <p className="text-xs text-taupe mb-6">
+              This event will be removed from your dashboard. This action can be restored by an administrator.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteTargetId(null)}
+                className="px-6 py-3 text-sm text-stone hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteHeritageEvent(deleteTarget.id);
+                  setDeleteTargetId(null);
+                }}
+                className="px-6 py-3 bg-red-600 text-white text-sm hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
