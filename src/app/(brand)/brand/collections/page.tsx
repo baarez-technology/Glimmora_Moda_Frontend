@@ -9,12 +9,17 @@ import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHead
 
 export default function CollectionsPage() {
   const { collections, products } = useBrand();
-  const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [filter, setFilter] = useState<'all' | 'published' | 'draft' | 'deleted'>('all');
 
-  const filteredCollections = collections.filter(c => {
-    if (filter === 'all') return true;
-    return c.status === filter;
-  });
+  const activeCollections = collections.filter(c => !c.isDeleted);
+  const deletedCollections = collections.filter(c => c.isDeleted);
+
+  const filteredCollections = filter === 'deleted'
+    ? deletedCollections
+    : activeCollections.filter(c => {
+        if (filter === 'all') return true;
+        return c.status === filter;
+      });
 
   const formatCurrency = (value: number) => {
     if (value >= 1000000) {
@@ -26,7 +31,8 @@ export default function CollectionsPage() {
     return `€${value.toLocaleString()}`;
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, isDeleted?: boolean) => {
+    if (isDeleted) return 'bg-red-100 text-red-600';
     switch (status) {
       case 'published':
         return 'bg-success/10 text-success';
@@ -55,9 +61,10 @@ export default function CollectionsPage() {
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit">
           {[
-            { value: 'all' as const, label: 'All', count: collections.length },
-            { value: 'published' as const, label: 'Published', count: collections.filter(c => c.status === 'published').length },
-            { value: 'draft' as const, label: 'Draft', count: collections.filter(c => c.status === 'draft').length }
+            { value: 'all' as const, label: 'All', count: activeCollections.length },
+            { value: 'published' as const, label: 'Published', count: activeCollections.filter(c => c.status === 'published').length },
+            { value: 'draft' as const, label: 'Draft', count: activeCollections.filter(c => c.status === 'draft').length },
+            { value: 'deleted' as const, label: 'Deleted', count: deletedCollections.length }
           ].map(tab => (
             <button
               key={tab.value}
@@ -87,7 +94,7 @@ export default function CollectionsPage() {
               <Link
                 key={collection.id}
                 href={`/brand/collections/${collection.id}`}
-                className="bg-white border border-sand/50 hover:border-sand transition-all group"
+                className={`bg-white border border-sand/50 hover:border-sand transition-all group `}
               >
                 {/* Hero Image */}
                 <div className="aspect-[16/9] bg-parchment relative overflow-hidden">
@@ -104,8 +111,8 @@ export default function CollectionsPage() {
                     </div>
                   )}
                   <div className="absolute top-3 right-3">
-                    <span className={`px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(collection.status)}`}>
-                      {collection.status}
+                    <span className={`px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(collection.status, collection.isDeleted)}`}>
+                      {collection.isDeleted ? 'Deleted' : collection.status}
                     </span>
                   </div>
                 </div>
