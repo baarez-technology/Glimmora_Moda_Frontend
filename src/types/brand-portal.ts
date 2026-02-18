@@ -405,6 +405,7 @@ export interface BrandStory {
   status: BrandStoryStatus;
   relatedProducts: string[];
   readTime: number;
+  isDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }

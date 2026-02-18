@@ -408,6 +408,13 @@ export async function updateBrandStory(
   });
 }
 
+export async function deleteBrandStory(id: string): Promise<ApiResponse<void>> {
+  return apiRequest<void>(`/api/brand-portal/stories/${id}`, {
+    method: 'DELETE',
+    mockHandler: () => undefined as void,
+  });
+}
+
 // ============================================
 // UHNI Offers
 // ============================================

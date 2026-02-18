@@ -1,15 +1,18 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Clock, CheckCircle, FileText, Edit, Package, Quote } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, FileText, Edit, Package, Quote, Trash2 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { BrandStoryType, BrandStoryStatus } from '@/types/brand-portal';
 
 export default function StoryDetailPage() {
   const params = useParams();
-  const { getBrandStoryById, getProductById, updateBrandStory } = useBrand();
+  const router = useRouter();
+  const { getBrandStoryById, getProductById, updateBrandStory, deleteBrandStory } = useBrand();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const storyId = params.id as string;
   const story = getBrandStoryById(storyId);
@@ -101,6 +104,13 @@ export default function StoryDetailPage() {
                 Unpublish
               </SecondaryButton>
             )}
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
           </div>
         }
       />
@@ -280,6 +290,38 @@ export default function StoryDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-noir/40">
+          <div className="bg-white p-8 max-w-md w-full mx-4 border border-sand">
+            <h3 className="font-display text-lg text-charcoal-deep mb-3">Delete Story</h3>
+            <p className="text-sm text-stone mb-2">
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{story.title}</span>?
+            </p>
+            <p className="text-xs text-taupe mb-6">
+              This story will be removed from your dashboard. This action can be restored by an administrator.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-6 py-3 text-sm text-stone hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteBrandStory(story.id);
+                  router.push('/brand/stories');
+                }}
+                className="px-6 py-3 bg-red-600 text-white text-sm hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -95,6 +95,7 @@ interface BrandContextType {
   getBrandStoryById: (id: string) => BrandStory | undefined;
   createBrandStory: (story: Omit<BrandStory, 'id' | 'createdAt' | 'updatedAt'>) => BrandStory;
   updateBrandStory: (id: string, updates: Partial<BrandStory>) => void;
+  deleteBrandStory: (id: string) => void;
 
   uhniOffers: UHNIPriceOffer[];
   getUHNIOfferById: (id: string) => UHNIPriceOffer | undefined;
@@ -458,6 +459,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     brandPortalService.updateBrandStory(id, updates).catch(console.error);
   }, []);
 
+  const deleteBrandStory = useCallback((id: string) => {
+    setBrandStories(prev => prev.map(s =>
+      s.id === id ? { ...s, isDeleted: true, updatedAt: new Date().toISOString() } : s
+    ));
+    brandPortalService.deleteBrandStory(id).catch(console.error);
+  }, []);
+
   const getUHNIOfferById = useCallback((id: string): UHNIPriceOffer | undefined => {
     return uhniOffers.find(o => o.id === id);
   }, [uhniOffers]);
@@ -540,6 +548,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         getBrandStoryById,
         createBrandStory,
         updateBrandStory,
+        deleteBrandStory,
         uhniOffers,
         getUHNIOfferById,
         createUHNIOffer,
