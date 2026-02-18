@@ -4,15 +4,13 @@ import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Upload, Plus, X } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { ArrowLeft, Upload } from 'lucide-react';
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function NewCollectionPage() {
   const router = useRouter();
-  const { products } = useBrand();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -20,7 +18,6 @@ export default function NewCollectionPage() {
     year: new Date().getFullYear().toString(),
     status: 'draft' as 'draft' | 'published'
   });
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [heroImage, setHeroImage] = useState<File | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -67,16 +64,8 @@ export default function NewCollectionPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // In a real app, this would save to the backend
-    console.log('Creating collection:', { ...formData, products: selectedProducts });
+    console.log('Creating collection:', formData);
     router.push('/brand/collections');
-  };
-
-  const toggleProduct = (productId: string) => {
-    setSelectedProducts(prev =>
-      prev.includes(productId)
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId]
-    );
   };
 
   return (
@@ -258,39 +247,6 @@ export default function NewCollectionPage() {
             {imageError && (
               <p className="mt-3 text-sm text-red-600">{imageError}</p>
             )}
-          </div>
-
-          {/* Products */}
-          <div className="bg-white border border-sand/50 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-lg text-charcoal-deep">Products</h2>
-              <span className="text-sm text-taupe">{selectedProducts.length} selected</span>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-80 overflow-y-auto">
-              {products.map(product => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => toggleProduct(product.id)}
-                  className={`p-3 border text-left transition-all ${
-                    selectedProducts.includes(product.id)
-                      ? 'border-charcoal-deep bg-parchment'
-                      : 'border-sand/50 hover:border-sand'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-charcoal-deep truncate">{product.name}</p>
-                    {selectedProducts.includes(product.id) ? (
-                      <X size={14} className="text-charcoal-deep flex-shrink-0" />
-                    ) : (
-                      <Plus size={14} className="text-taupe flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-taupe">{product.sku}</p>
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Actions */}
