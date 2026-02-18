@@ -42,12 +42,9 @@ interface BrandContextType {
   // Collections
   collections: BrandCollection[];
   getCollectionById: (id: string) => BrandCollection | undefined;
-<<<<<<< HEAD
   createCollection: (collection: Omit<BrandCollection, 'id'>) => BrandCollection;
   updateCollection: (id: string, updates: Partial<BrandCollection>) => void;
-=======
   deleteCollection: (id: string) => void;
->>>>>>> main
 
   // Orders
   orders: BrandOrder[];

@@ -1,15 +1,10 @@
+# Next.js build output
 .next/
 
 # Node modules
 node_modules/
 
-# Dependencies
-node_modules/
-.pnp/
-.pnp.js
-
-# Build outputs
-
+# Other build outputs
 out/
 build/
 dist/
@@ -44,7 +39,7 @@ Thumbs.db
 next-env.d.ts
 
 # Vercel
-.vercel
+.vercel/
 
-# Turbopack
+# Turbopack / Turborepo
 .turbo/
