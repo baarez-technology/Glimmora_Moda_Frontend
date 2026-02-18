@@ -98,6 +98,7 @@ interface BrandContextType {
   heritageEvents: HeritageEvent[];
   getHeritageEventById: (id: string) => HeritageEvent | undefined;
   createHeritageEvent: (event: Omit<HeritageEvent, 'id' | 'createdAt' | 'updatedAt'>) => HeritageEvent;
+  deleteHeritageEvent: (id: string) => void;
 
   brandStories: BrandStory[];
   getBrandStoryById: (id: string) => BrandStory | undefined;
@@ -367,6 +368,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return newEvent;
   }, []);
 
+  const deleteHeritageEvent = useCallback((id: string) => {
+    setHeritageEvents(prev => prev.map(e =>
+      e.id === id ? { ...e, isDeleted: true, updatedAt: new Date().toISOString() } : e
+    ));
+  }, []);
+
   const getBrandStoryById = useCallback((id: string): BrandStory | undefined => {
     return brandStories.find(s => s.id === id);
   }, [brandStories]);
@@ -447,6 +454,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         heritageEvents,
         getHeritageEventById,
         createHeritageEvent,
+        deleteHeritageEvent,
         brandStories,
         getBrandStoryById,
         createBrandStory,
