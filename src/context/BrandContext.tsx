@@ -55,6 +55,7 @@ interface BrandContextType {
   // Collections
   collections: BrandCollection[];
   getCollectionById: (id: string) => BrandCollection | undefined;
+  deleteCollection: (id: string) => void;
 
   // Orders
   orders: BrandOrder[];
@@ -249,6 +250,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return collections.find(c => c.id === id);
   }, [collections]);
 
+  const deleteCollection = useCallback((id: string) => {
+    setCollections(prev => prev.map(c =>
+      c.id === id ? { ...c, isDeleted: true, updatedAt: new Date().toISOString() } : c
+    ));
+  }, []);
+
   const getOrderById = useCallback((id: string): BrandOrder | undefined => {
     return orders.find(o => o.id === id);
   }, [orders]);
@@ -416,6 +423,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         createProduct,
         collections,
         getCollectionById,
+        deleteCollection,
         orders,
         getOrderById,
         inventory,
