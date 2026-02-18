@@ -372,6 +372,7 @@ export interface HeritageEvent {
   significance: HeritageEventSignificance;
   relatedProducts?: string[];
   videoUrl?: string;
+  isDeleted?: boolean;
   createdAt: string;
   updatedAt: string;
 }
