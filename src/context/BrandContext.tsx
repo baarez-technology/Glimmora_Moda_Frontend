@@ -91,11 +91,14 @@ interface BrandContextType {
   heritageEvents: HeritageEvent[];
   getHeritageEventById: (id: string) => HeritageEvent | undefined;
   createHeritageEvent: (event: Omit<HeritageEvent, 'id' | 'createdAt' | 'updatedAt'>) => HeritageEvent;
+  updateHeritageEvent: (id: string, updates: Partial<HeritageEvent>) => void;
+  deleteHeritageEvent: (id: string) => void;
 
   brandStories: BrandStory[];
   getBrandStoryById: (id: string) => BrandStory | undefined;
   createBrandStory: (story: Omit<BrandStory, 'id' | 'createdAt' | 'updatedAt'>) => BrandStory;
   updateBrandStory: (id: string, updates: Partial<BrandStory>) => void;
+  deleteBrandStory: (id: string) => void;
 
   uhniOffers: UHNIPriceOffer[];
   getUHNIOfferById: (id: string) => UHNIPriceOffer | undefined;
@@ -251,7 +254,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteProduct = useCallback((id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
+    setProducts(prev => prev.map(p =>
+      p.id === id ? { ...p, isDeleted: true, updatedAt: new Date().toISOString() } : p
+    ));
     brandPortalService.deleteBrandProduct(id).catch(console.error);
   }, []);
 
@@ -439,6 +444,19 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return newEvent;
   }, []);
 
+  const updateHeritageEvent = useCallback((id: string, updates: Partial<HeritageEvent>) => {
+    setHeritageEvents(prev => prev.map(e =>
+      e.id === id ? { ...e, ...updates, updatedAt: new Date().toISOString() } : e
+    ));
+    brandPortalService.updateHeritageEvent(id, updates).catch(console.error);
+  }, []);
+
+  const deleteHeritageEvent = useCallback((id: string) => {
+    setHeritageEvents(prev => prev.map(e =>
+      e.id === id ? { ...e, isDeleted: true, updatedAt: new Date().toISOString() } : e
+    ));
+  }, []);
+
   const getBrandStoryById = useCallback((id: string): BrandStory | undefined => {
     return brandStories.find(s => s.id === id);
   }, [brandStories]);
@@ -460,6 +478,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       s.id === id ? { ...s, ...updates, updatedAt: new Date().toISOString() } : s
     ));
     brandPortalService.updateBrandStory(id, updates).catch(console.error);
+  }, []);
+
+  const deleteBrandStory = useCallback((id: string) => {
+    setBrandStories(prev => prev.map(s =>
+      s.id === id ? { ...s, isDeleted: true, updatedAt: new Date().toISOString() } : s
+    ));
+    brandPortalService.deleteBrandStory(id).catch(console.error);
   }, []);
 
   const getUHNIOfferById = useCallback((id: string): UHNIPriceOffer | undefined => {
@@ -540,10 +565,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         heritageEvents,
         getHeritageEventById,
         createHeritageEvent,
+        updateHeritageEvent,
+        deleteHeritageEvent,
         brandStories,
         getBrandStoryById,
         createBrandStory,
         updateBrandStory,
+        deleteBrandStory,
         uhniOffers,
         getUHNIOfferById,
         createUHNIOffer,

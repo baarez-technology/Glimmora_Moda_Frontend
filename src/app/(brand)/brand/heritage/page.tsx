@@ -3,20 +3,28 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Clock, Award, Sparkles, Star, Layers, Users } from 'lucide-react';
+import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2, Pencil } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { HeritageEventSignificance } from '@/types/brand-portal';
 
-type FilterTab = 'all' | HeritageEventSignificance;
+type FilterTab = 'all' | 'deleted' | HeritageEventSignificance;
 
 export default function HeritagePage() {
-  const { heritageEvents } = useBrand();
+  const { heritageEvents, deleteHeritageEvent } = useBrand();
   const [filter, setFilter] = useState<FilterTab>('all');
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
-  const filteredEvents = heritageEvents.filter(event => {
-    return filter === 'all' || event.significance === filter;
-  });
+  const activeEvents = heritageEvents.filter(e => !e.isDeleted);
+  const deletedEvents = heritageEvents.filter(e => e.isDeleted);
+
+  const filteredEvents = filter === 'deleted'
+    ? deletedEvents
+    : activeEvents.filter(event => {
+        return filter === 'all' || event.significance === filter;
+      });
+
+  const deleteTarget = deleteTargetId ? heritageEvents.find(e => e.id === deleteTargetId) : null;
 
   // Sort by year descending
   const sortedEvents = [...filteredEvents].sort((a, b) => b.year - a.year);
@@ -60,13 +68,14 @@ export default function HeritagePage() {
   };
 
   const significanceCounts = {
-    all: heritageEvents.length,
-    milestone: heritageEvents.filter(e => e.significance === 'milestone').length,
-    collection: heritageEvents.filter(e => e.significance === 'collection').length,
-    innovation: heritageEvents.filter(e => e.significance === 'innovation').length,
-    cultural: heritageEvents.filter(e => e.significance === 'cultural').length,
-    collaboration: heritageEvents.filter(e => e.significance === 'collaboration').length,
-    award: heritageEvents.filter(e => e.significance === 'award').length
+    all: activeEvents.length,
+    milestone: activeEvents.filter(e => e.significance === 'milestone').length,
+    collection: activeEvents.filter(e => e.significance === 'collection').length,
+    innovation: activeEvents.filter(e => e.significance === 'innovation').length,
+    cultural: activeEvents.filter(e => e.significance === 'cultural').length,
+    collaboration: activeEvents.filter(e => e.significance === 'collaboration').length,
+    award: activeEvents.filter(e => e.significance === 'award').length,
+    deleted: deletedEvents.length
   };
 
   const filterTabs: { value: FilterTab; label: string }[] = [
@@ -74,7 +83,8 @@ export default function HeritagePage() {
     { value: 'milestone', label: 'Milestones' },
     { value: 'collection', label: 'Collections' },
     { value: 'innovation', label: 'Innovations' },
-    { value: 'cultural', label: 'Cultural' }
+    { value: 'cultural', label: 'Cultural' },
+    { value: 'deleted', label: 'Deleted' }
   ];
 
   return (
@@ -129,12 +139,13 @@ export default function HeritagePage() {
               <div className="absolute left-[39px] top-0 bottom-0 w-0.5 bg-sand" />
 
               <div className="space-y-8">
-                {sortedEvents.map((event, index) => {
+                {sortedEvents.map((event) => {
                   const SignificanceIcon = getSignificanceIcon(event.significance);
+                  const isDeleted = event.isDeleted;
                   return (
-                    <div key={event.id} className="relative flex gap-6">
+                    <div key={event.id} className={`relative flex gap-6 ${isDeleted ? 'opacity-60' : ''}`}>
                       {/* Year marker */}
-                      <div className="w-20 flex-shrink-0 text-right">
+                      <div className="w-24 flex-shrink-0 text-right">
                         <span className="font-display text-2xl text-charcoal-deep">{event.year}</span>
                       </div>
 
@@ -143,33 +154,56 @@ export default function HeritagePage() {
 
                       {/* Content */}
                       <div className="flex-1 pb-2">
-                        <div className="bg-parchment/30 p-5 hover:bg-parchment/50 transition-colors">
+                        <div className={`p-5 transition-colors ${isDeleted ? 'bg-red-50/40' : 'bg-parchment/30 hover:bg-parchment/50'}`}>
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getSignificanceBadge(event.significance)}`}>
+                                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${isDeleted ? 'bg-red-100 text-red-600' : getSignificanceBadge(event.significance)}`}>
                                   <SignificanceIcon size={10} />
-                                  {event.significance}
+                                  {isDeleted ? 'Deleted' : event.significance}
                                 </span>
                               </div>
-                              <h3 className="font-medium text-charcoal-deep">{event.title}</h3>
+                              <h3 className={`font-medium ${isDeleted ? 'text-stone line-through' : 'text-charcoal-deep'}`}>{event.title}</h3>
                               <p className="text-sm text-stone mt-1">{event.description}</p>
+                              {event.longDescription && (
+                                <p className="text-sm text-taupe mt-2 leading-relaxed">{event.longDescription}</p>
+                              )}
                               {event.relatedProducts && event.relatedProducts.length > 0 && (
                                 <p className="text-xs text-taupe mt-2">
                                   {event.relatedProducts.length} related product{event.relatedProducts.length !== 1 ? 's' : ''}
                                 </p>
                               )}
                             </div>
-                            {event.image && (
-                              <div className="w-24 h-24 bg-parchment flex-shrink-0 relative">
-                                <Image
-                                  src={event.image}
-                                  alt={event.title}
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              {event.image && (
+                                <div className="w-24 h-24 bg-parchment relative">
+                                  <Image
+                                    src={event.image}
+                                    alt={event.title}
                                   fill
-                                  className="object-cover"
-                                />
-                              </div>
-                            )}
+                                    className="object-cover"
+                                  />
+                                </div>
+                              )}
+                              {!isDeleted && (
+                                <div className="flex flex-col gap-1.5">
+                                  <Link
+                                    href={`/brand/heritage/${event.id}/edit`}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep/50 transition-colors"
+                                  >
+                                    <Pencil size={12} />
+                                    Edit
+                                  </Link>
+                                  <button
+                                    onClick={() => setDeleteTargetId(event.id)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-red-600 hover:border-red-200 hover:bg-red-50/50 transition-colors"
+                                  >
+                                    <Trash2 size={12} />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -181,6 +215,38 @@ export default function HeritagePage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-noir/40">
+          <div className="bg-white p-8 max-w-md w-full mx-4 border border-sand">
+            <h3 className="font-display text-lg text-charcoal-deep mb-3">Delete Heritage Event</h3>
+            <p className="text-sm text-stone mb-2">
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{deleteTarget.title}</span>?
+            </p>
+            <p className="text-xs text-taupe mb-6">
+              This event will be removed from your dashboard. This action can be restored by an administrator.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeleteTargetId(null)}
+                className="px-6 py-3 text-sm text-stone hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteHeritageEvent(deleteTarget.id);
+                  setDeleteTargetId(null);
+                }}
+                className="px-6 py-3 bg-red-600 text-white text-sm hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

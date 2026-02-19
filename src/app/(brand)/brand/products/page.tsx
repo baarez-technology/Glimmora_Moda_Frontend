@@ -8,7 +8,7 @@ import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHead
 import { ProductCard, ProductGridCard } from '@/components/brand/ProductCard';
 import type { BrandProduct } from '@/types/brand-portal';
 
-type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'out-of-stock';
+type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'out-of-stock' | 'deleted';
 type ViewMode = 'list' | 'grid';
 type SortField = 'name' | 'price' | 'totalStock' | 'demandScore';
 type SortDir = 'asc' | 'desc';
@@ -29,9 +29,9 @@ export default function ProductsPage() {
   const [page, setPage] = useState(1);
 
   const categories = useMemo(() => {
-    const cats = new Set(products.map(p => p.category));
+    const cats = new Set(activeProducts.map(p => p.category));
     return ['all', ...Array.from(cats)];
-  }, [products]);
+  }, [activeProducts]);
 
   // Toggle sort: click same header flips direction, click new header sets ascending
   const handleSort = (field: SortField) => {
@@ -45,7 +45,9 @@ export default function ProductsPage() {
   };
 
   const filteredAndSortedProducts = useMemo(() => {
-    let result = [...products];
+    if (filter === 'deleted') return deletedProducts;
+
+    let result = [...activeProducts];
 
     // Apply status/stock filter
     switch (filter) {

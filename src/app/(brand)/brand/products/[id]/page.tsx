@@ -351,15 +351,16 @@ export default function EditProductPage() {
         ]}
         actions={
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center gap-2 px-4 py-3 text-xs tracking-wide text-error hover:bg-error/5 border border-transparent hover:border-error/20 transition-colors"
-            >
-              <Trash2 size={16} /> Delete
-            </button>
             <SecondaryButton href="/brand/products" icon={ArrowLeft}>
               Back
             </SecondaryButton>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
             <PrimaryButton onClick={handleSave} icon={Save} disabled={isSaving || !hasChanges}>
               {isSaving ? 'Saving...' : 'Save Changes'}
             </PrimaryButton>
@@ -1096,9 +1097,9 @@ export default function EditProductPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/50"
             onClick={() => setShowDeleteConfirm(false)}
           />
           <div
@@ -1128,13 +1129,13 @@ export default function EditProductPage() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-5 py-3 border border-sand text-xs tracking-wider uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+                className="px-5 py-2.5 text-sm text-stone hover:text-charcoal-deep transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
-                className="flex-1 px-5 py-3 bg-error text-white text-xs tracking-wider uppercase hover:bg-error/90 transition-colors"
+                className="px-5 py-2.5 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors"
               >
                 {isDeleteDangerous ? 'Delete Anyway' : 'Delete Product'}
               </button>
