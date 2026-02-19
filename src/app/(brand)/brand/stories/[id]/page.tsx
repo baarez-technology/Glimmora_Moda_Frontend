@@ -255,45 +255,51 @@ export default function StoryDetailPage() {
                 {contentSections.length === 0 ? (
                   <p className="text-sm text-taupe text-center py-8">No content sections yet</p>
                 ) : (
-                  contentSections.map((section: Record<string, unknown>, index: number) => (
+                  contentSections.map((section: Record<string, unknown>, index: number) => {
+                    const sType = section.type as string;
+                    const sContent = (section.content as string) || '';
+                    const sCaption = (section.caption as string) || '';
+                    const sMediaUrl = (section.mediaUrl as string) || '';
+                    return (
                     <div key={index} className="prose prose-sm max-w-none">
-                      {section.type === 'text' && (
-                        <p className="text-charcoal-deep leading-relaxed">{section.content as string}</p>
+                      {sType === 'text' && (
+                        <p className="text-charcoal-deep leading-relaxed">{sContent}</p>
                       )}
-                      {section.type === 'image' && (
+                      {sType === 'image' && (
                         <div>
-                          {section.mediaUrl && (
+                          {sMediaUrl && (
                             <img
-                              src={section.mediaUrl as string}
-                              alt={(section.caption as string) || ''}
+                              src={sMediaUrl}
+                              alt={sCaption}
                               className="w-full h-auto"
                             />
                           )}
-                          {section.caption && (
-                            <p className="text-xs text-taupe text-center mt-2 italic">{section.caption as string}</p>
+                          {sCaption && (
+                            <p className="text-xs text-taupe text-center mt-2 italic">{sCaption}</p>
                           )}
                         </div>
                       )}
-                      {section.type === 'quote' && (
+                      {sType === 'quote' && (
                         <blockquote className="border-l-2 border-gold-muted pl-4 py-2">
-                          <p className="text-charcoal-deep italic">{section.content as string}</p>
-                          {section.caption && (
-                            <cite className="text-xs text-taupe block mt-2">— {section.caption as string}</cite>
+                          <p className="text-charcoal-deep italic">{sContent}</p>
+                          {sCaption && (
+                            <cite className="text-xs text-taupe block mt-2">— {sCaption}</cite>
                           )}
                         </blockquote>
                       )}
-                      {section.type === 'timeline' && (
+                      {sType === 'timeline' && (
                         <div className="border border-sand p-4 bg-parchment/30">
                           <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Timeline</p>
                           <div className="space-y-2">
-                            {(section.content as string).split('|').map((item: string, i: number) => (
+                            {sContent.split('|').map((item: string, i: number) => (
                               <p key={i} className="text-sm text-charcoal-deep">{item.trim()}</p>
                             ))}
                           </div>
                         </div>
                       )}
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
