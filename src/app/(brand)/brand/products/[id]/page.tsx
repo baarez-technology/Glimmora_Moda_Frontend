@@ -181,16 +181,20 @@ export default function ProductDetailPage() {
             <SecondaryButton href="/brand/products" icon={ArrowLeft}>
               Back
             </SecondaryButton>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
-            >
-              <Trash2 size={16} />
-              Delete
-            </button>
-            <PrimaryButton onClick={handleSave} icon={Save} disabled={isSaving || !hasChanges}>
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </PrimaryButton>
+            {product.is_active && (
+              <>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={16} />
+                  Delete
+                </button>
+                <PrimaryButton onClick={handleSave} icon={Save} disabled={isSaving || !hasChanges}>
+                  {isSaving ? 'Saving...' : 'Save Changes'}
+                </PrimaryButton>
+              </>
+            )}
           </div>
         }
       />

@@ -3,56 +3,84 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, Clock, Award, Sparkles, Star, Layers, Users } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
-import type { HeritageEventSignificance } from '@/types/brand-portal';
+import { ArrowLeft, Save, Clock, Award, Sparkles, Star, Layers, Users, Loader2 } from 'lucide-react';
+import { fetchHeritageEvent, updateHeritageEvent } from '@/services/brand-heritage.service';
+import type { HeritageEventResponse } from '@/services/brand-heritage.service';
+
+type SignificanceType = 'milestone' | 'collection' | 'innovation' | 'cultural' | 'collaboration' | 'award';
 
 export default function EditHeritageEventPage() {
   const params = useParams();
   const router = useRouter();
-  const { getHeritageEventById, updateHeritageEvent, products } = useBrand();
-
   const eventId = params.id as string;
-  const heritageEvent = getHeritageEventById(eventId);
+
+  const [event, setEvent] = useState<HeritageEventResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     year: new Date().getFullYear(),
     title: '',
-    description: '',
-    longDescription: '',
-    image: '',
-    significance: 'milestone' as HeritageEventSignificance,
-    relatedProducts: [] as string[],
-    videoUrl: ''
+    short_description: '',
+    full_description: '',
+    image_url: '',
+    video_url: '',
+    significance_type: 'milestone' as SignificanceType,
+    significance_type_subtype: '',
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   useEffect(() => {
-    if (heritageEvent) {
-      setFormData({
-        year: heritageEvent.year,
-        title: heritageEvent.title,
-        description: heritageEvent.description,
-        longDescription: heritageEvent.longDescription || '',
-        image: heritageEvent.image || '',
-        significance: heritageEvent.significance,
-        relatedProducts: heritageEvent.relatedProducts || [],
-        videoUrl: heritageEvent.videoUrl || ''
-      });
-    }
-  }, [heritageEvent]);
+    loadEvent();
+  }, [eventId]);
 
-  const toggleProduct = (productId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      relatedProducts: prev.relatedProducts.includes(productId)
-        ? prev.relatedProducts.filter(id => id !== productId)
-        : [...prev.relatedProducts, productId]
-    }));
+  const loadEvent = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchHeritageEvent(eventId);
+      setEvent(data);
+      setFormData({
+        year: data.year,
+        title: data.title,
+        short_description: data.short_description,
+        full_description: data.full_description || '',
+        image_url: data.image_url || '',
+        video_url: data.video_url || '',
+        significance_type: (data.significance_type || 'milestone') as SignificanceType,
+        significance_type_subtype: data.significance_type_subtype || '',
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load heritage event');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const significanceOptions: { value: HeritageEventSignificance; label: string; description: string; icon: React.ElementType }[] = [
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      await updateHeritageEvent(eventId, {
+        year: formData.year,
+        title: formData.title,
+        short_description: formData.short_description,
+        full_description: formData.full_description,
+        image_url: formData.image_url,
+        video_url: formData.video_url,
+        significance_type: formData.significance_type,
+        significance_type_subtype: formData.significance_type_subtype,
+      });
+      router.push('/brand/heritage');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update heritage event');
+      setIsSubmitting(false);
+    }
+  };
+
+  const significanceOptions: { value: SignificanceType; label: string; description: string; icon: React.ElementType }[] = [
     { value: 'milestone', label: 'Milestone', description: 'Major brand achievement', icon: Star },
     { value: 'collection', label: 'Collection', description: 'Notable collection launch', icon: Layers },
     { value: 'innovation', label: 'Innovation', description: 'Technical or design breakthrough', icon: Sparkles },
@@ -61,11 +89,19 @@ export default function EditHeritageEventPage() {
     { value: 'award', label: 'Award', description: 'Recognition or honor', icon: Award }
   ];
 
-  if (!heritageEvent) {
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-taupe" />
+      </div>
+    );
+  }
+
+  if (!event) {
     return (
       <div className="p-8 text-center">
         <Clock size={48} className="mx-auto text-taupe/40 mb-4" />
-        <p className="text-stone">Heritage event not found</p>
+        <p className="text-stone">{error || 'Heritage event not found'}</p>
         <Link
           href="/brand/heritage"
           className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
@@ -76,26 +112,6 @@ export default function EditHeritageEventPage() {
     );
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    updateHeritageEvent(eventId, {
-      year: formData.year,
-      title: formData.title,
-      description: formData.description,
-      longDescription: formData.longDescription || undefined,
-      image: formData.image || undefined,
-      significance: formData.significance,
-      relatedProducts: formData.relatedProducts.length > 0 ? formData.relatedProducts : undefined,
-      videoUrl: formData.videoUrl || undefined
-    });
-
-    setTimeout(() => {
-      router.push('/brand/heritage');
-    }, 500);
-  };
-
   return (
     <div>
       {/* Header */}
@@ -105,7 +121,7 @@ export default function EditHeritageEventPage() {
             Heritage
           </Link>
           <span className="text-taupe">/</span>
-          <span className="text-taupe">{heritageEvent.title}</span>
+          <span className="text-taupe">{event.title}</span>
           <span className="text-taupe">/</span>
           <span className="text-charcoal-deep">Edit</span>
         </nav>
@@ -124,6 +140,12 @@ export default function EditHeritageEventPage() {
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="p-8 space-y-6 max-w-4xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* Event Details */}
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50">
@@ -166,14 +188,14 @@ export default function EditHeritageEventPage() {
               </label>
               <input
                 type="text"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                value={formData.short_description}
+                onChange={(e) => setFormData({ ...formData, short_description: e.target.value })}
                 required
                 placeholder="A brief summary of the event..."
                 maxLength={200}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
-              <p className="text-xs text-taupe mt-1">{formData.description.length}/200 characters</p>
+              <p className="text-xs text-taupe mt-1">{formData.short_description.length}/200 characters</p>
             </div>
 
             <div>
@@ -181,8 +203,8 @@ export default function EditHeritageEventPage() {
                 Full Description
               </label>
               <textarea
-                value={formData.longDescription}
-                onChange={(e) => setFormData({ ...formData, longDescription: e.target.value })}
+                value={formData.full_description}
+                onChange={(e) => setFormData({ ...formData, full_description: e.target.value })}
                 rows={5}
                 placeholder="Tell the full story of this heritage moment..."
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
@@ -197,15 +219,15 @@ export default function EditHeritageEventPage() {
                 <div className="flex gap-4">
                   <input
                     type="url"
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
                     placeholder="https://..."
                     className="flex-1 px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
-                  {formData.image && (
+                  {formData.image_url && (
                     <div className="w-12 h-12 bg-parchment flex-shrink-0">
                       <img
-                        src={formData.image}
+                        src={formData.image_url}
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />
@@ -219,8 +241,8 @@ export default function EditHeritageEventPage() {
                 </label>
                 <input
                   type="url"
-                  value={formData.videoUrl}
-                  onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                  value={formData.video_url}
+                  onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
                   placeholder="https://youtube.com/..."
                   className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
@@ -238,12 +260,12 @@ export default function EditHeritageEventPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {significanceOptions.map(option => {
                 const Icon = option.icon;
-                const isSelected = formData.significance === option.value;
+                const isSelected = formData.significance_type === option.value;
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, significance: option.value })}
+                    onClick={() => setFormData({ ...formData, significance_type: option.value })}
                     className={`p-4 border text-left transition-colors ${
                       isSelected
                         ? 'border-charcoal-deep bg-parchment'
@@ -262,52 +284,6 @@ export default function EditHeritageEventPage() {
           </div>
         </div>
 
-        {/* Related Products */}
-        <div className="bg-white border border-sand/50">
-          <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
-            <h2 className="font-medium text-charcoal-deep">Related Products</h2>
-            <span className="text-sm text-taupe">
-              {formData.relatedProducts.length} selected
-            </span>
-          </div>
-          <div className="p-6">
-            {products.length === 0 ? (
-              <p className="text-sm text-taupe text-center py-4">No products available</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-64 overflow-y-auto">
-                {products.filter(p => p.status === 'published').map(product => {
-                  const isSelected = formData.relatedProducts.includes(product.id);
-                  return (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() => toggleProduct(product.id)}
-                      className={`flex items-center gap-3 p-3 border text-left transition-colors ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-parchment'
-                          : 'border-sand hover:border-charcoal-deep/50'
-                      }`}
-                    >
-                      <div className="w-10 h-10 bg-parchment flex-shrink-0">
-                        {product.images[0] && (
-                          <img
-                            src={product.images[0].url}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                      </div>
-                      <p className={`text-xs truncate flex-1 ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
-                        {product.name}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Actions */}
         <div className="flex items-center justify-end gap-4">
           <Link
@@ -316,14 +292,16 @@ export default function EditHeritageEventPage() {
           >
             Cancel
           </Link>
-          <button
-            type="submit"
-            disabled={isSubmitting || !formData.title || !formData.description}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
-          >
-            <Save size={16} />
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
-          </button>
+          {event.is_active === true && (
+            <button
+              type="submit"
+              disabled={isSubmitting || !formData.title || !formData.short_description}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+            >
+              <Save size={16} />
+              {isSubmitting ? 'Saving...' : 'Save Changes'}
+            </button>
+          )}
         </div>
       </form>
     </div>

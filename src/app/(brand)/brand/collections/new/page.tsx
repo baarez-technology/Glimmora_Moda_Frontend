@@ -5,22 +5,24 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Upload } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { createCollection } from '@/services/brand-collection.service';
+import { uploadImage } from '@/services/brand-product.service';
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function NewCollectionPage() {
   const router = useRouter();
-  const { products, createCollection } = useBrand();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     season: 'Spring/Summer',
     year: new Date().getFullYear().toString(),
-    status: 'draft' as 'draft' | 'published'
+    status: 'draft',
   });
-  const [heroImage, setHeroImage] = useState<File | null>(null);
+  const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -38,7 +40,7 @@ export default function NewCollectionPage() {
       return;
     }
 
-    setHeroImage(file);
+    setHeroFile(file);
     const url = URL.createObjectURL(file);
     setHeroPreview(url);
   };
@@ -46,7 +48,6 @@ export default function NewCollectionPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) validateAndSetImage(file);
-    // Reset input so re-selecting the same file triggers onChange
     e.target.value = '';
   };
 
@@ -58,31 +59,36 @@ export default function NewCollectionPage() {
 
   const removeImage = () => {
     if (heroPreview) URL.revokeObjectURL(heroPreview);
-    setHeroImage(null);
+    setHeroFile(null);
     setHeroPreview(null);
     setImageError(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    createCollection({
-      name: formData.name,
-      slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      description: formData.description,
-      season: formData.season,
-      year: parseInt(formData.year),
-      heroImage: '/images/collections/placeholder.jpg',
-      status: formData.status,
-      productIds: [],
-      productCount: 0,
-      totalRevenue: 0,
-      viewCount: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-    // In a real app, this would save to the backend
-    console.log('Creating collection:', formData);
-    router.push('/brand/collections');
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      let imageUrl = '';
+      if (heroFile) {
+        imageUrl = await uploadImage(heroFile);
+      }
+
+      await createCollection({
+        collection_name: formData.name,
+        season: formData.season,
+        year: formData.year,
+        status: formData.status,
+        collection_description: formData.description,
+        collection_image: imageUrl,
+      });
+
+      router.push('/brand/collections');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create collection');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -112,6 +118,12 @@ export default function NewCollectionPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="p-8 max-w-4xl">
         <div className="space-y-8">
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           {/* Basic Information */}
           <div className="bg-white border border-sand/50 p-6">
             <h2 className="font-display text-lg text-charcoal-deep mb-6">Basic Information</h2>
@@ -171,7 +183,7 @@ export default function NewCollectionPage() {
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
                 >
                   <option value="draft">Draft</option>
@@ -219,6 +231,7 @@ export default function NewCollectionPage() {
                   width={800}
                   height={400}
                   className="w-full h-64 object-cover border border-sand"
+                  unoptimized
                 />
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                   <button
@@ -236,9 +249,11 @@ export default function NewCollectionPage() {
                     Remove
                   </button>
                 </div>
-                <p className="mt-2 text-xs text-taupe">
-                  {heroImage?.name} ({(heroImage!.size / (1024 * 1024)).toFixed(1)}MB)
-                </p>
+                {heroFile && (
+                  <p className="mt-2 text-xs text-taupe">
+                    {heroFile.name} ({(heroFile.size / (1024 * 1024)).toFixed(1)}MB)
+                  </p>
+                )}
               </div>
             ) : (
               <div
@@ -276,9 +291,10 @@ export default function NewCollectionPage() {
             </Link>
             <button
               type="submit"
-              className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
+              disabled={isSubmitting}
+              className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors disabled:opacity-50"
             >
-              Create Collection
+              {isSubmitting ? 'Creating...' : 'Create Collection'}
             </button>
           </div>
         </div>

@@ -178,6 +178,21 @@ export async function softDeleteProduct(productId: string): Promise<{ message: s
   return res.json();
 }
 
+export async function restoreProduct(productId: string): Promise<BackendProduct> {
+  const res = await fetch(`/api/v1/product/${productId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ is_active: true }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to restore product' }));
+    throw new Error(err.detail || `Failed to restore product (${res.status})`);
+  }
+
+  return res.json();
+}
+
 export async function setRegionalStocks(
   productId: string,
   stocks: RegionalStockAddPayload[]

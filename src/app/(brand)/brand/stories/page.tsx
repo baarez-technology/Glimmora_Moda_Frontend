@@ -1,29 +1,65 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Plus, BookOpen, Clock, CheckCircle, FileText, Trash2, Pencil } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { Plus, BookOpen, Clock, CheckCircle, FileText, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import type { BrandStoryType, BrandStoryStatus } from '@/types/brand-portal';
+import { fetchStories, softDeleteStory } from '@/services/brand-story.service';
+import type { StoryResponse } from '@/services/brand-story.service';
 
-type FilterTab = 'all' | 'deleted' | BrandStoryType;
+type StoryType = 'heritage' | 'craftsmanship' | 'collection' | 'artisan';
+type FilterTab = 'all' | 'deleted' | StoryType;
 
 export default function BrandStoriesPage() {
-  const { brandStories, deleteBrandStory } = useBrand();
+  const [stories, setStories] = useState<StoryResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const activeStories = brandStories.filter(s => !s.isDeleted);
-  const deletedStories = brandStories.filter(s => s.isDeleted);
+  useEffect(() => {
+    loadStories();
+  }, []);
 
-  const filteredStories = filter === 'deleted'
-    ? deletedStories
-    : activeStories.filter(story => {
-        return filter === 'all' || story.type === filter;
-      });
+  const loadStories = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchStories();
+      setStories(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load stories');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const deleteTarget = deleteTargetId ? brandStories.find(s => s.id === deleteTargetId) : null;
+  const activeStories = useMemo(() => stories.filter(s => s.is_active), [stories]);
+  const deletedStories = useMemo(() => stories.filter(s => !s.is_active), [stories]);
+
+  const filteredStories = useMemo(() => {
+    if (filter === 'deleted') return deletedStories;
+    return activeStories.filter(story => {
+      return filter === 'all' || story.story_type === filter;
+    });
+  }, [activeStories, deletedStories, filter]);
+
+  const deleteTarget = deleteTargetId ? stories.find(s => s.story_id === deleteTargetId) : null;
+
+  const handleDelete = async () => {
+    if (!deleteTargetId) return;
+    setIsDeleting(true);
+    try {
+      await softDeleteStory(deleteTargetId);
+      setDeleteTargetId(null);
+      await loadStories();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete story');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -33,7 +69,7 @@ export default function BrandStoriesPage() {
     });
   };
 
-  const getTypeBadge = (type: BrandStoryType) => {
+  const getTypeBadge = (type: string) => {
     switch (type) {
       case 'heritage':
         return 'bg-gold-soft/20 text-gold-deep';
@@ -48,7 +84,7 @@ export default function BrandStoriesPage() {
     }
   };
 
-  const getStatusBadge = (status: BrandStoryStatus) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'published':
         return 'bg-success/10 text-success';
@@ -59,14 +95,14 @@ export default function BrandStoriesPage() {
     }
   };
 
-  const typeCounts = {
+  const typeCounts = useMemo(() => ({
     all: activeStories.length,
-    heritage: activeStories.filter(s => s.type === 'heritage').length,
-    craftsmanship: activeStories.filter(s => s.type === 'craftsmanship').length,
-    collection: activeStories.filter(s => s.type === 'collection').length,
-    artisan: activeStories.filter(s => s.type === 'artisan').length,
+    heritage: activeStories.filter(s => s.story_type === 'heritage').length,
+    craftsmanship: activeStories.filter(s => s.story_type === 'craftsmanship').length,
+    collection: activeStories.filter(s => s.story_type === 'collection').length,
+    artisan: activeStories.filter(s => s.story_type === 'artisan').length,
     deleted: deletedStories.length
-  };
+  }), [activeStories, deletedStories]);
 
   const filterTabs: { value: FilterTab; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -76,6 +112,50 @@ export default function BrandStoriesPage() {
     { value: 'artisan', label: 'Artisan' },
     { value: 'deleted', label: 'Deleted' }
   ];
+
+  if (isLoading) {
+    return (
+      <div>
+        <BrandPageHeader
+          title="Brand Stories"
+          subtitle="Loading..."
+          actions={
+            <PrimaryButton href="/brand/stories/new" icon={Plus}>
+              Create Story
+            </PrimaryButton>
+          }
+        />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin text-taupe" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <BrandPageHeader
+          title="Brand Stories"
+          subtitle="Error"
+          actions={
+            <PrimaryButton href="/brand/stories/new" icon={Plus}>
+              Create Story
+            </PrimaryButton>
+          }
+        />
+        <div className="p-8 text-center">
+          <p className="text-error mb-4">{error}</p>
+          <button
+            onClick={loadStories}
+            className="px-6 py-3 bg-charcoal-deep text-white text-sm tracking-wider uppercase hover:bg-noir transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -125,23 +205,29 @@ export default function BrandStoriesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredStories.map(story => {
-              const isDeleted = story.isDeleted;
+              const isActive = story.is_active;
               return (
                 <div
-                  key={story.id}
-                  className={`bg-white border border-sand/50 transition-colors group ${isDeleted ? 'opacity-60' : 'hover:border-sand'}`}
+                  key={story.story_id}
+                  className={`bg-white border border-sand/50 transition-colors group ${!isActive ? 'opacity-60' : 'hover:border-sand'}`}
                 >
                   {/* Hero Image */}
-                  <Link href={`/brand/stories/${story.id}`}>
+                  <Link href={`/brand/stories/${story.story_id}`}>
                     <div className="aspect-[16/9] bg-parchment relative overflow-hidden">
-                      <img
-                        src={story.heroImage}
-                        alt={story.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
+                      {story.image_url ? (
+                        <img
+                          src={story.image_url}
+                          alt={story.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-taupe">
+                          <BookOpen size={32} />
+                        </div>
+                      )}
                       <div className="absolute top-3 left-3 flex gap-2">
-                        <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${isDeleted ? 'bg-red-100 text-red-600' : getTypeBadge(story.type)}`}>
-                          {isDeleted ? 'Deleted' : story.type}
+                        <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${!isActive ? 'bg-red-100 text-red-600' : getTypeBadge(story.story_type)}`}>
+                          {!isActive ? 'Deleted' : story.story_type}
                         </span>
                       </div>
                       <div className="absolute top-3 right-3">
@@ -154,8 +240,8 @@ export default function BrandStoriesPage() {
 
                   {/* Content */}
                   <div className="p-5">
-                    <Link href={`/brand/stories/${story.id}`}>
-                      <h3 className={`font-medium transition-colors ${isDeleted ? 'text-stone line-through' : 'text-charcoal-deep group-hover:text-gold-muted'}`}>
+                    <Link href={`/brand/stories/${story.story_id}`}>
+                      <h3 className={`font-medium transition-colors ${!isActive ? 'text-stone line-through' : 'text-charcoal-deep group-hover:text-gold-muted'}`}>
                         {story.title}
                       </h3>
                       <p className="text-sm text-stone mt-1 line-clamp-2">{story.excerpt}</p>
@@ -165,13 +251,13 @@ export default function BrandStoriesPage() {
                       <div className="flex items-center gap-3 text-xs text-taupe">
                         <div className="flex items-center gap-1">
                           <Clock size={12} />
-                          <span>{story.readTime} min read</span>
+                          <span>{story.read_time} min read</span>
                         </div>
                         <div className="flex items-center gap-1">
                           {story.status === 'published' ? (
                             <>
                               <CheckCircle size={12} />
-                              <span>{story.publishedAt ? formatDate(story.publishedAt) : 'Published'}</span>
+                              <span>Published</span>
                             </>
                           ) : (
                             <>
@@ -182,17 +268,17 @@ export default function BrandStoriesPage() {
                         </div>
                       </div>
 
-                      {!isDeleted && (
+                      {isActive && (
                         <div className="flex items-center gap-1.5">
                           <Link
-                            href={`/brand/stories/${story.id}/edit`}
+                            href={`/brand/stories/${story.story_id}/edit`}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep/50 transition-colors"
                           >
                             <Pencil size={12} />
                             Edit
                           </Link>
                           <button
-                            onClick={() => setDeleteTargetId(story.id)}
+                            onClick={() => setDeleteTargetId(story.story_id)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-red-600 hover:border-red-200 hover:bg-red-50/50 transition-colors"
                           >
                             <Trash2 size={12} />
@@ -228,13 +314,11 @@ export default function BrandStoriesPage() {
                 Cancel
               </button>
               <button
-                onClick={() => {
-                  deleteBrandStory(deleteTarget.id);
-                  setDeleteTargetId(null);
-                }}
-                className="px-6 py-3 bg-red-600 text-white text-sm hover:bg-red-700 transition-colors"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-6 py-3 bg-red-600 text-white text-sm hover:bg-red-700 transition-colors disabled:opacity-50"
               >
-                Delete
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
