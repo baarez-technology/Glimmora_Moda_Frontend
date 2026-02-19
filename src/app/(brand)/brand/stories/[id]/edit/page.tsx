@@ -3,94 +3,118 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Plus, X, Image, Type, Quote, Clock, Trash2 } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { ArrowLeft, Plus, Image, Type, Quote, Clock, Trash2, Save, Loader2, BookOpen } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import type { BrandStoryType, StorySection } from '@/types/brand-portal';
+import { fetchStory, updateStory, fetchProductsList } from '@/services/brand-story.service';
+import type { StoryResponse, ProductListItem } from '@/services/brand-story.service';
+
+type StoryType = 'heritage' | 'craftsmanship' | 'collection' | 'artisan';
+
+interface ContentSection {
+  id: string;
+  type: 'text' | 'image' | 'quote' | 'timeline';
+  content: string;
+  caption?: string;
+  mediaUrl?: string;
+}
 
 export default function EditStoryPage() {
   const router = useRouter();
   const params = useParams();
   const storyId = params.id as string;
-  const { getBrandStoryById, updateBrandStory, products, partner } = useBrand();
 
-  const story = getBrandStoryById(storyId);
+  const [story, setStory] = useState<StoryResponse | null>(null);
+  const [products, setProducts] = useState<ProductListItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     title: '',
-    type: 'heritage' as BrandStoryType,
+    story_type: 'heritage' as StoryType,
+    story_type_subtype: '',
     excerpt: '',
-    heroImage: '',
-    content: [] as StorySection[],
-    relatedProducts: [] as string[],
+    image_url: '',
+    content: [] as ContentSection[],
+    product_list: [] as string[],
     status: 'draft' as 'draft' | 'published'
   });
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Pre-fill form with existing story data
   useEffect(() => {
-    if (story) {
+    loadData();
+  }, [storyId]);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [storyData, productData] = await Promise.all([
+        fetchStory(storyId),
+        fetchProductsList(),
+      ]);
+      setStory(storyData);
+      setProducts(productData);
       setFormData({
-        title: story.title,
-        type: story.type,
-        excerpt: story.excerpt,
-        heroImage: story.heroImage,
-        content: story.content,
-        relatedProducts: story.relatedProducts,
-        status: story.status
+        title: storyData.title,
+        story_type: (storyData.story_type || 'heritage') as StoryType,
+        story_type_subtype: storyData.story_type_subtype || '',
+        excerpt: storyData.excerpt || '',
+        image_url: storyData.image_url || '',
+        content: Array.isArray(storyData.content)
+          ? storyData.content.map((s: Record<string, unknown>, i: number) => ({
+              id: (s.id as string) || `section-${i}`,
+              type: (s.type as string) || 'text',
+              content: (s.content as string) || '',
+              caption: (s.caption as string) || undefined,
+              mediaUrl: (s.mediaUrl as string) || undefined,
+            })) as ContentSection[]
+          : [],
+        product_list: storyData.product_list || [],
+        status: (storyData.status || 'draft') as 'draft' | 'published',
       });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load story');
+    } finally {
+      setIsLoading(false);
     }
-  }, [story]);
+  };
 
-  if (!story) {
-    return (
-      <div className="p-8 text-center">
-        <p className="text-stone">Story not found</p>
-        <Link
-          href="/brand/stories"
-          className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
-        >
-          <ArrowLeft size={16} /> Back to Stories
-        </Link>
-      </div>
-    );
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partner) return;
-
     setIsSubmitting(true);
+    setError(null);
 
-    const readTime = Math.ceil(
+    const readTime = Math.max(1, Math.ceil(
       formData.content.reduce((acc, section) => {
         if (section.type === 'text' || section.type === 'quote') {
           return acc + section.content.split(' ').length;
         }
         return acc;
       }, 0) / 200
-    );
+    ));
 
-    updateBrandStory(storyId, {
-      title: formData.title,
-      type: formData.type,
-      excerpt: formData.excerpt,
-      heroImage: formData.heroImage,
-      content: formData.content,
-      relatedProducts: formData.relatedProducts,
-      status: formData.status,
-      publishedAt: formData.status === 'published' ? new Date().toISOString() : story.publishedAt,
-      readTime: Math.max(1, readTime)
-    });
-
-    setTimeout(() => {
+    try {
+      await updateStory(storyId, {
+        title: formData.title,
+        story_type: formData.story_type,
+        story_type_subtype: formData.story_type_subtype,
+        excerpt: formData.excerpt,
+        image_url: formData.image_url,
+        status: formData.status,
+        content: formData.content as unknown as Record<string, unknown>[],
+        product_list: formData.product_list,
+        sections: formData.content.length,
+        read_time: readTime,
+      });
       router.push(`/brand/stories/${storyId}`);
-    }, 500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update story');
+      setIsSubmitting(false);
+    }
   };
 
-  const addSection = (type: StorySection['type']) => {
-    const newSection: StorySection = {
+  const addSection = (type: ContentSection['type']) => {
+    const newSection: ContentSection = {
       id: `section-${Date.now()}`,
       type,
       content: '',
@@ -103,7 +127,7 @@ export default function EditStoryPage() {
     }));
   };
 
-  const updateSection = (index: number, updates: Partial<StorySection>) => {
+  const updateSection = (index: number, updates: Partial<ContentSection>) => {
     setFormData(prev => ({
       ...prev,
       content: prev.content.map((section, i) =>
@@ -122,13 +146,13 @@ export default function EditStoryPage() {
   const toggleProduct = (productId: string) => {
     setFormData(prev => ({
       ...prev,
-      relatedProducts: prev.relatedProducts.includes(productId)
-        ? prev.relatedProducts.filter(id => id !== productId)
-        : [...prev.relatedProducts, productId]
+      product_list: prev.product_list.includes(productId)
+        ? prev.product_list.filter(id => id !== productId)
+        : [...prev.product_list, productId]
     }));
   };
 
-  const storyTypes: { value: BrandStoryType; label: string; description: string }[] = [
+  const storyTypes: { value: StoryType; label: string; description: string }[] = [
     { value: 'heritage', label: 'Heritage', description: 'Brand history and legacy' },
     { value: 'craftsmanship', label: 'Craftsmanship', description: 'Artisan techniques and skills' },
     { value: 'collection', label: 'Collection', description: 'Collection stories and inspiration' },
@@ -141,6 +165,40 @@ export default function EditStoryPage() {
     { type: 'quote' as const, label: 'Quote', icon: Quote },
     { type: 'timeline' as const, label: 'Timeline', icon: Clock }
   ];
+
+  if (isLoading) {
+    return (
+      <div>
+        <BrandPageHeader
+          title="Edit Story"
+          subtitle="Loading..."
+          actions={
+            <SecondaryButton href="/brand/stories" icon={ArrowLeft}>
+              Cancel
+            </SecondaryButton>
+          }
+        />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin text-taupe" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!story) {
+    return (
+      <div className="p-8 text-center">
+        <BookOpen size={48} className="mx-auto text-taupe/40 mb-4" />
+        <p className="text-stone">{error || 'Story not found'}</p>
+        <Link
+          href="/brand/stories"
+          className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
+        >
+          <ArrowLeft size={16} /> Back to Stories
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -159,6 +217,12 @@ export default function EditStoryPage() {
       />
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6 max-w-4xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* Basic Information */}
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50">
@@ -188,14 +252,14 @@ export default function EditStoryPage() {
                   <button
                     key={type.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, type: type.value })}
+                    onClick={() => setFormData({ ...formData, story_type: type.value })}
                     className={`p-3 border text-left transition-colors ${
-                      formData.type === type.value
+                      formData.story_type === type.value
                         ? 'border-charcoal-deep bg-parchment'
                         : 'border-sand hover:border-charcoal-deep/50'
                     }`}
                   >
-                    <p className={`text-sm font-medium ${formData.type === type.value ? 'text-charcoal-deep' : 'text-stone'}`}>
+                    <p className={`text-sm font-medium ${formData.story_type === type.value ? 'text-charcoal-deep' : 'text-stone'}`}>
                       {type.label}
                     </p>
                     <p className="text-xs text-taupe mt-0.5">{type.description}</p>
@@ -227,15 +291,15 @@ export default function EditStoryPage() {
               <div className="flex gap-4">
                 <input
                   type="url"
-                  value={formData.heroImage}
-                  onChange={(e) => setFormData({ ...formData, heroImage: e.target.value })}
+                  value={formData.image_url}
+                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
                   placeholder="https://..."
                   className="flex-1 px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
-                {formData.heroImage && (
+                {formData.image_url && (
                   <div className="w-20 h-12 bg-parchment flex-shrink-0">
                     <img
-                      src={formData.heroImage}
+                      src={formData.image_url}
                       alt="Preview"
                       className="w-full h-full object-cover"
                     />
@@ -351,20 +415,21 @@ export default function EditStoryPage() {
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
             <h2 className="font-medium text-charcoal-deep">Related Products</h2>
-            <span className="text-sm text-taupe">{formData.relatedProducts.length} selected</span>
+            <span className="text-sm text-taupe">{formData.product_list.length} selected</span>
           </div>
           <div className="p-6">
             {products.length === 0 ? (
               <p className="text-sm text-taupe text-center py-4">No products available</p>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto">
-                {products.filter(p => p.status === 'published').map(product => {
-                  const isSelected = formData.relatedProducts.includes(product.id);
+                {products.map(product => {
+                  const pid = String(product.product_id);
+                  const isSelected = formData.product_list.includes(pid);
                   return (
                     <button
-                      key={product.id}
+                      key={product.product_id}
                       type="button"
-                      onClick={() => toggleProduct(product.id)}
+                      onClick={() => toggleProduct(pid)}
                       className={`flex items-center gap-2 p-2 border text-left transition-colors ${
                         isSelected
                           ? 'border-charcoal-deep bg-parchment'
@@ -372,12 +437,12 @@ export default function EditStoryPage() {
                       }`}
                     >
                       <div className="w-8 h-8 bg-parchment flex-shrink-0">
-                        {product.images[0] && (
-                          <img src={product.images[0].url} alt="" className="w-full h-full object-cover" />
+                        {product.image_url && (
+                          <img src={product.image_url} alt="" className="w-full h-full object-cover" />
                         )}
                       </div>
                       <p className={`text-xs truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
-                        {product.name}
+                        {product.product_name}
                       </p>
                     </button>
                   );
@@ -395,22 +460,26 @@ export default function EditStoryPage() {
           >
             Cancel
           </Link>
-          <button
-            type="submit"
-            onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))}
-            disabled={isSubmitting || !formData.title || !formData.excerpt}
-            className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-wide hover:bg-parchment transition-colors disabled:opacity-50"
-          >
-            Save Draft
-          </button>
-          <button
-            type="submit"
-            onClick={() => setFormData(prev => ({ ...prev, status: 'published' }))}
-            disabled={isSubmitting || !formData.title || !formData.excerpt}
-            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? 'Saving...' : 'Update & Publish'}
-          </button>
+          {story.is_active === true && (
+            <>
+              <button
+                type="submit"
+                onClick={() => setFormData(prev => ({ ...prev, status: 'draft' }))}
+                disabled={isSubmitting || !formData.title || !formData.excerpt}
+                className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-wide hover:bg-parchment transition-colors disabled:opacity-50"
+              >
+                Save Draft
+              </button>
+              <button
+                type="submit"
+                onClick={() => setFormData(prev => ({ ...prev, status: 'published' }))}
+                disabled={isSubmitting || !formData.title || !formData.excerpt}
+                className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? 'Saving...' : 'Update & Publish'}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </div>

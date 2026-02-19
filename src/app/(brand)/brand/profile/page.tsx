@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   User,
   Mail,
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
+import { brandChangePassword, updateBrandProfile } from '@/services/auth.service';
+import { uploadImage } from '@/services/brand-product.service';
 
 type ProfileTab = 'personal' | 'security' | 'notifications' | 'sessions';
 
@@ -27,9 +29,25 @@ export default function UserProfilePage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Get current user (first team member in mock data)
+  // Get current user from partner team members
   const currentUser = partner?.teamMembers[0];
+
+  // Read extra profile fields (phone, jobTitle) from stored API data
+  const brandApiData = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('moda-brand-data');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   if (!partner || !currentUser) return null;
 
@@ -37,20 +55,20 @@ export default function UserProfilePage() {
     firstName: currentUser.name.split(' ')[0],
     lastName: currentUser.name.split(' ')[1] || '',
     email: currentUser.email,
-    phone: '+33 6 12 34 56 78',
-    jobTitle: 'Brand Director',
+    phone: brandApiData?.phone_number || '',
+    jobTitle: brandApiData?.job_title || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
   const [notifications, setNotifications] = useState({
-    emailOrders: true,
-    emailAlerts: true,
-    emailReports: false,
-    pushOrders: true,
-    pushAlerts: true,
-    pushReports: false
+    emailOrders: brandApiData?.email_notification?.order_updates ?? true,
+    emailAlerts: brandApiData?.email_notification?.inventory_alerts ?? true,
+    emailReports: brandApiData?.email_notification?.weekly_reports ?? false,
+    pushOrders: brandApiData?.push_notification?.order_updates ?? true,
+    pushAlerts: brandApiData?.push_notification?.urgent_alerts ?? true,
+    pushReports: brandApiData?.push_notification?.daily_digest ?? false
   });
 
   const tabs: { id: ProfileTab; label: string; icon: React.ElementType }[] = [
@@ -93,23 +111,97 @@ export default function UserProfilePage() {
     }
   ];
 
-  const handleSave = () => {
-    // In a real app, this would save to the backend
-    console.log('Saving profile:', formData);
-    setSavedMessage('Changes saved successfully');
-    setTimeout(() => setSavedMessage(null), 3000);
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setIsUploadingAvatar(true);
+    setErrorMessage(null);
+    try {
+      const url = await uploadImage(file);
+      await updateBrandProfile({ profile_picture: url });
+      setAvatarUrl(url);
+      setSavedMessage('Profile picture updated');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to upload picture');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
-  const handlePasswordChange = () => {
+  const handleSave = async () => {
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      await updateBrandProfile({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone_number: formData.phone,
+        job_title: formData.jobTitle,
+      });
+      setSavedMessage('Changes saved successfully');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to save profile');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveNotifications = async () => {
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      await updateBrandProfile({
+        email_notification: {
+          order_updates: notifications.emailOrders,
+          inventory_alerts: notifications.emailAlerts,
+          weekly_reports: notifications.emailReports,
+        },
+        push_notification: {
+          order_updates: notifications.pushOrders,
+          urgent_alerts: notifications.pushAlerts,
+          daily_digest: notifications.pushReports,
+        },
+      });
+      setSavedMessage('Notification preferences saved');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to save preferences');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
     if (formData.newPassword !== formData.confirmPassword) {
-      alert('Passwords do not match');
+      setErrorMessage('Passwords do not match');
+      setTimeout(() => setErrorMessage(null), 4000);
       return;
     }
-    // In a real app, this would update the password
-    console.log('Changing password');
-    setFormData({ ...formData, currentPassword: '', newPassword: '', confirmPassword: '' });
-    setSavedMessage('Password updated successfully');
-    setTimeout(() => setSavedMessage(null), 3000);
+
+    setIsChangingPassword(true);
+    setErrorMessage(null);
+    try {
+      await brandChangePassword({
+        current_password: formData.currentPassword,
+        new_password: formData.newPassword,
+        confirm_new_password: formData.confirmPassword,
+      });
+      setFormData({ ...formData, currentPassword: '', newPassword: '', confirmPassword: '' });
+      setSavedMessage('Password updated successfully');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to change password');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -141,16 +233,23 @@ export default function UserProfilePage() {
           </div>
         )}
 
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm">
+            {errorMessage}
+          </div>
+        )}
+
         <div className="flex gap-8">
           {/* Sidebar with Avatar */}
           <div className="w-64 flex-shrink-0">
             {/* User Card */}
             <div className="bg-white border border-sand/50 p-6 mb-6">
               <div className="text-center">
-                <div className="relative inline-block">
-                  {currentUser.avatar ? (
+                <div className={`relative inline-block ${isUploadingAvatar ? 'opacity-50' : ''}`}>
+                  {(avatarUrl || currentUser.avatar) ? (
                     <img
-                      src={currentUser.avatar}
+                      src={avatarUrl || currentUser.avatar}
                       alt={currentUser.name}
                       className="w-24 h-24 rounded-full object-cover mx-auto"
                     />
@@ -159,9 +258,20 @@ export default function UserProfilePage() {
                       {currentUser.name.charAt(0)}
                     </div>
                   )}
-                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors">
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors disabled:opacity-50"
+                  >
                     <Camera size={14} />
                   </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
                 </div>
                 <h3 className="font-medium text-charcoal-deep mt-4">{currentUser.name}</h3>
                 <p className="text-sm text-taupe">{currentUser.email}</p>
@@ -271,8 +381,8 @@ export default function UserProfilePage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <PrimaryButton onClick={handleSave}>
-                    Save Changes
+                  <PrimaryButton onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </PrimaryButton>
                 </div>
               </div>
@@ -374,9 +484,9 @@ export default function UserProfilePage() {
                 <div className="flex justify-end">
                   <PrimaryButton
                     onClick={handlePasswordChange}
-                    disabled={!formData.currentPassword || !formData.newPassword || !formData.confirmPassword}
+                    disabled={!formData.currentPassword || !formData.newPassword || !formData.confirmPassword || isChangingPassword}
                   >
-                    Update Password
+                    {isChangingPassword ? 'Updating...' : 'Update Password'}
                   </PrimaryButton>
                 </div>
               </div>
@@ -446,8 +556,8 @@ export default function UserProfilePage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <PrimaryButton onClick={handleSave}>
-                    Save Preferences
+                  <PrimaryButton onClick={handleSaveNotifications} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Preferences'}
                   </PrimaryButton>
                 </div>
               </div>

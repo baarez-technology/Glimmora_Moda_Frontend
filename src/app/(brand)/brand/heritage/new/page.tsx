@@ -3,61 +3,54 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Clock, Award, Sparkles, Star, Layers, Users } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { ArrowLeft, Award, Sparkles, Star, Layers, Users } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import type { HeritageEventSignificance } from '@/types/brand-portal';
+import { createHeritageEvent } from '@/services/brand-heritage.service';
+
+type SignificanceType = 'milestone' | 'collection' | 'innovation' | 'cultural' | 'collaboration' | 'award';
 
 export default function NewHeritageEventPage() {
   const router = useRouter();
-  const { createHeritageEvent, products, partner } = useBrand();
 
   const [formData, setFormData] = useState({
     year: new Date().getFullYear(),
     title: '',
-    description: '',
-    longDescription: '',
-    image: '',
-    significance: 'milestone' as HeritageEventSignificance,
-    relatedProducts: [] as string[],
-    videoUrl: ''
+    short_description: '',
+    full_description: '',
+    image_url: '',
+    video_url: '',
+    significance_type: 'milestone' as SignificanceType,
+    significance_type_subtype: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partner) return;
-
     setIsSubmitting(true);
+    setError(null);
 
-    createHeritageEvent({
-      brandId: partner.brandId,
-      year: formData.year,
-      title: formData.title,
-      description: formData.description,
-      longDescription: formData.longDescription || undefined,
-      image: formData.image || undefined,
-      significance: formData.significance,
-      relatedProducts: formData.relatedProducts.length > 0 ? formData.relatedProducts : undefined,
-      videoUrl: formData.videoUrl || undefined
-    });
-
-    setTimeout(() => {
+    try {
+      await createHeritageEvent({
+        year: formData.year,
+        title: formData.title,
+        short_description: formData.short_description,
+        full_description: formData.full_description,
+        image_url: formData.image_url,
+        video_url: formData.video_url,
+        significance_type: formData.significance_type,
+        significance_type_subtype: formData.significance_type_subtype,
+        product_list: [],
+      });
       router.push('/brand/heritage');
-    }, 500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create heritage event');
+      setIsSubmitting(false);
+    }
   };
 
-  const toggleProduct = (productId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      relatedProducts: prev.relatedProducts.includes(productId)
-        ? prev.relatedProducts.filter(id => id !== productId)
-        : [...prev.relatedProducts, productId]
-    }));
-  };
-
-  const significanceOptions: { value: HeritageEventSignificance; label: string; description: string; icon: React.ElementType }[] = [
+  const significanceOptions: { value: SignificanceType; label: string; description: string; icon: React.ElementType }[] = [
     { value: 'milestone', label: 'Milestone', description: 'Major brand achievement', icon: Star },
     { value: 'collection', label: 'Collection', description: 'Notable collection launch', icon: Layers },
     { value: 'innovation', label: 'Innovation', description: 'Technical or design breakthrough', icon: Sparkles },
@@ -82,6 +75,12 @@ export default function NewHeritageEventPage() {
       />
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6 max-w-4xl">
+        {error && (
+          <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* Basic Information */}
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50">
@@ -124,14 +123,14 @@ export default function NewHeritageEventPage() {
               </label>
               <input
                 type="text"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                value={formData.short_description}
+                onChange={(e) => setFormData({ ...formData, short_description: e.target.value })}
                 required
                 placeholder="A brief summary of the event..."
                 maxLength={200}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
-              <p className="text-xs text-taupe mt-1">{formData.description.length}/200 characters</p>
+              <p className="text-xs text-taupe mt-1">{formData.short_description.length}/200 characters</p>
             </div>
 
             <div>
@@ -139,8 +138,8 @@ export default function NewHeritageEventPage() {
                 Full Description
               </label>
               <textarea
-                value={formData.longDescription}
-                onChange={(e) => setFormData({ ...formData, longDescription: e.target.value })}
+                value={formData.full_description}
+                onChange={(e) => setFormData({ ...formData, full_description: e.target.value })}
                 rows={5}
                 placeholder="Tell the full story of this heritage moment..."
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
@@ -155,15 +154,15 @@ export default function NewHeritageEventPage() {
                 <div className="flex gap-4">
                   <input
                     type="url"
-                    value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
                     placeholder="https://..."
                     className="flex-1 px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
-                  {formData.image && (
+                  {formData.image_url && (
                     <div className="w-12 h-12 bg-parchment flex-shrink-0">
                       <img
-                        src={formData.image}
+                        src={formData.image_url}
                         alt="Preview"
                         className="w-full h-full object-cover"
                       />
@@ -177,8 +176,8 @@ export default function NewHeritageEventPage() {
                 </label>
                 <input
                   type="url"
-                  value={formData.videoUrl}
-                  onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+                  value={formData.video_url}
+                  onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
                   placeholder="https://youtube.com/..."
                   className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
@@ -196,12 +195,12 @@ export default function NewHeritageEventPage() {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {significanceOptions.map(option => {
                 const Icon = option.icon;
-                const isSelected = formData.significance === option.value;
+                const isSelected = formData.significance_type === option.value;
                 return (
                   <button
                     key={option.value}
                     type="button"
-                    onClick={() => setFormData({ ...formData, significance: option.value })}
+                    onClick={() => setFormData({ ...formData, significance_type: option.value })}
                     className={`p-4 border text-left transition-colors ${
                       isSelected
                         ? 'border-charcoal-deep bg-parchment'
@@ -220,52 +219,6 @@ export default function NewHeritageEventPage() {
           </div>
         </div>
 
-        {/* Related Products */}
-        <div className="bg-white border border-sand/50">
-          <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
-            <h2 className="font-medium text-charcoal-deep">Related Products</h2>
-            <span className="text-sm text-taupe">
-              {formData.relatedProducts.length} selected
-            </span>
-          </div>
-          <div className="p-6">
-            {products.length === 0 ? (
-              <p className="text-sm text-taupe text-center py-4">No products available</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-64 overflow-y-auto">
-                {products.filter(p => p.status === 'published').map(product => {
-                  const isSelected = formData.relatedProducts.includes(product.id);
-                  return (
-                    <button
-                      key={product.id}
-                      type="button"
-                      onClick={() => toggleProduct(product.id)}
-                      className={`flex items-center gap-3 p-3 border text-left transition-colors ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-parchment'
-                          : 'border-sand hover:border-charcoal-deep/50'
-                      }`}
-                    >
-                      <div className="w-10 h-10 bg-parchment flex-shrink-0">
-                        {product.images[0] && (
-                          <img
-                            src={product.images[0].url}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        )}
-                      </div>
-                      <p className={`text-xs truncate flex-1 ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
-                        {product.name}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
         {/* Submit */}
         <div className="flex items-center justify-end gap-4">
           <Link
@@ -276,7 +229,7 @@ export default function NewHeritageEventPage() {
           </Link>
           <button
             type="submit"
-            disabled={isSubmitting || !formData.title || !formData.description}
+            disabled={isSubmitting || !formData.title || !formData.short_description}
             className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
           >
             {isSubmitting ? 'Creating...' : 'Create Event'}
