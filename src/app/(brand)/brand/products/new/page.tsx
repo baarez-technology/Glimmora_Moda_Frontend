@@ -1,18 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
-import { createProduct } from '@/services/brand-product.service';
+import { createProduct, fetchCollectionNames } from '@/services/brand-product.service';
+import type { CollectionNameItem } from '@/services/brand-product.service';
 
 export default function NewProductPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
+  const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
+
+  useEffect(() => {
+    fetchCollectionNames()
+      .then(setCollectionNames)
+      .catch(() => {});
+  }, []);
 
   const [formData, setFormData] = useState({
     product_name: '',
@@ -130,14 +138,17 @@ export default function NewProductPage() {
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                   Collection Name *
                 </label>
-                <input
-                  type="text"
+                <select
                   required
                   value={formData.collection_name}
                   onChange={(e) => setFormData({ ...formData, collection_name: e.target.value })}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                  placeholder="e.g., Spring 2025"
-                />
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                >
+                  <option value="">Select collection</option>
+                  {collectionNames.map((col) => (
+                    <option key={col.collection_id} value={col.collection_name}>{col.collection_name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>

@@ -196,15 +196,50 @@ export async function setRegionalStocks(
   return res.json();
 }
 
+// ─── Collection Names ────────────────────────────────────────────────────────
+
+export interface CollectionNameItem {
+  collection_id: string;
+  collection_name: string;
+}
+
+export async function fetchCollectionNames(): Promise<CollectionNameItem[]> {
+  const res = await fetch('/api/v1/collection/names', {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch collections' }));
+    throw new Error(err.detail || `Failed to fetch collections (${res.status})`);
+  }
+
+  return res.json();
+}
+
 // ─── Image Upload ────────────────────────────────────────────────────────────
 
 /**
- * Upload a product image and return its URL.
- * TODO: Replace with real upload endpoint when ready
- * (e.g., POST /api/v1/upload with multipart/form-data → { url: string })
+ * Upload a file to S3 via the backend and return its public URL.
+ * Endpoint: POST /api/v1/upload  (multipart/form-data)
  */
 export async function uploadImage(file: File): Promise<string> {
-  // Stub: return an object URL for local preview.
-  // Swap this body with the real upload call when the endpoint is ready.
-  return URL.createObjectURL(file);
+  const token = localStorage.getItem('moda-brand-token');
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch('/api/v1/upload', {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
+    throw new Error(err.detail || `Upload failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  return data.url;
 }

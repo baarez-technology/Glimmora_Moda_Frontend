@@ -111,7 +111,7 @@ export function ApiProductCard({ product, showMetrics = true }: ApiProductCardPr
                 </span>
               </div>
 
-              {showMetrics && demandScore > 0 && (
+              {showMetrics && (
                 <>
                   <span className="text-taupe">|</span>
                   <div className="flex items-center gap-1 text-xs">
@@ -139,6 +139,7 @@ export function ApiProductCard({ product, showMetrics = true }: ApiProductCardPr
 
 export function ApiProductGridCard({ product }: { product: BackendProduct }) {
   const totalUnits = product.performance_metrics.total_units;
+  const demandScore = product.performance_metrics.demand_score;
 
   const getStatusBadge = () => {
     if (!product.is_active) return 'bg-red-100 text-red-600';
@@ -194,6 +195,15 @@ export function ApiProductGridCard({ product }: { product: BackendProduct }) {
           <span className="text-xs text-stone">
             {totalUnits} units
           </span>
+        </div>
+
+        <div className="flex items-center gap-1 mt-2 text-xs">
+          {demandScore >= 80 ? (
+            <TrendingUp size={12} className="text-success" />
+          ) : demandScore <= 40 ? (
+            <TrendingDown size={12} className="text-error" />
+          ) : null}
+          <span className="text-stone">Demand: {demandScore}</span>
         </div>
       </div>
     </Link>

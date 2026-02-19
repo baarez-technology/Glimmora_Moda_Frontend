@@ -33,6 +33,7 @@ function mapApiBrandToPartner(apiBrand: BrandLoginResponse['brand']): BrandPartn
     brandId: apiBrand.brand_id,
     brandName: apiBrand.brand_name,
     brandLogo: apiBrand.brand_logo || undefined,
+    brandCategory: apiBrand.brand_category || undefined,
     tier: 'standard',
     status: apiBrand.is_active ? 'active' : 'suspended',
     partnerSince: apiBrand.created_at,

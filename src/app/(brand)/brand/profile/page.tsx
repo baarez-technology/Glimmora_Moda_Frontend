@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import {
   User,
   Mail,
@@ -18,6 +18,7 @@ import {
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { brandChangePassword, updateBrandProfile } from '@/services/auth.service';
+import { uploadImage } from '@/services/brand-product.service';
 
 type ProfileTab = 'personal' | 'security' | 'notifications' | 'sessions';
 
@@ -31,6 +32,9 @@ export default function UserProfilePage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Get current user from partner team members
   const currentUser = partner?.teamMembers[0];
@@ -106,6 +110,27 @@ export default function UserProfilePage() {
       icon: Monitor
     }
   ];
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    setIsUploadingAvatar(true);
+    setErrorMessage(null);
+    try {
+      const url = await uploadImage(file);
+      await updateBrandProfile({ profile_picture: url });
+      setAvatarUrl(url);
+      setSavedMessage('Profile picture updated');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to upload picture');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -221,10 +246,10 @@ export default function UserProfilePage() {
             {/* User Card */}
             <div className="bg-white border border-sand/50 p-6 mb-6">
               <div className="text-center">
-                <div className="relative inline-block">
-                  {currentUser.avatar ? (
+                <div className={`relative inline-block ${isUploadingAvatar ? 'opacity-50' : ''}`}>
+                  {(avatarUrl || currentUser.avatar) ? (
                     <img
-                      src={currentUser.avatar}
+                      src={avatarUrl || currentUser.avatar}
                       alt={currentUser.name}
                       className="w-24 h-24 rounded-full object-cover mx-auto"
                     />
@@ -233,9 +258,20 @@ export default function UserProfilePage() {
                       {currentUser.name.charAt(0)}
                     </div>
                   )}
-                  <button className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors">
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors disabled:opacity-50"
+                  >
                     <Camera size={14} />
                   </button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarChange}
+                    className="hidden"
+                  />
                 </div>
                 <h3 className="font-medium text-charcoal-deep mt-4">{currentUser.name}</h3>
                 <p className="text-sm text-taupe">{currentUser.email}</p>

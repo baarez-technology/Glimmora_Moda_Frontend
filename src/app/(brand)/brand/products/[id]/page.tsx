@@ -27,11 +27,13 @@ import {
   updateProduct,
   softDeleteProduct,
   setRegionalStocks,
+  fetchCollectionNames,
 } from '@/services/brand-product.service';
 import type {
   BackendProduct,
   RegionalStockItem,
   RegionalStockAddPayload,
+  CollectionNameItem,
 } from '@/services/brand-product.service';
 
 export default function ProductDetailPage() {
@@ -59,9 +61,13 @@ export default function ProductDetailPage() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
 
   useEffect(() => {
     loadProduct();
+    fetchCollectionNames()
+      .then(setCollectionNames)
+      .catch(() => {});
   }, [productId]);
 
   const loadProduct = async () => {
@@ -242,12 +248,16 @@ export default function ProductDetailPage() {
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                     Collection
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={formData.collection_name}
                     onChange={(e) => handleChange('collection_name', e.target.value)}
-                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                  >
+                    <option value="">Select collection</option>
+                    {collectionNames.map((col) => (
+                      <option key={col.collection_id} value={col.collection_name}>{col.collection_name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>

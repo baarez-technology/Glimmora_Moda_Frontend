@@ -131,7 +131,7 @@ export function BrandSidebar() {
             <div>
               <p className="text-sm font-medium text-charcoal-deep">{partner.brandName}</p>
               <p className="text-[10px] tracking-[0.1em] uppercase text-gold-muted">
-                {partner.tier}
+                {partner.brandCategory}
               </p>
             </div>
           </div>
