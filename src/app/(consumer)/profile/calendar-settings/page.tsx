@@ -2,8 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield, X, Clock } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
+import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
 import type { CalendarConnection, CalendarProvider } from '@/types';
 
 interface CalendarProviderInfo {
@@ -39,10 +42,30 @@ const calendarProviders: CalendarProviderInfo[] = [
 ];
 
 export default function CalendarSettingsPage() {
+  const router = useRouter();
+  const { isAuthenticated, isHydrated } = useAuth();
+  const { showToast } = useApp();
+
+  useEffect(() => {
+    if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/calendar-settings');
+  }, [isAuthenticated, isHydrated, router]);
+
   const [connections, setConnections] = useState<CalendarConnection[]>([]);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showManualEvent, setShowManualEvent] = useState(false);
+  const [manualEvent, setManualEvent] = useState({ title: '', date: '', time: '', location: '', type: 'meeting' });
+  const [manualEventErrors, setManualEventErrors] = useState<Record<string, string>>({});
+  const [preferences, setPreferences] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('moda-calendar-preferences');
+        if (saved) return JSON.parse(saved);
+      } catch { /* ignore */ }
+    }
+    return { includeWeather: true, prioritizeWardrobe: true, dailyReminders: false, suggestNew: true };
+  });
 
   useEffect(() => {
     const loadConnections = async () => {
@@ -54,14 +77,11 @@ export default function CalendarSettingsPage() {
     loadConnections();
   }, []);
 
+  const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+
   const handleConnect = (providerId: CalendarProvider) => {
-    setConnections(prev =>
-      prev.map(c =>
-        c.provider === providerId
-          ? { ...c, connected: true, email: 'user@example.com', lastSynced: new Date().toISOString() }
-          : c
-      )
-    );
+    // Show coming soon — OAuth integration requires backend
+    setConnectingProvider(providerId);
   };
 
   const handleDisconnect = (providerId: CalendarProvider) => {
@@ -85,6 +105,30 @@ export default function CalendarSettingsPage() {
       )
     );
     setSyncing(null);
+  };
+
+  const handleAddManualEvent = () => {
+    const errors: Record<string, string> = {};
+    if (!manualEvent.title.trim()) errors.title = 'Event title is required';
+    if (!manualEvent.date) errors.date = 'Event date is required';
+    if (Object.keys(errors).length > 0) {
+      setManualEventErrors(errors);
+      showToast('Please fill in all required fields', 'error');
+      return;
+    }
+    setManualEventErrors({});
+    const events = JSON.parse(localStorage.getItem('moda-manual-events') || '[]');
+    events.push({ ...manualEvent, id: `manual-${Date.now()}`, createdAt: new Date().toISOString() });
+    localStorage.setItem('moda-manual-events', JSON.stringify(events));
+    setManualEvent({ title: '', date: '', time: '', location: '', type: 'meeting' });
+    setShowManualEvent(false);
+    showToast('Event added successfully', 'success');
+  };
+
+  const togglePreference = (key: string) => {
+    const updated = { ...preferences, [key]: !preferences[key as keyof typeof preferences] };
+    setPreferences(updated);
+    localStorage.setItem('moda-calendar-preferences', JSON.stringify(updated));
   };
 
   const getConnection = (providerId: CalendarProvider) => {
@@ -191,8 +235,10 @@ export default function CalendarSettingsPage() {
                             </span>
                           )}
                         </div>
-                        {isConnected && connection?.email ? (
-                          <p className="text-sm text-stone">{connection.email}</p>
+                        {isConnected ? (
+                          <p className="text-sm text-stone">
+                            {connection?.email && connection.email !== 'user@example.com' ? connection.email : 'Connected'}
+                          </p>
                         ) : (
                           <p className="text-sm text-taupe">{provider.description}</p>
                         )}
@@ -252,12 +298,82 @@ export default function CalendarSettingsPage() {
         <div className="bg-white p-8">
           <h2 className="font-display text-xl text-charcoal-deep mb-4">Add Event Manually</h2>
           <p className="text-stone text-sm mb-6">
-            Don't want to connect a calendar? You can add events manually to get outfit suggestions.
+            Don&apos;t want to connect a calendar? You can add events manually to get outfit suggestions.
           </p>
-          <button className="flex items-center gap-2 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.15em] uppercase">
-            <Plus size={16} />
-            Add Manual Event
-          </button>
+          {showManualEvent ? (
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  value={manualEvent.title}
+                  onChange={(e) => { setManualEvent({ ...manualEvent, title: e.target.value }); setManualEventErrors(prev => ({ ...prev, title: '' })); }}
+                  placeholder="Event title *"
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${manualEventErrors.title ? 'border-red-400' : 'border-sand'}`}
+                />
+                {manualEventErrors.title && <p className="text-xs text-red-500 mt-1">{manualEventErrors.title}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <input
+                    type="date"
+                    value={manualEvent.date}
+                    onChange={(e) => { setManualEvent({ ...manualEvent, date: e.target.value }); setManualEventErrors(prev => ({ ...prev, date: '' })); }}
+                    min={new Date().toISOString().split('T')[0]}
+                    className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${manualEventErrors.date ? 'border-red-400' : 'border-sand'}`}
+                  />
+                  {manualEventErrors.date && <p className="text-xs text-red-500 mt-1">{manualEventErrors.date}</p>}
+                </div>
+                <input
+                  type="time"
+                  value={manualEvent.time}
+                  onChange={(e) => setManualEvent({ ...manualEvent, time: e.target.value })}
+                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <input
+                type="text"
+                value={manualEvent.location}
+                onChange={(e) => setManualEvent({ ...manualEvent, location: e.target.value })}
+                placeholder="Location (optional)"
+                className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+              <select
+                value={manualEvent.type}
+                onChange={(e) => setManualEvent({ ...manualEvent, type: e.target.value })}
+                className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+              >
+                <option value="meeting">Business Meeting</option>
+                <option value="dinner">Dinner</option>
+                <option value="party">Party / Social</option>
+                <option value="wedding">Wedding</option>
+                <option value="travel">Travel</option>
+                <option value="casual">Casual Outing</option>
+              </select>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleAddManualEvent}
+                  disabled={!manualEvent.title || !manualEvent.date}
+                  className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Event
+                </button>
+                <button
+                  onClick={() => { setShowManualEvent(false); setManualEvent({ title: '', date: '', time: '', location: '', type: 'meeting' }); setManualEventErrors({}); }}
+                  className="px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowManualEvent(true)}
+              className="flex items-center gap-2 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.15em] uppercase"
+            >
+              <Plus size={16} />
+              Add Manual Event
+            </button>
+          )}
         </div>
 
         {/* Preferences */}
@@ -266,28 +382,32 @@ export default function CalendarSettingsPage() {
 
           <div className="space-y-1">
             {[
-              { label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations', checked: true },
-              { label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first', checked: true },
-              { label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events", checked: false },
-              { label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks', checked: true }
-            ].map((item, index) => (
-              <label key={index} className="flex items-center justify-between p-5 bg-parchment cursor-pointer">
+              { key: 'includeWeather', label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations' },
+              { key: 'prioritizeWardrobe', label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first' },
+              { key: 'dailyReminders', label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events" },
+              { key: 'suggestNew', label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks' }
+            ].map((item) => (
+              <button
+                key={item.key}
+                onClick={() => togglePreference(item.key)}
+                className="flex items-center justify-between p-5 bg-parchment cursor-pointer w-full text-left"
+              >
                 <div>
                   <p className="font-medium text-charcoal-deep">{item.label}</p>
                   <p className="text-sm text-stone">{item.desc}</p>
                 </div>
                 <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${
-                  item.checked
+                  preferences[item.key as keyof typeof preferences]
                     ? 'border-charcoal-deep bg-charcoal-deep'
                     : 'border-sand'
                 }`}>
-                  {item.checked && (
+                  {preferences[item.key as keyof typeof preferences] && (
                     <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
                   )}
                 </div>
-              </label>
+              </button>
             ))}
           </div>
         </div>
@@ -305,6 +425,40 @@ export default function CalendarSettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Coming Soon Modal */}
+      {connectingProvider && (
+        <div
+          className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setConnectingProvider(null)}
+          onKeyDown={(e) => { if (e.key === 'Escape') setConnectingProvider(null); }}
+        >
+          <div className="bg-white max-w-md w-full p-8 relative" role="dialog" aria-modal="true" aria-labelledby="coming-soon-title" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setConnectingProvider(null)}
+              className="absolute top-4 right-4 p-2 hover:bg-sand/20 transition-colors"
+            >
+              <X size={18} />
+            </button>
+            <div className="text-center">
+              <div className="w-14 h-14 bg-parchment flex items-center justify-center mx-auto mb-6">
+                <Clock size={24} className="text-stone" />
+              </div>
+              <h3 id="coming-soon-title" className="font-display text-xl text-charcoal-deep mb-3">Coming Soon</h3>
+              <p className="text-stone text-sm mb-6">
+                {calendarProviders.find(p => p.id === connectingProvider)?.name} OAuth integration
+                is currently in development. Calendar sync will be available in an upcoming release.
+              </p>
+              <button
+                onClick={() => setConnectingProvider(null)}
+                className="px-8 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

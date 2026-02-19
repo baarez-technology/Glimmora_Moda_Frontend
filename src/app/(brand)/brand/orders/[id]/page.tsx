@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -15,7 +16,8 @@ import {
   Phone,
   User,
   CreditCard,
-  Calendar
+  Calendar,
+  ChevronDown
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
@@ -23,7 +25,9 @@ import type { OrderStatus } from '@/types/brand-portal';
 
 export default function OrderDetailPage() {
   const params = useParams();
-  const { getOrderById, getProductById } = useBrand();
+  const { getOrderById, getProductById, updateOrderStatus } = useBrand();
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const orderId = params.id as string;
   const order = getOrderById(orderId);
@@ -115,6 +119,15 @@ export default function OrderDetailPage() {
 
   const StatusIcon = getStatusIcon(order.status);
 
+  const statusOptions: OrderStatus[] = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+  const handleStatusUpdate = (newStatus: OrderStatus) => {
+    setIsUpdating(true);
+    updateOrderStatus(order.id, newStatus);
+    setShowStatusDropdown(false);
+    setTimeout(() => setIsUpdating(false), 500);
+  };
+
   return (
     <div>
       <BrandPageHeader
@@ -140,10 +153,35 @@ export default function OrderDetailPage() {
               <p className="text-xs opacity-80">Last updated: {formatDate(order.updatedAt)}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <span className={`px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getPaymentStatusBadge(order.paymentStatus)}`}>
               Payment: {order.paymentStatus}
             </span>
+            {/* Status Update Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                disabled={isUpdating}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                Update Status <ChevronDown size={14} />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-10">
+                  {statusOptions.map(status => (
+                    <button
+                      key={status}
+                      onClick={() => handleStatusUpdate(status)}
+                      className={`w-full text-left px-4 py-2 text-sm capitalize hover:bg-parchment transition-colors ${
+                        order.status === status ? 'bg-parchment text-charcoal-deep font-medium' : 'text-stone'
+                      }`}
+                    >
+                      {status}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

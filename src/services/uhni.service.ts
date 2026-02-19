@@ -13,7 +13,14 @@ import type {
   AutonomousActivity,
   PriceNegotiation,
   PrivateCollection,
-  UHNIProfile
+  ExclusiveEvent,
+  PrivateShoppingEvent,
+  HeritageArchiveItem,
+  IntelligenceInsight,
+  ZeroUIConfig,
+  InvisibleTransaction,
+  ConciergeTask,
+  SilentCommerceItem
 } from '@/types/uhni';
 import {
   mockConcierge,
@@ -22,7 +29,15 @@ import {
   mockBespokeOrders,
   mockAutonomousActivity,
   mockPriceNegotiations,
-  mockPrivateCollections
+  mockPrivateCollections,
+  mockExclusiveEvents,
+  mockPrivateShoppingEvents,
+  mockHeritageArchiveItems,
+  mockIntelligenceInsights,
+  mockZeroUIConfig,
+  mockInvisibleTransactions,
+  mockConciergeTasks,
+  mockSilentCommerceItems
 } from '@/data/uhni';
 
 // ============================================
@@ -131,9 +146,9 @@ export async function getPrivateCollections(): Promise<ApiResponse<PrivateCollec
   });
 }
 
-export async function getPrivateShopping(): Promise<ApiResponse<Record<string, unknown>[]>> {
-  return apiRequest<Record<string, unknown>[]>('/api/uhni/private-shopping', {
-    mockHandler: () => [],
+export async function getPrivateShopping(): Promise<ApiResponse<PrivateShoppingEvent[]>> {
+  return apiRequest<PrivateShoppingEvent[]>('/api/uhni/private-shopping', {
+    mockHandler: () => mockPrivateShoppingEvents,
   });
 }
 
@@ -141,9 +156,9 @@ export async function getPrivateShopping(): Promise<ApiResponse<Record<string, u
 // Events
 // ============================================
 
-export async function getExclusiveEvents(): Promise<ApiResponse<Record<string, unknown>[]>> {
-  return apiRequest<Record<string, unknown>[]>('/api/uhni/events', {
-    mockHandler: () => [],
+export async function getExclusiveEvents(): Promise<ApiResponse<ExclusiveEvent[]>> {
+  return apiRequest<ExclusiveEvent[]>('/api/uhni/events', {
+    mockHandler: () => mockExclusiveEvents,
   });
 }
 
@@ -151,9 +166,9 @@ export async function getExclusiveEvents(): Promise<ApiResponse<Record<string, u
 // Heritage Archive
 // ============================================
 
-export async function getHeritageArchive(): Promise<ApiResponse<Record<string, unknown>[]>> {
-  return apiRequest<Record<string, unknown>[]>('/api/uhni/heritage-archive', {
-    mockHandler: () => [],
+export async function getHeritageArchive(): Promise<ApiResponse<HeritageArchiveItem[]>> {
+  return apiRequest<HeritageArchiveItem[]>('/api/uhni/heritage-archive', {
+    mockHandler: () => mockHeritageArchiveItems,
   });
 }
 
@@ -161,8 +176,73 @@ export async function getHeritageArchive(): Promise<ApiResponse<Record<string, u
 // Intelligence
 // ============================================
 
-export async function getIntelligenceInsights(): Promise<ApiResponse<Record<string, unknown>[]>> {
-  return apiRequest<Record<string, unknown>[]>('/api/uhni/intelligence', {
-    mockHandler: () => [],
+export async function getIntelligenceInsights(): Promise<ApiResponse<IntelligenceInsight[]>> {
+  return apiRequest<IntelligenceInsight[]>('/api/uhni/intelligence', {
+    mockHandler: () => mockIntelligenceInsights,
+  });
+}
+
+// ============================================
+// U13: Zero-UI Commerce
+// ============================================
+
+export async function getZeroUIConfig(): Promise<ApiResponse<ZeroUIConfig>> {
+  return apiRequest<ZeroUIConfig>('/api/uhni/zero-ui/config', {
+    mockHandler: () => mockZeroUIConfig,
+  });
+}
+
+export async function updateZeroUIConfig(
+  config: Partial<ZeroUIConfig>
+): Promise<ApiResponse<ZeroUIConfig>> {
+  return apiRequest<ZeroUIConfig>('/api/uhni/zero-ui/config', {
+    method: 'PATCH',
+    body: config,
+    mockHandler: () => ({ ...mockZeroUIConfig, ...config }),
+  });
+}
+
+// ============================================
+// U14: Invisible Commerce
+// ============================================
+
+export async function getInvisibleTransactions(): Promise<ApiResponse<InvisibleTransaction[]>> {
+  return apiRequest<InvisibleTransaction[]>('/api/uhni/invisible-commerce/transactions', {
+    mockHandler: () => mockInvisibleTransactions,
+  });
+}
+
+// ============================================
+// U15: Concierge Tasks
+// ============================================
+
+export async function getConciergeTasks(): Promise<ApiResponse<ConciergeTask[]>> {
+  return apiRequest<ConciergeTask[]>('/api/uhni/concierge-tasks', {
+    mockHandler: () => mockConciergeTasks,
+  });
+}
+
+export async function updateConciergeTask(
+  id: string,
+  updates: Partial<ConciergeTask>
+): Promise<ApiResponse<ConciergeTask>> {
+  return apiRequest<ConciergeTask>(`/api/uhni/concierge-tasks/${id}`, {
+    method: 'PATCH',
+    body: updates,
+    mockHandler: () => {
+      const task = mockConciergeTasks.find(t => t.id === id);
+      if (!task) throw new Error(`Task ${id} not found`);
+      return { ...task, ...updates };
+    },
+  });
+}
+
+// ============================================
+// U16: Silent Commerce
+// ============================================
+
+export async function getSilentCommerceItems(): Promise<ApiResponse<SilentCommerceItem[]>> {
+  return apiRequest<SilentCommerceItem[]>('/api/uhni/silent-commerce', {
+    mockHandler: () => mockSilentCommerceItems,
   });
 }

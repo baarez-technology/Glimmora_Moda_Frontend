@@ -3,13 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import type { ProductCategory } from '@/types';
 
 export default function WardrobePage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortBy, setSortBy] = useState<'recent' | 'brand' | 'worn'>('recent');
   const { wardrobe, removeFromWardrobe } = useApp();
 
   useEffect(() => {
@@ -23,18 +26,97 @@ export default function WardrobePage() {
     totalValue: wardrobe.reduce((sum, item) => sum + item.product.price, 0),
   };
 
-  const suggestedOutfits = [
-    {
-      name: 'Power Meeting',
-      pieces: ['Bar Jacket', 'Navy Trousers', 'Silk Blouse'],
-      occasion: 'Professional'
-    },
-    {
-      name: 'Gallery Evening',
-      pieces: ['Bar Jacket', 'Wide-leg Pants', 'Statement Earrings'],
-      occasion: 'Art & Culture'
+  const filteredWardrobe = wardrobe
+    .filter(item => {
+      if (categoryFilter === 'all') return true;
+      const cat = item.product.category?.toLowerCase() || '';
+      const tags = item.product.tags?.map(t => t.toLowerCase()) || [];
+      return cat.includes(categoryFilter) || tags.some(t => t.includes(categoryFilter));
+    })
+    .sort((a, b) => {
+      if (sortBy === 'brand') return (a.product.brandName || '').localeCompare(b.product.brandName || '');
+      if (sortBy === 'worn') return b.wearCount - a.wearCount;
+      return new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime();
+    });
+
+  // Generate outfit suggestions dynamically from actual wardrobe items
+  const suggestedOutfits = (() => {
+    if (wardrobe.length < 2) return [];
+
+    const byCategory: Record<string, typeof wardrobe> = {};
+    wardrobe.forEach(item => {
+      const cat = item.product.category || 'other';
+      if (!byCategory[cat]) byCategory[cat] = [];
+      byCategory[cat].push(item);
+    });
+
+    const categories = Object.keys(byCategory);
+    const outfits: { name: string; pieces: string[]; occasion: string }[] = [];
+
+    // Strategy 1: Pick one item from each available category for a "Complete Look"
+    if (categories.length >= 2) {
+      const pieces = categories
+        .slice(0, 3)
+        .map(cat => byCategory[cat][0])
+        .filter(Boolean);
+      if (pieces.length >= 2) {
+        // Determine occasion from tags
+        const allTags = pieces.flatMap(p => p.product.tags.map(t => t.toLowerCase()));
+        const occasion = allTags.includes('formal') || allTags.includes('evening') ? 'Evening'
+          : allTags.includes('casual') || allTags.includes('everyday') ? 'Casual'
+          : allTags.includes('work') || allTags.includes('professional') ? 'Professional'
+          : 'Versatile';
+        outfits.push({
+          name: 'Complete Look',
+          pieces: pieces.map(p => p.product.name),
+          occasion,
+        });
+      }
     }
-  ];
+
+    // Strategy 2: Same-brand pairing
+    const brandGroups: Record<string, typeof wardrobe> = {};
+    wardrobe.forEach(item => {
+      const brand = item.product.brandName || 'Unknown';
+      if (!brandGroups[brand]) brandGroups[brand] = [];
+      brandGroups[brand].push(item);
+    });
+    const multiBrand = Object.entries(brandGroups).find(([, items]) => items.length >= 2);
+    if (multiBrand) {
+      const [brandName, items] = multiBrand;
+      outfits.push({
+        name: `${brandName} Ensemble`,
+        pieces: items.slice(0, 3).map(i => i.product.name),
+        occasion: 'Curated',
+      });
+    }
+
+    // Strategy 3: Mix from most-worn items
+    const mostWorn = [...wardrobe].sort((a, b) => b.wearCount - a.wearCount).slice(0, 3);
+    if (mostWorn.length >= 2 && outfits.length < 3) {
+      outfits.push({
+        name: 'Wardrobe Favourites',
+        pieces: mostWorn.map(i => i.product.name),
+        occasion: 'Go-To',
+      });
+    }
+
+    return outfits.slice(0, 3);
+  })();
+
+  // Identify missing wardrobe categories for the "Wardrobe Gaps" section
+  const wardrobeGaps = (() => {
+    const allCategories: { key: ProductCategory; label: string; suggestion: string }[] = [
+      { key: 'clothing', label: 'Clothing', suggestion: 'Add clothing pieces to build versatile outfits' },
+      { key: 'bags', label: 'Bags', suggestion: 'A bag ties every outfit together' },
+      { key: 'shoes', label: 'Shoes', suggestion: 'Add shoes to complete your looks' },
+      { key: 'accessories', label: 'Accessories', suggestion: 'Accessories elevate any ensemble' },
+      { key: 'jewelry', label: 'Jewelry', suggestion: 'Consider adding jewelry for elegant finishing touches' },
+      { key: 'watches', label: 'Watches', suggestion: 'A timepiece adds sophistication to your wardrobe' },
+    ];
+    const presentCategories = new Set(wardrobe.map(item => item.product.category));
+    return allCategories.filter(cat => !presentCategories.has(cat.key));
+  })();
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -66,6 +148,33 @@ export default function WardrobePage() {
             </div>
 
             <div className="flex items-center gap-6">
+              {/* Filter & Sort */}
+              <div className="flex items-center gap-3">
+                <SlidersHorizontal size={16} className="text-ivory-cream/40" />
+                <select
+                  value={categoryFilter}
+                  onChange={e => setCategoryFilter(e.target.value)}
+                  className="bg-transparent border border-ivory-cream/20 text-ivory-cream text-sm px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-ivory-cream/40"
+                  aria-label="Filter by category"
+                >
+                  <option value="all" className="text-charcoal-deep">All</option>
+                  <option value="clothing" className="text-charcoal-deep">Clothing</option>
+                  <option value="bags" className="text-charcoal-deep">Bags</option>
+                  <option value="shoes" className="text-charcoal-deep">Shoes</option>
+                  <option value="accessories" className="text-charcoal-deep">Accessories</option>
+                </select>
+                <select
+                  value={sortBy}
+                  onChange={e => setSortBy(e.target.value as 'recent' | 'brand' | 'worn')}
+                  className="bg-transparent border border-ivory-cream/20 text-ivory-cream text-sm px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-ivory-cream/40"
+                  aria-label="Sort by"
+                >
+                  <option value="recent" className="text-charcoal-deep">Recently Added</option>
+                  <option value="brand" className="text-charcoal-deep">Brand A–Z</option>
+                  <option value="worn" className="text-charcoal-deep">Most Worn</option>
+                </select>
+              </div>
+
               {/* View Toggle */}
               <div className="flex border border-ivory-cream/20">
                 <button
@@ -139,7 +248,7 @@ export default function WardrobePage() {
               <div className="lg:col-span-3">
                 {viewMode === 'grid' ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 md:gap-x-8 gap-y-10 md:gap-y-12">
-                    {wardrobe.map((item, index) => (
+                    {filteredWardrobe.map((item, index) => (
                       <div key={item.id} className="group">
                         <Link
                           href={`/product/${item.product.slug}`}
@@ -196,7 +305,7 @@ export default function WardrobePage() {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {wardrobe.map((item, index) => (
+                    {filteredWardrobe.map((item, index) => (
                       <div
                         key={item.id}
                         className="flex gap-6 md:gap-8 pb-6 border-b border-sand/50 last:border-0"
@@ -272,29 +381,59 @@ export default function WardrobePage() {
                 {/* Outfit Ideas */}
                 <div>
                   <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
-                    Styling Ideas
+                    Suggested Outfits
                   </span>
 
-                  <div className="space-y-4">
-                    {suggestedOutfits.map((outfit, index) => (
-                      <div key={index} className="p-5 bg-parchment">
-                        <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">{outfit.occasion}</p>
-                        <h4 className="font-display text-lg text-charcoal-deep mb-3">{outfit.name}</h4>
-                        <p className="text-sm text-stone">
-                          {outfit.pieces.join(' + ')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+                  {suggestedOutfits.length > 0 ? (
+                    <div className="space-y-4">
+                      {suggestedOutfits.map((outfit, index) => (
+                        <div key={index} className="p-5 bg-parchment">
+                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">{outfit.occasion}</p>
+                          <h4 className="font-display text-lg text-charcoal-deep mb-3">{outfit.name}</h4>
+                          <p className="text-sm text-stone">
+                            {outfit.pieces.join(' + ')}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-stone leading-relaxed">
+                      Add at least 2 pieces to your wardrobe to see personalized outfit suggestions.
+                    </p>
+                  )}
 
                   <Link
-                    href="/calendar"
+                    href="/planner"
                     className="group inline-flex items-center gap-2 mt-6 text-sm tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
                   >
                     <span>Plan an Outfit</span>
                     <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </div>
+
+                {/* Wardrobe Gaps */}
+                {wardrobeGaps.length > 0 && (
+                  <div>
+                    <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
+                      Wardrobe Gaps
+                    </span>
+                    <div className="space-y-3">
+                      {wardrobeGaps.map((gap) => (
+                        <div key={gap.key} className="p-4 border border-sand/60 bg-parchment/50">
+                          <p className="text-sm font-medium text-charcoal-deep mb-1">{gap.label}</p>
+                          <p className="text-xs text-stone leading-relaxed">{gap.suggestion}</p>
+                          <Link
+                            href={`/discover?category=${gap.key}`}
+                            className="inline-flex items-center gap-1.5 mt-2 text-[10px] tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                          >
+                            <span>Browse {gap.label}</span>
+                            <ArrowRight size={10} />
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Style Note */}
                 <div className="p-6 bg-charcoal-deep">

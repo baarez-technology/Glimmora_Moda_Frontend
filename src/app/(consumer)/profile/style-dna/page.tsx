@@ -1,17 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Palette, Sparkles, Target, MapPin, Compass } from 'lucide-react';
+import { ArrowLeft, Palette, Sparkles, Target, MapPin, Compass, Pencil, Save, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import type { FashionIdentity } from '@/types';
+
+const ALL_OCCASIONS = [
+  'everyday', 'work', 'formal', 'casual', 'evening',
+  'weekend', 'travel', 'sport', 'date', 'wedding'
+];
+
+const ALL_AESTHETICS = [
+  'minimalist', 'classic', 'bohemian', 'streetwear', 'romantic',
+  'edgy', 'preppy', 'avant-garde', 'vintage', 'athleisure'
+];
+
+const CONFIDENCE_OPTIONS: { value: FashionIdentity['confidenceLevel']; label: string; description: string }[] = [
+  { value: 'decisive', label: 'Decisive', description: 'You know exactly what you want' },
+  { value: 'guided', label: 'Guided', description: 'You appreciate thoughtful recommendations' },
+  { value: 'advisory', label: 'Advisory', description: 'You prefer expert curation' }
+];
+
+type EditingSection = 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'locations' | null;
 
 export default function StyleDNAPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
-  const { fashionIdentity, showToast } = useApp();
+  const { fashionIdentity, updateFashionIdentity, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [editingSection, setEditingSection] = useState<EditingSection>(null);
+
+  // Draft state for editing
+  const [draftOccasions, setDraftOccasions] = useState<string[]>([]);
+  const [draftAesthetics, setDraftAesthetics] = useState<string[]>([]);
+  const [draftConfidence, setDraftConfidence] = useState<FashionIdentity['confidenceLevel']>('guided');
+  const [draftBudgetMin, setDraftBudgetMin] = useState(0);
+  const [draftBudgetMax, setDraftBudgetMax] = useState(0);
+  const [draftPrimaryLocation, setDraftPrimaryLocation] = useState('');
+  const [draftTravelDestinations, setDraftTravelDestinations] = useState('');
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -24,6 +53,116 @@ export default function StyleDNAPage() {
       setIsLoaded(true);
     }
   }, [isHydrated, isAuthenticated]);
+
+  const startEditing = useCallback((section: EditingSection) => {
+    if (!fashionIdentity) return;
+    switch (section) {
+      case 'occasions':
+        setDraftOccasions([...fashionIdentity.occasions]);
+        break;
+      case 'aesthetics':
+        setDraftAesthetics([...fashionIdentity.aesthetics]);
+        break;
+      case 'confidence':
+        setDraftConfidence(fashionIdentity.confidenceLevel);
+        break;
+      case 'budget':
+        setDraftBudgetMin(fashionIdentity.budgetRange?.min ?? 0);
+        setDraftBudgetMax(fashionIdentity.budgetRange?.max ?? 1000);
+        break;
+      case 'locations':
+        setDraftPrimaryLocation(fashionIdentity.primaryLocation);
+        setDraftTravelDestinations(fashionIdentity.travelDestinations.join(', '));
+        break;
+    }
+    setEditingSection(section);
+  }, [fashionIdentity]);
+
+  const cancelEditing = () => {
+    setEditingSection(null);
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editingSection) {
+        setEditingSection(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [editingSection]);
+
+  const saveSection = useCallback((section: EditingSection) => {
+    if (!fashionIdentity || !section) return;
+
+    let updated: FashionIdentity;
+
+    switch (section) {
+      case 'occasions':
+        if (draftOccasions.length === 0) {
+          showToast('Please select at least one occasion', 'error');
+          return;
+        }
+        updated = { ...fashionIdentity, occasions: draftOccasions };
+        break;
+      case 'aesthetics':
+        if (draftAesthetics.length === 0) {
+          showToast('Please select at least one aesthetic', 'error');
+          return;
+        }
+        updated = { ...fashionIdentity, aesthetics: draftAesthetics };
+        break;
+      case 'confidence':
+        updated = { ...fashionIdentity, confidenceLevel: draftConfidence };
+        break;
+      case 'budget':
+        if (draftBudgetMin < 0 || draftBudgetMax < 0) {
+          showToast('Budget values must be positive', 'error');
+          return;
+        }
+        if (draftBudgetMin >= draftBudgetMax) {
+          showToast('Maximum must be greater than minimum', 'error');
+          return;
+        }
+        updated = { ...fashionIdentity, budgetRange: { min: draftBudgetMin, max: draftBudgetMax } };
+        break;
+      case 'locations':
+        if (!draftPrimaryLocation.trim()) {
+          showToast('Primary location is required', 'error');
+          return;
+        }
+        updated = {
+          ...fashionIdentity,
+          primaryLocation: draftPrimaryLocation.trim(),
+          travelDestinations: draftTravelDestinations
+            .split(',')
+            .map(d => d.trim())
+            .filter(Boolean)
+        };
+        break;
+      default:
+        return;
+    }
+
+    updateFashionIdentity(updated);
+    setEditingSection(null);
+  }, [fashionIdentity, draftOccasions, draftAesthetics, draftConfidence, draftBudgetMin, draftBudgetMax, draftPrimaryLocation, draftTravelDestinations, updateFashionIdentity, showToast]);
+
+  const toggleOccasion = (occasion: string) => {
+    setDraftOccasions(prev =>
+      prev.includes(occasion)
+        ? prev.filter(o => o !== occasion)
+        : [...prev, occasion]
+    );
+  };
+
+  const toggleAesthetic = (aesthetic: string) => {
+    setDraftAesthetics(prev =>
+      prev.includes(aesthetic)
+        ? prev.filter(a => a !== aesthetic)
+        : [...prev, aesthetic]
+    );
+  };
 
   if (!isHydrated || !isAuthenticated) {
     return (
@@ -45,6 +184,35 @@ export default function StyleDNAPage() {
   const confidenceInfo = fashionIdentity?.confidenceLevel
     ? confidenceLevels[fashionIdentity.confidenceLevel]
     : null;
+
+  const EditButton = ({ section }: { section: EditingSection }) => (
+    <button
+      onClick={() => startEditing(section)}
+      className="p-2 hover:bg-sand/20 transition-colors text-stone hover:text-charcoal-deep"
+      title={`Edit ${section}`}
+    >
+      <Pencil size={16} />
+    </button>
+  );
+
+  const SaveCancelButtons = ({ section }: { section: EditingSection }) => (
+    <div className="flex gap-3 mt-6">
+      <button
+        onClick={cancelEditing}
+        className="flex items-center gap-2 px-5 py-2.5 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-wider uppercase"
+      >
+        <X size={14} />
+        Cancel
+      </button>
+      <button
+        onClick={() => saveSection(section)}
+        className="flex items-center gap-2 px-5 py-2.5 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase"
+      >
+        <Save size={14} />
+        Save
+      </button>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -91,73 +259,160 @@ export default function StyleDNAPage() {
           <>
             {/* Occasion Preferences */}
             <div className="bg-white p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                  <Target size={18} className="text-charcoal-deep" />
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+                    <Target size={18} className="text-charcoal-deep" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-xl text-charcoal-deep">Occasion Preferences</h2>
+                    <p className="text-sm text-stone">Your lifestyle occasions</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-display text-xl text-charcoal-deep">Occasion Preferences</h2>
-                  <p className="text-sm text-stone">Your lifestyle occasions</p>
-                </div>
+                {editingSection !== 'occasions' && <EditButton section="occasions" />}
               </div>
-              <div className="flex flex-wrap gap-3">
-                {fashionIdentity.occasions.map(occasion => (
-                  <span
-                    key={occasion}
-                    className="px-4 py-2 bg-parchment text-charcoal-deep text-sm tracking-[0.05em] capitalize"
-                  >
-                    {occasion}
-                  </span>
-                ))}
-              </div>
-            </div>
 
-            {/* Aesthetics */}
-            <div className="bg-white p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                  <Palette size={18} className="text-charcoal-deep" />
-                </div>
+              {editingSection === 'occasions' ? (
                 <div>
-                  <h2 className="font-display text-xl text-charcoal-deep">Style Aesthetics</h2>
-                  <p className="text-sm text-stone">Your design language</p>
+                  <div className="flex flex-wrap gap-3">
+                    {ALL_OCCASIONS.map(occasion => (
+                      <button
+                        key={occasion}
+                        onClick={() => toggleOccasion(occasion)}
+                        className={`px-4 py-2 text-sm tracking-[0.05em] capitalize transition-colors border ${
+                          draftOccasions.includes(occasion)
+                            ? 'bg-charcoal-deep text-ivory-cream border-charcoal-deep'
+                            : 'bg-parchment text-stone border-sand hover:border-charcoal-deep hover:text-charcoal-deep'
+                        }`}
+                      >
+                        {occasion}
+                      </button>
+                    ))}
+                  </div>
+                  <SaveCancelButtons section="occasions" />
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {fashionIdentity.aesthetics.map(aesthetic => (
-                  <span
-                    key={aesthetic}
-                    className="px-4 py-2 bg-gold-soft/10 text-gold-deep text-sm tracking-[0.05em] capitalize"
-                  >
-                    {aesthetic}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            {/* Confidence Level */}
-            <div className="bg-white p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                  <Compass size={18} className="text-charcoal-deep" />
-                </div>
-                <div>
-                  <h2 className="font-display text-xl text-charcoal-deep">Shopping Confidence</h2>
-                  <p className="text-sm text-stone">How you like to shop</p>
-                </div>
-              </div>
-              {confidenceInfo && (
-                <div className={`inline-flex items-center gap-3 px-5 py-3 ${confidenceInfo.color}`}>
-                  <span className="text-sm font-medium">{confidenceInfo.label}</span>
-                  <span className="text-xs opacity-80">— {confidenceInfo.description}</span>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {fashionIdentity.occasions.map(occasion => (
+                    <span
+                      key={occasion}
+                      className="px-4 py-2 bg-parchment text-charcoal-deep text-sm tracking-[0.05em] capitalize"
+                    >
+                      {occasion}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
 
+            {/* Aesthetics */}
+            <div className="bg-white p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+                    <Palette size={18} className="text-charcoal-deep" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-xl text-charcoal-deep">Style Aesthetics</h2>
+                    <p className="text-sm text-stone">Your design language</p>
+                  </div>
+                </div>
+                {editingSection !== 'aesthetics' && <EditButton section="aesthetics" />}
+              </div>
+
+              {editingSection === 'aesthetics' ? (
+                <div>
+                  <div className="flex flex-wrap gap-3">
+                    {ALL_AESTHETICS.map(aesthetic => (
+                      <button
+                        key={aesthetic}
+                        onClick={() => toggleAesthetic(aesthetic)}
+                        className={`px-4 py-2 text-sm tracking-[0.05em] capitalize transition-colors border ${
+                          draftAesthetics.includes(aesthetic)
+                            ? 'bg-charcoal-deep text-ivory-cream border-charcoal-deep'
+                            : 'bg-gold-soft/10 text-stone border-gold-soft/30 hover:border-charcoal-deep hover:text-charcoal-deep'
+                        }`}
+                      >
+                        {aesthetic}
+                      </button>
+                    ))}
+                  </div>
+                  <SaveCancelButtons section="aesthetics" />
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-3">
+                  {fashionIdentity.aesthetics.map(aesthetic => (
+                    <span
+                      key={aesthetic}
+                      className="px-4 py-2 bg-gold-soft/10 text-gold-deep text-sm tracking-[0.05em] capitalize"
+                    >
+                      {aesthetic}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Confidence Level */}
+            <div className="bg-white p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+                    <Compass size={18} className="text-charcoal-deep" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-xl text-charcoal-deep">Shopping Confidence</h2>
+                    <p className="text-sm text-stone">How you like to shop</p>
+                  </div>
+                </div>
+                {editingSection !== 'confidence' && <EditButton section="confidence" />}
+              </div>
+
+              {editingSection === 'confidence' ? (
+                <div>
+                  <div className="space-y-3">
+                    {CONFIDENCE_OPTIONS.map(option => (
+                      <button
+                        key={option.value}
+                        onClick={() => setDraftConfidence(option.value)}
+                        className={`w-full flex items-center gap-4 px-5 py-4 border transition-colors text-left ${
+                          draftConfidence === option.value
+                            ? 'border-charcoal-deep bg-charcoal-deep/5'
+                            : 'border-sand hover:border-charcoal-deep/50'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                          draftConfidence === option.value
+                            ? 'border-charcoal-deep'
+                            : 'border-stone/40'
+                        }`}>
+                          {draftConfidence === option.value && (
+                            <div className="w-2 h-2 rounded-full bg-charcoal-deep" />
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-sm font-medium text-charcoal-deep">{option.label}</span>
+                          <span className="text-xs text-stone ml-2">— {option.description}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <SaveCancelButtons section="confidence" />
+                </div>
+              ) : (
+                confidenceInfo && (
+                  <div className={`inline-flex items-center gap-3 px-5 py-3 ${confidenceInfo.color}`}>
+                    <span className="text-sm font-medium">{confidenceInfo.label}</span>
+                    <span className="text-xs opacity-80">— {confidenceInfo.description}</span>
+                  </div>
+                )
+              )}
+            </div>
+
             {/* Budget Range */}
-            {fashionIdentity.budgetRange && (
-              <div className="bg-white p-8">
-                <div className="flex items-center gap-3 mb-8">
+            <div className="bg-white p-8">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
                     <Sparkles size={18} className="text-charcoal-deep" />
                   </div>
@@ -166,53 +421,118 @@ export default function StyleDNAPage() {
                     <p className="text-sm text-stone">Your comfort zone</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Minimum</p>
-                    <p className="font-display text-2xl text-charcoal-deep">
-                      &euro;{fashionIdentity.budgetRange.min.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="h-px flex-1 bg-sand" />
-                  <div className="text-center">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Maximum</p>
-                    <p className="font-display text-2xl text-charcoal-deep">
-                      &euro;{fashionIdentity.budgetRange.max.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
+                {editingSection !== 'budget' && <EditButton section="budget" />}
               </div>
-            )}
+
+              {editingSection === 'budget' ? (
+                <div>
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Minimum (&euro;)</label>
+                      <input
+                        type="number"
+                        value={draftBudgetMin}
+                        onChange={e => setDraftBudgetMin(Number(e.target.value))}
+                        min={0}
+                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Maximum (&euro;)</label>
+                      <input
+                        type="number"
+                        value={draftBudgetMax}
+                        onChange={e => setDraftBudgetMax(Number(e.target.value))}
+                        min={0}
+                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <SaveCancelButtons section="budget" />
+                </div>
+              ) : (
+                fashionIdentity.budgetRange ? (
+                  <div className="flex items-center gap-6">
+                    <div className="text-center">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Minimum</p>
+                      <p className="font-display text-2xl text-charcoal-deep">
+                        &euro;{fashionIdentity.budgetRange.min.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="h-px flex-1 bg-sand" />
+                    <div className="text-center">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Maximum</p>
+                      <p className="font-display text-2xl text-charcoal-deep">
+                        &euro;{fashionIdentity.budgetRange.max.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-stone">No budget range set. Click edit to add one.</p>
+                )
+              )}
+            </div>
 
             {/* Location */}
             <div className="bg-white p-8">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                  <MapPin size={18} className="text-charcoal-deep" />
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+                    <MapPin size={18} className="text-charcoal-deep" />
+                  </div>
+                  <div>
+                    <h2 className="font-display text-xl text-charcoal-deep">Lifestyle Locations</h2>
+                    <p className="text-sm text-stone">Where you wear your style</p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="font-display text-xl text-charcoal-deep">Lifestyle Locations</h2>
-                  <p className="text-sm text-stone">Where you wear your style</p>
-                </div>
+                {editingSection !== 'locations' && <EditButton section="locations" />}
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-3 border-b border-sand">
-                  <span className="text-sm text-stone">Primary Location</span>
-                  <span className="text-sm font-medium text-charcoal-deep">{fashionIdentity.primaryLocation}</span>
-                </div>
-                {fashionIdentity.travelDestinations.length > 0 && (
-                  <div className="pt-2">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-3">Travel Destinations</p>
-                    <div className="flex flex-wrap gap-2">
-                      {fashionIdentity.travelDestinations.map(dest => (
-                        <span key={dest} className="px-3 py-1.5 bg-parchment text-sm text-charcoal-deep">
-                          {dest}
-                        </span>
-                      ))}
+
+              {editingSection === 'locations' ? (
+                <div>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Primary Location</label>
+                      <input
+                        type="text"
+                        value={draftPrimaryLocation}
+                        onChange={e => setDraftPrimaryLocation(e.target.value)}
+                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Travel Destinations (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={draftTravelDestinations}
+                        onChange={e => setDraftTravelDestinations(e.target.value)}
+                        placeholder="Paris, Milan, Tokyo"
+                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
                     </div>
                   </div>
-                )}
-              </div>
+                  <SaveCancelButtons section="locations" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between py-3 border-b border-sand">
+                    <span className="text-sm text-stone">Primary Location</span>
+                    <span className="text-sm font-medium text-charcoal-deep">{fashionIdentity.primaryLocation}</span>
+                  </div>
+                  {fashionIdentity.travelDestinations.length > 0 && (
+                    <div className="pt-2">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-3">Travel Destinations</p>
+                      <div className="flex flex-wrap gap-2">
+                        {fashionIdentity.travelDestinations.map(dest => (
+                          <span key={dest} className="px-3 py-1.5 bg-parchment text-sm text-charcoal-deep">
+                            {dest}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Retake Quiz */}

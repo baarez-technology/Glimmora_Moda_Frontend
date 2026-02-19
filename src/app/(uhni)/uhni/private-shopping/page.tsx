@@ -10,90 +10,26 @@ import {
   MapPin,
   Clock,
   CheckCircle,
-  AlertCircle,
   Users
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-
-interface PrivateShoppingEvent {
-  id: string;
-  title: string;
-  designer: string;
-  venue: string;
-  city: string;
-  date: string;
-  time: string;
-  duration: string;
-  description: string;
-  status: 'upcoming' | 'rsvp_confirmed' | 'completed' | 'invite_only';
-  maxGuests: number;
-  guestsConfirmed: number;
-  dressCode?: string;
-  perks: string[];
-}
-
-// Mock data for private shopping events
-const mockPrivateShoppingEvents: PrivateShoppingEvent[] = [
-  {
-    id: 'pse-001',
-    title: 'Chanel Haute Couture Preview',
-    designer: 'Chanel',
-    venue: 'Palais de Tokyo',
-    city: 'Paris',
-    date: '2026-03-15',
-    time: '18:00',
-    duration: '3 hours',
-    description: 'An exclusive preview of the upcoming Chanel Haute Couture collection. Private viewing with creative director, champagne reception, and first-access ordering.',
-    status: 'upcoming',
-    maxGuests: 30,
-    guestsConfirmed: 18,
-    dressCode: 'Black Tie Optional',
-    perks: ['First access to order', 'Meet the designer', 'Champagne reception', 'Personal styling']
-  },
-  {
-    id: 'pse-002',
-    title: 'Brunello Cucinelli Private Trunk Show',
-    designer: 'Brunello Cucinelli',
-    venue: 'The Dorchester',
-    city: 'London',
-    date: '2026-04-02',
-    time: '14:00',
-    duration: '4 hours',
-    description: 'Private trunk show featuring the complete SS26 collection. Personal consultation with Italian artisans and made-to-measure services.',
-    status: 'rsvp_confirmed',
-    maxGuests: 20,
-    guestsConfirmed: 15,
-    dressCode: 'Smart Casual',
-    perks: ['Made-to-measure consultation', 'Artisan meet & greet', 'Afternoon tea', 'Exclusive pricing']
-  },
-  {
-    id: 'pse-003',
-    title: 'Loro Piana Winter Collection Preview',
-    designer: 'Loro Piana',
-    venue: 'Mandarin Oriental',
-    city: 'Milan',
-    date: '2026-02-28',
-    time: '19:00',
-    duration: '2.5 hours',
-    description: 'An intimate evening showcasing Loro Piana\'s finest cashmere and vicuña pieces. Limited edition items available exclusively at this event.',
-    status: 'invite_only',
-    maxGuests: 15,
-    guestsConfirmed: 12,
-    dressCode: 'Cocktail',
-    perks: ['Limited edition access', 'Fabric workshop', 'Wine tasting', 'Custom monogramming']
-  }
-];
+import { uhniService } from '@/services';
+import type { PrivateShoppingEvent } from '@/types/uhni';
 
 export default function PrivateShoppingPage() {
   const { showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [events, setEvents] = useState<PrivateShoppingEvent[]>([]);
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'confirmed' | 'completed'>('all');
 
   useEffect(() => {
-    setIsLoaded(true);
+    uhniService.getPrivateShopping().then(res => {
+      if (res.data) setEvents(res.data);
+      setIsLoaded(true);
+    });
   }, []);
 
-  const filteredEvents = mockPrivateShoppingEvents.filter(event => {
+  const filteredEvents = events.filter(event => {
     if (filter === 'all') return true;
     if (filter === 'upcoming') return event.status === 'upcoming' || event.status === 'invite_only';
     if (filter === 'confirmed') return event.status === 'rsvp_confirmed';

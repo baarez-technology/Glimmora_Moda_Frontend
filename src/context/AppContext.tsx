@@ -35,6 +35,7 @@ interface AppContextType {
   considerations: ConsiderationItem[];
   addToConsiderations: (product: Product, variants?: { size?: string; color?: string }, agiNote?: string) => void;
   removeFromConsiderations: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
   clearConsiderations: () => void;
   isInConsiderations: (productId: string) => boolean;
 
@@ -122,6 +123,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setConsiderations,
     addToConsiderations,
     removeFromConsiderations,
+    updateQuantity,
     clearConsiderations,
     isInConsiderations,
     persistConsiderations
@@ -144,10 +146,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     calendarService.getCalendarEvents().then(response => {
       if (response.success) setBaseCalendarEvents(response.data);
-    }).catch(console.error);
+    }).catch(() => {
+      showToast('Failed to load calendar events', 'error');
+    });
     productService.getAllProducts().then(response => {
       if (response.success) setAllProducts(response.data);
-    }).catch(console.error);
+    }).catch(() => {
+      showToast('Failed to load products', 'error');
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Generate dynamic calendar events with outfit suggestions based on wardrobe
@@ -277,6 +284,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       considerations,
       addToConsiderations,
       removeFromConsiderations,
+      updateQuantity,
       clearConsiderations,
       isInConsiderations,
 

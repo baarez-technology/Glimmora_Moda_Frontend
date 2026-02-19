@@ -315,9 +315,12 @@ export default function RestockAlertsPage() {
                                 <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">
                                   {notification.product.brandName}
                                 </p>
-                                <p className="font-display text-lg text-charcoal-deep">
+                                <Link
+                                  href={`/product/${notification.product.slug}`}
+                                  className="font-display text-lg text-charcoal-deep hover:text-gold-muted transition-colors"
+                                >
                                   {notification.product.name}
-                                </p>
+                                </Link>
                               </div>
                               <span className={`px-3 py-1 text-xs font-medium flex-shrink-0 ${getStatusColor(notification.status)}`}>
                                 {getStatusLabel(notification.status)}
@@ -329,6 +332,16 @@ export default function RestockAlertsPage() {
                                 Notified on {new Date(notification.notifiedAt).toLocaleDateString()}
                               </p>
                             )}
+
+                            <div className="flex gap-3 mt-3">
+                              <Link
+                                href={`/product/${notification.product.slug}`}
+                                className="flex items-center gap-2 px-5 py-2 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                              >
+                                <ExternalLink size={14} />
+                                View Product
+                              </Link>
+                            </div>
                           </div>
 
                           <button

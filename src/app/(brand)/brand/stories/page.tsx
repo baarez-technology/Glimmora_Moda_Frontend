@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Plus, BookOpen, Clock, CheckCircle, FileText, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchStories, softDeleteStory } from '@/services/brand-story.service';
@@ -215,10 +216,11 @@ export default function BrandStoriesPage() {
                   <Link href={`/brand/stories/${story.story_id}`}>
                     <div className="aspect-[16/9] bg-parchment relative overflow-hidden">
                       {story.image_url ? (
-                        <img
+                        <Image
                           src={story.image_url}
                           alt={story.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-taupe">

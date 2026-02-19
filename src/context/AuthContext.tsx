@@ -50,11 +50,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserTier(tier);
   };
 
-  const logout = () => {
+  const logout = async () => {
     setIsLoggingOut(true);
     setUserTier('standard');
-    authService.logout().catch(console.error);
-    setTimeout(() => setIsLoggingOut(false), 500);
+    try {
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout failed:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (

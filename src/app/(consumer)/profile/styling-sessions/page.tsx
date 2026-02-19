@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, Calendar, Video, Clock, User, Plus, Check, X, ChevronRight, MessageCircle, Sparkles, ArrowRight } from 'lucide-react';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import { useApp } from '@/context/AppContext';
 
 interface StylingSession {
@@ -29,6 +30,8 @@ export default function StylingSessionsPage() {
   const { isUHNI, isHydrated, concierge, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  // TODO: Pull sessions from a styling session service when API is available
+  // Currently showing example session data seeded from concierge context
   const [sessions, setSessions] = useState<StylingSession[]>([
     {
       id: '1',
@@ -37,16 +40,21 @@ export default function StylingSessionsPage() {
       date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
       time: '14:00',
       stylist: {
-        name: concierge?.name || 'Isabella Moretti',
+        name: concierge?.name || 'Your Stylist',
         avatar: concierge?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-        title: 'Senior Style Consultant',
-        specialties: ['Capsule Wardrobes', 'Event Styling', 'Investment Pieces']
+        title: concierge?.title || 'Style Consultant',
+        specialties: concierge?.specialties?.slice(0, 3) || ['Capsule Wardrobes', 'Event Styling', 'Investment Pieces']
       },
       status: 'scheduled',
-      focus: 'Spring/Summer 2025 Wardrobe Planning',
-      notes: 'Discuss upcoming gallery opening and vacation wardrobe needs'
+      focus: 'Wardrobe Planning Session',
+      notes: 'Discuss upcoming events and wardrobe needs'
     }
   ]);
+
+  const [showRescheduleModal, setShowRescheduleModal] = useState<string | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [cancelSessionId, setCancelSessionId] = useState<string | null>(null);
 
   const [bookingForm, setBookingForm] = useState({
     type: 'virtual' as 'virtual' | 'in-person',
@@ -59,7 +67,33 @@ export default function StylingSessionsPage() {
 
   useEffect(() => {
     setIsLoaded(true);
+    // Load saved sessions from localStorage
+    try {
+      const saved = localStorage.getItem('moda-styling-sessions');
+      if (saved) setSessions(JSON.parse(saved));
+    } catch { /* ignore */ }
   }, []);
+
+  // Persist sessions to localStorage on change
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('moda-styling-sessions', JSON.stringify(sessions));
+    }
+  }, [sessions, isLoaded]);
+
+  // ESC key handler for modals
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showBookingModal) setShowBookingModal(false);
+        if (showRescheduleModal) { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }
+      }
+    };
+    if (showBookingModal || showRescheduleModal) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [showBookingModal, showRescheduleModal]);
 
   // Redirect non-UHNI users
   useEffect(() => {
@@ -87,10 +121,10 @@ export default function StylingSessionsPage() {
       date: bookingForm.date,
       time: bookingForm.time,
       stylist: {
-        name: concierge?.name || 'Isabella Moretti',
+        name: concierge?.name || 'Your Stylist',
         avatar: concierge?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-        title: 'Senior Style Consultant',
-        specialties: ['Capsule Wardrobes', 'Event Styling', 'Investment Pieces']
+        title: concierge?.title || 'Style Consultant',
+        specialties: concierge?.specialties?.slice(0, 3) || ['Capsule Wardrobes', 'Event Styling', 'Investment Pieces']
       },
       status: 'scheduled',
       focus: bookingForm.focus,
@@ -110,6 +144,37 @@ export default function StylingSessionsPage() {
       focus: '',
       notes: ''
     });
+  };
+
+  const handleJoinSession = (session: StylingSession) => {
+    if (session.type === 'virtual') {
+      showToast('Virtual session link will be available 5 minutes before your appointment', 'info');
+    } else {
+      showToast('In-person session — check your email for venue details', 'info');
+    }
+  };
+
+  const handleReschedule = (sessionId: string) => {
+    if (!rescheduleDate || !rescheduleTime) {
+      showToast('Please select a new date and time', 'info');
+      return;
+    }
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId
+        ? { ...s, date: rescheduleDate, time: rescheduleTime }
+        : s
+    ));
+    setShowRescheduleModal(null);
+    setRescheduleDate('');
+    setRescheduleTime('');
+    showToast('Session rescheduled successfully', 'success');
+  };
+
+  const handleCancelSession = (sessionId: string) => {
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, status: 'cancelled' as const } : s
+    ));
+    showToast('Session cancelled', 'success');
   };
 
   const sessionTypes = [
@@ -136,7 +201,7 @@ export default function StylingSessionsPage() {
   ];
 
   const upcomingSessions = sessions.filter(s => s.status === 'scheduled');
-  const pastSessions = sessions.filter(s => s.status === 'completed');
+  const pastSessions = sessions.filter(s => s.status === 'completed' || s.status === 'cancelled');
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -254,13 +319,26 @@ export default function StylingSessionsPage() {
 
                           {/* Actions */}
                           <div className="flex gap-3 mt-4">
-                            <button className="flex-1 py-2 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.1em] uppercase">
+                            <button
+                              onClick={() => handleJoinSession(session)}
+                              className="flex-1 py-2 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.1em] uppercase"
+                            >
                               Join Session
                             </button>
-                            <button className="px-4 py-2 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.1em] uppercase">
+                            <button
+                              onClick={() => {
+                                setShowRescheduleModal(session.id);
+                                setRescheduleDate(session.date.split('T')[0]);
+                                setRescheduleTime(session.time);
+                              }}
+                              className="px-4 py-2 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.1em] uppercase"
+                            >
                               Reschedule
                             </button>
-                            <button className="px-4 py-2 border border-error/30 text-error hover:border-error transition-colors text-sm tracking-[0.1em] uppercase">
+                            <button
+                              onClick={() => setCancelSessionId(session.id)}
+                              className="px-4 py-2 border border-error/30 text-error hover:border-error transition-colors text-sm tracking-[0.1em] uppercase"
+                            >
                               Cancel
                             </button>
                           </div>
@@ -287,7 +365,10 @@ export default function StylingSessionsPage() {
                           <p className="font-medium text-charcoal-deep">{session.focus || 'Styling Session'}</p>
                           <p className="text-sm text-taupe">{new Date(session.date).toLocaleDateString()} • {session.stylist.name}</p>
                         </div>
-                        <button className="flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted transition-colors">
+                        <button
+                          onClick={() => showToast(session.notes || 'No session notes available', 'info')}
+                          className="flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
+                        >
                           <span className="tracking-[0.1em] uppercase">View Notes</span>
                           <ChevronRight size={14} />
                         </button>
@@ -387,10 +468,76 @@ export default function StylingSessionsPage() {
         </div>
       </div>
 
+      {/* Reschedule Modal */}
+      {showRescheduleModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }}>
+          <div className="bg-white max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="border-b border-sand px-8 py-6 flex items-center justify-between">
+              <h2 className="font-display text-xl text-charcoal-deep">Reschedule Session</h2>
+              <button
+                onClick={() => { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }}
+                className="p-2 hover:bg-sand/20 rounded transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-8 space-y-6">
+              <div>
+                <label className="block text-sm tracking-wider uppercase text-taupe mb-3">New Date</label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm tracking-wider uppercase text-taupe mb-3">New Time</label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <div className="flex gap-4">
+                <button
+                  onClick={() => { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }}
+                  className="flex-1 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleReschedule(showRescheduleModal)}
+                  disabled={!rescheduleDate || !rescheduleTime}
+                  className="flex-1 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-[0.15em] uppercase"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Session Confirmation */}
+      <ConfirmModal
+        isOpen={!!cancelSessionId}
+        onClose={() => setCancelSessionId(null)}
+        onConfirm={() => {
+          if (cancelSessionId) handleCancelSession(cancelSessionId);
+        }}
+        title="Cancel Session"
+        message="Are you sure you want to cancel this styling session? You can always book a new one later."
+        confirmLabel="Cancel Session"
+        confirmVariant="danger"
+      />
+
       {/* Booking Modal */}
       {showBookingModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => setShowBookingModal(false)}>
+          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-sand px-8 py-6 flex items-center justify-between z-10">
               <h2 className="font-display text-2xl text-charcoal-deep">Book Styling Session</h2>

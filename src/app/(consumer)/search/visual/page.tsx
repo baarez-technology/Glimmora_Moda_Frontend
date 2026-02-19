@@ -9,8 +9,10 @@ import ImageUploader from '@/components/search/ImageUploader';
 import VisualSearchResults from '@/components/search/VisualSearchResults';
 import { VisualSearchResult } from '@/types';
 import * as productService from '@/services/product.service';
+import { useApp } from '@/context/AppContext';
 
 export default function VisualSearchPage() {
+  const { showToast } = useApp();
   const [isProcessing, setIsProcessing] = useState(false);
   const [results, setResults] = useState<VisualSearchResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -19,15 +21,35 @@ export default function VisualSearchPage() {
     setIsProcessing(true);
     setHasSearched(false);
 
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // imageData is a base64 data URL from file upload; pass no arguments
+      // since performVisualSearch expects (detectedCategory?, detectedStyle?)
+      const response = await productService.performVisualSearch();
+      setResults(response.data);
+      setHasSearched(true);
+    } catch (error) {
+      console.error('Visual search failed:', error);
+      showToast('Visual search failed. Please try again.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [showToast]);
 
-    // Use product service visual search
-    const response = await productService.performVisualSearch(imageData);
-    setResults(response.data);
-    setHasSearched(true);
-    setIsProcessing(false);
-  }, []);
+  const handleExampleSearch = useCallback(async (category: string) => {
+    setIsProcessing(true);
+    setHasSearched(false);
+
+    try {
+      const response = await productService.performVisualSearch(category);
+      setResults(response.data);
+      setHasSearched(true);
+    } catch (error) {
+      console.error('Visual search failed:', error);
+      showToast('Visual search failed. Please try again.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [showToast]);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -154,7 +176,7 @@ export default function VisualSearchPage() {
               ].map((example, i) => (
                 <button
                   key={i}
-                  onClick={() => handleImageSelected(example.image)}
+                  onClick={() => handleExampleSearch(example.category)}
                   className="group relative aspect-square rounded-xl overflow-hidden bg-stone/10"
                 >
                   <Image

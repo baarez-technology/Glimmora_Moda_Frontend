@@ -174,7 +174,7 @@ export default function ProfilePage() {
             <div className="text-center md:text-left flex-1">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">
-                  Member Since 2024
+                  Member Since {user.createdAt ? new Date(user.createdAt).getFullYear() : new Date().getFullYear()}
                 </span>
               </div>
               <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-3">
@@ -465,12 +465,20 @@ export default function ProfilePage() {
                         <MessageCircle size={16} />
                         <span className="text-xs tracking-[0.15em] uppercase">Message</span>
                       </Link>
-                      <button className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors">
+                      <a
+                        href={`tel:${concierge.phone}`}
+                        className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors"
+                        aria-label={`Call ${concierge.name}`}
+                      >
                         <Phone size={16} />
-                      </button>
-                      <button className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors">
+                      </a>
+                      <a
+                        href={`mailto:${concierge.email}`}
+                        className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors"
+                        aria-label={`Email ${concierge.name}`}
+                      >
                         <Mail size={16} />
-                      </button>
+                      </a>
                     </div>
                   </div>
                 </div>

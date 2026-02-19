@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -17,6 +17,14 @@ import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
 
 type TimePeriod = '7d' | '30d' | '90d' | '12m';
+
+// Scale factors to simulate different data per period
+const PERIOD_SCALE: Record<TimePeriod, { revenue: number; orders: number; change: number }> = {
+  '7d':  { revenue: 0.25, orders: 0.2,  change: 1.4 },
+  '30d': { revenue: 1,    orders: 1,    change: 1 },
+  '90d': { revenue: 2.8,  orders: 2.5,  change: 0.7 },
+  '12m': { revenue: 11,   orders: 10,   change: 0.5 },
+};
 
 export default function AnalyticsPage() {
   const { analytics } = useBrand();
@@ -36,6 +44,16 @@ export default function AnalyticsPage() {
       </div>
     );
   }
+
+  const scale = PERIOD_SCALE[period];
+
+  // Period-adjusted metrics
+  const periodRevenue = Math.round(analytics.revenue.current * scale.revenue);
+  const periodRevenueChange = +(analytics.revenue.changePercent * scale.change).toFixed(1);
+  const periodOrders = Math.round(analytics.orders.totalOrders * scale.orders);
+  const periodOrdersChange = +(analytics.orders.changePercent * scale.change).toFixed(1);
+  const periodAov = periodOrders > 0 ? Math.round(periodRevenue / periodOrders) : 0;
+  const periodAovChange = +(analytics.orders.aovChangePercent * scale.change).toFixed(1);
 
   const formatCurrency = (value: number) => {
     if (value >= 1000000) {
@@ -99,20 +117,20 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             label="Revenue"
-            value={formatCurrency(analytics.revenue.current)}
-            change={analytics.revenue.changePercent}
+            value={formatCurrency(periodRevenue)}
+            change={periodRevenueChange}
             changeLabel="vs previous period"
           />
           <MetricCard
             label="Orders"
-            value={analytics.orders.totalOrders.toLocaleString()}
-            change={analytics.orders.changePercent}
+            value={periodOrders.toLocaleString()}
+            change={periodOrdersChange}
             changeLabel="vs previous period"
           />
           <MetricCard
             label="Average Order Value"
-            value={formatCurrency(analytics.orders.averageOrderValue)}
-            change={analytics.orders.aovChangePercent}
+            value={formatCurrency(periodAov)}
+            change={periodAovChange}
             changeLabel="vs previous period"
           />
           <MetricCard
@@ -120,6 +138,35 @@ export default function AnalyticsPage() {
             value={`${analytics.orders.returnRate.toFixed(1)}%`}
             trend={analytics.orders.returnRate > 3 ? 'down' : 'up'}
           />
+        </div>
+
+        {/* Chart Placeholders */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Revenue Trend</h2>
+            </div>
+            <div className="p-6 flex items-center justify-center h-64 bg-parchment/20">
+              <div className="text-center">
+                <BarChart3 size={40} className="mx-auto text-taupe/40 mb-3" />
+                <p className="text-sm text-stone">Chart visualization coming soon</p>
+                <p className="text-xs text-taupe mt-1">Revenue trend for {periodLabels[period].toLowerCase()}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Orders Over Time</h2>
+            </div>
+            <div className="p-6 flex items-center justify-center h-64 bg-parchment/20">
+              <div className="text-center">
+                <ShoppingCart size={40} className="mx-auto text-taupe/40 mb-3" />
+                <p className="text-sm text-stone">Chart visualization coming soon</p>
+                <p className="text-xs text-taupe mt-1">Order volume for {periodLabels[period].toLowerCase()}</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Revenue by Category */}
@@ -135,7 +182,7 @@ export default function AnalyticsPage() {
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm text-charcoal-deep capitalize">{item.category}</span>
                       <div className="flex items-center gap-4">
-                        <span className="text-sm text-stone">{formatCurrency(item.revenue)}</span>
+                        <span className="text-sm text-stone">{formatCurrency(Math.round(item.revenue * scale.revenue))}</span>
                         <span className="text-xs text-taupe w-12 text-right">{item.percentage.toFixed(1)}%</span>
                       </div>
                     </div>
@@ -169,9 +216,9 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-charcoal-deep">{formatCurrency(region.revenue)}</p>
+                    <p className="text-sm text-charcoal-deep">{formatCurrency(Math.round(region.revenue * scale.revenue))}</p>
                     <p className={`text-xs ${region.changePercent >= 0 ? 'text-success' : 'text-error'}`}>
-                      {region.changePercent >= 0 ? '+' : ''}{region.changePercent.toFixed(1)}%
+                      {region.changePercent >= 0 ? '+' : ''}{(region.changePercent * scale.change).toFixed(1)}%
                     </p>
                   </div>
                 </div>
@@ -231,11 +278,11 @@ export default function AnalyticsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className="text-sm font-medium text-charcoal-deep">
-                        {formatCurrency(product.revenue)}
+                        {formatCurrency(Math.round(product.revenue * scale.revenue))}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <span className="text-sm text-stone">{product.units}</span>
+                      <span className="text-sm text-stone">{Math.round(product.units * scale.orders)}</span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <span className={`text-sm ${product.changePercent >= 0 ? 'text-success' : 'text-error'}`}>

@@ -13,21 +13,29 @@ interface RouteGuardProps {
 
 export default function RouteGuard({ children, requiredTier, redirectTo = '/auth/login' }: RouteGuardProps) {
   const router = useRouter();
-  const { userTier, isAuthenticated } = useAuth();
-
-  useEffect(() => {
-    const allowedTiers = Array.isArray(requiredTier) ? requiredTier : [requiredTier];
-
-    // Check if user has required tier
-    if (!allowedTiers.includes(userTier)) {
-      router.push(redirectTo);
-    }
-  }, [userTier, requiredTier, redirectTo, router]);
+  const { userTier, isAuthenticated, isHydrated } = useAuth();
 
   const allowedTiers = Array.isArray(requiredTier) ? requiredTier : [requiredTier];
 
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    if (!isAuthenticated || !allowedTiers.includes(userTier)) {
+      router.push(redirectTo);
+    }
+  }, [userTier, isAuthenticated, isHydrated, requiredTier, redirectTo, router, allowedTiers]);
+
+  // Show loading spinner while auth state is hydrating
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-ivory-cream">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   // Don't render children if user doesn't have access
-  if (!allowedTiers.includes(userTier)) {
+  if (!isAuthenticated || !allowedTiers.includes(userTier)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-ivory-cream">
         <div className="text-center">

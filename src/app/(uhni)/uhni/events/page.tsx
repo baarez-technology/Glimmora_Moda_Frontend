@@ -15,91 +15,28 @@ import {
   Users
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-
-interface ExclusiveEvent {
-  id: string;
-  title: string;
-  type: 'exhibition' | 'gala' | 'masterclass' | 'launch' | 'experience';
-  host: string;
-  venue: string;
-  city: string;
-  country: string;
-  date: string;
-  time: string;
-  description: string;
-  highlights: string[];
-  registrationStatus: 'open' | 'registered' | 'waitlist' | 'closed';
-  maxAttendees: number;
-  spotsLeft: number;
-  image?: string;
-}
-
-const mockExclusiveEvents: ExclusiveEvent[] = [
-  {
-    id: 'evt-001',
-    title: 'Art of Haute Couture: Behind the Atelier',
-    type: 'exhibition',
-    host: 'Maison Valentino',
-    venue: 'Palazzo Mignanelli',
-    city: 'Rome',
-    country: 'Italy',
-    date: '2026-03-20',
-    time: '17:00',
-    description: 'A rare glimpse into the Valentino atelier. Witness master artisans at work, explore archive pieces spanning six decades, and enjoy a private dinner in the palazzo gardens.',
-    highlights: ['Atelier tour', 'Archive viewing', 'Private dinner', 'Meet the artisans'],
-    registrationStatus: 'open',
-    maxAttendees: 25,
-    spotsLeft: 8
-  },
-  {
-    id: 'evt-002',
-    title: 'Watchmaking Masterclass with Patek Philippe',
-    type: 'masterclass',
-    host: 'Patek Philippe',
-    venue: 'Patek Philippe Salon',
-    city: 'Geneva',
-    country: 'Switzerland',
-    date: '2026-04-10',
-    time: '10:00',
-    description: 'An immersive full-day masterclass in the art of haute horlogerie. Learn from master watchmakers, handle rare complications, and receive a certificate of completion.',
-    highlights: ['Hands-on workshop', 'Rare piece handling', 'Certificate', 'Lunch with CEO'],
-    registrationStatus: 'registered',
-    maxAttendees: 12,
-    spotsLeft: 0
-  },
-  {
-    id: 'evt-003',
-    title: 'Spring Gala: Fashion Forward Foundation',
-    type: 'gala',
-    host: 'Fashion Forward Foundation',
-    venue: 'The Met',
-    city: 'New York',
-    country: 'United States',
-    date: '2026-05-05',
-    time: '19:30',
-    description: 'Annual charity gala celebrating the intersection of fashion and sustainability. Black-tie event with live performances, silent auction, and networking with industry leaders.',
-    highlights: ['Black-tie dinner', 'Silent auction', 'Live performances', 'Sustainability showcase'],
-    registrationStatus: 'open',
-    maxAttendees: 200,
-    spotsLeft: 45
-  }
-];
+import { uhniService } from '@/services';
+import type { ExclusiveEvent, ExclusiveEventType } from '@/types/uhni';
 
 export default function EventsPage() {
   const { showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [filter, setFilter] = useState<'all' | ExclusiveEvent['type']>('all');
+  const [events, setEvents] = useState<ExclusiveEvent[]>([]);
+  const [filter, setFilter] = useState<'all' | ExclusiveEventType>('all');
 
   useEffect(() => {
-    setIsLoaded(true);
+    uhniService.getExclusiveEvents().then(res => {
+      if (res.data) setEvents(res.data);
+      setIsLoaded(true);
+    });
   }, []);
 
-  const filteredEvents = mockExclusiveEvents.filter(event => {
+  const filteredEvents = events.filter(event => {
     if (filter === 'all') return true;
     return event.type === filter;
   });
 
-  const getTypeIcon = (type: ExclusiveEvent['type']) => {
+  const getTypeIcon = (type: ExclusiveEventType) => {
     switch (type) {
       case 'exhibition': return Palette;
       case 'gala': return Star;
@@ -109,7 +46,7 @@ export default function EventsPage() {
     }
   };
 
-  const getTypeBadge = (type: ExclusiveEvent['type']) => {
+  const getTypeBadge = (type: ExclusiveEventType) => {
     switch (type) {
       case 'exhibition': return 'bg-info/10 text-info';
       case 'gala': return 'bg-gold-soft/20 text-gold-deep';
@@ -150,7 +87,7 @@ export default function EventsPage() {
     });
   };
 
-  const eventTypes: { value: 'all' | ExclusiveEvent['type']; label: string }[] = [
+  const eventTypes: { value: 'all' | ExclusiveEventType; label: string }[] = [
     { value: 'all', label: 'All Events' },
     { value: 'exhibition', label: 'Exhibitions' },
     { value: 'gala', label: 'Galas' },

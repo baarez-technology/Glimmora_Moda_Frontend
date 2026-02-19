@@ -252,7 +252,7 @@ export function ProductCard({ product, showMetrics = true }: ProductCardProps) {
   const isOutOfStock = product.totalStock === 0;
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-EU', {
+    return new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: product.currency,
       minimumFractionDigits: 0,

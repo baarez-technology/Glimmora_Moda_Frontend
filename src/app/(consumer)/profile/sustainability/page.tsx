@@ -1,17 +1,50 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Leaf, Droplets, Globe, Award, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Leaf, Droplets, Globe, Award, TrendingUp, Settings } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+
+interface SustainabilityPreferences {
+  preferSustainableMaterials: boolean;
+  showEcoCertifications: boolean;
+  prioritizeEthicalBrands: boolean;
+  includeCarbonFootprint: boolean;
+}
+
+const PREFS_STORAGE_KEY = 'moda-sustainability-prefs';
+
+const defaultPrefs: SustainabilityPreferences = {
+  preferSustainableMaterials: false,
+  showEcoCertifications: false,
+  prioritizeEthicalBrands: false,
+  includeCarbonFootprint: false
+};
+
+function loadPreferences(): SustainabilityPreferences {
+  if (typeof window === 'undefined') return defaultPrefs;
+  try {
+    const stored = localStorage.getItem(PREFS_STORAGE_KEY);
+    return stored ? { ...defaultPrefs, ...JSON.parse(stored) } : defaultPrefs;
+  } catch {
+    return defaultPrefs;
+  }
+}
+
+function savePreferences(prefs: SustainabilityPreferences) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+}
 
 export default function SustainabilityPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
-  const { wardrobe } = useApp();
+  const { wardrobe, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [preferences, setPreferences] = useState<SustainabilityPreferences>(defaultPrefs);
+  const [prefsHydrated, setPrefsHydrated] = useState(false);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -24,6 +57,27 @@ export default function SustainabilityPage() {
       setIsLoaded(true);
     }
   }, [isHydrated, isAuthenticated]);
+
+  // Load preferences on mount
+  useEffect(() => {
+    setPreferences(loadPreferences());
+    setPrefsHydrated(true);
+  }, []);
+
+  // Persist preferences whenever they change (after initial hydration)
+  useEffect(() => {
+    if (prefsHydrated) {
+      savePreferences(preferences);
+    }
+  }, [preferences, prefsHydrated]);
+
+  const togglePreference = useCallback((key: keyof SustainabilityPreferences) => {
+    setPreferences(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      return updated;
+    });
+    showToast('Preference updated', 'success');
+  }, [showToast]);
 
   // Compute sustainability metrics from wardrobe
   const metrics = useMemo(() => {
@@ -59,6 +113,29 @@ export default function SustainabilityPage() {
     { name: 'Fair Trade', count: Math.round(wardrobe.length * 0.12), color: 'bg-blue-100 text-blue-700' },
     { name: 'OEKO-TEX', count: Math.round(wardrobe.length * 0.2), color: 'bg-teal-100 text-teal-700' },
     { name: 'B Corp', count: Math.round(wardrobe.length * 0.08), color: 'bg-purple-100 text-purple-700' }
+  ];
+
+  const preferenceItems: { key: keyof SustainabilityPreferences; label: string; description: string }[] = [
+    {
+      key: 'preferSustainableMaterials',
+      label: 'Prefer sustainable materials',
+      description: 'Prioritize items made with eco-friendly and recycled materials'
+    },
+    {
+      key: 'showEcoCertifications',
+      label: 'Show eco-certifications prominently',
+      description: 'Highlight sustainability certifications on product pages'
+    },
+    {
+      key: 'prioritizeEthicalBrands',
+      label: 'Prioritize ethical brands',
+      description: 'Boost brands with verified ethical labor and sourcing practices'
+    },
+    {
+      key: 'includeCarbonFootprint',
+      label: 'Include carbon footprint in recommendations',
+      description: 'Factor environmental impact into personalized suggestions'
+    }
   ];
 
   return (
@@ -134,7 +211,7 @@ export default function SustainabilityPage() {
           <div className="bg-white p-8 text-center">
             <Globe size={24} className="text-green-600 mx-auto mb-3" />
             <p className="font-display text-2xl text-charcoal-deep mb-1">{metrics.carbonSaved}kg</p>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-stone">CO₂ Reduced</p>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-stone">CO2 Reduced</p>
           </div>
         </div>
 
@@ -154,6 +231,51 @@ export default function SustainabilityPage() {
               <div key={cert.name} className="flex items-center justify-between py-3 border-b border-sand last:border-0">
                 <span className={`px-3 py-1 text-xs tracking-wider uppercase ${cert.color}`}>{cert.name}</span>
                 <span className="text-sm text-charcoal-deep">{cert.count} items</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sustainability Preferences */}
+        <div className="bg-white p-8">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+              <Settings size={18} className="text-charcoal-deep" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl text-charcoal-deep">Preferences</h2>
+              <p className="text-sm text-stone">Customize how sustainability influences your experience</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            {preferenceItems.map(item => (
+              <div
+                key={item.key}
+                className="flex items-center justify-between py-4 border-b border-sand last:border-0"
+              >
+                <div className="flex-1 pr-4">
+                  <p className="text-sm font-medium text-charcoal-deep">{item.label}</p>
+                  <p className="text-xs text-stone mt-0.5">{item.description}</p>
+                </div>
+                <button
+                  onClick={() => togglePreference(item.key)}
+                  className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+                    preferences[item.key]
+                      ? 'bg-charcoal-deep'
+                      : 'bg-sand'
+                  }`}
+                  role="switch"
+                  aria-checked={preferences[item.key]}
+                  aria-label={item.label}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                      preferences[item.key]
+                        ? 'translate-x-5'
+                        : 'translate-x-0.5'
+                    } mt-0.5`}
+                  />
+                </button>
               </div>
             ))}
           </div>

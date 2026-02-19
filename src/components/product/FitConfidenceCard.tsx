@@ -34,6 +34,7 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="w-full p-4 flex items-center justify-between hover:bg-parchment/50 transition-colors"
       >
         <div className="flex items-center gap-3">

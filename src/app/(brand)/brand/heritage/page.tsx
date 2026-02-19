@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2, Pencil, Loader2 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchHeritageEvents, softDeleteHeritageEvent } from '@/services/brand-heritage.service';
@@ -251,11 +252,12 @@ export default function HeritagePage() {
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
                               {event.image_url && (
-                                <div className="w-24 h-24 bg-parchment">
-                                  <img
+                                <div className="w-24 h-24 bg-parchment relative">
+                                  <Image
                                     src={event.image_url}
                                     alt={event.title}
-                                    className="w-full h-full object-cover"
+                                  fill
+                                    className="object-cover"
                                   />
                                 </div>
                               )}

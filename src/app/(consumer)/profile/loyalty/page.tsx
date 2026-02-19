@@ -3,15 +3,17 @@
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Crown, Star, Gift, TrendingUp, Lock } from 'lucide-react';
+import { ArrowLeft, Crown, Star, Gift, TrendingUp, Lock, Check } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoyaltyPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
-  const { userTier, orders } = useApp();
+  const { userTier, orders, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
+  const [redeemedRewards, setRedeemedRewards] = useState<string[]>([]);
+  const [spentPoints, setSpentPoints] = useState(0);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -22,6 +24,12 @@ export default function LoyaltyPage() {
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
       setIsLoaded(true);
+      try {
+        const savedRedeemed = localStorage.getItem('moda-redeemed-rewards');
+        const savedSpent = localStorage.getItem('moda-spent-points');
+        if (savedRedeemed) setRedeemedRewards(JSON.parse(savedRedeemed));
+        if (savedSpent) setSpentPoints(parseInt(savedSpent, 10) || 0);
+      } catch { /* ignore */ }
     }
   }, [isHydrated, isAuthenticated]);
 
@@ -63,10 +71,22 @@ export default function LoyaltyPage() {
     return orders.reduce((sum, order) => sum + (order.total || 0), 0);
   }, [orders]);
 
-  const points = Math.round(totalSpent * tierInfo.pointsMultiplier);
+  const earnedPoints = Math.round(totalSpent * tierInfo.pointsMultiplier);
+  const points = earnedPoints - spentPoints;
   const progressToNext = tierInfo.nextThreshold
     ? Math.min(100, Math.round((totalSpent / tierInfo.nextThreshold) * 100))
     : 100;
+
+  const handleRedeem = (rewardName: string, rewardPoints: number) => {
+    if (points < rewardPoints) return;
+    const newSpent = spentPoints + rewardPoints;
+    const newRedeemed = [...redeemedRewards, rewardName];
+    setSpentPoints(newSpent);
+    setRedeemedRewards(newRedeemed);
+    localStorage.setItem('moda-spent-points', String(newSpent));
+    localStorage.setItem('moda-redeemed-rewards', JSON.stringify(newRedeemed));
+    showToast(`Redeemed: ${rewardName}`, 'success');
+  };
 
   const TierIcon = tierInfo.icon;
 
@@ -174,24 +194,35 @@ export default function LoyaltyPage() {
             </div>
           </div>
           <div className="space-y-3">
-            {rewards.map(reward => (
-              <div key={reward.name} className="flex items-center justify-between py-4 border-b border-sand last:border-0">
-                <div>
-                  <p className="font-medium text-charcoal-deep">{reward.name}</p>
-                  <p className="text-xs text-stone">{reward.points.toLocaleString()} points</p>
+            {rewards.map(reward => {
+              const isRedeemed = redeemedRewards.includes(reward.name);
+              return (
+                <div key={reward.name} className="flex items-center justify-between py-4 border-b border-sand last:border-0">
+                  <div>
+                    <p className={`font-medium ${isRedeemed ? 'text-stone line-through' : 'text-charcoal-deep'}`}>{reward.name}</p>
+                    <p className="text-xs text-stone">{reward.points.toLocaleString()} points</p>
+                  </div>
+                  {isRedeemed ? (
+                    <span className="flex items-center gap-1 text-xs text-success">
+                      <Check size={12} />
+                      Redeemed
+                    </span>
+                  ) : reward.available ? (
+                    <button
+                      onClick={() => handleRedeem(reward.name, reward.points)}
+                      className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors"
+                    >
+                      Redeem
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs text-stone">
+                      <Lock size={12} />
+                      {(reward.points - points).toLocaleString()} pts needed
+                    </span>
+                  )}
                 </div>
-                {reward.available ? (
-                  <button className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors">
-                    Redeem
-                  </button>
-                ) : (
-                  <span className="flex items-center gap-1 text-xs text-stone">
-                    <Lock size={12} />
-                    {(reward.points - points).toLocaleString()} pts needed
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 

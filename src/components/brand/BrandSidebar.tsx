@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -11,6 +12,7 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  ChevronDown,
   ShoppingBag,
   Scissors,
   MessageSquare,
@@ -19,7 +21,18 @@ import {
   Clock,
   BookOpen,
   Gift,
-  Calendar
+  Calendar,
+  Brain,
+  Activity,
+  Bot,
+  Fingerprint,
+  Network,
+  Shield,
+  Store,
+  AlertTriangle,
+  Rocket,
+  Gem,
+  Users
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 
@@ -32,6 +45,7 @@ interface NavItem {
 interface NavSection {
   title: string;
   items: NavItem[];
+  collapsible?: boolean;
 }
 
 const navigation: NavSection[] = [
@@ -75,6 +89,23 @@ const navigation: NavSection[] = [
     ]
   },
   {
+    title: 'Intelligence',
+    collapsible: true,
+    items: [
+      { label: 'Design-to-Demand', href: '/brand/intelligence/design-demand', icon: Brain },
+      { label: 'Intelligence Agent', href: '/brand/intelligence/agent', icon: Activity },
+      { label: 'Brand Concierge', href: '/brand/intelligence/concierge', icon: Bot },
+      { label: 'Memory Imprint', href: '/brand/intelligence/memory', icon: Fingerprint },
+      { label: 'Digital Twin', href: '/brand/intelligence/digital-twin', icon: Network },
+      { label: 'Cultural Authority', href: '/brand/intelligence/cultural-authority', icon: Shield },
+      { label: 'Boutiques', href: '/brand/intelligence/boutiques', icon: Store },
+      { label: 'Counterfeit Detection', href: '/brand/intelligence/counterfeit', icon: AlertTriangle },
+      { label: 'Drop Simulator', href: '/brand/intelligence/drop-simulator', icon: Rocket },
+      { label: 'Heritage DNA', href: '/brand/intelligence/heritage', icon: Gem },
+      { label: 'Client Genome', href: '/brand/intelligence/client-genome', icon: Users }
+    ]
+  },
+  {
     title: 'Account',
     items: [
       { label: 'Settings', href: '/brand/settings', icon: Settings }
@@ -86,6 +117,9 @@ export function BrandSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { partner, logout } = useBrand();
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    Intelligence: true
+  });
 
   const handleLogout = () => {
     logout();
@@ -98,6 +132,20 @@ export function BrandSidebar() {
     }
     return pathname.startsWith(href);
   };
+
+  const isSectionActive = (section: NavSection) => {
+    return section.items.some(item => isActive(item.href));
+  };
+
+  const toggleSection = (title: string) => {
+    setCollapsedSections(prev => ({ ...prev, [title]: !prev[title] }));
+  };
+
+  // Auto-expand intelligence section if a child is active
+  const intelligenceActive = navigation.find(s => s.title === 'Intelligence');
+  if (intelligenceActive && isSectionActive(intelligenceActive) && collapsedSections['Intelligence']) {
+    // This will be handled in the render - we check it there
+  }
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-sand flex flex-col z-40">
@@ -140,36 +188,57 @@ export function BrandSidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
-        {navigation.map(section => (
-          <div key={section.title}>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2 px-3">
-              {section.title}
-            </p>
-            <div className="space-y-1">
-              {section.items.map(item => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 group ${
-                      active
-                        ? 'bg-parchment text-charcoal-deep'
-                        : 'text-stone hover:text-charcoal-deep hover:bg-parchment/50'
-                    }`}
-                  >
-                    <Icon size={18} strokeWidth={1.5} />
-                    <span className="flex-1">{item.label}</span>
-                    {active && (
-                      <ChevronRight size={14} className="text-taupe" />
-                    )}
-                  </Link>
-                );
-              })}
+        {navigation.map(section => {
+          const isCollapsible = section.collapsible;
+          const isCollapsed = collapsedSections[section.title] && !isSectionActive(section);
+
+          return (
+            <div key={section.title}>
+              {isCollapsible ? (
+                <button
+                  onClick={() => toggleSection(section.title)}
+                  className="flex items-center justify-between w-full text-[10px] tracking-[0.2em] uppercase text-taupe mb-2 px-3 hover:text-charcoal-deep transition-colors"
+                >
+                  <span>{section.title}</span>
+                  {isCollapsed ? (
+                    <ChevronRight size={12} />
+                  ) : (
+                    <ChevronDown size={12} />
+                  )}
+                </button>
+              ) : (
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2 px-3">
+                  {section.title}
+                </p>
+              )}
+              {!isCollapsed && (
+                <div className="space-y-1">
+                  {section.items.map(item => {
+                    const Icon = item.icon;
+                    const active = isActive(item.href);
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 group ${
+                          active
+                            ? 'bg-parchment text-charcoal-deep'
+                            : 'text-stone hover:text-charcoal-deep hover:bg-parchment/50'
+                        }`}
+                      >
+                        <Icon size={18} strokeWidth={1.5} />
+                        <span className="flex-1">{item.label}</span>
+                        {active && (
+                          <ChevronRight size={14} className="text-taupe" />
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </nav>
 
       {/* User Section */}

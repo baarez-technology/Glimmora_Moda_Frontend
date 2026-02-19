@@ -395,10 +395,12 @@ export default function CalendarPage() {
 
                       {/* Suggestion Tabs */}
                       {selectedEvent.outfitSuggestions.length > 1 && (
-                        <div className="flex gap-1 mb-8 border-b border-sand">
+                        <div className="flex gap-1 mb-8 border-b border-sand" role="tablist">
                           {selectedEvent.outfitSuggestions.map((suggestion, index) => (
                             <button
                               key={suggestion.id}
+                              role="tab"
+                              aria-selected={selectedSuggestion === index}
                               onClick={() => setSelectedSuggestion(index)}
                               className={`px-6 py-4 text-sm tracking-[0.1em] uppercase transition-all relative ${
                                 selectedSuggestion === index

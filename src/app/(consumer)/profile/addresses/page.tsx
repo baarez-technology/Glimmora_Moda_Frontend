@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Plus, Edit2, Trash2, X, Check, Home } from 'lucide-react';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -58,6 +59,24 @@ export default function AddressesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState(emptyForm);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [deleteAddressId, setDeleteAddressId] = useState<string | null>(null);
+  const addressLabelRef = useRef<HTMLInputElement>(null);
+
+  // ESC key handler for address form
+  useEffect(() => {
+    if (!showForm) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setShowForm(false); setEditingId(null); }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showForm]);
+
+  // Auto-focus label input when form opens
+  useEffect(() => {
+    if (showForm) addressLabelRef.current?.focus();
+  }, [showForm]);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -82,9 +101,30 @@ export default function AddressesPage() {
     }
   }, [addresses, isHydratedLocal]);
 
+  const validateAddressForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
+    if (!formData.street.trim()) newErrors.street = 'Street address is required';
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.country.trim()) newErrors.country = 'Country is required';
+
+    if (formData.postalCode && (formData.postalCode.trim().length < 3 || formData.postalCode.trim().length > 12)) {
+      newErrors.postalCode = 'Postal code must be 3-12 characters';
+    }
+
+    if (formData.phone) {
+      if (!/^[+\d][\d\s\-()]{6,20}$/.test(formData.phone.trim())) {
+        newErrors.phone = 'Enter a valid phone number (e.g. +1 234 567-8900)';
+      }
+    }
+
+    setFormErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = useCallback(() => {
-    if (!formData.fullName || !formData.street || !formData.city || !formData.country) {
-      showToast('Please fill in all required fields', 'error');
+    if (!validateAddressForm()) {
+      showToast('Please fix the errors below', 'error');
       return;
     }
 
@@ -177,7 +217,7 @@ export default function AddressesPage() {
         {/* Add Button */}
         {!showForm && (
           <button
-            onClick={() => { setFormData(emptyForm); setEditingId(null); setShowForm(true); }}
+            onClick={() => { setFormData(emptyForm); setEditingId(null); setFormErrors({}); setShowForm(true); }}
             className="w-full py-4 border-2 border-dashed border-sand hover:border-charcoal-deep text-stone hover:text-charcoal-deep transition-colors flex items-center justify-center gap-2"
           >
             <Plus size={18} />
@@ -187,9 +227,9 @@ export default function AddressesPage() {
 
         {/* Form */}
         {showForm && (
-          <div className="bg-white p-8">
+          <div className="bg-white p-8" role="form" aria-labelledby="address-form-title">
             <div className="flex items-center justify-between mb-8">
-              <h2 className="font-display text-xl text-charcoal-deep">
+              <h2 id="address-form-title" className="font-display text-xl text-charcoal-deep">
                 {editingId ? 'Edit Address' : 'New Address'}
               </h2>
               <button onClick={() => { setShowForm(false); setEditingId(null); }} className="p-2 hover:bg-sand/20 transition-colors">
@@ -200,6 +240,7 @@ export default function AddressesPage() {
               <div className="col-span-2">
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Label</label>
                 <input
+                  ref={addressLabelRef}
                   type="text" value={formData.label}
                   onChange={e => setFormData({ ...formData, label: e.target.value })}
                   placeholder="e.g. Home, Office"
@@ -242,9 +283,10 @@ export default function AddressesPage() {
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Postal Code</label>
                 <input
                   type="text" value={formData.postalCode}
-                  onChange={e => setFormData({ ...formData, postalCode: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onChange={e => { setFormData({ ...formData, postalCode: e.target.value }); setFormErrors(prev => ({ ...prev, postalCode: '' })); }}
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.postalCode ? 'border-red-400' : 'border-sand'}`}
                 />
+                {formErrors.postalCode && <p className="text-xs text-red-500 mt-1">{formErrors.postalCode}</p>}
               </div>
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Country *</label>
@@ -258,9 +300,11 @@ export default function AddressesPage() {
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Phone</label>
                 <input
                   type="tel" value={formData.phone}
-                  onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onChange={e => { setFormData({ ...formData, phone: e.target.value }); setFormErrors(prev => ({ ...prev, phone: '' })); }}
+                  placeholder="+1 234 567 8900"
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.phone ? 'border-red-400' : 'border-sand'}`}
                 />
+                {formErrors.phone && <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>}
               </div>
             </div>
             <div className="flex gap-4 mt-6">
@@ -321,7 +365,7 @@ export default function AddressesPage() {
                   <button onClick={() => handleEdit(address)} className="p-2 hover:bg-sand/20 transition-colors" title="Edit">
                     <Edit2 size={16} className="text-stone" />
                   </button>
-                  <button onClick={() => handleDelete(address.id)} className="p-2 hover:bg-red-50 transition-colors" title="Delete">
+                  <button onClick={() => setDeleteAddressId(address.id)} className="p-2 hover:bg-red-50 transition-colors" title="Delete">
                     <Trash2 size={16} className="text-red-600" />
                   </button>
                 </div>
@@ -330,6 +374,19 @@ export default function AddressesPage() {
           ))
         )}
       </div>
+
+      {/* Delete Address Confirmation */}
+      <ConfirmModal
+        isOpen={!!deleteAddressId}
+        onClose={() => setDeleteAddressId(null)}
+        onConfirm={() => {
+          if (deleteAddressId) handleDelete(deleteAddressId);
+        }}
+        title="Delete Address"
+        message="Are you sure you want to delete this address? This action cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

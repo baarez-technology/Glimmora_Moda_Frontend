@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, X, MapPin, Check, User } from 'lucide-react';
+import { ArrowRight, X, MapPin, Check, User, Minus, Plus } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
 export default function ConsiderationPage() {
-  const { considerations, removeFromConsiderations } = useApp();
+  const { considerations, removeFromConsiderations, updateQuantity } = useApp();
   const { isAuthenticated, isHydrated } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
@@ -21,7 +21,7 @@ export default function ConsiderationPage() {
     removeFromConsiderations(id);
   };
 
-  const total = considerations.reduce((sum, item) => sum + item.product.price, 0);
+  const total = considerations.reduce((sum, item) => sum + item.product.price * (item.quantity || 1), 0);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -119,10 +119,32 @@ export default function ConsiderationPage() {
                           </div>
                         )}
 
-                        {/* Price */}
-                        <p className="font-display text-xl text-charcoal-deep mt-6">
-                          €{item.product.price.toLocaleString()}
-                        </p>
+                        {/* Price & Quantity */}
+                        <div className="flex items-center justify-between mt-6">
+                          <p className="font-display text-xl text-charcoal-deep">
+                            €{(item.product.price * (item.quantity || 1)).toLocaleString()}
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => updateQuantity(item.id, (item.quantity || 1) - 1)}
+                              disabled={(item.quantity || 1) <= 1}
+                              className="w-8 h-8 flex items-center justify-center border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                              aria-label="Decrease quantity"
+                            >
+                              <Minus size={14} />
+                            </button>
+                            <span className="text-sm font-medium text-charcoal-deep w-6 text-center">
+                              {item.quantity || 1}
+                            </span>
+                            <button
+                              onClick={() => updateQuantity(item.id, (item.quantity || 1) + 1)}
+                              className="w-8 h-8 flex items-center justify-center border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-all"
+                              aria-label="Increase quantity"
+                            >
+                              <Plus size={14} />
+                            </button>
+                          </div>
+                        </div>
 
                         {/* View Product Link */}
                         <Link
@@ -160,8 +182,10 @@ export default function ConsiderationPage() {
                   <div className="space-y-4 border-b border-ivory-cream/10 pb-6 mb-6">
                     {considerations.map((item) => (
                       <div key={item.id} className="flex justify-between text-sm">
-                        <span className="text-taupe truncate pr-4">{item.product.name}</span>
-                        <span className="text-ivory-cream flex-shrink-0">€{item.product.price.toLocaleString()}</span>
+                        <span className="text-taupe truncate pr-4">
+                          {item.product.name}{(item.quantity || 1) > 1 ? ` ×${item.quantity}` : ''}
+                        </span>
+                        <span className="text-ivory-cream flex-shrink-0">€{(item.product.price * (item.quantity || 1)).toLocaleString()}</span>
                       </div>
                     ))}
                   </div>

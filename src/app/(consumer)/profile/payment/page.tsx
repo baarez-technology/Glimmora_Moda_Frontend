@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, Plus, Trash2, X, Check, Shield } from 'lucide-react';
+import { ArrowLeft, CreditCard, Plus, Trash2, X, Check, Shield, Pencil } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -48,6 +48,7 @@ export default function PaymentPage() {
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [isHydratedLocal, setIsHydratedLocal] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     type: 'visa' as PaymentMethod['type'],
     cardNumber: '',
@@ -55,6 +56,32 @@ export default function PaymentPage() {
     expiryYear: '',
     holderName: ''
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const paymentCardInputRef = useRef<HTMLSelectElement>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
+
+  // ESC key handler for form and delete confirmation
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (deleteConfirmId) setDeleteConfirmId(null);
+        else if (showForm) { setShowForm(false); setEditingCardId(null); }
+      }
+    };
+    if (showForm || deleteConfirmId) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [showForm, deleteConfirmId]);
+
+  // Auto-focus when form/modal opens
+  useEffect(() => {
+    if (showForm) paymentCardInputRef.current?.focus();
+  }, [showForm]);
+  useEffect(() => {
+    if (deleteConfirmId) deleteCancelRef.current?.focus();
+  }, [deleteConfirmId]);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -79,11 +106,86 @@ export default function PaymentPage() {
     }
   }, [methods, isHydratedLocal]);
 
+  const luhnCheck = (num: string): boolean => {
+    const digits = num.replace(/\D/g, '');
+    let sum = 0;
+    let isEven = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let digit = parseInt(digits[i], 10);
+      if (isEven) { digit *= 2; if (digit > 9) digit -= 9; }
+      sum += digit;
+      isEven = !isEven;
+    }
+    return sum % 10 === 0;
+  };
+
+  const formatCardInput = (value: string): string => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const validateCardForm = (isEditMode: boolean): boolean => {
+    const errs: Record<string, string> = {};
+    const digits = formData.cardNumber.replace(/\s/g, '');
+
+    if (!isEditMode) {
+      // Adding new card: card number is required
+      if (!digits) errs.cardNumber = 'Card number is required';
+      else if (digits.length !== 16) errs.cardNumber = 'Card number must be 16 digits';
+      else if (!luhnCheck(digits)) errs.cardNumber = 'Invalid card number';
+    } else if (digits) {
+      // Editing: only validate if user entered a new card number
+      if (digits.length !== 16) errs.cardNumber = 'Card number must be 16 digits';
+      else if (!luhnCheck(digits)) errs.cardNumber = 'Invalid card number';
+    }
+
+    if (!formData.holderName.trim()) errs.holderName = 'Cardholder name is required';
+    if (!formData.expiryMonth) errs.expiryMonth = 'Required';
+    if (!formData.expiryYear) errs.expiryYear = 'Required';
+
+    if (formData.expiryMonth && formData.expiryYear) {
+      const now = new Date();
+      const expiry = new Date(parseInt(formData.expiryYear), parseInt(formData.expiryMonth));
+      if (expiry <= now) errs.expiryMonth = 'Card has expired';
+    }
+
+    setFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingCardId(null);
+    setFormData({ type: 'visa', cardNumber: '', expiryMonth: '', expiryYear: '', holderName: '' });
+    setFormErrors({});
+  };
+
+  const openAddForm = () => {
+    setEditingCardId(null);
+    setFormData({ type: 'visa', cardNumber: '', expiryMonth: '', expiryYear: '', holderName: '' });
+    setFormErrors({});
+    setShowForm(true);
+  };
+
+  const openEditForm = (method: PaymentMethod) => {
+    setEditingCardId(method.id);
+    setFormData({
+      type: method.type,
+      cardNumber: '', // Don't pre-fill full card number for security
+      expiryMonth: method.expiryMonth,
+      expiryYear: method.expiryYear,
+      holderName: method.holderName
+    });
+    setFormErrors({});
+    setShowForm(true);
+  };
+
   const handleAdd = useCallback(() => {
-    if (!formData.holderName || !formData.cardNumber || !formData.expiryMonth || !formData.expiryYear) {
-      showToast('Please fill in all fields', 'error');
+    if (!validateCardForm(false)) {
+      showToast('Please fix the errors below', 'error');
       return;
     }
+    // Only store last 4 digits — never store full card number
     const lastFour = formData.cardNumber.replace(/\s/g, '').slice(-4);
     const newMethod: PaymentMethod = {
       id: `pm-${Date.now()}`,
@@ -95,20 +197,56 @@ export default function PaymentPage() {
       isDefault: methods.length === 0
     };
     setMethods(prev => [...prev, newMethod]);
-    setFormData({ type: 'visa', cardNumber: '', expiryMonth: '', expiryYear: '', holderName: '' });
-    setShowForm(false);
+    closeForm();
     showToast('Payment method added', 'success');
   }, [formData, methods.length, showToast]);
 
+  const handleSaveEdit = useCallback(() => {
+    if (!editingCardId) return;
+    if (!validateCardForm(true)) {
+      showToast('Please fix the errors below', 'error');
+      return;
+    }
+
+    setMethods(prev => prev.map(m => {
+      if (m.id !== editingCardId) return m;
+
+      const updatedCard: PaymentMethod = {
+        ...m,
+        type: formData.type,
+        expiryMonth: formData.expiryMonth,
+        expiryYear: formData.expiryYear,
+        holderName: formData.holderName
+      };
+
+      // If user provided a new card number, update lastFour
+      const digits = formData.cardNumber.replace(/\s/g, '');
+      if (digits.length === 16) {
+        updatedCard.lastFour = digits.slice(-4);
+      }
+
+      return updatedCard;
+    }));
+
+    closeForm();
+    showToast('Payment method updated', 'success');
+  }, [editingCardId, formData, showToast]);
+
   const handleDelete = (id: string) => {
-    const method = methods.find(m => m.id === id);
+    setDeleteConfirmId(id);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteConfirmId) return;
+    const method = methods.find(m => m.id === deleteConfirmId);
     setMethods(prev => {
-      const filtered = prev.filter(m => m.id !== id);
+      const filtered = prev.filter(m => m.id !== deleteConfirmId);
       if (method?.isDefault && filtered.length > 0) {
         filtered[0].isDefault = true;
       }
       return filtered;
     });
+    setDeleteConfirmId(null);
     showToast('Payment method removed', 'success');
   };
 
@@ -164,7 +302,7 @@ export default function PaymentPage() {
         {/* Add Button */}
         {!showForm && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={openAddForm}
             className="w-full py-4 border-2 border-dashed border-sand hover:border-charcoal-deep text-stone hover:text-charcoal-deep transition-colors flex items-center justify-center gap-2"
           >
             <Plus size={18} />
@@ -172,93 +310,7 @@ export default function PaymentPage() {
           </button>
         )}
 
-        {/* Add Card Form */}
-        {showForm && (
-          <div className="bg-white p-8">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="font-display text-xl text-charcoal-deep">Add Card</h2>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-sand/20 transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Card Type</label>
-                <select
-                  value={formData.type}
-                  onChange={e => setFormData({ ...formData, type: e.target.value as PaymentMethod['type'] })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                >
-                  <option value="visa">Visa</option>
-                  <option value="mastercard">Mastercard</option>
-                  <option value="amex">American Express</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Card Number</label>
-                <input
-                  type="text"
-                  value={formData.cardNumber}
-                  onChange={e => setFormData({ ...formData, cardNumber: e.target.value })}
-                  placeholder="•••• •••• •••• ••••"
-                  maxLength={19}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Cardholder Name</label>
-                <input
-                  type="text"
-                  value={formData.holderName}
-                  onChange={e => setFormData({ ...formData, holderName: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Expiry Month</label>
-                  <select
-                    value={formData.expiryMonth}
-                    onChange={e => setFormData({ ...formData, expiryMonth: e.target.value })}
-                    className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                  >
-                    <option value="">Month</option>
-                    {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Expiry Year</label>
-                  <select
-                    value={formData.expiryYear}
-                    onChange={e => setFormData({ ...formData, expiryYear: e.target.value })}
-                    className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                  >
-                    <option value="">Year</option>
-                    {Array.from({ length: 8 }, (_, i) => String(new Date().getFullYear() + i)).map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-4 pt-4">
-                <button
-                  onClick={() => setShowForm(false)}
-                  className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-wider uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAdd}
-                  className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase"
-                >
-                  Add Card
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Add Card Form - placeholder for inline position; actual form rendered as overlay below */}
 
         {/* Card List */}
         {methods.length === 0 && !showForm ? (
@@ -296,6 +348,13 @@ export default function PaymentPage() {
                       <Check size={16} className="text-stone" />
                     </button>
                   )}
+                  <button
+                    onClick={() => openEditForm(method)}
+                    className="p-2 hover:bg-sand/20 transition-colors"
+                    title="Edit card"
+                  >
+                    <Pencil size={16} className="text-stone" />
+                  </button>
                   <button onClick={() => handleDelete(method.id)} className="p-2 hover:bg-red-50 transition-colors" title="Remove">
                     <Trash2 size={16} className="text-red-600" />
                   </button>
@@ -305,6 +364,138 @@ export default function PaymentPage() {
           ))
         )}
       </div>
+
+      {/* Add Card Form Overlay */}
+      {showForm && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="payment-form-title" onClick={closeForm}>
+          <div className="bg-white max-w-lg w-full p-8 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-8">
+              <h2 id="payment-form-title" className="font-display text-xl text-charcoal-deep">
+                {editingCardId ? 'Edit Card' : 'Add Card'}
+              </h2>
+              <button onClick={closeForm} className="p-2 hover:bg-sand/20 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Card Type</label>
+                <select
+                  ref={paymentCardInputRef}
+                  value={formData.type}
+                  onChange={e => setFormData({ ...formData, type: e.target.value as PaymentMethod['type'] })}
+                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                >
+                  <option value="visa">Visa</option>
+                  <option value="mastercard">Mastercard</option>
+                  <option value="amex">American Express</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">
+                  Card Number
+                  {editingCardId && (
+                    <span className="text-stone/60 normal-case tracking-normal ml-2">
+                      — leave blank to keep existing
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  value={formData.cardNumber}
+                  onChange={e => { setFormData({ ...formData, cardNumber: formatCardInput(e.target.value) }); setFormErrors(prev => ({ ...prev, cardNumber: '' })); }}
+                  placeholder={editingCardId
+                    ? `•••• •••• •••• ${methods.find(m => m.id === editingCardId)?.lastFour ?? '****'}`
+                    : '1234 5678 9012 3456'
+                  }
+                  maxLength={19}
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.cardNumber ? 'border-red-400' : 'border-sand'}`}
+                />
+                {formErrors.cardNumber && <p className="text-xs text-red-500 mt-1">{formErrors.cardNumber}</p>}
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Cardholder Name</label>
+                <input
+                  type="text"
+                  value={formData.holderName}
+                  onChange={e => { setFormData({ ...formData, holderName: e.target.value }); setFormErrors(prev => ({ ...prev, holderName: '' })); }}
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.holderName ? 'border-red-400' : 'border-sand'}`}
+                />
+                {formErrors.holderName && <p className="text-xs text-red-500 mt-1">{formErrors.holderName}</p>}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Expiry Month</label>
+                  <select
+                    value={formData.expiryMonth}
+                    onChange={e => setFormData({ ...formData, expiryMonth: e.target.value })}
+                    className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  >
+                    <option value="">Month</option>
+                    {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Expiry Year</label>
+                  <select
+                    value={formData.expiryYear}
+                    onChange={e => setFormData({ ...formData, expiryYear: e.target.value })}
+                    className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  >
+                    <option value="">Year</option>
+                    {Array.from({ length: 8 }, (_, i) => String(new Date().getFullYear() + i)).map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex gap-4 pt-4">
+                <button
+                  onClick={closeForm}
+                  className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-wider uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={editingCardId ? handleSaveEdit : handleAdd}
+                  className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase"
+                >
+                  {editingCardId ? 'Save Changes' : 'Add Card'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-payment-title">
+          <div className="bg-white max-w-md w-full p-8">
+            <h3 id="delete-payment-title" className="font-display text-xl text-charcoal-deep mb-3">Remove Payment Method</h3>
+            <p className="text-stone text-sm mb-6">
+              Are you sure you want to remove this card? This action cannot be undone.
+            </p>
+            <div className="flex gap-4">
+              <button
+                ref={deleteCancelRef}
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-wider uppercase"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-6 py-3 bg-red-600 text-white hover:bg-red-700 transition-colors text-sm tracking-wider uppercase"
+              >
+                Remove Card
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

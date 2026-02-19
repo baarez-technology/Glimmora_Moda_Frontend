@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Calendar, Star, MessageCircle, ThumbsUp, ThumbsDown, Camera, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
@@ -17,17 +17,21 @@ interface OutfitHistoryEntry {
 }
 
 function buildSampleHistory(products: Product[]): OutfitHistoryEntry[] {
+  // Generate dates relative to current date
+  const now = Date.now();
+  const daysAgo = (days: number) => new Date(now - days * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
   return [
     {
       id: 'outfit-1',
-      date: '2024-01-20',
+      date: daysAgo(3),
       occasion: 'Business Meeting',
       productIds: [products[0]?.id, products[2]?.id].filter(Boolean),
       feedback: {
         id: 'fb-1',
         outfitId: 'outfit-1',
         outfitItems: [products[0]?.id, products[2]?.id].filter(Boolean),
-        wornDate: '2024-01-20',
+        wornDate: daysAgo(3),
         rating: 5 as const,
         feedback: {
           comfort: 5,
@@ -38,19 +42,19 @@ function buildSampleHistory(products: Product[]): OutfitHistoryEntry[] {
         },
         occasion: 'business-meeting',
         notes: 'Received so many compliments! Perfect for the client presentation.',
-        createdAt: '2024-01-20T18:00:00Z'
+        createdAt: new Date(now - 3 * 24 * 60 * 60 * 1000).toISOString()
       }
     },
     {
       id: 'outfit-2',
-      date: '2024-01-18',
+      date: daysAgo(5),
       occasion: 'Dinner Date',
       productIds: [products[1]?.id, products[3]?.id].filter(Boolean),
       feedback: {
         id: 'fb-2',
         outfitId: 'outfit-2',
         outfitItems: [products[1]?.id, products[3]?.id].filter(Boolean),
-        wornDate: '2024-01-18',
+        wornDate: daysAgo(5),
         rating: 4 as const,
         feedback: {
           comfort: 4,
@@ -61,12 +65,12 @@ function buildSampleHistory(products: Product[]): OutfitHistoryEntry[] {
         },
         occasion: 'romantic-dinner',
         notes: 'Felt very elegant. The shoes were a bit tight after a few hours.',
-        createdAt: '2024-01-18T22:00:00Z'
+        createdAt: new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString()
       }
     },
     {
       id: 'outfit-3',
-      date: '2024-01-15',
+      date: daysAgo(8),
       occasion: 'Weekend Brunch',
       productIds: [products[0]?.id].filter(Boolean)
     }
@@ -86,6 +90,22 @@ export default function WardrobeHistoryPage() {
     notes: '',
     wouldWearAgain: true
   });
+  const feedbackModalRef = useRef<HTMLDivElement>(null);
+
+  // ESC key handler for feedback modal
+  useEffect(() => {
+    if (!showFeedbackModal) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowFeedbackModal(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showFeedbackModal]);
+
+  // Auto-focus modal when opened
+  useEffect(() => {
+    if (showFeedbackModal) feedbackModalRef.current?.focus();
+  }, [showFeedbackModal]);
 
   useEffect(() => {
     async function loadData() {
@@ -95,7 +115,7 @@ export default function WardrobeHistoryPage() {
         setProducts(loadedProducts);
 
         // Load from localStorage or use sample data
-        const saved = localStorage.getItem('modaglimmora_outfit_history');
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('modaglimmora_outfit_history') : null;
         if (saved) {
           setHistory(JSON.parse(saved));
         } else {
@@ -151,13 +171,19 @@ export default function WardrobeHistoryPage() {
   const StarRating = ({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) => (
     <div>
       <p className="text-xs text-stone/60 mb-2">{label}</p>
-      <div className="flex gap-1">
+      <div className="flex gap-1" role="group" aria-label={label}>
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             type="button"
             onClick={() => onChange(star)}
-            className="p-1"
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' && star < 5) onChange(star + 1);
+              if (e.key === 'ArrowLeft' && star > 1) onChange(star - 1);
+            }}
+            className="p-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-soft rounded"
+            aria-label={`Rate ${star} out of 5 stars`}
+            aria-pressed={star <= value}
           >
             <Star
               className={`w-6 h-6 transition-colors ${
@@ -349,17 +375,19 @@ export default function WardrobeHistoryPage() {
 
       {/* Feedback Modal */}
       {showFeedbackModal && selectedEntry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="feedback-modal-title">
           <div
             className="absolute inset-0 bg-charcoal-deep/50 backdrop-blur-sm"
             onClick={() => setShowFeedbackModal(false)}
           />
           <motion.div
+            ref={feedbackModalRef}
+            tabIndex={-1}
             className="relative bg-white rounded-2xl w-full max-w-md p-6"
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
           >
-            <h2 className="text-xl font-display text-charcoal-deep mb-2">How was this outfit?</h2>
+            <h2 id="feedback-modal-title" className="text-xl font-display text-charcoal-deep mb-2">How was this outfit?</h2>
             <p className="text-sm text-stone/60 mb-6">{selectedEntry.occasion} - {new Date(selectedEntry.date).toLocaleDateString()}</p>
 
             <div className="space-y-6">
