@@ -27,6 +27,20 @@ function DiscoverContent() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('relevance');
+
+  // ESC key handler for filter drawer
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowMobileFilters(false);
+      }
+    };
+    if (showMobileFilters) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [showMobileFilters]);
 
   useEffect(() => {
     async function loadData() {
@@ -57,7 +71,7 @@ function DiscoverContent() {
   };
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => {
+    const filtered = products.filter(p => {
       if (budgetRange) {
         const range = budgetRanges[budgetRange];
         if (p.price < range.min || p.price > range.max) return false;
@@ -97,7 +111,17 @@ function DiscoverContent() {
 
       return true;
     });
-  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, products]);
+
+    return [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'price-asc': return a.price - b.price;
+        case 'price-desc': return b.price - a.price;
+        case 'newest': return -1;
+        case 'brand-az': return a.brandName.localeCompare(b.brandName);
+        default: return 0;
+      }
+    });
+  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, products, sortBy]);
 
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
@@ -229,7 +253,20 @@ function DiscoverContent() {
               ))}
             </nav>
 
-            {/* Filter Toggle - Refined */}
+            {/* Sort & Filter Controls */}
+            <div className="flex items-center gap-4">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="px-4 py-2 border border-sand bg-white text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+              >
+                <option value="relevance">Relevance</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+                <option value="newest">Newest</option>
+                <option value="brand-az">Brand A-Z</option>
+              </select>
+
             <button
               onClick={() => setShowMobileFilters(true)}
               className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-charcoal-deep hover:text-gold-deep transition-colors"
@@ -242,6 +279,7 @@ function DiscoverContent() {
                 )}
               </span>
             </button>
+            </div>
           </div>
 
           {/* Active Filters - Refined Chips */}

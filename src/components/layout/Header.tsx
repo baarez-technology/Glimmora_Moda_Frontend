@@ -15,8 +15,10 @@ export default function Header() {
   const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+  const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const accountRef = useRef<HTMLDivElement>(null);
+  const brandDropdownRef = useRef<HTMLDivElement>(null);
 
   // Load brands from service on mount
   useEffect(() => {
@@ -42,18 +44,18 @@ export default function Header() {
   useEffect(() => {
     const handleEscKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (isMenuOpen) {
-          setIsMenuOpen(false);
-        }
-        if (isAccountOpen) {
-          setIsAccountOpen(false);
-        }
+        if (isMenuOpen) setIsMenuOpen(false);
+        if (isAccountOpen) setIsAccountOpen(false);
+        if (isBrandDropdownOpen) setIsBrandDropdownOpen(false);
       }
     };
 
     const handleClickOutside = (e: MouseEvent) => {
       if (accountRef.current && !accountRef.current.contains(e.target as Node)) {
         setIsAccountOpen(false);
+      }
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target as Node)) {
+        setIsBrandDropdownOpen(false);
       }
     };
 
@@ -63,7 +65,7 @@ export default function Header() {
       window.removeEventListener('keydown', handleEscKey);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isMenuOpen, isAccountOpen]);
+  }, [isMenuOpen, isAccountOpen, isBrandDropdownOpen]);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-ivory-cream/95 backdrop-blur-sm border-b border-sand/30">
@@ -82,32 +84,48 @@ export default function Header() {
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="lg:hidden p-2 -ml-2"
             aria-label="Toggle menu"
+            aria-expanded={isMenuOpen}
+            aria-controls="mobile-menu"
           >
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
 
           {/* Navigation Left */}
-          <nav className="hidden lg:flex items-center gap-8">
-            <div className="relative group">
-              <button className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors py-2">
+          <nav className="hidden lg:flex items-center gap-8" aria-label="Main navigation">
+            <div
+              ref={brandDropdownRef}
+              className="relative"
+              onMouseEnter={() => setIsBrandDropdownOpen(true)}
+              onMouseLeave={() => setIsBrandDropdownOpen(false)}
+            >
+              <button
+                className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors py-2"
+                aria-haspopup="true"
+                aria-expanded={isBrandDropdownOpen}
+                onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+              >
                 Brand Universes
               </button>
-              <div className="absolute top-full left-0 pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300">
-                <div className="bg-white shadow-lg rounded-lg p-6 min-w-[280px]">
-                  <p className="text-xs tracking-[0.15em] uppercase text-greige mb-4">Explore Our Maisons</p>
-                  <div className="space-y-3">
-                    {brands.map((brand) => (
-                      <Link
-                        key={brand.id}
-                        href={`/brand/${brand.slug}`}
-                        className="block text-charcoal-deep hover:text-gold-muted transition-colors"
-                      >
-                        <span className="font-display text-lg">{brand.name}</span>
-                      </Link>
-                    ))}
+              {isBrandDropdownOpen && (
+                <div className="absolute top-full left-0 pt-4">
+                  <div className="bg-white shadow-lg rounded-lg p-6 min-w-[280px]" role="menu">
+                    <p className="text-xs tracking-[0.15em] uppercase text-greige mb-4">Explore Our Maisons</p>
+                    <div className="space-y-3">
+                      {brands.map((brand) => (
+                        <Link
+                          key={brand.id}
+                          href={`/brand/${brand.slug}`}
+                          role="menuitem"
+                          className="block text-charcoal-deep hover:text-gold-muted transition-colors"
+                          onClick={() => setIsBrandDropdownOpen(false)}
+                        >
+                          <span className="font-display text-lg">{brand.name}</span>
+                        </Link>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
             <Link
               href="/discover"
@@ -116,7 +134,7 @@ export default function Header() {
               Discover
             </Link>
             <Link
-              href="/collection/autumn-winter-2024"
+              href="/collection"
               className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors"
             >
               Collections
@@ -152,6 +170,8 @@ export default function Header() {
                 onClick={() => setIsAccountOpen(!isAccountOpen)}
                 className="p-2 text-charcoal-warm hover:text-noir transition-colors relative"
                 aria-label="Account"
+                aria-haspopup="true"
+                aria-expanded={isAccountOpen}
               >
                 <User size={20} />
                 {/* UHNI indicator dot */}
@@ -209,8 +229,8 @@ export default function Header() {
 
         {/* Mobile Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden absolute top-full left-0 right-0 bg-white shadow-lg animate-slide-up max-h-[80vh] overflow-y-auto">
-            <nav className="p-6 space-y-6">
+          <div id="mobile-menu" className="lg:hidden absolute top-full left-0 right-0 bg-white shadow-lg animate-slide-up max-h-[80vh] overflow-y-auto">
+            <nav className="p-6 space-y-6" aria-label="Main navigation">
               {/* Quick Stats */}
               {considerations.length > 0 && (
                 <div className="pb-4 border-b border-sand/30">
@@ -249,7 +269,7 @@ export default function Header() {
                   Discover
                 </Link>
                 <Link
-                  href="/collection/autumn-winter-2024"
+                  href="/collection"
                   className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
                   onClick={() => setIsMenuOpen(false)}
                 >

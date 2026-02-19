@@ -71,10 +71,7 @@ export default function PrivacyPage() {
   }, [settings, isHydratedLocal]);
 
   const toggle = (key: keyof PrivacySettings) => {
-    if (key === 'essentialCookies') {
-      showToast('Essential cookies cannot be disabled', 'info');
-      return;
-    }
+    if (key === 'essentialCookies') return; // Essential cookies cannot be toggled
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
     showToast('Privacy settings updated', 'success');
   };
@@ -206,22 +203,32 @@ export default function PrivacyPage() {
             ].map(item => (
               <div key={item.key} className="flex items-center justify-between py-5 border-b border-sand last:border-0">
                 <div>
-                  <p className="font-medium text-charcoal-deep">{item.label}</p>
+                  <p className={`font-medium ${item.locked ? 'text-stone' : 'text-charcoal-deep'}`}>{item.label}</p>
                   <p className="text-sm text-stone">{item.desc}</p>
                 </div>
-                <button
-                  onClick={() => toggle(item.key)}
-                  disabled={item.locked}
-                  className={`w-12 h-7 transition-colors relative flex-shrink-0 ${
-                    settings[item.key] ? 'bg-charcoal-deep' : 'bg-sand'
-                  } ${item.locked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                >
-                  <span
-                    className={`absolute top-1 w-5 h-5 bg-white transition-transform ${
-                      settings[item.key] ? 'translate-x-6' : 'translate-x-1'
+                {item.locked ? (
+                  <div
+                    className="w-12 h-7 relative flex-shrink-0 bg-charcoal-deep/40 opacity-50 cursor-not-allowed select-none"
+                    aria-disabled="true"
+                    aria-label={`${item.label} - always enabled`}
+                    title="Essential cookies are always enabled"
+                  >
+                    <span className="absolute top-1 w-5 h-5 bg-white/70 translate-x-6" />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => toggle(item.key)}
+                    className={`w-12 h-7 transition-colors relative flex-shrink-0 ${
+                      settings[item.key] ? 'bg-charcoal-deep' : 'bg-sand'
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`absolute top-1 w-5 h-5 bg-white transition-transform ${
+                        settings[item.key] ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                )}
               </div>
             ))}
           </div>

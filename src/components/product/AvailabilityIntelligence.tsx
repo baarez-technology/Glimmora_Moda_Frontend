@@ -40,6 +40,7 @@ export default function AvailabilityIntelligence({ availability, onNotifyRestock
       {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="w-full p-4 flex items-center justify-between hover:bg-parchment/50 transition-colors"
         title="Global Stock & Availability Intelligence Layer - Real-time inventory tracking across boutiques worldwide"
       >

@@ -51,15 +51,15 @@ export default function ImmersiveVisualization({
     setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
   };
 
-  // Generate fit predictions based on Body Twin
+  // TODO: Derive fit predictions from body-twin measurements matched against product sizing data
+  // Currently shows estimated fit labels without fake confidence percentages
   const fitPredictions = bodyTwin ? {
     overallFit: selectedSize === 'M' ? 'Perfect Fit' : selectedSize === 'S' ? 'Snug Fit' : 'Relaxed Fit',
-    confidence: 92,
     measurements: [
-      { area: 'Shoulders', fit: 'True to size', confidence: 94 },
-      { area: 'Chest', fit: 'Slightly relaxed', confidence: 89 },
-      { area: 'Waist', fit: 'True to size', confidence: 95 },
-      { area: 'Length', fit: 'Perfect', confidence: 97 }
+      { area: 'Shoulders', fit: 'True to size' },
+      { area: 'Chest', fit: 'Slightly relaxed' },
+      { area: 'Waist', fit: 'True to size' },
+      { area: 'Length', fit: 'Estimated fit' }
     ],
     recommendations: [
       'This size will provide the intended silhouette',
@@ -67,6 +67,9 @@ export default function ImmersiveVisualization({
       'Ideal for layering without bulk'
     ]
   } : null;
+
+  // Pull color variants from the product data
+  const colorVariants = product.variants.filter(v => v.type === 'color');
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
@@ -193,7 +196,14 @@ export default function ImmersiveVisualization({
                   </div>
                   <div className="bg-white/70 border border-sand/40 rounded-md px-4 py-3">
                     <p className="text-xs text-stone">Color</p>
-                    <p className="text-sm text-charcoal-deep mt-1 font-medium">{selectedColor || 'Default'}</p>
+                    <p className="text-sm text-charcoal-deep mt-1 font-medium">
+                      {selectedColor || (colorVariants.length > 0 ? colorVariants[0].name : 'Default')}
+                    </p>
+                    {colorVariants.length > 1 && (
+                      <p className="text-[10px] text-taupe mt-1">
+                        {colorVariants.length} colors available
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -231,7 +241,7 @@ export default function ImmersiveVisualization({
                   </div>
                   <div>
                     <h3 className="font-display text-xl text-charcoal-deep">{fitPredictions.overallFit}</h3>
-                    <p className="text-xs text-stone">{fitPredictions.confidence}% confidence</p>
+                    <p className="text-xs text-stone">Estimated fit based on Body Twin</p>
                   </div>
                 </div>
 
@@ -253,7 +263,6 @@ export default function ImmersiveVisualization({
                     <div key={index} className="bg-white/70 border border-sand/40 rounded-md px-4 py-3">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-sm text-charcoal-deep font-medium">{measurement.area}</p>
-                        <span className="text-xs text-stone">{measurement.confidence}%</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Ruler size={14} className="text-taupe" />

@@ -56,6 +56,7 @@ export interface ConsiderationItem {
     color?: string;
   };
   agiNote?: string;
+  quantity?: number;
 }
 
 // User
@@ -63,6 +64,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  createdAt?: string;
   fashionIdentity?: FashionIdentity;
   wardrobe: WardrobeItem[];
   considerations: ConsiderationItem[];

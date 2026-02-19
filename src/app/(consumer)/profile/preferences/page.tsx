@@ -2,16 +2,28 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Settings, Bell, Lock, ShoppingBag, Monitor, Save, Check, RotateCcw, Shield } from 'lucide-react';
 import * as userService from '@/services/user.service';
+import { useAuth } from '@/context/AuthContext';
 import type { UserPreferences } from '@/types';
 
 export default function PreferencesPage() {
+  const router = useRouter();
+  const { isAuthenticated, isHydrated } = useAuth();
+
+  useEffect(() => {
+    if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/preferences');
+  }, [isAuthenticated, isHydrated, router]);
+
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [initialPreferences, setInitialPreferences] = useState<UserPreferences | null>(null);
   const [saved, setSaved] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [showAddBrand, setShowAddBrand] = useState(false);
+  const [newBrandName, setNewBrandName] = useState('');
+  const [budgetError, setBudgetError] = useState('');
 
   useEffect(() => {
     const loadPreferences = async () => {
@@ -41,7 +53,29 @@ export default function PreferencesPage() {
     setHasChanges(true);
   };
 
+  const handleAddBrand = () => {
+    const trimmed = newBrandName.trim();
+    if (!trimmed || !preferences) return;
+    if (preferences.shopping.preferredBrands.includes(trimmed)) {
+      setNewBrandName('');
+      setShowAddBrand(false);
+      return;
+    }
+    updatePreference('shopping', 'preferredBrands', [...preferences.shopping.preferredBrands, trimmed]);
+    setNewBrandName('');
+    setShowAddBrand(false);
+  };
+
+  const handleRemoveBrand = (brand: string) => {
+    if (!preferences) return;
+    updatePreference('shopping', 'preferredBrands', preferences.shopping.preferredBrands.filter(b => b !== brand));
+  };
+
   const handleSave = () => {
+    if (preferences) {
+      localStorage.setItem('moda-user-preferences', JSON.stringify(preferences));
+      setInitialPreferences(preferences);
+    }
     setSaved(true);
     setHasChanges(false);
     setTimeout(() => setSaved(false), 2000);
@@ -140,31 +174,38 @@ export default function PreferencesPage() {
               { key: 'priceChanges', label: 'Price Changes', desc: 'Alert when items in your considerations change price' },
               { key: 'outfitSuggestions', label: 'Outfit Suggestions', desc: 'Receive curated outfit ideas based on your wardrobe' },
               { key: 'eventReminders', label: 'Event Reminders', desc: 'Get outfit suggestions before calendar events' }
-            ].map((item) => (
-              <label key={item.key} className="flex items-center justify-between p-6 cursor-pointer hover:bg-parchment/50 transition-colors">
-                <div>
-                  <p className="text-charcoal-deep">{item.label}</p>
-                  <p className="text-sm text-stone">{item.desc}</p>
-                </div>
-                <div
-                  onClick={(e) => {
-                    e.preventDefault();
-                    updatePreference('notifications', item.key as keyof UserPreferences['notifications'], !preferences.notifications[item.key as keyof typeof preferences.notifications]);
-                  }}
-                  className={`w-6 h-6 border-2 flex items-center justify-center cursor-pointer transition-all ${
-                    preferences.notifications[item.key as keyof typeof preferences.notifications]
-                      ? 'border-charcoal-deep bg-charcoal-deep'
-                      : 'border-sand hover:border-charcoal-deep'
-                  }`}
-                >
-                  {preferences.notifications[item.key as keyof typeof preferences.notifications] && (
-                    <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </label>
-            ))}
+            ].map((item) => {
+              const checked = !!preferences.notifications[item.key as keyof typeof preferences.notifications];
+              return (
+                <label key={item.key} className="flex items-center justify-between p-6 cursor-pointer hover:bg-parchment/50 transition-colors">
+                  <div>
+                    <p className="text-charcoal-deep">{item.label}</p>
+                    <p className="text-sm text-stone">{item.desc}</p>
+                  </div>
+                  <span className="relative">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => updatePreference('notifications', item.key as keyof UserPreferences['notifications'], !checked)}
+                      className="sr-only peer"
+                    />
+                    <span
+                      className={`w-6 h-6 border-2 flex items-center justify-center cursor-pointer transition-all ${
+                        checked
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand peer-focus-visible:border-charcoal-deep hover:border-charcoal-deep'
+                      }`}
+                    >
+                      {checked && (
+                        <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
         </section>
 
@@ -185,31 +226,38 @@ export default function PreferencesPage() {
               { key: 'shareWardrobeInsights', label: 'Share Wardrobe Insights', desc: 'Allow aggregate wardrobe data to improve recommendations' },
               { key: 'allowAGILearning', label: 'Personalized Learning', desc: 'Let our system learn from your preferences' },
               { key: 'shareStylePreferences', label: 'Share Style Preferences', desc: 'Allow anonymized style data to improve the platform' }
-            ].map((item) => (
-              <label key={item.key} className="flex items-center justify-between p-6 cursor-pointer hover:bg-parchment/50 transition-colors">
-                <div>
-                  <p className="text-charcoal-deep">{item.label}</p>
-                  <p className="text-sm text-stone">{item.desc}</p>
-                </div>
-                <div
-                  onClick={(e) => {
-                    e.preventDefault();
-                    updatePreference('privacy', item.key as keyof UserPreferences['privacy'], !preferences.privacy[item.key as keyof typeof preferences.privacy]);
-                  }}
-                  className={`w-6 h-6 border-2 flex items-center justify-center cursor-pointer transition-all ${
-                    preferences.privacy[item.key as keyof typeof preferences.privacy]
-                      ? 'border-charcoal-deep bg-charcoal-deep'
-                      : 'border-sand hover:border-charcoal-deep'
-                  }`}
-                >
-                  {preferences.privacy[item.key as keyof typeof preferences.privacy] && (
-                    <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </label>
-            ))}
+            ].map((item) => {
+              const checked = !!preferences.privacy[item.key as keyof typeof preferences.privacy];
+              return (
+                <label key={item.key} className="flex items-center justify-between p-6 cursor-pointer hover:bg-parchment/50 transition-colors">
+                  <div>
+                    <p className="text-charcoal-deep">{item.label}</p>
+                    <p className="text-sm text-stone">{item.desc}</p>
+                  </div>
+                  <span className="relative">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => updatePreference('privacy', item.key as keyof UserPreferences['privacy'], !checked)}
+                      className="sr-only peer"
+                    />
+                    <span
+                      className={`w-6 h-6 border-2 flex items-center justify-center cursor-pointer transition-all ${
+                        checked
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand peer-focus-visible:border-charcoal-deep hover:border-charcoal-deep'
+                      }`}
+                    >
+                      {checked && (
+                        <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
           </div>
 
           <div className="p-6 bg-parchment/50">
@@ -246,7 +294,17 @@ export default function PreferencesPage() {
                     <input
                       type="number"
                       value={preferences.shopping.budgetMin}
-                      onChange={(e) => updatePreference('shopping', 'budgetMin', parseInt(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        if (val > preferences.shopping.budgetMax) {
+                          setBudgetError('Minimum cannot exceed maximum');
+                          setTimeout(() => setBudgetError(''), 3000);
+                          updatePreference('shopping', 'budgetMin', preferences.shopping.budgetMax);
+                        } else {
+                          setBudgetError('');
+                          updatePreference('shopping', 'budgetMin', val);
+                        }
+                      }}
                       className="w-full pl-10 pr-4 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
                     />
                   </div>
@@ -258,25 +316,75 @@ export default function PreferencesPage() {
                     <input
                       type="number"
                       value={preferences.shopping.budgetMax}
-                      onChange={(e) => updatePreference('shopping', 'budgetMax', parseInt(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        if (val < preferences.shopping.budgetMin) {
+                          setBudgetError('Maximum cannot be less than minimum');
+                          setTimeout(() => setBudgetError(''), 3000);
+                          updatePreference('shopping', 'budgetMax', preferences.shopping.budgetMin);
+                        } else {
+                          setBudgetError('');
+                          updatePreference('shopping', 'budgetMax', val);
+                        }
+                      }}
                       className="w-full pl-10 pr-4 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
                     />
                   </div>
                 </div>
               </div>
+              {budgetError && (
+                <p className="mt-2 text-xs text-error" role="alert">{budgetError}</p>
+              )}
             </div>
 
             <div>
               <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-4 block">Preferred Brands</label>
               <div className="flex flex-wrap gap-2">
                 {preferences.shopping.preferredBrands.map((brand) => (
-                  <span key={brand} className="px-4 py-2 bg-parchment text-sm text-charcoal-deep">
+                  <span key={brand} className="group px-4 py-2 bg-parchment text-sm text-charcoal-deep flex items-center gap-2">
                     {brand}
+                    <button
+                      onClick={() => handleRemoveBrand(brand)}
+                      className="text-stone/40 hover:text-error transition-colors"
+                      aria-label={`Remove ${brand}`}
+                    >
+                      &times;
+                    </button>
                   </span>
                 ))}
-                <button className="px-4 py-2 border border-dashed border-sand text-sm text-taupe hover:border-charcoal-deep hover:text-charcoal-deep transition-colors">
-                  + Add Brand
-                </button>
+                {showAddBrand ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newBrandName}
+                      onChange={(e) => setNewBrandName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddBrand(); if (e.key === 'Escape') { setShowAddBrand(false); setNewBrandName(''); } }}
+                      placeholder="Brand name"
+                      autoFocus
+                      className="px-3 py-2 border border-sand text-sm focus:outline-none focus:border-charcoal-deep transition-colors w-40"
+                    />
+                    <button
+                      onClick={handleAddBrand}
+                      disabled={!newBrandName.trim()}
+                      className="px-3 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => { setShowAddBrand(false); setNewBrandName(''); }}
+                      className="px-2 py-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowAddBrand(true)}
+                    className="px-4 py-2 border border-dashed border-sand text-sm text-taupe hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+                  >
+                    + Add Brand
+                  </button>
+                )}
               </div>
             </div>
 

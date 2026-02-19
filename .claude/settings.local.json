@@ -10,7 +10,12 @@
       "Bash(npx next build:*)",
       "Bash(powershell.exe -Command \"Get-ChildItem ''Z:\\\\Dummy Moda-Glimmora'' | Format-Table Name, Length, LastWriteTime\")",
       "Bash(wc:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(pip3 install:*)",
+      "Bash(npx mammoth:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run build:*)"
     ]
   }
 }

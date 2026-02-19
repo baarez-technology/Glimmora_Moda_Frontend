@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Link2, Mail, Copy, Check, Twitter, Facebook, MessageCircle } from 'lucide-react';
 import Image from 'next/image';
@@ -31,6 +31,22 @@ export default function ShareModal({
 }: ShareModalProps) {
   const [copied, setCopied] = useState(false);
   const shareUrl = url || (typeof window !== 'undefined' ? window.location.href : '');
+  const shareCloseRef = useRef<HTMLButtonElement>(null);
+
+  // ESC key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
+  // Auto-focus close button when modal opens
+  useEffect(() => {
+    if (isOpen) shareCloseRef.current?.focus();
+  }, [isOpen]);
 
   const copyToClipboard = async () => {
     try {
@@ -79,6 +95,9 @@ export default function ShareModal({
     <AnimatePresence>
       <motion.div
         className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="share-modal-title"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -101,8 +120,9 @@ export default function ShareModal({
         >
           {/* Header */}
           <div className="px-6 py-4 border-b border-stone/10 flex items-center justify-between">
-            <h2 className="text-lg font-display text-charcoal-deep">Share</h2>
+            <h2 id="share-modal-title" className="text-lg font-display text-charcoal-deep">Share</h2>
             <button
+              ref={shareCloseRef}
               onClick={onClose}
               className="p-2 hover:bg-stone/10 rounded-full transition-colors"
             >

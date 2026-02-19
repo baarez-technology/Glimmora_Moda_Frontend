@@ -87,13 +87,13 @@ export default function Footer() {
             </h3>
             <nav className="space-y-3">
               <Link
-                href="/authenticity"
+                href="/discover"
                 className="block text-sm text-stone hover:text-ivory-cream transition-colors"
               >
                 Authenticity Guarantee
               </Link>
               <Link
-                href="/privacy"
+                href="/profile/privacy"
                 className="block text-sm text-stone hover:text-ivory-cream transition-colors"
               >
                 Privacy Policy
@@ -105,7 +105,7 @@ export default function Footer() {
                 Terms of Service
               </Link>
               <Link
-                href="/sustainability"
+                href="/profile/sustainability"
                 className="block text-sm text-stone hover:text-ivory-cream transition-colors"
               >
                 Sustainability
@@ -120,7 +120,7 @@ export default function Footer() {
         <div className="max-w-[1800px] mx-auto px-6 lg:px-12 py-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-xs text-stone">
-              © 2024 ModaGlimmora. All rights reserved.
+              © {new Date().getFullYear()} ModaGlimmora. All rights reserved.
             </p>
             <p className="text-xs tracking-[0.1em] text-stone">
               Powered by AGI Intelligence • No Dark Patterns • Privacy First

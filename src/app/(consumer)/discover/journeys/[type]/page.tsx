@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { use, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Palette, Globe, Gem, History } from 'lucide-react';
 import Link from 'next/link';
@@ -36,10 +36,13 @@ const journeyTypeConfig = {
   }
 };
 
-export default function JourneyTypePage() {
-  const params = useParams();
+interface JourneyTypePageProps {
+  params: Promise<{ type: string }>;
+}
+
+export default function JourneyTypePage({ params }: JourneyTypePageProps) {
+  const { type } = use(params);
   const searchParams = useSearchParams();
-  const type = params.type as string;
   const selectedJourneyId = searchParams.get('journey');
 
   const [typeJourneys, setTypeJourneys] = useState<CulturalJourney[]>([]);

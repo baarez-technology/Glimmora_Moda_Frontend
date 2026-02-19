@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Grid, Plus, Lock, Globe, Sparkles, Heart, MoreHorizontal, X } from 'lucide-react';
+import { Grid, Plus, Lock, Globe, Sparkles, Heart, MoreHorizontal, X, Trash2 } from 'lucide-react';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import Image from 'next/image';
 import Link from 'next/link';
 import { InspirationBoard, Product } from '@/types';
@@ -56,6 +57,24 @@ export default function BoardsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBoardName, setNewBoardName] = useState('');
   const [newBoardDescription, setNewBoardDescription] = useState('');
+  const [favoriteBoards, setFavoriteBoards] = useState<string[]>([]);
+  const [deleteBoardId, setDeleteBoardId] = useState<string | null>(null);
+  const boardNameInputRef = useRef<HTMLInputElement>(null);
+
+  // ESC key handler for create modal
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowCreateModal(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showCreateModal]);
+
+  // Auto-focus board name input
+  useEffect(() => {
+    if (showCreateModal) boardNameInputRef.current?.focus();
+  }, [showCreateModal]);
 
   // Load products from service and boards from localStorage
   useEffect(() => {
@@ -71,6 +90,11 @@ export default function BoardsPage() {
             setBoards(JSON.parse(saved));
           } else {
             setBoards(buildSampleBoards(loadedProducts));
+          }
+
+          const savedFavs = localStorage.getItem('moda-favorite-boards');
+          if (savedFavs) {
+            setFavoriteBoards(JSON.parse(savedFavs));
           }
         }
       } catch (error) {
@@ -107,6 +131,16 @@ export default function BoardsPage() {
     setNewBoardName('');
     setNewBoardDescription('');
     setShowCreateModal(false);
+  };
+
+  const toggleFavorite = (boardId: string) => {
+    setFavoriteBoards(prev => {
+      const updated = prev.includes(boardId)
+        ? prev.filter(id => id !== boardId)
+        : [...prev, boardId];
+      localStorage.setItem('moda-favorite-boards', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const deleteBoard = (boardId: string) => {
@@ -248,11 +282,13 @@ export default function BoardsPage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              // Toggle favorite
+                              toggleFavorite(board.id);
                             }}
                             className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
                           >
-                            <Heart className="w-4 h-4 text-charcoal-deep" />
+                            <Heart
+                              className={`w-4 h-4 ${favoriteBoards.includes(board.id) ? 'text-error fill-error' : 'text-charcoal-deep'}`}
+                            />
                           </button>
                         </div>
 
@@ -261,13 +297,11 @@ export default function BoardsPage() {
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
-                              if (confirm('Delete this board?')) {
-                                deleteBoard(board.id);
-                              }
+                              setDeleteBoardId(board.id);
                             }}
                             className="p-2 bg-white/80 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
                           >
-                            <MoreHorizontal className="w-4 h-4 text-charcoal-deep" />
+                            <Trash2 className="w-4 h-4 text-charcoal-deep" />
                           </button>
                         </div>
                       </div>
@@ -293,9 +327,22 @@ export default function BoardsPage() {
         )}
       </main>
 
+      {/* Delete Board Confirmation */}
+      <ConfirmModal
+        isOpen={!!deleteBoardId}
+        onClose={() => setDeleteBoardId(null)}
+        onConfirm={() => {
+          if (deleteBoardId) deleteBoard(deleteBoardId);
+        }}
+        title="Delete Board"
+        message="Are you sure you want to delete this board? All saved items will be lost."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+      />
+
       {/* Create Board Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="create-board-title">
           <div
             className="absolute inset-0 bg-charcoal-deep/50 backdrop-blur-sm"
             onClick={() => setShowCreateModal(false)}
@@ -312,12 +359,13 @@ export default function BoardsPage() {
               <X className="w-5 h-5 text-stone/60" />
             </button>
 
-            <h2 className="text-xl font-display text-charcoal-deep mb-6">Create New Board</h2>
+            <h2 id="create-board-title" className="text-xl font-display text-charcoal-deep mb-6">Create New Board</h2>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm text-stone/70 mb-2">Board Name</label>
                 <input
+                  ref={boardNameInputRef}
                   type="text"
                   value={newBoardName}
                   onChange={(e) => setNewBoardName(e.target.value)}

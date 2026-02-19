@@ -5,16 +5,24 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ShoppingBag, Trash2, Check, Clock, Info, ChevronRight, Layers, Crown, Zap, Settings, MessageCircle } from 'lucide-react';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as userService from '@/services/user.service';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function SilentCartPage() {
   const router = useRouter();
+  const { isAuthenticated, isHydrated } = useAuth();
   const { addToConsiderations, showToast, isUHNI, autonomousSettings, concierge } = useApp();
+
+  useEffect(() => {
+    if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/silent-cart');
+  }, [isAuthenticated, isHydrated, router]);
   const [cart, setCart] = useState<Awaited<ReturnType<typeof userService.getSilentCart>>['data'] | null>(null);
   const [approvedItems, setApprovedItems] = useState<string[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showAutoPurchaseConfirm, setShowAutoPurchaseConfirm] = useState(false);
 
   useEffect(() => {
     const loadSilentCart = async () => {
@@ -83,10 +91,61 @@ export default function SilentCartPage() {
     router.push('/consideration');
   };
 
-  if (loading || !cart) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+      </div>
+    );
+  }
+
+  if (!cart || cart.items.length === 0) {
+    return (
+      <div className="min-h-screen bg-ivory-cream">
+        <div className="bg-charcoal-deep">
+          <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
+            <Link
+              href="/profile"
+              className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
+            >
+              <ArrowLeft size={16} />
+              Back to Profile
+            </Link>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-gold-soft/20 flex items-center justify-center">
+                <Layers size={28} className="text-gold-soft" />
+              </div>
+              <div>
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-2">
+                  Curated For You
+                </span>
+                <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
+                  Silent Cart
+                </h1>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
+          <div className="text-center py-20 bg-white">
+            <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
+              <ShoppingBag size={32} className="text-charcoal-deep" />
+            </div>
+            <h3 className="font-display text-xl text-charcoal-deep mb-3">
+              Your Silent Cart is Empty
+            </h3>
+            <p className="text-stone mb-8 max-w-md mx-auto">
+              We don't have any curated items for you yet. Browse our collection and we'll
+              quietly prepare suggestions that align with your style and upcoming occasions.
+            </p>
+            <Link
+              href="/discover"
+              className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
+            >
+              <span className="text-sm tracking-[0.15em] uppercase">Browse Products</span>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -347,10 +406,7 @@ export default function SilentCartPage() {
                 <>
                   <div className="flex gap-3">
                     <button
-                      onClick={() => {
-                        showToast('Items approved for auto-purchase', 'success');
-                        // In real app, this would trigger the autonomous purchase flow
-                      }}
+                      onClick={() => setShowAutoPurchaseConfirm(true)}
                       disabled={approvedItems.length === 0}
                       className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-success text-ivory-cream hover:bg-success/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
@@ -420,6 +476,30 @@ export default function SilentCartPage() {
             </div>
           </>
         )}
+
+        {/* Auto-Purchase Confirmation */}
+        <ConfirmModal
+          isOpen={showAutoPurchaseConfirm}
+          onClose={() => setShowAutoPurchaseConfirm(false)}
+          onConfirm={() => {
+            const purchased = JSON.parse(localStorage.getItem('moda-auto-purchased') || '[]');
+            const newPurchased = [...purchased, ...approvedItems];
+            localStorage.setItem('moda-auto-purchased', JSON.stringify(newPurchased));
+            setCart({
+              ...cart!,
+              items: cart!.items.filter(item => !approvedItems.includes(item.productId)),
+              totalValue: cart!.items
+                .filter(item => !approvedItems.includes(item.productId))
+                .reduce((sum, item) => sum + item.product.price, 0)
+            });
+            const count = approvedItems.length;
+            setApprovedItems([]);
+            showToast(`${count} item(s) approved for auto-purchase`, 'success');
+          }}
+          title="Confirm Auto-Purchase"
+          message={`Auto-purchase ${approvedItems.length} item(s) for €${approvedTotal.toLocaleString()}? This action cannot be undone.`}
+          confirmLabel="Purchase"
+        />
 
         {/* Info Box */}
         <div className="mt-10 flex items-start gap-4 p-6 bg-parchment border border-sand text-sm">

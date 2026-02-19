@@ -20,7 +20,8 @@ export default function SizeGuide({ product, isOpen, onClose, bodyTwin, onSizeSe
   // Get size variants for this product
   const sizeVariants = product.variants.filter(v => v.type === 'size');
 
-  // Generate sizing chart based on product category
+  // TODO: Fetch from product.sizeChart when API provides it
+  // Currently using generic sizing data as fallback
   const getSizingChart = () => {
     const category = product.category;
 
@@ -69,13 +70,11 @@ export default function SizeGuide({ product, isOpen, onClose, bodyTwin, onSizeSe
   const getIntelligentSuggestion = () => {
     if (!bodyTwin) return null;
 
-    // Simulate intelligent sizing based on body twin data
+    // TODO: Derive suggestion from body-twin measurement matching against product.sizeChart
     const suggestedSize = sizeVariants.find(v => v.available)?.value || 'M';
-    const confidence = 89;
 
     return {
       size: suggestedSize,
-      confidence,
       reasons: [
         'Based on your body measurements',
         `${product.brandName} typically runs true to size`,
@@ -87,18 +86,8 @@ export default function SizeGuide({ product, isOpen, onClose, bodyTwin, onSizeSe
 
   const intelligentSuggestion = getIntelligentSuggestion();
 
-  // Get sizing insights from reviews
-  const getReviewInsights = () => {
-    // Simulate review-based sizing feedback
-    return {
-      runsSmall: 15,
-      trueToSize: 72,
-      runsLarge: 13,
-      totalReviews: 89
-    };
-  };
-
-  const reviewInsights = getReviewInsights();
+  // TODO: Fetch review-based sizing insights from product review API
+  // Render review fit breakdown (runs small / true to size / runs large) when real data is available
 
   const handleSizeSelection = (size: string) => {
     onSizeSelect?.(size);
@@ -141,7 +130,7 @@ export default function SizeGuide({ product, isOpen, onClose, bodyTwin, onSizeSe
                       We recommend size {intelligentSuggestion.size}
                     </h3>
                     <span className="text-xs text-emerald-700 bg-emerald-100 px-2 py-1 rounded-full">
-                      {intelligentSuggestion.confidence}% confidence
+                      Body Twin Match
                     </span>
                   </div>
                   <p className="text-sm text-stone mb-4">{intelligentSuggestion.fitNotes}</p>
@@ -177,32 +166,7 @@ export default function SizeGuide({ product, isOpen, onClose, bodyTwin, onSizeSe
             </div>
           )}
 
-          {/* Review-Based Sizing Insights */}
-          <div>
-            <h3 className="font-display text-lg text-charcoal-deep mb-4">How does it fit?</h3>
-            <p className="text-xs text-stone mb-4">Based on {reviewInsights.totalReviews} customer reviews</p>
-
-            <div className="space-y-3">
-              {[
-                { label: 'Runs Small', value: reviewInsights.runsSmall, color: 'bg-blue-500' },
-                { label: 'True to Size', value: reviewInsights.trueToSize, color: 'bg-emerald-500' },
-                { label: 'Runs Large', value: reviewInsights.runsLarge, color: 'bg-orange-500' }
-              ].map((item) => (
-                <div key={item.label}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-charcoal-deep">{item.label}</span>
-                    <span className="text-sm text-stone">{item.value}%</span>
-                  </div>
-                  <div className="h-2 bg-sand/30 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${item.color} transition-all duration-500`}
-                      style={{ width: `${item.value}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* TODO: Review-Based Sizing Insights — render when review API provides fit data */}
 
           {/* Unit Toggle */}
           <div className="flex items-center justify-between pb-4 border-b border-sand/30">

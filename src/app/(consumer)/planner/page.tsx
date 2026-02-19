@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Calendar, ChevronLeft, ChevronRight, Plus, Sparkles, X } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Plus, Sparkles, X, Sun, Briefcase, Moon } from 'lucide-react';
 import Image from 'next/image';
 import * as productService from '@/services/product.service';
 import { Product } from '@/types';
@@ -15,11 +15,18 @@ interface DayPlan {
   }[];
 }
 
+const occasionIcons: Record<string, React.ReactNode> = {
+  morning: <Sun className="w-3 h-3" />,
+  work: <Briefcase className="w-3 h-3" />,
+  evening: <Moon className="w-3 h-3" />,
+  special: <Sparkles className="w-3 h-3" />,
+};
+
 const occasions = [
-  { id: 'morning', label: 'Morning', icon: '☀️' },
-  { id: 'work', label: 'Work', icon: '💼' },
-  { id: 'evening', label: 'Evening', icon: '🌙' },
-  { id: 'special', label: 'Special Event', icon: '✨' }
+  { id: 'morning', label: 'Morning' },
+  { id: 'work', label: 'Work' },
+  { id: 'evening', label: 'Evening' },
+  { id: 'special', label: 'Special Event' }
 ];
 
 const STORAGE_KEY = 'moda-weekly-planner';
@@ -67,6 +74,22 @@ export default function PlannerPage() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [showProductPicker, setShowProductPicker] = useState<{ dayIndex: number; occasionIndex: number } | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const plannerPickerCloseRef = useRef<HTMLButtonElement>(null);
+
+  // ESC key handler for product picker modal
+  useEffect(() => {
+    if (!showProductPicker) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowProductPicker(null);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showProductPicker]);
+
+  // Auto-focus close button when picker opens
+  useEffect(() => {
+    if (showProductPicker) plannerPickerCloseRef.current?.focus();
+  }, [showProductPicker]);
 
   // Load products from service
   useEffect(() => {
@@ -254,7 +277,7 @@ export default function PlannerPage() {
                           className="min-h-[100px] bg-stone/5 rounded-lg p-2"
                         >
                           <p className="text-[10px] text-stone/50 mb-2 flex items-center gap-1">
-                            <span>{occasion?.icon}</span>
+                            {occasion && occasionIcons[occasion.id]}
                             {occasion?.label}
                           </p>
 
@@ -316,26 +339,91 @@ export default function PlannerPage() {
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
-              <h3 className="font-display text-lg text-charcoal-deep mb-2">AI Style Suggestions</h3>
-              <p className="text-sm text-stone/70 mb-4">
-                Based on your wardrobe and upcoming events, here are some outfit combinations that would work well for your week.
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {allProducts.slice(0, 4).map((product) => (
-                  <div key={product.id} className="bg-white rounded-lg p-3 border border-stone/10">
-                    <div className="aspect-square bg-stone/5 rounded overflow-hidden relative mb-2">
-                      <Image
-                        src={product.images[0]?.url || ''}
-                        alt={product.name}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <p className="text-xs text-charcoal-deep line-clamp-1">{product.name}</p>
-                    <p className="text-[10px] text-stone/50">{product.brandName}</p>
+              <h3 className="font-display text-lg text-charcoal-deep mb-2">AI Styling Tips</h3>
+              {(() => {
+                // Gather all products currently planned in the week
+                const plannedProducts = weekPlan.flatMap(day =>
+                  day.outfits.flatMap(outfit => outfit.products)
+                );
+
+                if (plannedProducts.length === 0) {
+                  return (
+                    <p className="text-sm text-stone/70">
+                      Add items to your planner for personalized styling tips.
+                    </p>
+                  );
+                }
+
+                // Analyze planned products
+                const brands = Array.from(new Set(plannedProducts.map(p => p.brandName)));
+                const categories = Array.from(new Set(plannedProducts.map(p => p.category)));
+                const allTags = plannedProducts.flatMap(p => p.tags.map(t => t.toLowerCase()));
+                const tagSet = new Set(allTags);
+
+                const tips: string[] = [];
+
+                // Brand-based tips
+                if (brands.length === 1) {
+                  tips.push(`Your week features an all-${brands[0]} lineup \u2014 consider mixing in another maison for visual contrast.`);
+                } else if (brands.length >= 3) {
+                  tips.push(`Great variety with ${brands.length} different brands across your week for a dynamic, eclectic style.`);
+                }
+
+                // Category-based tips
+                const hasClothing = categories.includes('clothing');
+                const hasBags = categories.includes('bags');
+                const hasShoes = categories.includes('shoes');
+                const hasAccessories = categories.includes('accessories') || categories.includes('jewelry') || categories.includes('watches');
+
+                if (hasClothing && !hasAccessories) {
+                  tips.push('Consider complementing your clothing selections with accessories or jewelry for a finished look.');
+                }
+                if (hasClothing && !hasShoes) {
+                  tips.push('Complete your planned outfits with footwear choices to round out each day.');
+                }
+                if (!hasBags && plannedProducts.length >= 3) {
+                  tips.push('Adding a bag to your planned outfits ties the look together for on-the-go days.');
+                }
+
+                // Tag/style-based tips
+                if (tagSet.has('formal') || tagSet.has('evening') || tagSet.has('black-tie')) {
+                  tips.push('Formal pieces in your plan work beautifully with structured accessories and refined clutches.');
+                }
+                if (tagSet.has('casual') || tagSet.has('everyday') || tagSet.has('relaxed')) {
+                  tips.push('Casual selections pair well with minimalist jewelry and comfortable footwear.');
+                }
+                if (tagSet.has('silk') || tagSet.has('satin') || tagSet.has('velvet')) {
+                  tips.push('Luxe fabrics in your plan deserve careful layering \u2014 keep other pieces clean and simple.');
+                }
+
+                // Repetition tip
+                const dayCount = weekPlan.filter(d => d.outfits.some(o => o.products.length > 0)).length;
+                const emptyDays = 7 - dayCount;
+                if (emptyDays > 0 && dayCount > 0) {
+                  tips.push(`You still have ${emptyDays} day${emptyDays > 1 ? 's' : ''} unplanned \u2014 fill them in for a fully styled week.`);
+                }
+
+                // Fallback tip
+                if (tips.length === 0) {
+                  tips.push(`You have ${plannedProducts.length} item${plannedProducts.length > 1 ? 's' : ''} planned \u2014 try mixing textures and silhouettes for variety.`);
+                }
+
+                return (
+                  <div className="space-y-3">
+                    <p className="text-sm text-stone/70 mb-2">
+                      Based on the {plannedProducts.length} item{plannedProducts.length !== 1 ? 's' : ''} in your weekly plan:
+                    </p>
+                    <ul className="space-y-2">
+                      {tips.slice(0, 4).map((tip, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-stone/80">
+                          <span className="mt-1.5 w-1 h-1 rounded-full bg-gold-soft flex-shrink-0" />
+                          {tip}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                ))}
-              </div>
+                );
+              })()}
             </div>
           </div>
         </motion.div>
@@ -343,7 +431,7 @@ export default function PlannerPage() {
 
       {/* Product Picker Modal */}
       {showProductPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="planner-picker-title">
           <div
             className="absolute inset-0 bg-charcoal-deep/50 backdrop-blur-sm"
             onClick={() => setShowProductPicker(null)}
@@ -354,8 +442,9 @@ export default function PlannerPage() {
             animate={{ scale: 1, opacity: 1 }}
           >
             <div className="sticky top-0 bg-white border-b border-stone/10 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-display text-charcoal-deep">Add to Outfit</h2>
+              <h2 id="planner-picker-title" className="text-xl font-display text-charcoal-deep">Add to Outfit</h2>
               <button
+                ref={plannerPickerCloseRef}
                 onClick={() => setShowProductPicker(null)}
                 className="p-2 hover:bg-stone/10 rounded-full"
               >

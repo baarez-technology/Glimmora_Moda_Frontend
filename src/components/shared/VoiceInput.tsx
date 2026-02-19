@@ -77,6 +77,7 @@ export default function VoiceInput({
       {/* Main button */}
       <motion.button
         onClick={handleToggle}
+        aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
         className={`relative p-3 rounded-full transition-colors ${
           isListening
             ? 'bg-red-500 text-white'
@@ -201,6 +202,7 @@ export function VoiceInputInline({
     <div className={`flex items-center gap-3 ${className}`}>
       <motion.button
         onClick={() => isListening ? stopListening() : startListening()}
+        aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
         className={`p-2 rounded-full transition-colors ${
           isListening ? 'bg-red-500 text-white' : 'bg-stone/10 text-stone/60 hover:bg-stone/20'
         }`}

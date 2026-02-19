@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Plus, Save, Trash2, Sparkles, Calendar, TrendingUp, X } from 'lucide-react';
@@ -23,6 +23,31 @@ export default function OutfitBuilderPage() {
   const [activeSlot, setActiveSlot] = useState<string | null>(null);
 
   // Outfit slots for drag-and-drop
+  const productPickerCloseRef = useRef<HTMLButtonElement>(null);
+  const saveOutfitInputRef = useRef<HTMLInputElement>(null);
+
+  // ESC key handler for modals
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showSaveModal) setShowSaveModal(false);
+        else if (showProductPicker) { setShowProductPicker(false); setActiveSlot(null); }
+      }
+    };
+    if (showProductPicker || showSaveModal) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [showProductPicker, showSaveModal]);
+
+  // Auto-focus when modals open
+  useEffect(() => {
+    if (showProductPicker) productPickerCloseRef.current?.focus();
+  }, [showProductPicker]);
+  useEffect(() => {
+    if (showSaveModal) saveOutfitInputRef.current?.focus();
+  }, [showSaveModal]);
+
   const [outfitSlots, setOutfitSlots] = useState<OutfitSlot[]>([
     { id: 'top', category: 'clothing', product: null, label: 'Top' },
     { id: 'bottom', category: 'clothing', product: null, label: 'Bottom' },
@@ -80,22 +105,66 @@ export default function OutfitBuilderPage() {
     const filledSlots = outfitSlots.filter(slot => slot.product).length;
     const totalSlots = outfitSlots.length;
 
-    // Calculate compatibility score based on brands, colors, styles
-    let compatibilityScore = (filledSlots / totalSlots) * 100;
+    if (filledSlots === 0) return 0;
+
+    // Base: how filled the outfit is (up to 40 points)
+    let compatibilityScore = (filledSlots / totalSlots) * 40;
 
     const products = outfitSlots.filter(slot => slot.product).map(slot => slot.product!);
-    if (products.length >= 2) {
-      // Bonus for matching brands
-      const brands = new Set(products.map(p => p.brandId));
-      if (brands.size === 1) compatibilityScore = Math.min(100, compatibilityScore + 15);
 
-      // Bonus for complementary tags
-      const allTags = products.flatMap(p => p.tags);
-      const uniqueTags = new Set(allTags);
-      if (uniqueTags.size < allTags.length) compatibilityScore = Math.min(100, compatibilityScore + 10);
+    if (products.length >= 2) {
+      // Brand coherence bonus (up to 15 points)
+      const brands = new Set(products.map(p => p.brandId));
+      if (brands.size === 1) {
+        compatibilityScore += 15;
+      } else if (brands.size <= Math.ceil(products.length / 2)) {
+        compatibilityScore += 8;
+      }
+
+      // Tag/occasion overlap bonus (up to 20 points)
+      const allTags = products.flatMap(p => p.tags.map(t => t.toLowerCase()));
+      const tagCounts: Record<string, number> = {};
+      allTags.forEach(t => { tagCounts[t] = (tagCounts[t] || 0) + 1; });
+      const sharedTags = Object.values(tagCounts).filter(c => c > 1).length;
+      compatibilityScore += Math.min(20, sharedTags * 5);
+
+      // Color harmony bonus (up to 15 points)
+      const colorVariants = products
+        .flatMap(p => p.variants.filter(v => v.type === 'color'))
+        .map(v => v.value.toLowerCase());
+      if (colorVariants.length >= 2) {
+        const neutrals = ['black', 'white', 'grey', 'gray', 'navy', 'beige', 'cream', 'ivory', 'tan', 'charcoal', 'nude', 'camel'];
+        const neutralCount = colorVariants.filter(c => neutrals.some(n => c.includes(n))).length;
+        const uniqueColors = new Set(colorVariants);
+
+        if (neutralCount >= colorVariants.length - 1) {
+          compatibilityScore += 15;
+        } else if (uniqueColors.size <= 3) {
+          compatibilityScore += 10;
+        } else {
+          compatibilityScore += 5;
+        }
+      }
+
+      // Occasion appropriateness bonus (up to 10 points)
+      const occasionKeywords: Record<string, string[]> = {
+        formal: ['formal', 'evening', 'black-tie', 'gala', 'luxury', 'elegant', 'sophisticated'],
+        casual: ['casual', 'everyday', 'relaxed', 'weekend', 'daywear', 'comfortable'],
+        work: ['work', 'professional', 'office', 'business', 'tailored', 'structured'],
+        creative: ['avant-garde', 'artistic', 'bold', 'statement', 'contemporary'],
+      };
+      for (const [, keywords] of Object.entries(occasionKeywords)) {
+        const matchingProducts = products.filter(p =>
+          p.tags.some(t => keywords.includes(t.toLowerCase()))
+        );
+        if (matchingProducts.length >= 2) {
+          compatibilityScore += Math.min(10, matchingProducts.length * 4);
+          break;
+        }
+      }
     }
 
-    return Math.round(compatibilityScore);
+    return Math.round(Math.min(100, compatibilityScore));
   };
 
   const compatibilityScore = getOutfitScore();
@@ -109,7 +178,28 @@ export default function OutfitBuilderPage() {
     const slot = outfitSlots.find(s => s.id === activeSlot);
     if (!slot) return [];
 
+    const shoeTags = ['shoe', 'loafer', 'boot', 'sneaker', 'heel', 'pump', 'sandal'];
+    const accessoryTags = ['scarf', 'belt', 'jewelry', 'watch', 'bracelet', 'ring', 'necklace'];
+
+    const isShoeItem = (product: Product) => {
+      const cat = product.category.toLowerCase();
+      const tags = product.tags.map(t => t.toLowerCase());
+      return cat.includes('shoes') || tags.some(t => shoeTags.some(st => t.includes(st)));
+    };
+
+    const isAccessoryItem = (product: Product) => {
+      const cat = product.category.toLowerCase();
+      const tags = product.tags.map(t => t.toLowerCase());
+      return (cat.includes('accessor') || tags.some(t => accessoryTags.some(at => t.includes(at)))) && !isShoeItem(product);
+    };
+
     return wardrobe.filter(item => {
+      if (slot.id === 'shoes') {
+        return isShoeItem(item.product);
+      }
+      if (slot.id === 'accessory') {
+        return isAccessoryItem(item.product);
+      }
       if (slot.category === 'clothing') {
         return item.product.category === 'clothing';
       }
@@ -270,16 +360,70 @@ export default function OutfitBuilderPage() {
             </div>
 
             {/* AI Styling Tips */}
-            {outfitSlots.filter(s => s.product).length >= 2 && (
+            {outfitSlots.some(s => s.product) && (
               <div className="p-6 bg-gradient-to-br from-sapphire-deep/5 to-gold-muted/5 border border-sapphire-subtle/20">
                 <div className="flex items-center gap-2 mb-3">
                   <Sparkles size={16} className="text-sapphire-subtle" />
                   <h3 className="text-sm tracking-wider uppercase text-charcoal-deep">Styling Tips</h3>
                 </div>
                 <div className="space-y-2 text-sm text-stone">
-                  <p>• This combination creates a sophisticated, cohesive look</p>
-                  <p>• Consider adding statement accessories for evening occasions</p>
-                  <p>• The color palette works beautifully for professional settings</p>
+                  {(() => {
+                    const filledSlots = outfitSlots.filter(s => s.product);
+                    const emptySlots = outfitSlots.filter(s => !s.product);
+                    const products = filledSlots.map(s => s.product!);
+                    const allTags = products.flatMap(p => p.tags.map(t => t.toLowerCase()));
+                    const categories = new Set(products.map(p => p.category));
+                    const brands = Array.from(new Set(products.map(p => p.brandName)));
+
+                    const tips: string[] = [];
+
+                    // Missing slot suggestions
+                    const missingShoes = emptySlots.find(s => s.id === 'shoes');
+                    const missingBag = emptySlots.find(s => s.id === 'bag');
+                    const missingAccessory = emptySlots.find(s => s.id === 'accessory');
+                    const missingOuterwear = emptySlots.find(s => s.id === 'outerwear');
+
+                    if (missingShoes) tips.push('Complete your look with footwear to ground the outfit.');
+                    if (missingBag) tips.push('A well-chosen bag can anchor the entire ensemble.');
+                    if (missingAccessory && products.length >= 2) tips.push('An accessory adds a finishing touch \u2014 consider a scarf, belt, or statement piece.');
+                    if (missingOuterwear && products.length >= 3) tips.push('An outer layer adds depth and versatility to this look.');
+
+                    // Tag-based style tips
+                    if (allTags.some(t => ['formal', 'evening', 'black-tie', 'gala'].includes(t))) {
+                      tips.push('Formal pieces pair beautifully with structured accessories and refined clutches.');
+                    } else if (allTags.some(t => ['casual', 'everyday', 'relaxed', 'weekend'].includes(t))) {
+                      tips.push('Keep the casual vibe cohesive with minimalist accessories and comfortable textures.');
+                    }
+                    if (allTags.some(t => ['work', 'professional', 'office', 'tailored'].includes(t))) {
+                      tips.push('This professional combination works well with clean lines and understated jewelry.');
+                    }
+
+                    // Brand coherence tip
+                    if (brands.length === 1 && products.length >= 2) {
+                      tips.push(`An all-${brands[0]} look creates a strong house aesthetic \u2014 consider mixing in one contrasting piece for individuality.`);
+                    } else if (brands.length >= 3) {
+                      tips.push('Mixing multiple maisons adds personality \u2014 unify with a consistent color thread.');
+                    }
+
+                    // Color tip
+                    const colorVariants = products.flatMap(p => p.variants.filter(v => v.type === 'color')).map(v => v.value.toLowerCase());
+                    if (colorVariants.length >= 2) {
+                      const neutrals = ['black', 'white', 'grey', 'gray', 'navy', 'beige', 'cream', 'ivory', 'charcoal', 'nude', 'camel'];
+                      const allNeutral = colorVariants.every(c => neutrals.some(n => c.includes(n)));
+                      if (allNeutral) {
+                        tips.push('Neutral palette detected \u2014 a pop of color through an accessory could elevate this look.');
+                      }
+                    }
+
+                    // Fallback
+                    if (tips.length === 0) {
+                      tips.push('Add more items to receive tailored styling suggestions for this outfit.');
+                    }
+
+                    return tips.slice(0, 4).map((tip, i) => (
+                      <p key={i}>&bull; {tip}</p>
+                    ));
+                  })()}
                 </div>
               </div>
             )}
@@ -289,13 +433,14 @@ export default function OutfitBuilderPage() {
 
       {/* Product Picker Modal */}
       {showProductPicker && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-          <div className="bg-white max-w-4xl w-full max-h-[80vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" role="dialog" aria-modal="true" aria-labelledby="product-picker-title" onClick={() => { setShowProductPicker(false); setActiveSlot(null); }}>
+          <div className="bg-white max-w-4xl w-full max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-white border-b border-sand/30 px-8 py-6 flex items-center justify-between z-10">
-              <h3 className="font-display text-2xl text-charcoal-deep">
+              <h3 id="product-picker-title" className="font-display text-2xl text-charcoal-deep">
                 Choose from Wardrobe
               </h3>
               <button
+                ref={productPickerCloseRef}
                 onClick={() => {
                   setShowProductPicker(false);
                   setActiveSlot(null);
@@ -346,10 +491,10 @@ export default function OutfitBuilderPage() {
 
       {/* Save Outfit Modal */}
       {showSaveModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
-          <div className="bg-white max-w-lg w-full">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" role="dialog" aria-modal="true" aria-labelledby="save-outfit-title" onClick={() => setShowSaveModal(false)}>
+          <div className="bg-white max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
             <div className="px-8 py-6 border-b border-sand/30">
-              <h3 className="font-display text-2xl text-charcoal-deep">Save Outfit</h3>
+              <h3 id="save-outfit-title" className="font-display text-2xl text-charcoal-deep">Save Outfit</h3>
             </div>
 
             <div className="p-8 space-y-6">
@@ -358,6 +503,7 @@ export default function OutfitBuilderPage() {
                   Outfit Name *
                 </label>
                 <input
+                  ref={saveOutfitInputRef}
                   type="text"
                   value={outfitName}
                   onChange={(e) => setOutfitName(e.target.value)}

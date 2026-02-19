@@ -28,6 +28,9 @@ export default function ProductsPage() {
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage] = useState(1);
 
+  const activeProducts = useMemo(() => products.filter(p => !p.isDeleted), [products]);
+  const deletedProducts = useMemo(() => products.filter(p => p.isDeleted), [products]);
+
   const categories = useMemo(() => {
     const cats = new Set(activeProducts.map(p => p.category));
     return ['all', ...Array.from(cats)];

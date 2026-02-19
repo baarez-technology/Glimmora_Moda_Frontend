@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, User, Check, ChevronRight, Shield, Save } from 'lucide-react';
+import { ArrowLeft, User, Check, ChevronRight, ChevronLeft, Shield, Save } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import { useApp } from '@/context/AppContext';
 import type { DigitalBodyTwin } from '@/types';
@@ -41,6 +41,7 @@ export default function BodyTwinPage() {
   const [activeStep, setActiveStep] = useState(0);
   const [saved, setSaved] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [measurementErrors, setMeasurementErrors] = useState<Record<string, string>>({});
 
   // Load existing Body Twin data on mount
   useEffect(() => {
@@ -66,7 +67,48 @@ export default function BodyTwinPage() {
     { title: 'Measurements', description: 'Optional precise measurements' },
   ];
 
+  const measurementRanges: Record<string, { min: number; max: number; label: string }> = {
+    height: { min: 100, max: 250, label: 'Height' },
+    bust: { min: 50, max: 180, label: 'Chest' },
+    waist: { min: 40, max: 160, label: 'Waist' },
+    hips: { min: 50, max: 180, label: 'Hips' },
+    inseam: { min: 50, max: 100, label: 'Inseam' },
+  };
+
+  const validateMeasurements = (): boolean => {
+    const errors: Record<string, string> = {};
+    const m = bodyTwin.measurements;
+    if (m) {
+      Object.entries(measurementRanges).forEach(([key, range]) => {
+        const value = m[key as keyof typeof m];
+        if (value !== undefined && value !== null) {
+          if (value < range.min || value > range.max) {
+            errors[key] = `${range.label} must be ${range.min}-${range.max} cm`;
+          }
+        }
+      });
+    }
+    setMeasurementErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleMeasurementChange = (key: string, value: string) => {
+    const parsed = parseInt(value) || undefined;
+    setBodyTwin({
+      ...bodyTwin,
+      measurements: { ...bodyTwin.measurements, [key]: parsed }
+    });
+    // Clear error on change
+    if (measurementErrors[key]) {
+      setMeasurementErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+    }
+  };
+
   const handleSave = () => {
+    if (!validateMeasurements()) {
+      showToast('Please fix measurement errors before saving', 'error');
+      return;
+    }
     try {
       // Save Body Twin to localStorage
       localStorage.setItem('moda-body-twin', JSON.stringify(bodyTwin));
@@ -315,71 +357,28 @@ export default function BodyTwinPage() {
               <p className="text-stone mb-8">Add precise measurements for even more accurate fit predictions</p>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">Height (cm)</label>
-                  <input
-                    type="number"
-                    value={bodyTwin.measurements?.height || ''}
-                    onChange={(e) => setBodyTwin({
-                      ...bodyTwin,
-                      measurements: { ...bodyTwin.measurements, height: parseInt(e.target.value) || undefined }
-                    })}
-                    placeholder="165"
-                    className="w-full px-5 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">Bust (cm)</label>
-                  <input
-                    type="number"
-                    value={bodyTwin.measurements?.bust || ''}
-                    onChange={(e) => setBodyTwin({
-                      ...bodyTwin,
-                      measurements: { ...bodyTwin.measurements, bust: parseInt(e.target.value) || undefined }
-                    })}
-                    placeholder="88"
-                    className="w-full px-5 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">Waist (cm)</label>
-                  <input
-                    type="number"
-                    value={bodyTwin.measurements?.waist || ''}
-                    onChange={(e) => setBodyTwin({
-                      ...bodyTwin,
-                      measurements: { ...bodyTwin.measurements, waist: parseInt(e.target.value) || undefined }
-                    })}
-                    placeholder="68"
-                    className="w-full px-5 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">Hips (cm)</label>
-                  <input
-                    type="number"
-                    value={bodyTwin.measurements?.hips || ''}
-                    onChange={(e) => setBodyTwin({
-                      ...bodyTwin,
-                      measurements: { ...bodyTwin.measurements, hips: parseInt(e.target.value) || undefined }
-                    })}
-                    placeholder="94"
-                    className="w-full px-5 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">Inseam (cm)</label>
-                  <input
-                    type="number"
-                    value={bodyTwin.measurements?.inseam || ''}
-                    onChange={(e) => setBodyTwin({
-                      ...bodyTwin,
-                      measurements: { ...bodyTwin.measurements, inseam: parseInt(e.target.value) || undefined }
-                    })}
-                    placeholder="76"
-                    className="w-full px-5 py-4 border border-sand focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
+                {Object.entries(measurementRanges).map(([key, range]) => (
+                  <div key={key}>
+                    <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">
+                      {range.label} (cm)
+                      <span className="text-taupe ml-2 normal-case tracking-normal">{range.min}-{range.max}</span>
+                    </label>
+                    <input
+                      type="number"
+                      min={range.min}
+                      max={range.max}
+                      value={bodyTwin.measurements?.[key as keyof typeof bodyTwin.measurements] || ''}
+                      onChange={(e) => handleMeasurementChange(key, e.target.value)}
+                      placeholder={String(Math.round((range.min + range.max) / 2))}
+                      className={`w-full px-5 py-4 border focus:outline-none focus:border-charcoal-deep transition-colors ${
+                        measurementErrors[key] ? 'border-red-400' : 'border-sand'
+                      }`}
+                    />
+                    {measurementErrors[key] && (
+                      <p className="text-xs text-red-500 mt-1">{measurementErrors[key]}</p>
+                    )}
+                  </div>
+                ))}
               </div>
 
               <div className="mt-8 p-5 bg-parchment border border-sand">
@@ -397,13 +396,23 @@ export default function BodyTwinPage() {
 
         {/* Navigation */}
         <div className="flex justify-between">
-          <button
-            onClick={() => setActiveStep(Math.max(0, activeStep - 1))}
-            disabled={activeStep === 0}
-            className="px-8 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-[0.15em] uppercase"
-          >
-            Previous
-          </button>
+          {activeStep === 0 ? (
+            <Link
+              href="/profile"
+              className="flex items-center gap-2 px-8 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+            >
+              <ChevronLeft size={16} />
+              Back to Profile
+            </Link>
+          ) : (
+            <button
+              onClick={() => setActiveStep(activeStep - 1)}
+              className="flex items-center gap-2 px-8 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+            >
+              <ChevronLeft size={16} />
+              Previous
+            </button>
+          )}
 
           <div className="flex gap-3">
             {activeStep < steps.length - 1 ? (
