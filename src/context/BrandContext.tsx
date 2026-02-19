@@ -8,6 +8,7 @@ import type {
   GlobalInventoryOverview,
   BrandAnalytics,
   BrandOrder,
+  OrderStatus,
   RecentActivity,
   HeritageEvent,
   BrandStory,
@@ -49,9 +50,11 @@ interface BrandContextType {
   // Orders
   orders: BrandOrder[];
   getOrderById: (id: string) => BrandOrder | undefined;
+  updateOrderStatus: (id: string, status: OrderStatus) => void;
 
   // Inventory
   inventory: GlobalInventoryOverview | null;
+  resolveAlert: (alertId: string) => void;
 
   // Analytics
   analytics: BrandAnalytics | null;
@@ -291,6 +294,24 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return orders.find(o => o.id === id);
   }, [orders]);
 
+  const updateOrderStatus = useCallback((id: string, status: OrderStatus) => {
+    setOrders(prev => prev.map(o =>
+      o.id === id ? { ...o, status, updatedAt: new Date().toISOString() } : o
+    ));
+  }, []);
+
+  const resolveAlert = useCallback((alertId: string) => {
+    setInventory(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        alerts: prev.alerts.map(a =>
+          a.id === alertId ? { ...a, resolvedAt: new Date().toISOString() } : a
+        ),
+      };
+    });
+  }, []);
+
   // ============================================
   // UHNI Features
   // ============================================
@@ -495,7 +516,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         deleteCollection,
         orders,
         getOrderById,
+        updateOrderStatus,
         inventory,
+        resolveAlert,
         analytics,
         recentActivity,
         // UHNI Features

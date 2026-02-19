@@ -36,7 +36,12 @@ export {
   type CraftsmanshipDetail,
   type RegionAvailability,
   type Availability,
-  type Product
+  type Product,
+  type ProductVisibility,
+  type ExperienceMode,
+  type PricingVisibility,
+  type CommerceAction,
+  type ProductMedia
 } from './product';
 
 // ============================================
@@ -142,8 +147,59 @@ export {
   type UHNIAvailabilitySearch,
   type EnhancedAlternative,
   type GlobalNetworkStats,
-  type RestockPrediction
+  type RestockPrediction,
+  // Events & Private Shopping
+  type ExclusiveEventType,
+  type RegistrationStatus,
+  type ExclusiveEvent,
+  type PrivateShoppingStatus,
+  type PrivateShoppingEvent,
+  type HeritageArchiveItem,
+  type InsightCategory,
+  type InsightTrend,
+  type IntelligenceInsight,
+  // Zero-UI Commerce (U13)
+  type ZeroUITrigger,
+  type ZeroUIConfig,
+  // Invisible Commerce (U14)
+  type InvisibleMethod,
+  type DiscretionLevel,
+  type InvisibleTransaction,
+  // Concierge Tasks (U15)
+  type ConciergeTaskType,
+  type ConciergeTaskStatus,
+  type ConciergeTaskPriority,
+  type ConciergeTask,
+  // Silent Commerce (U16)
+  type AwarenessLevel,
+  type DisplayMode,
+  type SilentCommerceItem
 } from './uhni';
+
+// ============================================
+// BRAND INTELLIGENCE TYPES
+// ============================================
+export {
+  type DemandSimulation,
+  type RegionDemand,
+  type BrandIntelligenceSignal,
+  type BrandConciergeConfig,
+  type ConciergeConversation,
+  type MemoryImprint,
+  type BrandDigitalTwin,
+  type DigitalTwinNode,
+  type DigitalTwinMetrics,
+  type CulturalAuthority,
+  type BoutiquePerformance,
+  type BoutiqueScores,
+  type CounterfeitAlert,
+  type DropSimulation,
+  type DropRegionForecast,
+  type HeritageAsset,
+  type ClientArchetype,
+  type SpendPattern,
+  type BehaviorTrait
+} from './brand-intelligence';
 
 // ============================================
 // VISUALIZATION TYPES (IV)

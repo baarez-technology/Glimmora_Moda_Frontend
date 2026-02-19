@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { ChevronRight, Search, MessageSquare, Clock, CheckCircle, XCircle, ArrowRightLeft, AlertTriangle } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
@@ -98,6 +99,7 @@ export default function NegotiationsPage() {
     { value: 'pending', label: 'Pending' },
     { value: 'counter_offered', label: 'Counter Offered' },
     { value: 'approved', label: 'Approved' },
+    { value: 'accepted', label: 'Accepted' },
     { value: 'declined', label: 'Declined' }
   ];
 
@@ -183,11 +185,12 @@ export default function NegotiationsPage() {
                       <tr key={neg.id} className={`hover:bg-parchment/30 transition-colors ${expiringSoon && neg.status === 'pending' ? 'bg-warning/5' : ''}`}>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-parchment flex-shrink-0">
-                              <img
+                            <div className="w-12 h-12 bg-parchment flex-shrink-0 relative">
+                              <Image
                                 src={neg.productImage}
                                 alt={neg.productName}
-                                className="w-full h-full object-cover"
+                                fill
+                                className="object-cover"
                               />
                             </div>
                             <div>

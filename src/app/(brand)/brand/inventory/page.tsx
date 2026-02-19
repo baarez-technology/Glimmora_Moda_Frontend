@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import {
   Globe,
   MapPin,
@@ -10,14 +11,15 @@ import {
   Package,
   RefreshCw,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  CheckCircle
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
 
 export default function InventoryPage() {
-  const { inventory } = useBrand();
+  const { inventory, resolveAlert } = useBrand();
   const [expandedRegions, setExpandedRegions] = useState<string[]>(['Europe', 'Asia', 'Americas']);
 
   if (!inventory) {
@@ -77,7 +79,17 @@ export default function InventoryPage() {
     }
   };
 
-  const activeAlerts = inventory?.alerts.filter(a => !a.resolvedAt) ?? [];
+  const activeAlerts = inventory.alerts.filter(a => !a.resolvedAt);
+
+  // Compute separate change percentages for units vs value from regional data
+  const totalRegionUnits = inventory.regions.reduce((sum, r) => sum + r.totalUnits, 0);
+  const totalRegionValue = inventory.regions.reduce((sum, r) => sum + r.totalValue, 0);
+  const weightedUnitsChange = totalRegionUnits > 0
+    ? inventory.regions.reduce((sum, r) => sum + r.changePercent * (r.totalUnits / totalRegionUnits), 0)
+    : inventory.changePercent;
+  const weightedValueChange = totalRegionValue > 0
+    ? inventory.regions.reduce((sum, r) => sum + r.changePercent * (r.totalValue / totalRegionValue), 0)
+    : inventory.changePercent;
 
   return (
     <div>
@@ -90,7 +102,7 @@ export default function InventoryPage() {
             <Globe size={14} />
             <span>{inventory.regions.length} Regions</span>
           </div>
-          <span className="text-taupe">•</span>
+          <span className="text-taupe">·</span>
           <div className="flex items-center gap-2">
             <RefreshCw size={14} />
             <span>Last synced: {formatTime(inventory.lastSyncedAt)}</span>
@@ -104,13 +116,13 @@ export default function InventoryPage() {
           <MetricCard
             label="Total Units"
             value={inventory.totalUnits.toLocaleString()}
-            change={inventory.changePercent}
+            change={+weightedUnitsChange.toFixed(1)}
             changeLabel="vs last month"
           />
           <MetricCard
             label="Total Value"
             value={formatCurrency(inventory.totalValue)}
-            change={inventory.changePercent}
+            change={+weightedValueChange.toFixed(1)}
             changeLabel="vs last month"
           />
           <MetricCard
@@ -234,12 +246,17 @@ export default function InventoryPage() {
             <div className="divide-y divide-sand/30">
               {activeAlerts.map(alert => (
                 <div key={alert.id} className="px-6 py-4 flex items-start gap-4">
-                  <div className={`w-10 h-10 flex items-center justify-center ${getAlertPriorityColor(alert.priority)}`}>
+                  <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 ${getAlertPriorityColor(alert.priority)}`}>
                     <AlertTriangle size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-charcoal-deep">{alert.productName}</p>
+                      <Link
+                        href={`/brand/products/${alert.productId}`}
+                        className="font-medium text-charcoal-deep hover:text-gold-muted transition-colors"
+                      >
+                        {alert.productName}
+                      </Link>
                       <span className={`px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getAlertPriorityColor(alert.priority)}`}>
                         {alert.priority}
                       </span>
@@ -254,7 +271,7 @@ export default function InventoryPage() {
                       {alert.threshold && <span>Threshold: {alert.threshold}</span>}
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
                     <span className={`inline-block px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${
                       alert.type === 'low_stock' ? 'bg-warning/10 text-warning' :
                       alert.type === 'out_of_stock' ? 'bg-error/10 text-error' :
@@ -263,9 +280,16 @@ export default function InventoryPage() {
                     }`}>
                       {getAlertTypeLabel(alert.type)}
                     </span>
-                    <p className="text-xs text-taupe mt-2">
+                    <p className="text-xs text-taupe">
                       {formatTime(alert.createdAt)}
                     </p>
+                    <button
+                      onClick={() => resolveAlert(alert.id)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-stone hover:text-success border border-sand hover:border-success transition-colors"
+                    >
+                      <CheckCircle size={12} />
+                      Resolve
+                    </button>
                   </div>
                 </div>
               ))}

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Plus, Clock, Award, Sparkles, Star, Layers, Users } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
@@ -160,11 +161,12 @@ export default function HeritagePage() {
                               )}
                             </div>
                             {event.image && (
-                              <div className="w-24 h-24 bg-parchment flex-shrink-0">
-                                <img
+                              <div className="w-24 h-24 bg-parchment flex-shrink-0 relative">
+                                <Image
                                   src={event.image}
                                   alt={event.title}
-                                  className="w-full h-full object-cover"
+                                  fill
+                                  className="object-cover"
                                 />
                               </div>
                             )}

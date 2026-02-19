@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
+import * as intelligenceService from '@/services/intelligence.service';
+import * as wardrobeService from '@/services/wardrobe.service';
 import type {
   Product,
   Brand,
@@ -259,7 +261,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   };
 }
 
-// Separate hook for computed intelligence data
+// Separate hook for intelligence data — loads from service layer with fallbacks
 export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, brand, allProducts }: {
   product: Product;
   sizeVariants: Product['variants'];
@@ -268,13 +270,67 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
   brand?: { name: string } | null;
   allProducts: Product[];
 }) {
-  // G-SAIL™ Availability Intelligence
-  const availabilityIntelligence: AvailabilityIntelligence = useMemo(() => ({
-    productId: product.id,
-    currentStatus: product.availability.status,
-    localConfidence: product.availability.regions[0]?.confidence || 85,
-    alternatives: [
-      ...product.availability.regions
+  // Service-loaded intelligence data
+  const [serviceData, setServiceData] = useState<{
+    availability: AvailabilityIntelligence | null;
+    fitConfidence: FitConfidence | null;
+    outfitSuggestions: CompleteOutfit[];
+    fabricSimulation: FabricSimulation | null;
+    climateSuitability: ClimateSuitability | null;
+    sustainabilityScore: SustainabilityScore | null;
+    materialFeel: MaterialFeel | null;
+  }>({
+    availability: null,
+    fitConfidence: null,
+    outfitSuggestions: [],
+    fabricSimulation: null,
+    climateSuitability: null,
+    sustainabilityScore: null,
+    materialFeel: null,
+  });
+
+  // Load intelligence data from services
+  useEffect(() => {
+    let cancelled = false;
+    async function loadIntelligenceData() {
+      try {
+        const [availRes, fitRes, outfitRes, fabricRes, climateRes, sustainRes, materialRes] =
+          await Promise.all([
+            intelligenceService.getAvailabilityIntelligence(product.id),
+            wardrobeService.getFitConfidence(product.id),
+            wardrobeService.getOutfitSuggestions(product),
+            intelligenceService.getFabricSimulation(product.id),
+            intelligenceService.getClimateSuitability(product.id),
+            intelligenceService.getSustainabilityScore(product.id),
+            intelligenceService.getMaterialFeel(product.id),
+          ]);
+        if (!cancelled) {
+          setServiceData({
+            availability: availRes.data ?? null,
+            fitConfidence: fitRes.data ?? null,
+            outfitSuggestions: outfitRes.data ?? [],
+            fabricSimulation: fabricRes.data ?? null,
+            climateSuitability: climateRes.data ?? null,
+            sustainabilityScore: sustainRes.data ?? null,
+            materialFeel: materialRes.data ?? null,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load product intelligence data:', error);
+      }
+    }
+    loadIntelligenceData();
+    return () => { cancelled = true; };
+  }, [product]);
+
+  // G-SAIL™ Availability Intelligence — service data with fallback
+  const availabilityIntelligence: AvailabilityIntelligence = useMemo(() => {
+    if (serviceData.availability) return serviceData.availability;
+    return {
+      productId: product.id,
+      currentStatus: product.availability.status,
+      localConfidence: product.availability.regions[0]?.confidence || 85,
+      alternatives: product.availability.regions
         .filter(r => r.available)
         .map(r => ({
           type: 'geography' as const,
@@ -282,37 +338,25 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
           city: r.city,
           availabilityConfidence: r.confidence,
           deliveryDays: r.deliveryDays,
-          priceDifference: r.region === 'Americas' ? 150 : r.region === 'Asia' ? 80 : 0,
+          priceDifference: 0,
           reason: `Available at ${product.brandName} ${r.city} boutique with ${r.confidence}% confidence`
         })),
-      ...allProducts
-        .filter(p => p.brandId === product.brandId && p.id !== product.id && p.category === product.category)
-        .slice(0, 2)
-        .map(p => ({
-          type: 'equivalent' as const,
-          availabilityConfidence: 95,
-          reason: `Similar style from ${p.brandName} with comparable craftsmanship`,
-          product: p
-        }))
-    ],
-    restockPrediction: product.availability.status === 'unavailable' ? {
-      estimatedDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      probability: 78
-    } : undefined,
-    conciergeOption: product.availability.status !== 'available'
-  }), [product, allProducts]);
+      restockPrediction: product.availability.status === 'unavailable' ? {
+        estimatedDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        probability: 78
+      } : undefined,
+      conciergeOption: product.availability.status !== 'available'
+    };
+  }, [serviceData.availability, product]);
 
-  // Fit Confidence
+  // Fit Confidence — service data with fallback
   const fitConfidence: FitConfidence = useMemo(() => {
+    if (serviceData.fitConfidence) return serviceData.fitConfidence;
     const suggestedSize = sizeVariants.find(v => v.available)?.value || 'M';
     return {
       overallScore: 87,
       suggestedSize,
-      breakdown: {
-        sizeMatch: 92,
-        styleMatch: 85,
-        proportionMatch: 84
-      },
+      breakdown: { sizeMatch: 92, styleMatch: 85, proportionMatch: 84 },
       sizeNotes: [
         'Runs true to size based on brand standards',
         'Structured fit that defines the silhouette',
@@ -321,47 +365,33 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
       returnRisk: 'low',
       recommendation: `Based on the ${product.brandName} fit profile, ${suggestedSize} will provide the intended silhouette. The ${product.materials[0]?.name || 'fabric'} has minimal stretch, so accurate sizing ensures optimal drape and comfort.`
     };
-  }, [product, sizeVariants]);
+  }, [serviceData.fitConfidence, product, sizeVariants]);
 
-  // Outfit Suggestions
+  // Outfit Suggestions — service data with fallback
   const outfitSuggestions: CompleteOutfit[] = useMemo(() => {
+    if (serviceData.outfitSuggestions.length > 0) return serviceData.outfitSuggestions;
     const complementaryProducts = allProducts
       .filter(p => p.id !== product.id && p.category !== product.category)
-      .slice(0, 8);
-
+      .slice(0, 4);
     return [
       {
         id: 'outfit-1',
-        name: 'Power Evening',
-        occasion: 'Gallery Opening',
+        name: 'Curated Ensemble',
+        occasion: 'Evening',
         description: 'A sophisticated ensemble for cultural events where understated elegance speaks volumes.',
         items: [
           { type: 'suggested' as const, productId: product.id, product, category: product.category, note: 'The focal point' },
           ...(complementaryProducts[0] ? [{ type: 'suggested' as const, productId: complementaryProducts[0].id, product: complementaryProducts[0], category: complementaryProducts[0].category }] : []),
           ...(complementaryProducts[1] ? [{ type: 'suggested' as const, productId: complementaryProducts[1].id, product: complementaryProducts[1], category: complementaryProducts[1].category }] : [])
         ].filter(Boolean),
-        compatibilityScore: 94,
+        compatibilityScore: 90,
         totalPrice: product.price + (complementaryProducts[0]?.price || 0) + (complementaryProducts[1]?.price || 0),
-        agiReasoning: `This combination leverages the structural elegance of the ${product.name} as the centerpiece.`
-      },
-      {
-        id: 'outfit-2',
-        name: 'Refined Professional',
-        occasion: 'Business Meeting',
-        description: 'Command attention while maintaining impeccable taste in professional settings.',
-        items: [
-          { type: 'suggested' as const, productId: product.id, product, category: product.category },
-          ...(complementaryProducts[2] ? [{ type: 'suggested' as const, productId: complementaryProducts[2].id, product: complementaryProducts[2], category: complementaryProducts[2].category }] : []),
-          ...(complementaryProducts[3] ? [{ type: 'suggested' as const, productId: complementaryProducts[3].id, product: complementaryProducts[3], category: complementaryProducts[3].category }] : [])
-        ].filter(Boolean),
-        compatibilityScore: 89,
-        totalPrice: product.price + (complementaryProducts[2]?.price || 0) + (complementaryProducts[3]?.price || 0),
-        agiReasoning: `The ${product.name} anchors this professional look with authority.`
+        agiReasoning: `This combination highlights the ${product.name} as the centerpiece.`
       }
     ];
-  }, [product, allProducts]);
+  }, [serviceData.outfitSuggestions, product, allProducts]);
 
-  // Personalization Match
+  // Personalization Match — computed from user data (no service endpoint)
   const personalizationMatch: PersonalizationMatch | null = useMemo(() => {
     if (!fashionIdentity) return null;
 
@@ -409,17 +439,13 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     };
   }, [fashionIdentity, product, wardrobe]);
 
-  // Delivery Estimate
+  // Delivery Estimate — computed with deterministic dates (no Math.random)
   const deliveryEstimate: DeliveryEstimate = useMemo(() => {
     const today = new Date();
-    const standardDays = 5 + Math.floor(Math.random() * 3);
-    const expressDays = 2 + Math.floor(Math.random() * 2);
-
     const standardDate = new Date(today);
-    standardDate.setDate(today.getDate() + standardDays);
-
+    standardDate.setDate(today.getDate() + 6);
     const expressDate = new Date(today);
-    expressDate.setDate(today.getDate() + expressDays);
+    expressDate.setDate(today.getDate() + 3);
 
     return {
       standard: {
@@ -439,8 +465,9 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     };
   }, []);
 
-  // Fabric Simulation
+  // Fabric Simulation — service data with fallback
   const fabricSimulation: FabricSimulation | undefined = useMemo(() => {
+    if (serviceData.fabricSimulation) return serviceData.fabricSimulation;
     if (!product.materials.length) return undefined;
     const materialName = product.materials[0]?.name?.toLowerCase() || '';
     const fabricType: FabricSimulation['fabricType'] =
@@ -464,45 +491,52 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
       texture: `The ${product.materials[0]?.name || 'fabric'} provides an elegant drape that moves naturally with the body while maintaining its structure.`,
       careComplexity: 'moderate'
     };
-  }, [product]);
+  }, [serviceData.fabricSimulation, product]);
 
-  // Climate Suitability
-  const climateSuitability: ClimateSuitability = useMemo(() => ({
-    productId: product.id,
-    temperatureRange: { min: 15, max: 28 },
-    humidity: 'medium',
-    weather: ['sunny', 'cloudy'],
-    seasons: ['spring', 'autumn'],
-    climates: ['temperate', 'continental'],
-    indoorOutdoor: 'both',
-    activityLevel: 'moderate'
-  }), [product.id]);
+  // Climate Suitability — service data with fallback
+  const climateSuitability: ClimateSuitability = useMemo(() => {
+    if (serviceData.climateSuitability) return serviceData.climateSuitability;
+    return {
+      productId: product.id,
+      temperatureRange: { min: 15, max: 28 },
+      humidity: 'medium',
+      weather: ['sunny', 'cloudy'],
+      seasons: ['spring', 'autumn'],
+      climates: ['temperate', 'continental'],
+      indoorOutdoor: 'both',
+      activityLevel: 'moderate'
+    };
+  }, [serviceData.climateSuitability, product.id]);
 
-  // Sustainability Score
-  const sustainabilityScore: SustainabilityScore = useMemo(() => ({
-    productId: product.id,
-    overallScore: Math.floor(Math.random() * 25) + 70,
-    breakdown: {
-      materials: Math.floor(Math.random() * 20) + 75,
-      production: Math.floor(Math.random() * 20) + 70,
-      packaging: Math.floor(Math.random() * 20) + 65,
-      transport: Math.floor(Math.random() * 20) + 60,
-      longevity: Math.floor(Math.random() * 20) + 80,
-      endOfLife: Math.floor(Math.random() * 20) + 55
-    },
-    certifications: ['GOTS Certified', 'Fair Trade'],
-    carbonFootprint: `${(Math.random() * 5 + 2).toFixed(1)} kg CO2e`,
-    waterUsage: `${Math.floor(Math.random() * 50) + 30}L`,
-    recyclability: 'medium',
-    repairability: 'high',
-    biodegradable: false,
-    veganFriendly: true,
-    highlights: ['Responsibly sourced materials', 'Low water consumption'],
-    improvements: ['Working on carbon-neutral shipping']
-  }), [product.id]);
+  // Sustainability Score — service data with fallback (NO Math.random)
+  const sustainabilityScore: SustainabilityScore = useMemo(() => {
+    if (serviceData.sustainabilityScore) return serviceData.sustainabilityScore;
+    return {
+      productId: product.id,
+      overallScore: 75,
+      breakdown: {
+        materials: 78,
+        production: 74,
+        packaging: 68,
+        transport: 65,
+        longevity: 85,
+        endOfLife: 60
+      },
+      certifications: ['Responsibly Sourced'],
+      carbonFootprint: '8.5 kg CO2e',
+      waterUsage: '55L',
+      recyclability: 'medium',
+      repairability: 'high',
+      biodegradable: false,
+      veganFriendly: true,
+      highlights: ['Responsibly sourced materials', 'Low water consumption'],
+      improvements: ['Working on carbon-neutral shipping']
+    };
+  }, [serviceData.sustainabilityScore, product.id]);
 
-  // Material Feel
+  // Material Feel — service data with fallback
   const materialFeel: MaterialFeel | undefined = useMemo(() => {
+    if (serviceData.materialFeel) return serviceData.materialFeel;
     if (!product.materials.length) return undefined;
     return {
       productId: product.id,
@@ -517,9 +551,9 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
         'Temperature-regulating',
         'Flexible yet structured'
       ],
-      agiDescription: `This ${product.materials[0]?.name || 'piece'} offers a luxurious sensory experience against the skin, with a refined texture that exemplifies ${brand?.name}'s commitment to quality.`
+      agiDescription: `This ${product.materials[0]?.name || 'piece'} offers a luxurious sensory experience against the skin, with a refined texture that exemplifies ${brand?.name || 'the brand'}'s commitment to quality.`
     };
-  }, [product, brand]);
+  }, [serviceData.materialFeel, product, brand]);
 
   return {
     availabilityIntelligence,

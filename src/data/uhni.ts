@@ -14,7 +14,15 @@ import type {
   UHNIPricingSummary,
   UHNIAvailabilitySearch,
   GlobalNetworkStats,
-  RestockPrediction
+  RestockPrediction,
+  ExclusiveEvent,
+  PrivateShoppingEvent,
+  HeritageArchiveItem,
+  IntelligenceInsight,
+  ZeroUIConfig,
+  InvisibleTransaction,
+  ConciergeTask,
+  SilentCommerceItem
 } from '@/types';
 import { products } from './products';
 
@@ -603,5 +611,392 @@ export const mockRestockPredictions: RestockPrediction[] = [
     estimatedDate: '2025-02-08',
     probability: 85,
     alertEnabled: false
+  }
+];
+
+// ============================================
+// EXCLUSIVE EVENTS
+// ============================================
+
+export const mockExclusiveEvents: ExclusiveEvent[] = [
+  {
+    id: 'evt-001',
+    title: 'Art of Haute Couture: Behind the Atelier',
+    type: 'exhibition',
+    host: 'Maison Valentino',
+    venue: 'Palazzo Mignanelli',
+    city: 'Rome',
+    country: 'Italy',
+    date: '2026-03-20',
+    time: '17:00',
+    description: 'A rare glimpse into the Valentino atelier. Witness master artisans at work, explore archive pieces spanning six decades, and enjoy a private dinner in the palazzo gardens.',
+    highlights: ['Atelier tour', 'Archive viewing', 'Private dinner', 'Meet the artisans'],
+    registrationStatus: 'open',
+    maxAttendees: 25,
+    spotsLeft: 8
+  },
+  {
+    id: 'evt-002',
+    title: 'Watchmaking Masterclass with Patek Philippe',
+    type: 'masterclass',
+    host: 'Patek Philippe',
+    venue: 'Patek Philippe Salon',
+    city: 'Geneva',
+    country: 'Switzerland',
+    date: '2026-04-10',
+    time: '10:00',
+    description: 'An immersive full-day masterclass in the art of haute horlogerie. Learn from master watchmakers, handle rare complications, and receive a certificate of completion.',
+    highlights: ['Hands-on workshop', 'Rare piece handling', 'Certificate', 'Lunch with CEO'],
+    registrationStatus: 'registered',
+    maxAttendees: 12,
+    spotsLeft: 0
+  },
+  {
+    id: 'evt-003',
+    title: 'Spring Gala: Fashion Forward Foundation',
+    type: 'gala',
+    host: 'Fashion Forward Foundation',
+    venue: 'The Met',
+    city: 'New York',
+    country: 'United States',
+    date: '2026-05-05',
+    time: '19:30',
+    description: 'Annual charity gala celebrating the intersection of fashion and sustainability. Black-tie event with live performances, silent auction, and networking with industry leaders.',
+    highlights: ['Black-tie dinner', 'Silent auction', 'Live performances', 'Sustainability showcase'],
+    registrationStatus: 'open',
+    maxAttendees: 200,
+    spotsLeft: 45
+  }
+];
+
+// ============================================
+// PRIVATE SHOPPING EVENTS
+// ============================================
+
+export const mockPrivateShoppingEvents: PrivateShoppingEvent[] = [
+  {
+    id: 'pse-001',
+    title: 'Chanel Haute Couture Preview',
+    designer: 'Chanel',
+    venue: 'Palais de Tokyo',
+    city: 'Paris',
+    date: '2026-03-15',
+    time: '18:00',
+    duration: '3 hours',
+    description: 'An exclusive preview of the upcoming Chanel Haute Couture collection. Private viewing with creative director, champagne reception, and first-access ordering.',
+    status: 'upcoming',
+    maxGuests: 30,
+    guestsConfirmed: 18,
+    dressCode: 'Black Tie Optional',
+    perks: ['First access to order', 'Meet the designer', 'Champagne reception', 'Personal styling']
+  },
+  {
+    id: 'pse-002',
+    title: 'Brunello Cucinelli Private Trunk Show',
+    designer: 'Brunello Cucinelli',
+    venue: 'The Dorchester',
+    city: 'London',
+    date: '2026-04-02',
+    time: '14:00',
+    duration: '4 hours',
+    description: 'Private trunk show featuring the complete SS26 collection. Personal consultation with Italian artisans and made-to-measure services.',
+    status: 'rsvp_confirmed',
+    maxGuests: 20,
+    guestsConfirmed: 15,
+    dressCode: 'Smart Casual',
+    perks: ['Made-to-measure consultation', 'Artisan meet & greet', 'Afternoon tea', 'Exclusive pricing']
+  },
+  {
+    id: 'pse-003',
+    title: 'Loro Piana Winter Collection Preview',
+    designer: 'Loro Piana',
+    venue: 'Mandarin Oriental',
+    city: 'Milan',
+    date: '2026-02-28',
+    time: '19:00',
+    duration: '2.5 hours',
+    description: 'An intimate evening showcasing Loro Piana\'s finest cashmere and vicuña pieces. Limited edition items available exclusively at this event.',
+    status: 'invite_only',
+    maxGuests: 15,
+    guestsConfirmed: 12,
+    dressCode: 'Cocktail',
+    perks: ['Limited edition access', 'Fabric workshop', 'Wine tasting', 'Custom monogramming']
+  }
+];
+
+// ============================================
+// HERITAGE ARCHIVE
+// ============================================
+
+export const mockHeritageArchiveItems: HeritageArchiveItem[] = [
+  {
+    id: 'ha-001',
+    title: 'The Original Bar Jacket',
+    brand: 'Dior',
+    era: '1947',
+    description: 'The iconic Bar Jacket from Christian Dior\'s revolutionary "New Look" collection that transformed post-war fashion. Featuring nipped waist and full skirt silhouette.',
+    significance: 'Defined the post-war feminine silhouette and established Dior as a global fashion house.',
+    image: 'https://images.unsplash.com/photo-1558171813-4c088753af8f?w=800',
+    relatedProducts: ['dior-bar-jacket']
+  },
+  {
+    id: 'ha-002',
+    title: 'Kelly Bag Prototype',
+    brand: 'Hermès',
+    era: '1956',
+    description: 'One of the earliest versions of the Kelly bag, renamed after Grace Kelly was photographed shielding her pregnancy with it. Hand-stitched saddle leather with palladium hardware.',
+    significance: 'Transformed from a functional saddle bag to the most coveted luxury accessory in history.',
+    image: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    relatedProducts: ['hermes-kelly-28']
+  },
+  {
+    id: 'ha-003',
+    title: 'Intrecciato Weave Sample',
+    brand: 'Bottega Veneta',
+    era: '1966',
+    description: 'An original sample of the signature intrecciato weave technique developed in the Bottega Veneta workshop in Vicenza. This weaving method became the house\'s defining motif.',
+    significance: 'The intrecciato weave became synonymous with understated luxury and "when your own initials are enough."',
+    image: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=800',
+    relatedProducts: ['bottega-cassette']
+  }
+];
+
+// ============================================
+// INTELLIGENCE INSIGHTS
+// ============================================
+
+export const mockIntelligenceInsights: IntelligenceInsight[] = [
+  {
+    id: 'ins-001',
+    title: 'Quiet Luxury Continues to Rise',
+    category: 'style_trend',
+    summary: 'Demand for understated, logo-free luxury items has increased 34% this quarter. Brands like Loro Piana, Brunello Cucinelli, and The Row are seeing record engagement.',
+    impact: 'high',
+    trend: 'rising',
+    confidence: 92,
+    date: '2026-02-15'
+  },
+  {
+    id: 'ins-002',
+    title: 'Vintage Hermès Investment Value',
+    category: 'investment_piece',
+    summary: 'Pre-owned Hermès bags have appreciated 14.2% year-over-year, outperforming the S&P 500. Birkin 25 in exotic leathers showing highest appreciation.',
+    impact: 'high',
+    trend: 'rising',
+    confidence: 88,
+    date: '2026-02-10'
+  },
+  {
+    id: 'ins-003',
+    title: 'Wardrobe Gap: Evening Wear',
+    category: 'wardrobe_gap',
+    summary: 'Based on your upcoming calendar events and current wardrobe analysis, you may want to consider adding a formal evening gown. Three events in the next 60 days require black-tie attire.',
+    impact: 'medium',
+    trend: 'stable',
+    confidence: 85,
+    date: '2026-02-08'
+  },
+  {
+    id: 'ins-004',
+    title: 'Asian Market Luxury Rebound',
+    category: 'market_signal',
+    summary: 'Chinese luxury spending is rebounding strongly with a 22% increase in Q1 projections. Japanese market continues its steady growth at 8% YoY.',
+    impact: 'medium',
+    trend: 'rising',
+    confidence: 79,
+    date: '2026-02-05'
+  }
+];
+
+// ============================================
+// U13: ZERO-UI COMMERCE CONFIG
+// ============================================
+
+export const mockZeroUIConfig: ZeroUIConfig = {
+  autoReplenish: true,
+  invisibleCheckout: false,
+  wardrobePreparation: true,
+  triggers: [
+    {
+      id: 'trigger-1',
+      type: 'restock',
+      description: 'Auto-restock signature fragrances when supply drops below 30 days',
+      enabled: true,
+      lastTriggered: '2026-01-28T10:00:00Z'
+    },
+    {
+      id: 'trigger-2',
+      type: 'seasonal',
+      description: 'Prepare seasonal wardrobe transition pieces 4 weeks before equinox',
+      enabled: true,
+      lastTriggered: '2025-12-15T08:00:00Z'
+    },
+    {
+      id: 'trigger-3',
+      type: 'event',
+      description: 'Source outfit options 2 weeks before calendar events',
+      enabled: false
+    },
+    {
+      id: 'trigger-4',
+      type: 'travel',
+      description: 'Prepare travel wardrobe based on destination weather and itinerary',
+      enabled: true,
+      lastTriggered: '2026-02-01T14:00:00Z'
+    }
+  ],
+  preferences: {
+    maxAutoSpend: 5000,
+    preferredBrands: ['Hermès', 'Dior', 'Loro Piana', 'Brunello Cucinelli'],
+    excludedCategories: ['swimwear', 'sportswear'],
+    notifyBefore: true,
+    notifyAfter: true
+  }
+};
+
+// ============================================
+// U14: INVISIBLE TRANSACTIONS
+// ============================================
+
+export const mockInvisibleTransactions: InvisibleTransaction[] = [
+  {
+    id: 'inv-001',
+    productId: 'hermes-silk-scarf',
+    productName: 'Hermès Silk Carré 90',
+    productImage: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    method: 'auto',
+    status: 'completed',
+    discretionLevel: 'standard',
+    noDigitalTrail: false,
+    amount: 450,
+    date: '2026-02-10T09:30:00Z'
+  },
+  {
+    id: 'inv-002',
+    productId: 'dior-sauvage-refill',
+    productName: 'Dior Sauvage Parfum Refill',
+    productImage: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800',
+    method: 'scheduled',
+    status: 'processing',
+    discretionLevel: 'high',
+    noDigitalTrail: false,
+    amount: 180,
+    date: '2026-02-14T08:00:00Z'
+  },
+  {
+    id: 'inv-003',
+    productId: 'cartier-love-bracelet',
+    productName: 'Cartier Love Bracelet Rose Gold',
+    productImage: 'https://images.unsplash.com/photo-1611591437281-460bfbe1220a?w=800',
+    method: 'concierge',
+    status: 'pending',
+    discretionLevel: 'maximum',
+    noDigitalTrail: true,
+    amount: 7650,
+    date: '2026-02-16T11:00:00Z'
+  }
+];
+
+// ============================================
+// U15: CONCIERGE TASKS
+// ============================================
+
+export const mockConciergeTasks: ConciergeTask[] = [
+  {
+    id: 'task-001',
+    type: 'styling',
+    title: 'Monaco GP Weekend Styling',
+    description: 'Prepare complete looks for three Monaco GP events: yacht party, race day, and gala dinner.',
+    status: 'in_progress',
+    assignedTo: 'Isabella Martinez',
+    priority: 'high',
+    dueDate: '2026-05-10',
+    notes: ['Client prefers European designers', 'No repeat brands across events', 'Jewelry coordination needed'],
+    clientInstructions: 'Please ensure all outfits are comfortable for warm weather. I prefer minimal accessories.',
+    createdAt: '2026-02-01T10:00:00Z',
+    updatedAt: '2026-02-15T14:30:00Z'
+  },
+  {
+    id: 'task-002',
+    type: 'sourcing',
+    title: 'Vintage Chanel Jacket Search',
+    description: 'Locate a vintage Chanel tweed jacket from the 1990s Karl Lagerfeld era, size 38.',
+    status: 'pending',
+    assignedTo: 'Isabella Martinez',
+    priority: 'medium',
+    dueDate: '2026-03-30',
+    notes: ['Checking Paris vintage dealers', 'Vestiaire Collective monitoring active'],
+    createdAt: '2026-02-10T09:00:00Z',
+    updatedAt: '2026-02-10T09:00:00Z'
+  },
+  {
+    id: 'task-003',
+    type: 'reservation',
+    title: 'Dior Private Viewing Reservation',
+    description: 'Reserve private viewing appointment at Dior 30 Montaigne for client visit to Paris.',
+    status: 'completed',
+    assignedTo: 'Isabella Martinez',
+    priority: 'medium',
+    dueDate: '2026-02-20',
+    notes: ['Confirmed for Feb 22 at 14:00', 'VIP salon reserved', 'Champagne service arranged'],
+    createdAt: '2026-02-05T11:00:00Z',
+    updatedAt: '2026-02-12T16:00:00Z'
+  },
+  {
+    id: 'task-004',
+    type: 'alteration',
+    title: 'Bar Jacket Final Fitting',
+    description: 'Coordinate final fitting for bespoke Dior Bar Jacket at Paris atelier.',
+    status: 'pending',
+    assignedTo: 'Isabella Martinez',
+    priority: 'urgent',
+    dueDate: '2026-02-25',
+    notes: ['Atelier confirmed availability', 'Transport arranged from hotel'],
+    clientInstructions: 'I will be in Paris Feb 23-26. Morning appointments preferred.',
+    createdAt: '2026-02-08T08:00:00Z',
+    updatedAt: '2026-02-14T10:00:00Z'
+  }
+];
+
+// ============================================
+// U16: SILENT COMMERCE ITEMS
+// ============================================
+
+export const mockSilentCommerceItems: SilentCommerceItem[] = [
+  {
+    id: 'sc-001',
+    productId: 'loro-piana-cashmere-throw',
+    productName: 'Loro Piana Baby Cashmere Throw',
+    productImage: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800',
+    brandName: 'Loro Piana',
+    price: 2850,
+    awareness: 'passive',
+    context: 'Based on your home decor preferences and upcoming winter travel to Aspen.',
+    displayMode: 'ambient',
+    relevanceScore: 78
+  },
+  {
+    id: 'sc-002',
+    productId: 'brunello-cucinelli-blazer',
+    productName: 'Brunello Cucinelli Linen Blazer',
+    productImage: 'https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=800',
+    brandName: 'Brunello Cucinelli',
+    price: 3200,
+    awareness: 'active',
+    context: 'Complements 4 items in your wardrobe. Last one in your size at Milan boutique.',
+    displayMode: 'card',
+    relevanceScore: 92
+  },
+  {
+    id: 'sc-003',
+    productId: 'hermes-garden-party',
+    productName: 'Hermès Garden Party 36',
+    productImage: 'https://images.unsplash.com/photo-1594223274512-ad4803739b7c?w=800',
+    brandName: 'Hermès',
+    price: 3400,
+    awareness: 'urgent',
+    context: 'Rare color just became available. Only 2 units globally. Your concierge can secure it.',
+    displayMode: 'notification',
+    relevanceScore: 97
   }
 ];

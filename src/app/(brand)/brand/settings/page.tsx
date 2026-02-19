@@ -15,10 +15,12 @@ import {
   Plus,
   Trash2,
   Users,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 
 type SettingsTab = 'profile' | 'team' | 'api' | 'notifications';
 
@@ -33,6 +35,32 @@ export default function SettingsPage() {
   const [inviteRole, setInviteRole] = useState<'admin' | 'manager' | 'analyst' | 'viewer'>('viewer');
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyPermissions, setNewKeyPermissions] = useState<('read' | 'write' | 'delete')[]>(['read']);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+
+  // Display settings - controlled state
+  const [displayCurrency, setDisplayCurrency] = useState(partner?.settings.display.currency || 'EUR');
+  const [displayTimezone, setDisplayTimezone] = useState(partner?.settings.display.timezone || 'Europe/Paris');
+  const [displayLanguage, setDisplayLanguage] = useState(partner?.settings.display.language || 'en');
+
+  // Notification settings - controlled state
+  const [notifSettings, setNotifSettings] = useState({
+    lowStockAlerts: partner?.settings.notifications.lowStockAlerts ?? true,
+    orderUpdates: partner?.settings.notifications.orderUpdates ?? true,
+    demandSignals: partner?.settings.notifications.demandSignals ?? true,
+    weeklyReports: partner?.settings.notifications.weeklyReports ?? false,
+  });
+
+  // Integration settings - controlled state
+  const [webhookUrl, setWebhookUrl] = useState(partner?.settings.integration.webhookUrl || '');
+  const [syncFrequency, setSyncFrequency] = useState(partner?.settings.integration.syncFrequency || 'realtime');
+
+  // Team member delete confirmation
+  const [deleteMemberId, setDeleteMemberId] = useState<string | null>(null);
+  const [showDeleteMemberModal, setShowDeleteMemberModal] = useState(false);
+
+  const inviteModalRef = useModalAccessibility(showInviteModal, () => setShowInviteModal(false));
+  const apiKeyModalRef = useModalAccessibility(showCreateKeyModal, () => setShowCreateKeyModal(false));
+  const deleteMemberModalRef = useModalAccessibility(showDeleteMemberModal, () => setShowDeleteMemberModal(false));
 
   if (!partner) return null;
 
@@ -71,19 +99,21 @@ export default function SettingsPage() {
   };
 
   const handleInviteMember = () => {
-    // In a real app, this would send the invitation
     console.log('Inviting member:', { email: inviteEmail, role: inviteRole });
     setShowInviteModal(false);
     setInviteEmail('');
     setInviteRole('viewer');
+    setSavedMessage('Invitation sent successfully');
+    setTimeout(() => setSavedMessage(null), 3000);
   };
 
   const handleCreateKey = () => {
-    // In a real app, this would create a new API key
     console.log('Creating API key:', { name: newKeyName, permissions: newKeyPermissions });
     setShowCreateKeyModal(false);
     setNewKeyName('');
     setNewKeyPermissions(['read']);
+    setSavedMessage('API key created successfully');
+    setTimeout(() => setSavedMessage(null), 3000);
   };
 
   const togglePermission = (permission: 'read' | 'write' | 'delete') => {
@@ -94,6 +124,31 @@ export default function SettingsPage() {
     );
   };
 
+  const handleDeleteMember = (memberId: string) => {
+    setDeleteMemberId(memberId);
+    setShowDeleteMemberModal(true);
+  };
+
+  const confirmDeleteMember = () => {
+    console.log('Removing team member:', deleteMemberId);
+    setShowDeleteMemberModal(false);
+    setDeleteMemberId(null);
+    setSavedMessage('Team member removed successfully');
+    setTimeout(() => setSavedMessage(null), 3000);
+  };
+
+  const handleSaveSettings = () => {
+    console.log('Saving settings:', {
+      display: { currency: displayCurrency, timezone: displayTimezone, language: displayLanguage },
+      notifications: notifSettings,
+      integration: { webhookUrl, syncFrequency },
+    });
+    setSavedMessage('Settings saved successfully');
+    setTimeout(() => setSavedMessage(null), 3000);
+  };
+
+  const memberToDelete = partner.teamMembers.find(m => m.id === deleteMemberId);
+
   return (
     <div>
       <BrandPageHeader
@@ -102,6 +157,14 @@ export default function SettingsPage() {
       />
 
       <div className="p-8">
+        {/* Success Message */}
+        {savedMessage && (
+          <div className="mb-6 px-4 py-3 bg-success/10 text-success text-sm flex items-center gap-2">
+            <Check size={16} />
+            {savedMessage}
+          </div>
+        )}
+
         <div className="flex gap-8">
           {/* Sidebar Navigation */}
           <div className="w-64 flex-shrink-0">
@@ -182,17 +245,25 @@ export default function SettingsPage() {
                       <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                         Currency
                       </label>
-                      <select className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer">
-                        <option value="EUR">EUR (€)</option>
+                      <select
+                        value={displayCurrency}
+                        onChange={(e) => setDisplayCurrency(e.target.value)}
+                        className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                      >
+                        <option value="EUR">EUR (&euro;)</option>
                         <option value="USD">USD ($)</option>
-                        <option value="GBP">GBP (£)</option>
+                        <option value="GBP">GBP (&pound;)</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                         Timezone
                       </label>
-                      <select className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer">
+                      <select
+                        value={displayTimezone}
+                        onChange={(e) => setDisplayTimezone(e.target.value)}
+                        className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                      >
                         <option value="Europe/Paris">Europe/Paris</option>
                         <option value="Europe/London">Europe/London</option>
                         <option value="America/New_York">America/New York</option>
@@ -202,9 +273,13 @@ export default function SettingsPage() {
                       <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                         Language
                       </label>
-                      <select className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer">
+                      <select
+                        value={displayLanguage}
+                        onChange={(e) => setDisplayLanguage(e.target.value)}
+                        className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                      >
                         <option value="en">English</option>
-                        <option value="fr">Français</option>
+                        <option value="fr">Fran&ccedil;ais</option>
                         <option value="de">Deutsch</option>
                       </select>
                     </div>
@@ -252,7 +327,10 @@ export default function SettingsPage() {
                           <span className={`px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getRoleBadge(member.role)}`}>
                             {member.role}
                           </span>
-                          <button className="text-stone hover:text-error transition-colors">
+                          <button
+                            onClick={() => handleDeleteMember(member.id)}
+                            className="text-stone hover:text-error transition-colors"
+                          >
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -336,11 +414,21 @@ export default function SettingsPage() {
                       <div className="flex items-center gap-3">
                         <input
                           type="url"
-                          value={partner.settings.integration.webhookUrl || ''}
-                          readOnly
-                          className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep font-mono text-sm"
+                          value={webhookUrl}
+                          onChange={(e) => setWebhookUrl(e.target.value)}
+                          placeholder="https://your-domain.com/webhook"
+                          className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep font-mono text-sm placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                         />
-                        <button className="px-4 py-3 border border-sand text-stone hover:text-charcoal-deep hover:bg-parchment transition-colors">
+                        <button
+                          onClick={() => {
+                            if (webhookUrl) {
+                              navigator.clipboard.writeText(webhookUrl);
+                              setSavedMessage('Webhook URL copied');
+                              setTimeout(() => setSavedMessage(null), 2000);
+                            }
+                          }}
+                          className="px-4 py-3 border border-sand text-stone hover:text-charcoal-deep hover:bg-parchment transition-colors"
+                        >
                           <Link2 size={16} />
                         </button>
                       </div>
@@ -350,7 +438,11 @@ export default function SettingsPage() {
                       <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                         Sync Frequency
                       </label>
-                      <select className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer">
+                      <select
+                        value={syncFrequency}
+                        onChange={(e) => setSyncFrequency(e.target.value as 'realtime' | 'hourly' | 'daily')}
+                        className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
+                      >
                         <option value="realtime">Real-time</option>
                         <option value="hourly">Hourly</option>
                         <option value="daily">Daily</option>
@@ -371,10 +463,10 @@ export default function SettingsPage() {
 
                   <div className="space-y-4">
                     {[
-                      { key: 'lowStockAlerts', label: 'Low Stock Alerts', description: 'Get notified when products fall below threshold' },
-                      { key: 'orderUpdates', label: 'Order Updates', description: 'Receive updates on new orders and changes' },
-                      { key: 'demandSignals', label: 'Demand Signals', description: 'Be notified of significant demand changes' },
-                      { key: 'weeklyReports', label: 'Weekly Reports', description: 'Receive weekly performance summaries' }
+                      { key: 'lowStockAlerts' as const, label: 'Low Stock Alerts', description: 'Get notified when products fall below threshold' },
+                      { key: 'orderUpdates' as const, label: 'Order Updates', description: 'Receive updates on new orders and changes' },
+                      { key: 'demandSignals' as const, label: 'Demand Signals', description: 'Be notified of significant demand changes' },
+                      { key: 'weeklyReports' as const, label: 'Weekly Reports', description: 'Receive weekly performance summaries' }
                     ].map(item => (
                       <div key={item.key} className="flex items-center justify-between py-4 border-b border-sand/30 last:border-0">
                         <div>
@@ -384,7 +476,8 @@ export default function SettingsPage() {
                         <label className="relative inline-flex items-center cursor-pointer">
                           <input
                             type="checkbox"
-                            defaultChecked={partner.settings.notifications[item.key as keyof typeof partner.settings.notifications]}
+                            checked={notifSettings[item.key]}
+                            onChange={() => setNotifSettings(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
                             className="sr-only peer"
                           />
                           <div className="w-11 h-6 bg-sand peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-charcoal-deep" />
@@ -396,9 +489,9 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* Save Button */}
+            {/* Global Save Button */}
             <div className="mt-8 flex justify-end">
-              <PrimaryButton>
+              <PrimaryButton onClick={handleSaveSettings}>
                 Save Changes
               </PrimaryButton>
             </div>
@@ -409,9 +502,15 @@ export default function SettingsPage() {
       {/* Invite Member Modal */}
       {showInviteModal && (
         <div className="fixed inset-0 bg-noir/50 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md mx-4">
+          <div
+            ref={inviteModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="invite-modal-title"
+            className="bg-white w-full max-w-md mx-4"
+          >
             <div className="px-6 py-4 border-b border-sand flex items-center justify-between">
-              <h2 className="font-display text-lg text-charcoal-deep">Invite Team Member</h2>
+              <h2 id="invite-modal-title" className="font-display text-lg text-charcoal-deep">Invite Team Member</h2>
               <button
                 onClick={() => setShowInviteModal(false)}
                 className="text-stone hover:text-charcoal-deep transition-colors"
@@ -470,9 +569,15 @@ export default function SettingsPage() {
       {/* Create API Key Modal */}
       {showCreateKeyModal && (
         <div className="fixed inset-0 bg-noir/50 flex items-center justify-center z-50">
-          <div className="bg-white w-full max-w-md mx-4">
+          <div
+            ref={apiKeyModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="api-key-modal-title"
+            className="bg-white w-full max-w-md mx-4"
+          >
             <div className="px-6 py-4 border-b border-sand flex items-center justify-between">
-              <h2 className="font-display text-lg text-charcoal-deep">Create API Key</h2>
+              <h2 id="api-key-modal-title" className="font-display text-lg text-charcoal-deep">Create API Key</h2>
               <button
                 onClick={() => setShowCreateKeyModal(false)}
                 className="text-stone hover:text-charcoal-deep transition-colors"
@@ -533,6 +638,55 @@ export default function SettingsPage() {
                   Create Key
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Team Member Confirmation Modal */}
+      {showDeleteMemberModal && memberToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm"
+            onClick={() => setShowDeleteMemberModal(false)}
+          />
+          <div
+            ref={deleteMemberModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-member-modal-title"
+            className="relative bg-white w-full max-w-md shadow-2xl p-8"
+          >
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-error/10 flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-error" />
+              </div>
+              <h3 id="delete-member-modal-title" className="font-display text-xl text-charcoal-deep mb-2">Remove Team Member</h3>
+              <p className="text-sm text-stone">
+                Are you sure you want to remove <span className="font-medium text-charcoal-deep">{memberToDelete.name}</span> from the team?
+              </p>
+              {memberToDelete.role === 'admin' && (
+                <div className="mt-4 flex items-start gap-2 bg-warning/10 border border-warning/20 p-3 text-left">
+                  <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
+                  <p className="text-xs text-warning">
+                    This member has <strong>admin</strong> privileges. Removing them will revoke all their access immediately.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowDeleteMemberModal(false)}
+                className="flex-1 px-5 py-3 border border-sand text-xs tracking-wider uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteMember}
+                className="flex-1 px-5 py-3 bg-error text-white text-xs tracking-wider uppercase hover:bg-error/90 transition-colors"
+              >
+                Remove Member
+              </button>
             </div>
           </div>
         </div>

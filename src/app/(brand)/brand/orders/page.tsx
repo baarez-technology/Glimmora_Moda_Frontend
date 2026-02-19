@@ -1,24 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Search, Filter, Package, Clock, Truck, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Search, Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ArrowUpDown } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import type { OrderStatus } from '@/types/brand-portal';
+
+const ORDERS_PER_PAGE = 20;
 
 export default function OrdersPage() {
   const { orders } = useBrand();
   const [filter, setFilter] = useState<'all' | OrderStatus>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortDateAsc, setSortDateAsc] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredOrders = orders.filter(order => {
-    const matchesFilter = filter === 'all' || order.status === filter;
-    const matchesSearch = searchQuery === '' ||
-      order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      order.customer.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
+  const filteredAndSortedOrders = useMemo(() => {
+    const filtered = orders.filter(order => {
+      const matchesFilter = filter === 'all' || order.status === filter;
+      const matchesSearch = searchQuery === '' ||
+        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.customer.name.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesFilter && matchesSearch;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const dateA = new Date(a.createdAt).getTime();
+      const dateB = new Date(b.createdAt).getTime();
+      return sortDateAsc ? dateA - dateB : dateB - dateA;
+    });
+  }, [orders, filter, searchQuery, sortDateAsc]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedOrders.length / ORDERS_PER_PAGE));
+  const paginatedOrders = filteredAndSortedOrders.slice(
+    (currentPage - 1) * ORDERS_PER_PAGE,
+    currentPage * ORDERS_PER_PAGE
+  );
+
+  // Reset to page 1 when filter/search changes
+  const handleFilterChange = (value: 'all' | OrderStatus) => {
+    setFilter(value);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
 
   const formatCurrency = (value: number) => {
     return `€${value.toLocaleString()}`;
@@ -64,6 +94,21 @@ export default function OrdersPage() {
     }
   };
 
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status) {
+      case 'paid':
+        return 'bg-success/10 text-success';
+      case 'pending':
+        return 'bg-warning/10 text-warning';
+      case 'refunded':
+        return 'bg-info/10 text-info';
+      case 'failed':
+        return 'bg-error/10 text-error';
+      default:
+        return 'bg-taupe/20 text-stone';
+    }
+  };
+
   const getTierBadge = (tier?: string) => {
     switch (tier) {
       case 'uhni':
@@ -89,7 +134,7 @@ export default function OrdersPage() {
     <div>
       <BrandPageHeader
         title="Orders"
-        subtitle={`${filteredOrders.length} order${filteredOrders.length !== 1 ? 's' : ''}`}
+        subtitle={`${filteredAndSortedOrders.length} order${filteredAndSortedOrders.length !== 1 ? 's' : ''}`}
       />
 
       <div className="p-8 space-y-6">
@@ -101,11 +146,12 @@ export default function OrdersPage() {
             { value: 'confirmed' as const, label: 'Confirmed' },
             { value: 'processing' as const, label: 'Processing' },
             { value: 'shipped' as const, label: 'Shipped' },
-            { value: 'delivered' as const, label: 'Delivered' }
+            { value: 'delivered' as const, label: 'Delivered' },
+            { value: 'cancelled' as const, label: 'Cancelled' }
           ].map(tab => (
             <button
               key={tab.value}
-              onClick={() => setFilter(tab.value)}
+              onClick={() => handleFilterChange(tab.value)}
               className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
                 filter === tab.value
                   ? 'bg-white text-charcoal-deep'
@@ -127,13 +173,13 @@ export default function OrdersPage() {
             type="text"
             placeholder="Search by order number or customer..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full pl-11 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
           />
         </div>
 
         {/* Orders List */}
-        {filteredOrders.length === 0 ? (
+        {filteredAndSortedOrders.length === 0 ? (
           <div className="bg-white border border-sand/50 p-12 text-center">
             <p className="text-stone">No orders found</p>
           </div>
@@ -144,7 +190,13 @@ export default function OrdersPage() {
                 <thead>
                   <tr className="border-b border-sand/30">
                     <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Order
+                      <button
+                        onClick={() => setSortDateAsc(prev => !prev)}
+                        className="inline-flex items-center gap-1.5 hover:text-charcoal-deep transition-colors"
+                      >
+                        Order
+                        <ArrowUpDown size={12} className={sortDateAsc ? 'text-charcoal-deep' : 'text-taupe'} />
+                      </button>
                     </th>
                     <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
                       Customer
@@ -159,13 +211,16 @@ export default function OrdersPage() {
                       Total
                     </th>
                     <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
+                      Payment
+                    </th>
+                    <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
                       Status
                     </th>
                     <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-sand/30">
-                  {filteredOrders.map(order => {
+                  {paginatedOrders.map(order => {
                     const StatusIcon = getStatusIcon(order.status);
                     return (
                       <tr key={order.id} className="hover:bg-parchment/30 transition-colors">
@@ -209,6 +264,13 @@ export default function OrdersPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex justify-center">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getPaymentStatusBadge(order.paymentStatus)}`}>
+                              {order.paymentStatus}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex justify-center">
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(order.status)}`}>
                               <StatusIcon size={12} />
                               {order.status}
@@ -229,6 +291,44 @@ export default function OrdersPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-sand/30 flex items-center justify-between">
+                <p className="text-xs text-taupe">
+                  Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, filteredAndSortedOrders.length)} of {filteredAndSortedOrders.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft size={14} /> Previous
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-8 h-8 text-xs transition-colors ${
+                        currentPage === page
+                          ? 'bg-charcoal-deep text-ivory-cream'
+                          : 'text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Next <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

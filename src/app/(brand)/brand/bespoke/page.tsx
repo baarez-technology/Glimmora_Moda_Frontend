@@ -90,6 +90,7 @@ export default function BespokeOrdersPage() {
     { value: 'design_approval', label: 'Design' },
     { value: 'production', label: 'Production' },
     { value: 'fitting', label: 'Fitting' },
+    { value: 'final_adjustments', label: 'Adjustments' },
     { value: 'complete', label: 'Complete' }
   ];
 
