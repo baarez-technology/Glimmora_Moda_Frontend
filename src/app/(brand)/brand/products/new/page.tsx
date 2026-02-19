@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, X, ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import type { BrandProductStatus, BrandProduct } from '@/types/brand-portal';
 import type {
@@ -75,13 +74,22 @@ export default function NewProductPage() {
   // Image URL input
   const [imageUrl, setImageUrl] = useState('');
   const [images, setImages] = useState<ProductImage[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
+  const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
+
+  useEffect(() => {
+    fetchCollectionNames()
+      .then(setCollectionNames)
+      .catch(() => {});
+  }, []);
 
   const [formData, setFormData] = useState({
-    name: '',
+    product_name: '',
     sku: '',
     price: '',
-    category: 'bags' as ProductCategory,
-    description: '',
+    collection_name: '',
+    product_description: '',
     tagline: '',
     narrative: '',
     status: 'draft' as BrandProductStatus,
@@ -186,6 +194,7 @@ export default function NewProductPage() {
     if (!validateAll()) return;
 
     setIsSubmitting(true);
+    setError(null);
 
     try {
       const newProduct: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -195,9 +204,8 @@ export default function NewProductPage() {
         slug: generateSlug(formData.name),
         sku: formData.sku,
         price: parseFloat(formData.price) || 0,
-        currency: 'EUR',
-        category: formData.category,
-        description: formData.description,
+        collection_name: formData.collection_name,
+        status: formData.status,
         tagline: formData.tagline,
         narrative: formData.narrative || formData.description,
         status: formData.status,
@@ -253,7 +261,7 @@ export default function NewProductPage() {
         title="Create Product"
         breadcrumbs={[
           { label: 'Products', href: '/brand/products' },
-          { label: 'New Product' }
+          { label: 'New Product' },
         ]}
         actions={
           <Link
@@ -268,6 +276,12 @@ export default function NewProductPage() {
 
       <form onSubmit={handleSubmit} className="p-8" noValidate>
         <div className="max-w-3xl space-y-8">
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           {/* Basic Information */}
           <section className="bg-white border border-sand/50 p-6 space-y-6">
             <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
@@ -311,7 +325,7 @@ export default function NewProductPage() {
 
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Price (EUR) *
+                  Price *
                 </label>
                 <input
                   type="number"
@@ -330,17 +344,16 @@ export default function NewProductPage() {
 
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Category *
+                  Collection Name *
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => updateField('category', e.target.value as ProductCategory)}
                   className={`${inputNormal} cursor-pointer`}
                 >
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
+                  <option value="">Select collection</option>
+                  {collectionNames.map((col) => (
+                    <option key={col.collection_id} value={col.collection_name}>{col.collection_name}</option>
                   ))}
                 </select>
               </div>
@@ -392,8 +405,8 @@ export default function NewProductPage() {
                   Description
                 </label>
                 <textarea
-                  value={formData.description}
-                  onChange={(e) => updateField('description', e.target.value)}
+                  value={formData.product_description}
+                  onChange={(e) => updateField('product_description', e.target.value)}
                   rows={3}
                   className={`${inputNormal} resize-none`}
                   placeholder="Describe the product, its heritage, and unique qualities..."

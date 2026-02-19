@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Upload, Save } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { ArrowLeft, Upload, Save, Loader2 } from 'lucide-react';
+import { fetchCollectionDetail, fetchCollectionBasicInfo, updateCollection } from '@/services/brand-collection.service';
+import { uploadImage } from '@/services/brand-product.service';
+import type { CollectionDetailResponse } from '@/services/brand-collection.service';
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -13,37 +15,57 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export default function EditCollectionPage() {
   const params = useParams();
   const router = useRouter();
-  const { getCollectionById, updateCollection, products } = useBrand();
-
   const collectionId = params.id as string;
-  const collection = getCollectionById(collectionId);
+
+  const [collection, setCollection] = useState<CollectionDetailResponse | null>(null);
+  const [isActive, setIsActive] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     season: 'Spring/Summer',
     year: new Date().getFullYear().toString(),
-    status: 'draft' as 'draft' | 'published' | 'archived'
+    status: 'draft',
   });
-  const [heroImage, setHeroImage] = useState<File | null>(null);
+  const [heroFile, setHeroFile] = useState<File | null>(null);
   const [heroPreview, setHeroPreview] = useState<string | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string>('');
   const [imageError, setImageError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (collection) {
+    loadCollection();
+  }, [collectionId]);
+
+  const loadCollection = async () => {
+    setIsLoading(true);
+    try {
+      const [data, basicInfo] = await Promise.all([
+        fetchCollectionDetail(collectionId),
+        fetchCollectionBasicInfo(collectionId),
+      ]);
+      setCollection(data);
+      setIsActive(basicInfo?.is_active ?? false);
       setFormData({
-        name: collection.name,
-        description: collection.description,
-        season: collection.season,
-        year: collection.year.toString(),
-        status: collection.status
+        name: data.collection_name,
+        description: data.collection_description,
+        season: data.season,
+        year: data.year,
+        status: data.collection_status,
       });
-      if (collection.heroImage) {
-        setHeroPreview(collection.heroImage);
+      if (data.collection_image) {
+        setHeroPreview(data.collection_image);
+        setExistingImageUrl(data.collection_image);
       }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load collection');
+    } finally {
+      setIsLoading(false);
     }
-  }, [collection]);
+  };
 
   const validateAndSetImage = (file: File) => {
     setImageError(null);
@@ -58,7 +80,7 @@ export default function EditCollectionPage() {
       return;
     }
 
-    setHeroImage(file);
+    setHeroFile(file);
     const url = URL.createObjectURL(file);
     setHeroPreview(url);
   };
@@ -76,16 +98,52 @@ export default function EditCollectionPage() {
   };
 
   const removeImage = () => {
-    if (heroPreview && heroImage) URL.revokeObjectURL(heroPreview);
-    setHeroImage(null);
+    if (heroPreview && heroFile) URL.revokeObjectURL(heroPreview);
+    setHeroFile(null);
     setHeroPreview(null);
+    setExistingImageUrl('');
     setImageError(null);
   };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      let imageUrl = existingImageUrl;
+      if (heroFile) {
+        imageUrl = await uploadImage(heroFile);
+      }
+
+      await updateCollection(collectionId, {
+        collection_name: formData.name,
+        season: formData.season,
+        year: formData.year,
+        status: formData.status,
+        collection_description: formData.description,
+        collection_image: imageUrl,
+      });
+
+      router.push(`/brand/collections/${collectionId}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update collection');
+      setIsSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-taupe" />
+      </div>
+    );
+  }
 
   if (!collection) {
     return (
       <div className="p-8 text-center">
-        <p className="text-stone">Collection not found</p>
+        <p className="text-stone">{error || 'Collection not found'}</p>
         <Link
           href="/brand/collections"
           className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
@@ -95,22 +153,6 @@ export default function EditCollectionPage() {
       </div>
     );
   }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateCollection(collectionId, {
-      name: formData.name,
-      description: formData.description,
-      season: formData.season,
-      year: parseInt(formData.year),
-      status: formData.status,
-      productIds: collection.productIds,
-      productCount: collection.productIds.length,
-    });
-    // In a real app, this would update the collection in the backend
-    console.log('Updating collection:', formData);
-    router.push(`/brand/collections/${collectionId}`);
-  };
 
   return (
     <div>
@@ -122,7 +164,7 @@ export default function EditCollectionPage() {
           </Link>
           <span className="text-taupe">/</span>
           <Link href={`/brand/collections/${collectionId}`} className="text-taupe hover:text-charcoal-deep transition-colors">
-            {collection.name}
+            {collection.collection_name}
           </Link>
           <span className="text-taupe">/</span>
           <span className="text-charcoal-deep">Edit</span>
@@ -143,6 +185,12 @@ export default function EditCollectionPage() {
       {/* Form */}
       <form onSubmit={handleSubmit} className="p-8 max-w-4xl">
         <div className="space-y-8">
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           {/* Basic Information */}
           <div className="bg-white border border-sand/50 p-6">
             <h2 className="font-display text-lg text-charcoal-deep mb-6">Basic Information</h2>
@@ -202,7 +250,7 @@ export default function EditCollectionPage() {
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' | 'archived' })}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
                 >
                   <option value="draft">Draft</option>
@@ -269,9 +317,9 @@ export default function EditCollectionPage() {
                     Remove
                   </button>
                 </div>
-                {heroImage && (
+                {heroFile && (
                   <p className="mt-2 text-xs text-taupe">
-                    {heroImage.name} ({(heroImage.size / (1024 * 1024)).toFixed(1)}MB)
+                    {heroFile.name} ({(heroFile.size / (1024 * 1024)).toFixed(1)}MB)
                   </p>
                 )}
               </div>
@@ -309,13 +357,16 @@ export default function EditCollectionPage() {
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
-            >
-              <Save size={16} />
-              Save Changes
-            </button>
+            {isActive && (
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                <Save size={16} />
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            )}
           </div>
         </div>
       </form>

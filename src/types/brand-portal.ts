@@ -55,6 +55,7 @@ export interface BrandPartner {
   brandId: string;
   brandName: string;
   brandLogo?: string;
+  brandCategory?: string;
   tier: BrandPartnerTier;
   status: BrandPartnerStatus;
   partnerSince: string;

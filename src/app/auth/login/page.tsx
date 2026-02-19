@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { brandLogin } from '@/services/auth.service';
 
 type DemoTier = 'consumer' | 'uhni' | 'brand';
 
@@ -26,6 +27,7 @@ function LoginForm() {
     password: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -34,23 +36,36 @@ function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
-    // Simulate brief loading for UX
-    await new Promise(resolve => setTimeout(resolve, 500));
+    setLoginError(null);
 
     if (selectedTier === 'brand') {
-      // Brand partner login
-      // Set brand auth in localStorage
-      localStorage.setItem('moda-brand-auth', 'true');
-      showToast('Welcome to the Brand Portal.', 'success');
-      router.push('/brand');
+      // Real brand partner login via API
+      try {
+        const data = await brandLogin({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        // Store tokens and brand data for persistent login
+        localStorage.setItem('moda-brand-token', data.access_token);
+        localStorage.setItem('moda-brand-refresh-token', data.refresh_token);
+        localStorage.setItem('moda-brand-data', JSON.stringify(data.brand));
+
+        showToast('Welcome to the Brand Portal.', 'success');
+        router.push('/brand');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        setLoginError(message);
+        showToast(message, 'error');
+        setIsSubmitting(false);
+      }
     } else {
-      // Consumer/UHNI login
-      // Set user role based on selected demo tier
-      // Update both contexts to keep them in sync
+      // Consumer/UHNI login (demo mode)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const tier = selectedTier === 'uhni' ? 'uhni' : 'preferred';
-      setAuthUserRole(tier);  // For authentication state
-      setAppUserRole(tier);   // For UHNI features
+      setAuthUserRole(tier);
+      setAppUserRole(tier);
 
       if (selectedTier === 'uhni') {
         showToast('Welcome back. Your personal concierge is available.', 'success');
@@ -58,7 +73,6 @@ function LoginForm() {
         showToast('Welcome back to ModaGlimmora!', 'success');
       }
 
-      // Redirect to the original destination or home
       router.push(redirectUrl);
     }
   };
@@ -172,6 +186,13 @@ function LoginForm() {
                 </button>
               </div>
             </div>
+
+            {/* Login Error */}
+            {loginError && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm">
+                {loginError}
+              </div>
+            )}
 
             {/* Demo Mode Tier Selector */}
             <div className="p-4 bg-parchment/50 border border-sand/50">

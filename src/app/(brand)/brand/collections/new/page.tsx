@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { createCollection } from '@/services/brand-collection.service';
+import { uploadImage } from '@/services/brand-product.service';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 
 export default function NewCollectionPage() {
@@ -22,7 +23,7 @@ export default function NewCollectionPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) return;
 
@@ -65,6 +66,12 @@ export default function NewCollectionPage() {
       />
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6 max-w-4xl">
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
         {/* Basic Information */}
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50">
@@ -125,7 +132,7 @@ export default function NewCollectionPage() {
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
               >
                 <option value="draft">Draft</option>
@@ -197,10 +204,11 @@ export default function NewCollectionPage() {
           </Link>
           <button
             type="submit"
+              disabled={isSubmitting}
             disabled={isSubmitting || !formData.name.trim()}
-            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50 disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating...' : 'Create Collection'}
+            {isSubmitting ? 'Creating...' : '{isSubmitting ? 'Creating...' : 'Create Collection'}'}
           </button>
         </div>
       </form>

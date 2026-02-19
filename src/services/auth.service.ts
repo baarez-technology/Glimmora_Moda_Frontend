@@ -94,3 +94,143 @@ export async function loginAsBrand(credentials: {
     }),
   });
 }
+
+// ============================================
+// Real Brand Login (Backend API)
+// ============================================
+
+export interface BrandLoginRequest {
+  email: string;
+  password: string;
+  device?: {
+    device_type?: string;
+    device_fcm_token?: string;
+    device_name?: string;
+    browse_type?: string;
+  };
+}
+
+export interface BrandLoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  brand: {
+    brand_id: string;
+    brand_name: string;
+    brand_logo: string | null;
+    brand_category: string;
+    first_name: string;
+    last_name: string;
+    role: string;
+    profile_picture: string | null;
+    email: string;
+    phone_number: string;
+    job_title: string;
+    email_notification: {
+      order_updates: boolean;
+      inventory_alerts: boolean;
+      weekly_reports: boolean;
+    };
+    push_notification: {
+      order_updates: boolean;
+      urgent_alerts: boolean;
+      daily_digest: boolean;
+    };
+    devices: unknown[];
+    is_active: boolean;
+    is_2fa_enabled: boolean;
+    created_at: string;
+    updated_at: string;
+  };
+}
+
+export async function brandLogin(credentials: BrandLoginRequest): Promise<BrandLoginResponse> {
+  const res = await fetch(`/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Login failed' }));
+    throw new Error(err.detail || `Login failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export interface BrandProfileUpdatePayload {
+  brand_name?: string;
+  brand_logo?: string;
+  brand_category?: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  profile_picture?: string;
+  phone_number?: string;
+  job_title?: string;
+  email_notification?: {
+    order_updates?: boolean;
+    inventory_alerts?: boolean;
+    weekly_reports?: boolean;
+  };
+  push_notification?: {
+    order_updates?: boolean;
+    urgent_alerts?: boolean;
+    daily_digest?: boolean;
+  };
+}
+
+export async function updateBrandProfile(
+  payload: BrandProfileUpdatePayload
+): Promise<BrandLoginResponse['brand']> {
+  const token = localStorage.getItem('moda-brand-token');
+  const res = await fetch(`/api/v1/brand/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update profile' }));
+    throw new Error(err.detail || `Failed to update profile (${res.status})`);
+  }
+
+  const updated = await res.json();
+  // Keep localStorage in sync so Header and other components see fresh data
+  localStorage.setItem('moda-brand-data', JSON.stringify(updated));
+  return updated;
+}
+
+export async function brandChangePassword(payload: {
+  current_password: string;
+  new_password: string;
+  confirm_new_password: string;
+}): Promise<{ message: string }> {
+  const token = localStorage.getItem('moda-brand-token');
+  const res = await fetch(`/api/v1/brand/me/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to change password' }));
+    throw new Error(err.detail || `Failed to change password (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export function brandLogout(): void {
+  localStorage.removeItem('moda-brand-token');
+  localStorage.removeItem('moda-brand-refresh-token');
+  localStorage.removeItem('moda-brand-data');
+  localStorage.removeItem('moda-brand-auth');
+}

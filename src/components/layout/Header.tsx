@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Heart, Menu, X, LogOut, Settings } from 'lucide-react';
+import { User, Heart, Menu, X, LogOut, Settings, Building2 } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { brandLogout } from '@/services/auth.service';
 import type { Brand } from '@/types';
 
 export default function Header() {
@@ -20,6 +21,30 @@ export default function Header() {
   const accountRef = useRef<HTMLDivElement>(null);
   const brandDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Check if brand user is logged in (separate from consumer auth)
+  const [isBrandLoggedIn, setIsBrandLoggedIn] = useState(false);
+  const [brandUserName, setBrandUserName] = useState<string | null>(null);
+  const [brandName, setBrandName] = useState<string | null>(null);
+  const [brandProfilePicture, setBrandProfilePicture] = useState<string | null>(null);
+  const [brandLogo, setBrandLogo] = useState<string | null>(null);
+  const [brandRole, setBrandRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      const token = localStorage.getItem('moda-brand-token');
+      const data = localStorage.getItem('moda-brand-data');
+      if (token && data) {
+        const parsed = JSON.parse(data);
+        setIsBrandLoggedIn(true);
+        setBrandUserName(`${parsed.first_name} ${parsed.last_name}`);
+        setBrandName(parsed.brand_name || null);
+        setBrandProfilePicture(parsed.profile_picture || null);
+        setBrandLogo(parsed.brand_logo || null);
+        setBrandRole(parsed.role || null);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
   // Load brands from service on mount
   useEffect(() => {
     brandService.getAllBrands().then((res) => {
@@ -31,13 +56,24 @@ export default function Header() {
 
   const handleLogout = () => {
     setIsAccountOpen(false);
-    // Navigate to homepage first, then logout after a brief delay
-    // This prevents race condition with protected page auth guards
     router.replace('/');
     setTimeout(() => {
       logout();
       showToast('You have been signed out', 'success');
     }, 100);
+  };
+
+  const handleBrandLogout = () => {
+    setIsAccountOpen(false);
+    brandLogout();
+    setIsBrandLoggedIn(false);
+    setBrandUserName(null);
+    setBrandName(null);
+    setBrandProfilePicture(null);
+    setBrandLogo(null);
+    setBrandRole(null);
+    showToast('Signed out of Brand Portal', 'success');
+    router.replace('/');
   };
 
   // ESC key handler and click outside handler
@@ -173,17 +209,72 @@ export default function Header() {
                 aria-haspopup="true"
                 aria-expanded={isAccountOpen}
               >
-                <User size={20} />
+                {isBrandLoggedIn && (brandProfilePicture || brandLogo) ? (
+                  <img
+                    src={brandProfilePicture || brandLogo || ''}
+                    alt={brandUserName || 'Brand'}
+                    className="w-7 h-7 rounded-full object-cover"
+                  />
+                ) : (
+                  <User size={20} />
+                )}
                 {/* UHNI indicator dot */}
                 {isHydrated && isAuthenticated && isUHNI && (
                   <span className="absolute top-1 right-1 w-2 h-2 bg-gold-deep rounded-full border border-ivory-cream" title="UHNI Member" />
+                )}
+                {/* Brand logged-in indicator dot */}
+                {isBrandLoggedIn && !(brandProfilePicture || brandLogo) && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-charcoal-deep rounded-full border border-ivory-cream" title="Brand Portal" />
                 )}
               </button>
 
               {/* Account Dropdown Menu */}
               {isAccountOpen && (
                 <div className="absolute top-full right-0 pt-2">
-                  <div className="bg-white shadow-lg min-w-[200px] border border-sand/30">
+                  <div className="bg-white shadow-lg min-w-[220px] border border-sand/30">
+                    {/* Brand Portal Link (if brand user is logged in) */}
+                    {isBrandLoggedIn && (
+                      <>
+                        <div className="px-5 py-3 border-b border-sand/30 bg-parchment/30">
+                          <div className="flex items-center gap-3">
+                            {brandProfilePicture || brandLogo ? (
+                              <img
+                                src={brandProfilePicture || brandLogo || ''}
+                                alt={brandUserName || 'Brand'}
+                                className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center text-sm font-display flex-shrink-0">
+                                {brandName?.charAt(0) || 'B'}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-sm text-charcoal-deep font-medium truncate">{brandUserName}</p>
+                              <p className="text-[10px] tracking-[0.1em] text-taupe truncate">
+                                {brandRole && <span className="uppercase">{brandRole}</span>}
+                                {brandRole && brandName && <span> · </span>}
+                                {brandName}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        <Link
+                          href="/brand"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
+                        >
+                          <Building2 size={16} />
+                          <span>Go to Brand Portal</span>
+                        </Link>
+                        <button
+                          onClick={handleBrandLogout}
+                          className="w-full flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors"
+                        >
+                          <LogOut size={16} />
+                          <span>Sign Out (Brand)</span>
+                        </button>
+                      </>
+                    )}
                     {isHydrated && isAuthenticated ? (
                       <>
                         <Link
@@ -210,7 +301,7 @@ export default function Header() {
                           <span>Sign Out</span>
                         </button>
                       </>
-                    ) : (
+                    ) : !isBrandLoggedIn ? (
                       <Link
                         href="/auth/login"
                         onClick={() => setIsAccountOpen(false)}
@@ -219,7 +310,7 @@ export default function Header() {
                         <User size={16} />
                         <span>Sign In</span>
                       </Link>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -288,6 +379,47 @@ export default function Header() {
                   )}
                 </Link>
 
+                {/* Brand Portal (if brand user logged in) */}
+                {isBrandLoggedIn && (
+                  <>
+                    <div className="flex items-center gap-3 pb-2">
+                      {brandProfilePicture || brandLogo ? (
+                        <img
+                          src={brandProfilePicture || brandLogo || ''}
+                          alt={brandUserName || 'Brand'}
+                          className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center text-xs font-display flex-shrink-0">
+                          {brandName?.charAt(0) || 'B'}
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm text-charcoal-deep font-medium truncate">{brandUserName}</p>
+                        {brandName && (
+                          <p className="text-[10px] text-taupe truncate">{brandName}</p>
+                        )}
+                      </div>
+                    </div>
+                    <Link
+                      href="/brand"
+                      className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      Brand Portal
+                    </Link>
+                    <button
+                      onClick={() => {
+                        handleBrandLogout();
+                        setIsMenuOpen(false);
+                      }}
+                      className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm text-left"
+                    >
+                      Sign Out (Brand)
+                    </button>
+                  </>
+                )}
+
                 {/* Account Section - Different for logged in vs guest */}
                 {isHydrated && isAuthenticated ? (
                   <>
@@ -315,7 +447,7 @@ export default function Header() {
                       Sign Out
                     </button>
                   </>
-                ) : (
+                ) : !isBrandLoggedIn ? (
                   <Link
                     href="/auth/login"
                     className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
@@ -323,7 +455,7 @@ export default function Header() {
                   >
                     Sign In
                   </Link>
-                )}
+                ) : null}
               </div>
             </nav>
           </div>

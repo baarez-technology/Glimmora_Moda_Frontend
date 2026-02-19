@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User,
@@ -23,6 +23,8 @@ import {
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
+import { brandChangePassword, updateBrandProfile } from '@/services/auth.service';
+import { uploadImage } from '@/services/brand-product.service';
 
 type ProfileTab = 'personal' | 'security' | 'notifications' | 'sessions';
 
@@ -53,20 +55,20 @@ export default function UserProfilePage() {
     firstName: currentUser?.name.split(' ')[0] || '',
     lastName: currentUser?.name.split(' ').slice(1).join(' ') || '',
     email: currentUser?.email || '',
-    phone: '+33 6 12 34 56 78',
-    jobTitle: 'Brand Director',
+    phone: brandApiData?.phone_number || '',
+    jobTitle: brandApiData?.job_title || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
   const [notifications, setNotifications] = useState({
-    emailOrders: true,
-    emailAlerts: true,
-    emailReports: false,
-    pushOrders: true,
-    pushAlerts: true,
-    pushReports: false
+    emailOrders: brandApiData?.email_notification?.order_updates ?? true,
+    emailAlerts: brandApiData?.email_notification?.inventory_alerts ?? true,
+    emailReports: brandApiData?.email_notification?.weekly_reports ?? false,
+    pushOrders: brandApiData?.push_notification?.order_updates ?? true,
+    pushAlerts: brandApiData?.push_notification?.urgent_alerts ?? true,
+    pushReports: brandApiData?.push_notification?.daily_digest ?? false
   });
 
   const twoFAModalRef = useModalAccessibility(show2FAModal, () => setShow2FAModal(false));
@@ -150,7 +152,33 @@ export default function UserProfilePage() {
     setTimeout(() => setSavedMessage(null), 3000);
   };
 
-  const handlePasswordChange = () => {
+  const handleSaveNotifications = async () => {
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      await updateBrandProfile({
+        email_notification: {
+          order_updates: notifications.emailOrders,
+          inventory_alerts: notifications.emailAlerts,
+          weekly_reports: notifications.emailReports,
+        },
+        push_notification: {
+          order_updates: notifications.pushOrders,
+          urgent_alerts: notifications.pushAlerts,
+          daily_digest: notifications.pushReports,
+        },
+      });
+      setSavedMessage('Notification preferences saved');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to save preferences');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async () => {
     setPasswordError(null);
 
     const strengthError = validatePassword(formData.newPassword);
@@ -161,6 +189,8 @@ export default function UserProfilePage() {
 
     if (formData.newPassword !== formData.confirmPassword) {
       setPasswordError('Passwords do not match');
+      setErrorMessage('Passwords do not match');
+      setTimeout(() => setErrorMessage(null), 4000);
       return;
     }
 
@@ -235,16 +265,23 @@ export default function UserProfilePage() {
           </div>
         )}
 
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 text-red-700 text-sm">
+            {errorMessage}
+          </div>
+        )}
+
         <div className="flex gap-8">
           {/* Sidebar with Avatar */}
           <div className="w-64 flex-shrink-0">
             {/* User Card */}
             <div className="bg-white border border-sand/50 p-6 mb-6">
               <div className="text-center">
-                <div className="relative inline-block">
-                  {avatarPreview || currentUser.avatar ? (
+                <div className={`relative inline-block ${isUploadingAvatar ? 'opacity-50' : ''}`}>
+                  {avatarPreview || (avatarUrl || currentUser.avatar) ? (
                     <img
-                      src={avatarPreview || currentUser.avatar}
+                      src={avatarPreview || avatarUrl || currentUser.avatar}
                       alt={currentUser.name}
                       className="w-24 h-24 rounded-full object-cover mx-auto"
                     />
@@ -255,7 +292,11 @@ export default function UserProfilePage() {
                   )}
                   <button
                     onClick={() => setShowAvatarInput(!showAvatarInput)}
-                    className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors"
+                   
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
+                    className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors disabled:opacity-50"
+                  
                   >
                     <Camera size={14} />
                   </button>
@@ -264,6 +305,13 @@ export default function UserProfilePage() {
                     type="file"
                     accept="image/*"
                     onChange={handleAvatarFileChange}
+                    className="hidden"
+                  />
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarChange}
                     className="hidden"
                   />
                 </div>
@@ -405,8 +453,8 @@ export default function UserProfilePage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <PrimaryButton onClick={handleSave}>
-                    Save Changes
+                  <PrimaryButton onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </PrimaryButton>
                 </div>
               </div>
@@ -547,9 +595,9 @@ export default function UserProfilePage() {
                 <div className="flex justify-end">
                   <PrimaryButton
                     onClick={handlePasswordChange}
-                    disabled={!formData.currentPassword || !formData.newPassword || !formData.confirmPassword}
+                    disabled={!formData.currentPassword || !formData.newPassword || !formData.confirmPassword || isChangingPassword}
                   >
-                    Update Password
+                    {isChangingPassword ? 'Updating...' : 'Update Password'}
                   </PrimaryButton>
                 </div>
               </div>
@@ -619,8 +667,8 @@ export default function UserProfilePage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <PrimaryButton onClick={handleSave}>
-                    Save Preferences
+                  <PrimaryButton onClick={handleSaveNotifications} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Preferences'}
                   </PrimaryButton>
                 </div>
               </div>

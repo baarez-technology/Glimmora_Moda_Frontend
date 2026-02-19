@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
@@ -115,10 +115,16 @@ const navigation: NavSection[] = [
 
 export function BrandSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { partner, logout } = useBrand();
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     Intelligence: true
   });
+
+  const handleLogout = () => {
+    logout();
+    router.push('/auth/login?mode=brand');
+  };
 
   const isActive = (href: string) => {
     if (href === '/brand') {
@@ -159,13 +165,21 @@ export function BrandSidebar() {
       {partner && (
         <div className="px-6 py-4 border-b border-sand bg-parchment/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-charcoal-deep text-ivory-cream flex items-center justify-center text-sm font-display">
-              {partner.brandName.charAt(0)}
-            </div>
+            {partner.brandLogo ? (
+              <img
+                src={partner.brandLogo}
+                alt={partner.brandName}
+                className="w-10 h-10 object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 bg-charcoal-deep text-ivory-cream flex items-center justify-center text-sm font-display">
+                {partner.brandName.charAt(0)}
+              </div>
+            )}
             <div>
               <p className="text-sm font-medium text-charcoal-deep">{partner.brandName}</p>
               <p className="text-[10px] tracking-[0.1em] uppercase text-gold-muted">
-                {partner.tier}
+                {partner.brandCategory}
               </p>
             </div>
           </div>
@@ -256,7 +270,7 @@ export function BrandSidebar() {
           </Link>
         )}
         <button
-          onClick={logout}
+          onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2 w-full text-sm text-stone hover:text-error transition-colors"
         >
           <LogOut size={18} strokeWidth={1.5} />

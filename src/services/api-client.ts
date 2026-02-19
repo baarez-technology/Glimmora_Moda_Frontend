@@ -85,7 +85,15 @@ export class ApiError extends Error {
 
 const DEFAULT_CONFIG: ApiClientConfig = {
   mode: 'mock',
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   mockDelay: 300,
+  getAuthToken: () => {
+    try {
+      return localStorage.getItem('moda-brand-token');
+    } catch {
+      return null;
+    }
+  },
 };
 
 let config: ApiClientConfig = { ...DEFAULT_CONFIG };

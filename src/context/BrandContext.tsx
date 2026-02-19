@@ -24,6 +24,49 @@ import type {
   UHNIPriceOffer
 } from '@/types/uhni';
 import * as brandPortalService from '@/services/brand-portal.service';
+import type { BrandLoginResponse } from '@/services/auth.service';
+import { brandLogout as clearBrandTokens } from '@/services/auth.service';
+
+// Map API brand response (snake_case) to frontend BrandPartner (camelCase)
+function mapApiBrandToPartner(apiBrand: BrandLoginResponse['brand']): BrandPartner {
+  return {
+    id: apiBrand.brand_id,
+    brandId: apiBrand.brand_id,
+    brandName: apiBrand.brand_name,
+    brandLogo: apiBrand.brand_logo || undefined,
+    brandCategory: apiBrand.brand_category || undefined,
+    tier: 'standard',
+    status: apiBrand.is_active ? 'active' : 'suspended',
+    partnerSince: apiBrand.created_at,
+    teamMembers: [
+      {
+        id: apiBrand.brand_id,
+        name: `${apiBrand.first_name} ${apiBrand.last_name}`,
+        email: apiBrand.email,
+        role: (apiBrand.role as 'admin' | 'manager' | 'analyst' | 'viewer') || 'admin',
+        avatar: apiBrand.profile_picture || undefined,
+        lastActive: new Date().toISOString(),
+      },
+    ],
+    apiKeys: [],
+    settings: {
+      notifications: {
+        lowStockAlerts: apiBrand.email_notification.inventory_alerts,
+        orderUpdates: apiBrand.email_notification.order_updates,
+        demandSignals: false,
+        weeklyReports: apiBrand.email_notification.weekly_reports,
+      },
+      integration: {
+        syncFrequency: 'daily',
+      },
+      display: {
+        currency: 'USD',
+        timezone: 'UTC',
+        language: 'en',
+      },
+    },
+  };
+}
 
 interface BrandContextType {
   // Brand Partner
@@ -110,8 +153,9 @@ interface BrandContextType {
   createStylingSession: (session: Omit<StylingSession, 'id'>) => void;
 
   // Auth
-  loginAsBrand: () => void;
+  loginAsBrand: (data: BrandLoginResponse) => void;
   logout: () => void;
+  getAccessToken: () => string | null;
 }
 
 const BrandContext = createContext<BrandContextType | undefined>(undefined);
@@ -147,7 +191,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       const response = await brandPortalService.getBrandDashboardData();
       if (response.success) {
         const d = response.data;
-        setPartner(d.partner);
+        // Don't overwrite partner — it comes from the real login response
         setProducts(d.products);
         setCollections(d.collections);
         setOrders(d.orders);
@@ -170,33 +214,35 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount (persistent login)
   useEffect(() => {
     try {
-      const storedAuth = localStorage.getItem('moda-brand-auth');
-      if (storedAuth === 'true') {
+      const storedToken = localStorage.getItem('moda-brand-token');
+      const storedBrand = localStorage.getItem('moda-brand-data');
+      if (storedToken && storedBrand) {
+        const apiBrand = JSON.parse(storedBrand);
         setIsAuthenticated(true);
+        setPartner(mapApiBrandToPartner(apiBrand));
         loadBrandData();
       }
     } catch (err) {
-      console.error('Failed to load brand auth state:', err);
+      console.error('Failed to restore brand session:', err);
+      // Clear corrupted data
+      clearBrandTokens();
     }
     setIsHydrated(true);
   }, [loadBrandData]);
 
-  // Save auth state to localStorage
-  useEffect(() => {
-    if (isHydrated) {
-      try {
-        localStorage.setItem('moda-brand-auth', isAuthenticated.toString());
-      } catch (err) {
-        console.error('Failed to save brand auth state:', err);
-      }
+  const loginAsBrand = useCallback((data: BrandLoginResponse) => {
+    try {
+      localStorage.setItem('moda-brand-token', data.access_token);
+      localStorage.setItem('moda-brand-refresh-token', data.refresh_token);
+      localStorage.setItem('moda-brand-data', JSON.stringify(data.brand));
+    } catch (err) {
+      console.error('Failed to store brand auth data:', err);
     }
-  }, [isAuthenticated, isHydrated]);
-
-  const loginAsBrand = useCallback(() => {
     setIsAuthenticated(true);
+    setPartner(mapApiBrandToPartner(data.brand));
     loadBrandData();
   }, [loadBrandData]);
 
@@ -217,10 +263,14 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setBrandStories([]);
     setUhniOffers([]);
     setStylingSessions([]);
+    clearBrandTokens();
+  }, []);
+
+  const getAccessToken = useCallback((): string | null => {
     try {
-      localStorage.removeItem('moda-brand-auth');
-    } catch (err) {
-      console.error('Failed to clear brand auth:', err);
+      return localStorage.getItem('moda-brand-token');
+    } catch {
+      return null;
     }
   }, []);
 
@@ -581,7 +631,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         createStylingSession,
         // Auth
         loginAsBrand,
-        logout
+        logout,
+        getAccessToken
       }}
     >
       {children}
