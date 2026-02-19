@@ -138,9 +138,17 @@ export default function SettingsPage() {
 
                   <div className="space-y-6">
                     <div className="flex items-center gap-6">
-                      <div className="w-20 h-20 bg-charcoal-deep text-ivory-cream flex items-center justify-center text-2xl font-display">
-                        {partner.brandName.charAt(0)}
-                      </div>
+                      {partner.brandLogo ? (
+                        <img
+                          src={partner.brandLogo}
+                          alt={partner.brandName}
+                          className="w-20 h-20 object-cover"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-charcoal-deep text-ivory-cream flex items-center justify-center text-2xl font-display">
+                          {partner.brandName.charAt(0)}
+                        </div>
+                      )}
                       <div>
                         <p className="text-lg font-medium text-charcoal-deep">{partner.brandName}</p>
                         <p className="text-sm text-taupe">Partner since {formatDate(partner.partnerSince)}</p>

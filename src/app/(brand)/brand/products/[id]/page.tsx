@@ -2,70 +2,103 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import {
   ArrowLeft,
   Save,
   Trash2,
-  TrendingUp,
-  TrendingDown,
   Eye,
   ShoppingCart,
   DollarSign,
   Clock,
   MapPin,
   AlertTriangle,
-  Settings2
+  Loader2,
+  TrendingUp,
+  Plus,
+  X,
+  Check,
+  Minus,
 } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { MetricCard } from '@/components/brand/MetricCard';
-import { StockManagementModal } from '@/components/brand/StockManagementModal';
-import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
-import type { ProductCategory } from '@/types/product';
+import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
+import {
+  fetchProduct,
+  updateProduct,
+  softDeleteProduct,
+  setRegionalStocks,
+} from '@/services/brand-product.service';
+import type {
+  BackendProduct,
+  RegionalStockItem,
+  RegionalStockAddPayload,
+} from '@/services/brand-product.service';
 
-export default function EditProductPage() {
+export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { getProductById, updateProduct, deleteProduct } = useBrand();
 
   const productId = params.id as string;
-  const product = getProductById(productId);
+
+  const [product, setProduct] = useState<BackendProduct | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    name: '',
+    product_name: '',
     sku: '',
     price: '',
-    category: 'bags' as ProductCategory,
-    description: '',
+    collection_name: '',
+    product_description: '',
     tagline: '',
-    status: 'draft' as BrandProductStatus
+    status: 'draft',
   });
 
+  const [productImages, setProductImages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
 
   useEffect(() => {
-    if (product) {
-      setFormData({
-        name: product.name,
-        sku: product.sku,
-        price: product.price.toString(),
-        category: product.category,
-        description: product.description,
-        tagline: product.tagline,
-        status: product.status
-      });
-    }
-  }, [product]);
+    loadProduct();
+  }, [productId]);
 
-  if (!product) {
+  const loadProduct = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchProduct(productId);
+      setProduct(data);
+      setFormData({
+        product_name: data.product_name,
+        sku: data.sku,
+        price: data.price.toString(),
+        collection_name: data.collection_name,
+        product_description: data.product_description,
+        tagline: data.tagline,
+        status: data.status,
+      });
+      setProductImages(data.product_images || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load product');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-taupe" />
+      </div>
+    );
+  }
+
+  if (error || !product) {
     return (
       <div className="p-8 text-center">
-        <p className="text-stone">Product not found</p>
+        <p className="text-stone">{error || 'Product not found'}</p>
         <Link
           href="/brand/products"
           className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
@@ -79,18 +112,20 @@ export default function EditProductPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      updateProduct(productId, {
-        name: formData.name,
+      const updated = await updateProduct(productId, {
+        product_name: formData.product_name,
         sku: formData.sku,
         price: parseFloat(formData.price) || product.price,
-        category: formData.category,
-        description: formData.description,
+        collection_name: formData.collection_name,
+        product_description: formData.product_description,
         tagline: formData.tagline,
-        status: formData.status
+        status: formData.status,
+        product_images: productImages,
       });
+      setProduct(updated);
       setHasChanges(false);
-    } catch (error) {
-      console.error('Failed to save:', error);
+    } catch (err) {
+      console.error('Failed to save:', err);
     } finally {
       setIsSaving(false);
     }
@@ -101,37 +136,39 @@ export default function EditProductPage() {
     setHasChanges(true);
   };
 
-  const handleStockSave = (updatedStock: RegionalStock[]) => {
-    const newTotal = updatedStock.reduce((sum, s) => sum + s.units, 0);
-    updateProduct(productId, {
-      regionalStock: updatedStock,
-      totalStock: newTotal,
-    });
+  const handleImagesChange = (images: string[]) => {
+    setProductImages(images);
+    setHasChanges(true);
   };
 
-  const handleDelete = () => {
-    deleteProduct(productId);
-    router.push('/brand/products');
+  const handleStockSave = async (stocks: RegionalStockAddPayload[]) => {
+    try {
+      await setRegionalStocks(productId, stocks);
+      await loadProduct();
+    } catch (err) {
+      console.error('Failed to save stocks:', err);
+    }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-EU', {
-      style: 'currency',
-      currency: product.currency,
-      minimumFractionDigits: 0
-    }).format(value);
+  const handleDelete = async () => {
+    try {
+      await softDeleteProduct(productId);
+      router.push('/brand/products');
+    } catch (err) {
+      console.error('Failed to delete:', err);
+    }
   };
 
-  const isLowStock = product.totalStock > 0 && product.totalStock <= 10;
-  const categories: ProductCategory[] = ['bags', 'clothing', 'shoes', 'accessories', 'jewelry', 'watches'];
+  const totalUnits = product.performance_metrics.total_units;
+  const isLowStock = product.is_low_stock;
 
   return (
     <div>
       <BrandPageHeader
-        title={product.name}
+        title={product.product_name}
         breadcrumbs={[
           { label: 'Products', href: '/brand/products' },
-          { label: product.name }
+          { label: product.product_name },
         ]}
         actions={
           <div className="flex items-center gap-3">
@@ -169,8 +206,8 @@ export default function EditProductPage() {
                   </label>
                   <input
                     type="text"
-                    value={formData.name}
-                    onChange={(e) => handleChange('name', e.target.value)}
+                    value={formData.product_name}
+                    onChange={(e) => handleChange('product_name', e.target.value)}
                     className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
                 </div>
@@ -189,7 +226,7 @@ export default function EditProductPage() {
 
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Price (EUR)
+                    Price
                   </label>
                   <input
                     type="number"
@@ -203,19 +240,14 @@ export default function EditProductPage() {
 
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Category
+                    Collection
                   </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => handleChange('category', e.target.value)}
-                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
-                  >
-                    {categories.map(cat => (
-                      <option key={cat} value={cat}>
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    value={formData.collection_name}
+                    onChange={(e) => handleChange('collection_name', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
                 </div>
 
                 <div>
@@ -259,8 +291,8 @@ export default function EditProductPage() {
                     Description
                   </label>
                   <textarea
-                    value={formData.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
+                    value={formData.product_description}
+                    onChange={(e) => handleChange('product_description', e.target.value)}
                     rows={4}
                     className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                   />
@@ -271,18 +303,16 @@ export default function EditProductPage() {
             {/* Regional Stock */}
             <section className="bg-white border border-sand/50 p-6">
               <div className="flex items-center justify-between border-b border-sand/50 pb-4 mb-6">
-                <h2 className="font-medium text-charcoal-deep">
-                  Regional Stock
-                </h2>
+                <h2 className="font-medium text-charcoal-deep">Regional Stock</h2>
                 <button
                   onClick={() => setIsStockModalOpen(true)}
                   className="inline-flex items-center gap-2 px-4 py-2 border border-sand text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:bg-parchment transition-colors"
                 >
-                  <Settings2 size={14} /> Manage Stock
+                  <Plus size={14} /> Manage Stock
                 </button>
               </div>
 
-              {product.regionalStock.length === 0 ? (
+              {product.regional_stocks.length === 0 ? (
                 <div className="text-center py-8">
                   <MapPin size={28} className="text-taupe mx-auto mb-3" />
                   <p className="text-sm text-stone">No stock locations configured</p>
@@ -295,27 +325,27 @@ export default function EditProductPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {product.regionalStock.map((stock, idx) => (
+                  {product.regional_stocks.map((stock) => (
                     <div
-                      key={idx}
+                      key={stock.stock_id}
                       className="flex items-center justify-between py-3 border-b border-sand/30 last:border-0"
                     >
                       <div className="flex items-center gap-3">
                         <MapPin size={16} className="text-taupe" />
                         <div>
                           <p className="text-sm text-charcoal-deep">{stock.city}</p>
-                          <p className="text-xs text-taupe">{stock.region}</p>
+                          <p className="text-xs text-taupe">{stock.country}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className={`text-sm font-medium ${
-                          stock.units <= stock.lowStockThreshold ? 'text-warning' : 'text-charcoal-deep'
+                          stock.is_low_stock ? 'text-warning' : 'text-charcoal-deep'
                         }`}>
                           {stock.units} units
                         </p>
-                        {stock.units <= stock.lowStockThreshold && (
+                        {stock.is_low_stock && (
                           <p className="text-xs text-warning flex items-center gap-1">
-                            <AlertTriangle size={10} /> Below threshold
+                            <AlertTriangle size={10} /> Below threshold ({stock.threshold})
                           </p>
                         )}
                       </div>
@@ -324,35 +354,17 @@ export default function EditProductPage() {
                 </div>
               )}
             </section>
-
-            {/* Stock Management Modal */}
-            <StockManagementModal
-              isOpen={isStockModalOpen}
-              onClose={() => setIsStockModalOpen(false)}
-              productName={product.name}
-              regionalStock={product.regionalStock}
-              onSave={handleStockSave}
-            />
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Product Image */}
-            <div className="bg-white border border-sand/50 p-4">
-              <div className="aspect-square bg-parchment relative overflow-hidden">
-                {product.images[0] ? (
-                  <Image
-                    src={product.images[0].url}
-                    alt={product.images[0].alt}
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-taupe text-sm">
-                    No image
-                  </div>
-                )}
-              </div>
+            {/* Product Images */}
+            <div className="bg-white border border-sand/50 p-6">
+              <h3 className="text-sm font-medium text-charcoal-deep mb-4">Images</h3>
+              <ProductImageUpload
+                images={productImages}
+                onChange={handleImagesChange}
+              />
             </div>
 
             {/* Performance Metrics */}
@@ -364,7 +376,7 @@ export default function EditProductPage() {
                     <Eye size={14} /> Views
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performanceMetrics.views.toLocaleString()}
+                    {product.performance_metrics.views.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -372,7 +384,7 @@ export default function EditProductPage() {
                     <ShoppingCart size={14} /> Add to Cart
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performanceMetrics.addToCart.toLocaleString()}
+                    {product.performance_metrics.add_to_cart.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -380,7 +392,7 @@ export default function EditProductPage() {
                     <DollarSign size={14} /> Purchases
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performanceMetrics.purchases.toLocaleString()}
+                    {product.performance_metrics.purchases.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -388,7 +400,7 @@ export default function EditProductPage() {
                     <TrendingUp size={14} /> Conversion
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performanceMetrics.conversionRate.toFixed(2)}%
+                    {product.performance_metrics.conversion_rate.toFixed(2)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -396,7 +408,7 @@ export default function EditProductPage() {
                     <Clock size={14} /> Avg Decision Time
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performanceMetrics.avgTimeToDecision}h
+                    {product.performance_metrics.avg_decision_time}h
                   </span>
                 </div>
               </div>
@@ -405,21 +417,21 @@ export default function EditProductPage() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-stone">Demand Score</span>
                   <span className={`text-sm font-medium ${
-                    product.demandScore >= 80 ? 'text-success' :
-                    product.demandScore >= 50 ? 'text-charcoal-deep' :
+                    product.performance_metrics.demand_score >= 80 ? 'text-success' :
+                    product.performance_metrics.demand_score >= 50 ? 'text-charcoal-deep' :
                     'text-warning'
                   }`}>
-                    {product.demandScore}/100
+                    {product.performance_metrics.demand_score}/100
                   </span>
                 </div>
                 <div className="h-2 bg-parchment overflow-hidden">
                   <div
                     className={`h-full transition-all ${
-                      product.demandScore >= 80 ? 'bg-success' :
-                      product.demandScore >= 50 ? 'bg-gold-muted' :
+                      product.performance_metrics.demand_score >= 80 ? 'bg-success' :
+                      product.performance_metrics.demand_score >= 50 ? 'bg-gold-muted' :
                       'bg-warning'
                     }`}
-                    style={{ width: `${product.demandScore}%` }}
+                    style={{ width: `${product.performance_metrics.demand_score}%` }}
                   />
                 </div>
               </div>
@@ -430,7 +442,7 @@ export default function EditProductPage() {
               <h3 className="text-sm font-medium text-charcoal-deep mb-4">Stock Summary</h3>
               <div className="text-center py-4">
                 <p className={`text-3xl font-display ${isLowStock ? 'text-warning' : 'text-charcoal-deep'}`}>
-                  {product.totalStock}
+                  {totalUnits}
                 </p>
                 <p className="text-xs text-stone mt-1">Total Units</p>
                 {isLowStock && (
@@ -443,7 +455,7 @@ export default function EditProductPage() {
               <div className="mt-4 pt-4 border-t border-sand/50">
                 <p className="text-xs text-stone mb-2">Revenue (All Time)</p>
                 <p className="text-xl font-display text-charcoal-deep">
-                  {formatCurrency(product.performanceMetrics.revenue)}
+                  ${product.performance_metrics.total_revenue.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -461,10 +473,10 @@ export default function EditProductPage() {
           <div className="relative bg-white border border-sand p-8 max-w-md w-full mx-4">
             <h3 className="font-display text-xl text-charcoal-deep mb-3">Delete Product</h3>
             <p className="text-stone text-sm leading-relaxed mb-2">
-              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.name}</span>?
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.product_name}</span>?
             </p>
             <p className="text-taupe text-xs mb-6">
-              This product will be removed from your dashboard. This action can be restored by an administrator.
+              This product will be soft-deleted and set as inactive.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -483,6 +495,284 @@ export default function EditProductPage() {
           </div>
         </div>
       )}
+
+      {/* Stock Management Modal */}
+      {isStockModalOpen && (
+        <StockModal
+          productName={product.product_name}
+          existingStocks={product.regional_stocks}
+          onClose={() => setIsStockModalOpen(false)}
+          onSave={handleStockSave}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── Inline Stock Management Modal ───────────────────────────────────────────
+
+function StockModal({
+  productName,
+  existingStocks,
+  onClose,
+  onSave,
+}: {
+  productName: string;
+  existingStocks: RegionalStockItem[];
+  onClose: () => void;
+  onSave: (stocks: RegionalStockAddPayload[]) => Promise<void>;
+}) {
+  const [rows, setRows] = useState<RegionalStockAddPayload[]>(() =>
+    existingStocks.map(s => ({
+      city: s.city,
+      country: s.country,
+      units: s.units,
+      threshold: s.threshold,
+    }))
+  );
+  const [isSaving, setIsSaving] = useState(false);
+  const [showAddRow, setShowAddRow] = useState(false);
+  const [newRow, setNewRow] = useState({ city: '', country: '', units: 0, threshold: 5 });
+
+  const totalUnits = rows.reduce((sum, s) => sum + s.units, 0);
+  const lowStockCount = rows.filter(s => s.units <= s.threshold).length;
+
+  const handleUnitChange = (index: number, value: number) => {
+    setRows(prev => prev.map((s, i) =>
+      i === index ? { ...s, units: Math.max(0, value) } : s
+    ));
+  };
+
+  const handleThresholdChange = (index: number, value: number) => {
+    setRows(prev => prev.map((s, i) =>
+      i === index ? { ...s, threshold: Math.max(0, value) } : s
+    ));
+  };
+
+  const handleRemoveRow = (index: number) => {
+    setRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddRow = () => {
+    if (!newRow.city.trim() || !newRow.country.trim()) return;
+    setRows(prev => [...prev, {
+      city: newRow.city.trim(),
+      country: newRow.country.trim(),
+      units: Math.max(0, newRow.units),
+      threshold: Math.max(0, newRow.threshold),
+    }]);
+    setNewRow({ city: '', country: '', units: 0, threshold: 5 });
+    setShowAddRow(false);
+  };
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await onSave(rows);
+      onClose();
+    } catch (err) {
+      console.error('Failed to save stocks:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-8 py-5 border-b border-sand/50">
+          <div>
+            <h2 className="font-display text-xl text-charcoal-deep">Manage Stock</h2>
+            <p className="text-xs text-stone mt-1">{productName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-parchment transition-colors">
+            <X size={18} className="text-stone" />
+          </button>
+        </div>
+
+        {/* Summary Bar */}
+        <div className="px-8 py-3 bg-parchment/50 border-b border-sand/30 flex items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Total</span>
+            <span className="text-sm font-medium text-charcoal-deep">{totalUnits} units</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Locations</span>
+            <span className="text-sm font-medium text-charcoal-deep">{rows.length}</span>
+          </div>
+          {lowStockCount > 0 && (
+            <div className="flex items-center gap-2 text-warning">
+              <AlertTriangle size={14} />
+              <span className="text-xs">{lowStockCount} below threshold</span>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-8">
+          {rows.length === 0 ? (
+            <div className="text-center py-8">
+              <MapPin size={32} className="text-taupe mx-auto mb-3" />
+              <p className="text-sm text-stone">No stock locations configured</p>
+            </div>
+          ) : (
+            <div className="space-y-0">
+              <div className="grid grid-cols-[1fr_1fr_100px_100px_40px] gap-3 pb-3 border-b border-sand/50">
+                <span className="text-[10px] tracking-[0.15em] uppercase text-stone">City</span>
+                <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Country</span>
+                <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Units</span>
+                <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Threshold</span>
+                <span />
+              </div>
+
+              {rows.map((stock, idx) => (
+                <div
+                  key={`${stock.city}-${stock.country}-${idx}`}
+                  className="grid grid-cols-[1fr_1fr_100px_100px_40px] gap-3 py-3 border-b border-sand/20 items-center group"
+                >
+                  <span className="text-sm text-charcoal-deep flex items-center gap-2">
+                    <MapPin size={14} className="text-taupe flex-shrink-0" />
+                    {stock.city}
+                  </span>
+                  <span className="text-sm text-charcoal-deep">{stock.country}</span>
+
+                  <div className="flex items-center border border-sand">
+                    <button
+                      onClick={() => handleUnitChange(idx, stock.units - 1)}
+                      className="px-2 py-1.5 hover:bg-parchment transition-colors"
+                    >
+                      <Minus size={12} className="text-stone" />
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      value={stock.units}
+                      onChange={(e) => handleUnitChange(idx, parseInt(e.target.value, 10) || 0)}
+                      className={`w-full text-center text-sm bg-transparent focus:outline-none py-1.5 ${
+                        stock.units <= stock.threshold ? 'text-warning font-medium' : 'text-charcoal-deep'
+                      }`}
+                    />
+                    <button
+                      onClick={() => handleUnitChange(idx, stock.units + 1)}
+                      className="px-2 py-1.5 hover:bg-parchment transition-colors"
+                    >
+                      <Plus size={12} className="text-stone" />
+                    </button>
+                  </div>
+
+                  <input
+                    type="number"
+                    min="0"
+                    value={stock.threshold}
+                    onChange={(e) => handleThresholdChange(idx, parseInt(e.target.value, 10) || 0)}
+                    className="w-full text-center text-sm bg-transparent border border-sand py-1.5 focus:outline-none focus:border-charcoal-deep text-charcoal-deep"
+                  />
+
+                  <button
+                    onClick={() => handleRemoveRow(idx)}
+                    className="p-1.5 text-taupe hover:text-error opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {showAddRow ? (
+            <div className="mt-4 p-4 border border-sand/50 bg-parchment/30 space-y-4">
+              <p className="text-[10px] tracking-[0.15em] uppercase text-stone">Add Location</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">City</label>
+                  <input
+                    type="text"
+                    value={newRow.city}
+                    onChange={(e) => setNewRow(prev => ({ ...prev, city: e.target.value }))}
+                    placeholder="e.g. Paris"
+                    className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Country</label>
+                  <input
+                    type="text"
+                    value={newRow.country}
+                    onChange={(e) => setNewRow(prev => ({ ...prev, country: e.target.value }))}
+                    placeholder="e.g. France"
+                    className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Units</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newRow.units}
+                    onChange={(e) => setNewRow(prev => ({ ...prev, units: parseInt(e.target.value, 10) || 0 }))}
+                    className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Threshold</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newRow.threshold}
+                    onChange={(e) => setNewRow(prev => ({ ...prev, threshold: parseInt(e.target.value, 10) || 0 }))}
+                    className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep"
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={handleAddRow}
+                  disabled={!newRow.city.trim() || !newRow.country.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Check size={14} /> Add
+                </button>
+                <button
+                  onClick={() => setShowAddRow(false)}
+                  className="px-5 py-2 text-xs tracking-wider uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAddRow(true)}
+              className="mt-4 inline-flex items-center gap-2 px-4 py-2.5 border border-dashed border-sand text-xs tracking-[0.15em] uppercase text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors w-full justify-center"
+            >
+              <Plus size={14} /> Add Location
+            </button>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-8 py-4 border-t border-sand/50 flex items-center justify-between bg-white">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 text-xs tracking-wider uppercase text-stone hover:text-charcoal-deep transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check size={14} />
+            {isSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

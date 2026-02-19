@@ -4,6 +4,203 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronRight, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import type { BrandProduct } from '@/types/brand-portal';
+import type { BackendProduct } from '@/services/brand-product.service';
+
+// ─── Cards for BackendProduct (real API data) ────────────────────────────────
+
+interface ApiProductCardProps {
+  product: BackendProduct;
+  showMetrics?: boolean;
+}
+
+export function ApiProductCard({ product, showMetrics = true }: ApiProductCardProps) {
+  const totalUnits = product.performance_metrics.total_units;
+  const isLowStock = product.is_low_stock;
+  const isOutOfStock = totalUnits === 0;
+  const demandScore = product.performance_metrics.demand_score;
+
+  const getStatusBadge = () => {
+    if (!product.is_active) {
+      return (
+        <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-red-100 text-red-600">
+          Deleted
+        </span>
+      );
+    }
+    switch (product.status) {
+      case 'published':
+        return (
+          <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success">
+            Published
+          </span>
+        );
+      case 'draft':
+        return (
+          <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-taupe/20 text-stone">
+            Draft
+          </span>
+        );
+      case 'archived':
+        return (
+          <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-stone/10 text-stone">
+            Archived
+          </span>
+        );
+      default:
+        return (
+          <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-taupe/20 text-stone">
+            {product.status}
+          </span>
+        );
+    }
+  };
+
+  return (
+    <Link
+      href={`/brand/products/${product.product_id}`}
+      className="block bg-white border border-sand/50 hover:border-sand transition-colors group"
+    >
+      <div className="flex items-stretch">
+        {/* Product Image */}
+        <div className="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-parchment relative overflow-hidden">
+          {product.product_image ? (
+            <Image
+              src={product.product_image}
+              alt={product.product_name}
+              fill
+              className="object-cover"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-taupe text-sm">
+              No image
+            </div>
+          )}
+        </div>
+
+        {/* Product Details */}
+        <div className="flex-1 p-4 flex flex-col justify-center min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h3 className="text-sm font-medium text-charcoal-deep truncate group-hover:text-gold-muted transition-colors">
+                {product.product_name}
+              </h3>
+              <p className="text-xs text-taupe mt-0.5">{product.collection_name}</p>
+            </div>
+            {getStatusBadge()}
+          </div>
+
+          <div className="flex items-center gap-4 mt-3 text-xs text-stone">
+            <span className="font-medium text-charcoal-deep">
+              ${product.price.toLocaleString()}
+            </span>
+            <span className="text-taupe">|</span>
+            <span>SKU: {product.sku}</span>
+          </div>
+
+          {/* Stock & Metrics Row */}
+          <div className="flex items-center justify-between mt-3">
+            <div className="flex items-center gap-4">
+              <div className={`flex items-center gap-1.5 text-xs ${
+                isOutOfStock ? 'text-error' :
+                isLowStock ? 'text-warning' :
+                'text-stone'
+              }`}>
+                {(isOutOfStock || isLowStock) && <AlertTriangle size={12} />}
+                <span>
+                  {isOutOfStock ? 'Out of stock' : `${totalUnits} units`}
+                </span>
+              </div>
+
+              {showMetrics && demandScore > 0 && (
+                <>
+                  <span className="text-taupe">|</span>
+                  <div className="flex items-center gap-1 text-xs">
+                    {demandScore >= 80 ? (
+                      <TrendingUp size={12} className="text-success" />
+                    ) : demandScore <= 40 ? (
+                      <TrendingDown size={12} className="text-error" />
+                    ) : null}
+                    <span className="text-stone">Demand: {demandScore}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <ChevronRight
+              size={16}
+              className="text-taupe group-hover:text-charcoal-deep transition-colors"
+            />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+export function ApiProductGridCard({ product }: { product: BackendProduct }) {
+  const totalUnits = product.performance_metrics.total_units;
+
+  const getStatusBadge = () => {
+    if (!product.is_active) return 'bg-red-100 text-red-600';
+    switch (product.status) {
+      case 'published':
+        return 'bg-success/10 text-success';
+      case 'draft':
+        return 'bg-taupe/20 text-stone';
+      case 'archived':
+        return 'bg-stone/10 text-stone';
+      default:
+        return 'bg-taupe/20 text-stone';
+    }
+  };
+
+  return (
+    <Link
+      href={`/brand/products/${product.product_id}`}
+      className="block bg-white border border-sand/50 hover:border-sand transition-all group"
+    >
+      {/* Image */}
+      <div className="aspect-square bg-parchment relative overflow-hidden">
+        {product.product_image ? (
+          <Image
+            src={product.product_image}
+            alt={product.product_name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-taupe text-sm">
+            No image
+          </div>
+        )}
+        <div className="absolute top-3 right-3">
+          <span className={`px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge()}`}>
+            {!product.is_active ? 'Deleted' : product.status}
+          </span>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4">
+        <h3 className="text-sm font-medium text-charcoal-deep truncate">
+          {product.product_name}
+        </h3>
+        <p className="text-xs text-taupe mt-1">{product.sku}</p>
+
+        <div className="flex items-center justify-between mt-3">
+          <span className="text-sm font-medium text-charcoal-deep">
+            ${product.price.toLocaleString()}
+          </span>
+          <span className="text-xs text-stone">
+            {totalUnits} units
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Legacy Cards for BrandProduct (mock data / BrandContext) ────────────────
 
 interface ProductCardProps {
   product: BrandProduct;

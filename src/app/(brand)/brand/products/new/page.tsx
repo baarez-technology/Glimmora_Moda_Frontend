@@ -2,81 +2,51 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Upload, X, Plus } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
-import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import type { BrandProductStatus, BrandProduct } from '@/types/brand-portal';
-import type { ProductCategory, ProductImage, ProductVariant, Material } from '@/types/product';
+import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
+import { createProduct } from '@/services/brand-product.service';
 
 export default function NewProductPage() {
   const router = useRouter();
-  const { partner, createProduct } = useBrand();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
-    name: '',
+    product_name: '',
     sku: '',
     price: '',
-    category: 'bags' as ProductCategory,
-    description: '',
+    collection_name: '',
+    product_description: '',
     tagline: '',
-    status: 'draft' as BrandProductStatus
+    status: 'draft',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
     try {
-      // Create the product
-      const newProduct: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'> = {
-        brandId: partner?.brandId || 'dior',
-        brandName: partner?.brandName || 'Dior',
-        name: formData.name,
-        slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      const created = await createProduct({
+        product_name: formData.product_name,
         sku: formData.sku,
         price: parseFloat(formData.price) || 0,
-        currency: 'EUR',
-        category: formData.category,
-        description: formData.description,
-        tagline: formData.tagline,
-        narrative: formData.description,
+        collection_name: formData.collection_name,
         status: formData.status,
-        images: [],
-        variants: [],
-        materials: [],
-        craftsmanship: [],
-        ivEnabled: false,
-        availability: {
-          status: 'unavailable',
-          quantity: 0,
-          regions: []
-        },
-        collection: '',
-        tags: [],
-        totalStock: 0,
-        regionalStock: [],
-        demandScore: 0,
-        performanceMetrics: {
-          views: 0,
-          addToCart: 0,
-          purchases: 0,
-          conversionRate: 0,
-          revenue: 0,
-          avgTimeToDecision: 0
-        }
-      };
+        tagline: formData.tagline,
+        product_description: formData.product_description,
+        product_images: productImages,
+      });
 
-      const created = createProduct(newProduct);
-      router.push(`/brand/products/${created.id}`);
-    } catch (error) {
-      console.error('Failed to create product:', error);
+      router.push(`/brand/products/${created.product_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create product');
       setIsSubmitting(false);
     }
   };
-
-  const categories: ProductCategory[] = ['bags', 'clothing', 'shoes', 'accessories', 'jewelry', 'watches'];
 
   return (
     <div>
@@ -84,7 +54,7 @@ export default function NewProductPage() {
         title="Create Product"
         breadcrumbs={[
           { label: 'Products', href: '/brand/products' },
-          { label: 'New Product' }
+          { label: 'New Product' },
         ]}
         actions={
           <Link
@@ -99,6 +69,12 @@ export default function NewProductPage() {
 
       <form onSubmit={handleSubmit} className="p-8">
         <div className="max-w-3xl space-y-8">
+          {error && (
+            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+              {error}
+            </div>
+          )}
+
           {/* Basic Information */}
           <section className="bg-white border border-sand/50 p-6 space-y-6">
             <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
@@ -113,8 +89,8 @@ export default function NewProductPage() {
                 <input
                   type="text"
                   required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  value={formData.product_name}
+                  onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   placeholder="e.g., Lady Dior Small"
                 />
@@ -136,7 +112,7 @@ export default function NewProductPage() {
 
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Price (EUR) *
+                  Price *
                 </label>
                 <input
                   type="number"
@@ -152,20 +128,16 @@ export default function NewProductPage() {
 
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Category *
+                  Collection Name *
                 </label>
-                <select
+                <input
+                  type="text"
                   required
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value as ProductCategory })}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
-                >
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>
-                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                    </option>
-                  ))}
-                </select>
+                  value={formData.collection_name}
+                  onChange={(e) => setFormData({ ...formData, collection_name: e.target.value })}
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  placeholder="e.g., Spring 2025"
+                />
               </div>
 
               <div>
@@ -174,7 +146,7 @@ export default function NewProductPage() {
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as BrandProductStatus })}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                 >
                   <option value="draft">Draft</option>
@@ -209,8 +181,8 @@ export default function NewProductPage() {
                   Description
                 </label>
                 <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  value={formData.product_description}
+                  onChange={(e) => setFormData({ ...formData, product_description: e.target.value })}
                   rows={4}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                   placeholder="Describe the product, its heritage, and unique qualities..."
@@ -219,25 +191,16 @@ export default function NewProductPage() {
             </div>
           </section>
 
-          {/* Images Placeholder */}
+          {/* Images */}
           <section className="bg-white border border-sand/50 p-6 space-y-6">
             <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
               Images
             </h2>
 
-            <div className="border-2 border-dashed border-sand p-8 text-center">
-              <div className="w-12 h-12 bg-parchment mx-auto mb-4 flex items-center justify-center">
-                <Upload size={20} className="text-stone" />
-              </div>
-              <p className="text-sm text-stone mb-2">Drop images here or click to upload</p>
-              <p className="text-xs text-taupe">PNG, JPG up to 10MB</p>
-              <button
-                type="button"
-                className="mt-4 px-4 py-2 border border-sand text-sm text-stone hover:text-charcoal-deep hover:bg-parchment/30 transition-colors"
-              >
-                Select Files
-              </button>
-            </div>
+            <ProductImageUpload
+              images={productImages}
+              onChange={setProductImages}
+            />
           </section>
 
           {/* Actions */}

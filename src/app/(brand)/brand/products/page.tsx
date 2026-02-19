@@ -1,35 +1,55 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Search, Grid, List, Filter } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { Plus, Search, Grid, List, Filter, Loader2 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import { ProductCard, ProductGridCard } from '@/components/brand/ProductCard';
-import type { BrandProduct, BrandProductStatus } from '@/types/brand-portal';
+import { ApiProductCard, ApiProductGridCard } from '@/components/brand/ProductCard';
+import { fetchProducts } from '@/services/brand-product.service';
+import type { BackendProduct } from '@/services/brand-product.service';
 
-type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'deleted';
+type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'archived' | 'deleted';
 type ViewMode = 'list' | 'grid';
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
   const initialFilter = (searchParams.get('filter') as FilterTab) || 'all';
 
-  const { products } = useBrand();
+  const [products, setProducts] = useState<BackendProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>(initialFilter);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [collectionFilter, setCollectionFilter] = useState<string>('all');
 
-  const activeProducts = useMemo(() => products.filter(p => !p.isDeleted), [products]);
-  const deletedProducts = useMemo(() => products.filter(p => p.isDeleted), [products]);
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
-  const categories = useMemo(() => {
-    const cats = new Set(activeProducts.map(p => p.category));
-    return ['all', ...Array.from(cats)];
+  const loadProducts = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchProducts();
+      setProducts(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load products');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const activeProducts = useMemo(() => products.filter(p => p.is_active), [products]);
+  const deletedProducts = useMemo(() => products.filter(p => !p.is_active), [products]);
+
+  const collections = useMemo(() => {
+    const cols = new Set(activeProducts.map(p => p.collection_name).filter(Boolean));
+    return ['all', ...Array.from(cols)];
   }, [activeProducts]);
 
   const filteredProducts = useMemo(() => {
+    // Deleted tab shows inactive products
     if (filter === 'deleted') return deletedProducts;
 
     let result = [...activeProducts];
@@ -43,35 +63,83 @@ export default function ProductsPage() {
         result = result.filter(p => p.status === 'draft');
         break;
       case 'low-stock':
-        result = result.filter(p => p.totalStock > 0 && p.totalStock <= 10);
+        result = result.filter(p => p.is_low_stock);
+        break;
+      case 'archived':
+        result = result.filter(p => p.status === 'archived');
         break;
     }
 
-    // Apply category filter
-    if (categoryFilter !== 'all') {
-      result = result.filter(p => p.category === categoryFilter);
+    // Apply collection filter
+    if (collectionFilter !== 'all') {
+      result = result.filter(p => p.collection_name === collectionFilter);
     }
 
     // Apply search
     if (search) {
       const searchLower = search.toLowerCase();
       result = result.filter(p =>
-        p.name.toLowerCase().includes(searchLower) ||
+        p.product_name.toLowerCase().includes(searchLower) ||
         p.sku.toLowerCase().includes(searchLower) ||
-        p.category.toLowerCase().includes(searchLower)
+        p.collection_name.toLowerCase().includes(searchLower)
       );
     }
 
     return result;
-  }, [activeProducts, deletedProducts, filter, categoryFilter, search]);
+  }, [activeProducts, deletedProducts, filter, collectionFilter, search]);
 
   const filterTabs: { value: FilterTab; label: string; count: number }[] = [
     { value: 'all', label: 'All', count: activeProducts.length },
     { value: 'published', label: 'Published', count: activeProducts.filter(p => p.status === 'published').length },
     { value: 'draft', label: 'Draft', count: activeProducts.filter(p => p.status === 'draft').length },
-    { value: 'low-stock', label: 'Low Stock', count: activeProducts.filter(p => p.totalStock > 0 && p.totalStock <= 10).length },
-    { value: 'deleted', label: 'Deleted', count: deletedProducts.length }
+    { value: 'low-stock', label: 'Low Stock', count: activeProducts.filter(p => p.is_low_stock).length },
+    { value: 'archived', label: 'Archived', count: activeProducts.filter(p => p.status === 'archived').length },
+    { value: 'deleted', label: 'Deleted', count: deletedProducts.length },
   ];
+
+  if (isLoading) {
+    return (
+      <div>
+        <BrandPageHeader
+          title="Products"
+          subtitle="Loading..."
+          actions={
+            <PrimaryButton href="/brand/products/new" icon={Plus}>
+              Add Product
+            </PrimaryButton>
+          }
+        />
+        <div className="flex items-center justify-center py-20">
+          <Loader2 size={24} className="animate-spin text-taupe" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <BrandPageHeader
+          title="Products"
+          subtitle="Error"
+          actions={
+            <PrimaryButton href="/brand/products/new" icon={Plus}>
+              Add Product
+            </PrimaryButton>
+          }
+        />
+        <div className="p-8 text-center">
+          <p className="text-error mb-4">{error}</p>
+          <button
+            onClick={loadProducts}
+            className="px-6 py-3 bg-charcoal-deep text-white text-sm tracking-wider uppercase hover:bg-noir transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -120,16 +188,16 @@ export default function ProductsPage() {
             />
           </div>
 
-          {/* Category Filter */}
+          {/* Collection Filter */}
           <div className="relative">
             <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+              value={collectionFilter}
+              onChange={(e) => setCollectionFilter(e.target.value)}
               className="appearance-none px-4 py-3 pr-10 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
             >
-              {categories.map(cat => (
-                <option key={cat} value={cat}>
-                  {cat === 'all' ? 'All Categories' : cat.charAt(0).toUpperCase() + cat.slice(1)}
+              {collections.map(col => (
+                <option key={col} value={col}>
+                  {col === 'all' ? 'All Collections' : col}
                 </option>
               ))}
             </select>
@@ -175,13 +243,13 @@ export default function ProductsPage() {
         ) : viewMode === 'list' ? (
           <div className="space-y-3">
             {filteredProducts.map(product => (
-              <ProductCard key={product.id} product={product} />
+              <ApiProductCard key={product.product_id} product={product} />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredProducts.map(product => (
-              <ProductGridCard key={product.id} product={product} />
+              <ApiProductGridCard key={product.product_id} product={product} />
             ))}
           </div>
         )}
