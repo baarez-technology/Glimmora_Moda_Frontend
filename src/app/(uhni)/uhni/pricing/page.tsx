@@ -3,40 +3,66 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, DollarSign, Crown, Check, Clock, Bell, Tag, TrendingDown, MessageCircle, ArrowRight, AlertCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
-  mockPriceNegotiations,
-  mockPriceOffers,
-  mockPriceAlerts,
-  mockPricingTiers,
-  mockPricingSummary
-} from '@/data';
-import type { NegotiationStatus } from '@/types';
+  getPriceNegotiations,
+  getPriceOffers,
+  getPriceAlerts,
+  getPricingTiers,
+  getPricingSummary,
+  acceptNegotiation,
+  claimOffer
+} from '@/services/uhni.service';
+import type { NegotiationStatus, PriceNegotiation, UHNIPriceOffer, UHNIPriceAlert, UHNIPricingTier, UHNIPricingSummary } from '@/types';
 
 export default function PricingPage() {
-  const router = useRouter();
-  const { isUHNI, concierge, showToast } = useApp();
+  const { concierge, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'negotiations' | 'offers' | 'alerts'>('negotiations');
+
+  const [negotiations, setNegotiations] = useState<PriceNegotiation[]>([]);
+  const [offers, setOffers] = useState<UHNIPriceOffer[]>([]);
+  const [alerts, setAlerts] = useState<UHNIPriceAlert[]>([]);
+  const [tiers, setTiers] = useState<UHNIPricingTier[]>([]);
+  const [summary, setSummary] = useState<UHNIPricingSummary | null>(null);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
+    const loadData = async () => {
+      setIsDataLoading(true);
+      try {
+        const [negRes, offRes, alertRes, tierRes, sumRes] = await Promise.all([
+          getPriceNegotiations(),
+          getPriceOffers(),
+          getPriceAlerts(),
+          getPricingTiers(),
+          getPricingSummary(),
+        ]);
+        setNegotiations(negRes.data);
+        setOffers(offRes.data);
+        setAlerts(alertRes.data);
+        setTiers(tierRes.data);
+        setSummary(sumRes.data);
+      } catch {
+        showToast('Failed to load pricing data', 'error');
+      } finally {
+        setIsDataLoading(false);
+      }
+    };
+    loadData();
+  }, []);
 
-  if (!isUHNI) {
+  if (isDataLoading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
+          <p className="text-stone text-sm">Loading pricing data...</p>
         </div>
       </div>
     );
@@ -68,12 +94,24 @@ export default function PricingPage() {
     return days > 0 ? days : 0;
   };
 
-  const handleAcceptOffer = (id: string) => {
-    showToast('Counter offer accepted! Your concierge will confirm.', 'success');
+  const handleAcceptOffer = async (id: string) => {
+    try {
+      await acceptNegotiation(id);
+      setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status: 'accepted' as NegotiationStatus } : n));
+      showToast('Offer accepted successfully', 'success');
+    } catch {
+      showToast('Failed to accept offer', 'error');
+    }
   };
 
-  const handleClaimOffer = (id: string, name: string) => {
-    showToast(`Offer claimed for ${name}`, 'success');
+  const handleClaimOffer = async (id: string, _name: string) => {
+    try {
+      await claimOffer(id);
+      setOffers(prev => prev.map(o => o.id === id ? { ...o, claimed: true } : o));
+      showToast('Offer claimed — your concierge will follow up', 'success');
+    } catch {
+      showToast('Failed to claim offer', 'error');
+    }
   };
 
   return (
@@ -82,11 +120,11 @@ export default function PricingPage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -117,22 +155,22 @@ export default function PricingPage() {
           <div className="bg-white p-6">
             <TrendingDown size={20} className="text-success mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Lifetime Savings</p>
-            <p className="font-display text-2xl text-charcoal-deep">{formatCurrency(mockPricingSummary.lifetimeSavings)}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatCurrency(summary?.lifetimeSavings ?? 0)}</p>
           </div>
           <div className="bg-white p-6">
             <Clock size={20} className="text-gold-muted mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Active Negotiations</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockPricingSummary.activeNegotiations}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{summary?.activeNegotiations ?? 0}</p>
           </div>
           <div className="bg-white p-6">
             <Tag size={20} className="text-gold-soft mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Pending Offers</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockPricingSummary.pendingOffers}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{summary?.pendingOffers ?? 0}</p>
           </div>
           <div className="bg-white p-6">
             <Bell size={20} className="text-stone mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Price Alerts</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockPricingSummary.priceAlertsSet}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{summary?.priceAlertsSet ?? 0}</p>
           </div>
         </div>
 
@@ -140,7 +178,7 @@ export default function PricingPage() {
         <div className="mb-12">
           <h2 className="font-display text-xl text-charcoal-deep mb-6">Your Pricing Tier</h2>
           <div className="grid md:grid-cols-3 gap-6">
-            {mockPricingTiers.map((tier) => {
+            {tiers.map((tier) => {
               const isCurrentTier = tier.tier === 'uhni';
               return (
                 <div
@@ -183,9 +221,9 @@ export default function PricingPage() {
         {/* Tabs */}
         <div className="flex gap-1 bg-parchment p-1 mb-8">
           {[
-            { value: 'negotiations' as const, label: 'Negotiations', count: mockPriceNegotiations.length },
-            { value: 'offers' as const, label: 'Special Offers', count: mockPriceOffers.filter(o => !o.claimed).length },
-            { value: 'alerts' as const, label: 'Price Alerts', count: mockPriceAlerts.length },
+            { value: 'negotiations' as const, label: 'Negotiations', count: negotiations.length },
+            { value: 'offers' as const, label: 'Special Offers', count: offers.filter(o => !o.claimed).length },
+            { value: 'alerts' as const, label: 'Price Alerts', count: alerts.length },
           ].map(tab => (
             <button
               key={tab.value}
@@ -204,7 +242,7 @@ export default function PricingPage() {
         {/* Negotiations Tab */}
         {activeTab === 'negotiations' && (
           <div className="space-y-4">
-            {mockPriceNegotiations.map((negotiation) => {
+            {negotiations.map((negotiation) => {
               const status = getStatusBadge(negotiation.status);
               const StatusIcon = status.icon;
               const daysRemaining = getDaysRemaining(negotiation.expiresAt);
@@ -291,7 +329,7 @@ export default function PricingPage() {
               );
             })}
 
-            {mockPriceNegotiations.length === 0 && (
+            {negotiations.length === 0 && (
               <div className="text-center py-16 bg-white">
                 <DollarSign size={32} className="text-taupe mx-auto mb-4" />
                 <p className="text-stone mb-4">No active negotiations.</p>
@@ -309,7 +347,7 @@ export default function PricingPage() {
         {/* Offers Tab */}
         {activeTab === 'offers' && (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {mockPriceOffers.filter(o => !o.claimed).map((offer) => {
+            {offers.filter(o => !o.claimed).map((offer) => {
               const daysRemaining = getDaysRemaining(offer.validUntil);
 
               return (
@@ -364,7 +402,7 @@ export default function PricingPage() {
         {/* Alerts Tab */}
         {activeTab === 'alerts' && (
           <div className="space-y-4">
-            {mockPriceAlerts.map((alert) => {
+            {alerts.map((alert) => {
               const priceGap = alert.currentPrice - alert.targetPrice;
               const percentageGap = ((priceGap / alert.currentPrice) * 100).toFixed(1);
 
@@ -411,7 +449,7 @@ export default function PricingPage() {
               );
             })}
 
-            {mockPriceAlerts.length === 0 && (
+            {alerts.length === 0 && (
               <div className="text-center py-16 bg-white">
                 <Bell size={32} className="text-taupe mx-auto mb-4" />
                 <p className="text-stone">No price alerts set.</p>

@@ -28,6 +28,7 @@ export default function UHNIDashboardPage() {
     sourcingRequests,
     bespokeOrders,
     autonomousSettings,
+    autonomousActivity,
     wardrobe,
     showToast
   } = useApp();
@@ -98,7 +99,7 @@ export default function UHNIDashboardPage() {
             <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Bespoke Orders</p>
           </div>
           <div className="bg-white p-5 text-center">
-            <p className="font-display text-2xl text-charcoal-deep">{concierge ? '1' : '0'}</p>
+            <p className="font-display text-lg text-charcoal-deep truncate">{concierge ? concierge.name.split(' ')[0] : '—'}</p>
             <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Concierge</p>
           </div>
           <div className="bg-white p-5 text-center">
@@ -138,7 +139,7 @@ export default function UHNIDashboardPage() {
             <h2 className="font-display text-xl text-charcoal-deep">Recent Activity</h2>
           </div>
           <div className="divide-y divide-sand/30">
-            {sourcingRequests.slice(0, 3).map(request => (
+            {sourcingRequests.slice(0, 2).map(request => (
               <div key={request.id} className="px-8 py-5 flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-parchment flex items-center justify-center">
@@ -153,7 +154,7 @@ export default function UHNIDashboardPage() {
                   href="/uhni/sourcing"
                   className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase"
                 >
-                  View
+                  View All
                 </Link>
               </div>
             ))}
@@ -172,7 +173,26 @@ export default function UHNIDashboardPage() {
                   href="/uhni/bespoke"
                   className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase"
                 >
-                  View
+                  View All
+                </Link>
+              </div>
+            ))}
+            {autonomousActivity.slice(0, 2).map(activity => (
+              <div key={activity.id} className="px-8 py-5 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-parchment flex items-center justify-center">
+                    <Bot size={18} className="text-stone" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-charcoal-deep">{activity.product.name}</p>
+                    <p className="text-xs text-stone capitalize">{activity.type.replace(/_/g, ' ')}</p>
+                  </div>
+                </div>
+                <Link
+                  href="/uhni/autonomous"
+                  className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase"
+                >
+                  View All
                 </Link>
               </div>
             ))}

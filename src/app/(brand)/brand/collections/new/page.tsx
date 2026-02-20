@@ -4,9 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { createCollection } from '@/services/brand-collection.service';
-import { uploadImage } from '@/services/brand-product.service';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
+import { useBrand } from '@/context/BrandContext';
 
 export default function NewCollectionPage() {
   const router = useRouter();
@@ -22,6 +21,7 @@ export default function NewCollectionPage() {
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +132,7 @@ export default function NewCollectionPage() {
               </label>
               <select
                 value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
               >
                 <option value="draft">Draft</option>
@@ -204,11 +204,10 @@ export default function NewCollectionPage() {
           </Link>
           <button
             type="submit"
-              disabled={isSubmitting}
             disabled={isSubmitting || !formData.name.trim()}
-            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50 disabled:opacity-50"
+            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating...' : '{isSubmitting ? 'Creating...' : 'Create Collection'}'}
+            {isSubmitting ? 'Creating...' : 'Create Collection'}
           </button>
         </div>
       </form>

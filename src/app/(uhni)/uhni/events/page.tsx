@@ -27,6 +27,9 @@ export default function EventsPage() {
   useEffect(() => {
     uhniService.getExclusiveEvents().then(res => {
       if (res.data) setEvents(res.data);
+    }).catch(() => {
+      showToast('Failed to load events', 'error');
+    }).finally(() => {
       setIsLoaded(true);
     });
   }, []);
@@ -75,6 +78,11 @@ export default function EventsPage() {
   };
 
   const handleRegister = (event: ExclusiveEvent) => {
+    setEvents(prev => prev.map(e =>
+      e.id === event.id
+        ? { ...e, registrationStatus: 'registered' as const, spotsLeft: Math.max(0, e.spotsLeft - 1) }
+        : e
+    ));
     showToast(`Registration confirmed for ${event.title}`, 'success');
   };
 

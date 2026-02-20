@@ -3,38 +3,55 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Globe, Search, MapPin, Clock, Check, Package, Crown, MessageCircle, Bell, AlertCircle, Plane, Building } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
-  mockUHNIAvailabilitySearches,
-  mockGlobalNetworkStats,
-  mockRestockPredictions
-} from '@/data';
-import type { AvailabilitySearchStatus, AvailabilitySearchPriority } from '@/types';
+  getAvailabilitySearches,
+  getGlobalNetworkStats,
+  getRestockPredictions,
+  placeHold,
+  confirmShipment,
+  enableRestockAlert
+} from '@/services/uhni.service';
+import type { AvailabilitySearchStatus, AvailabilitySearchPriority, UHNIAvailabilitySearch, GlobalNetworkStats, RestockPrediction } from '@/types';
 
 export default function GlobalSourcingPage() {
-  const router = useRouter();
-  const { isUHNI, concierge, showToast } = useApp();
+  const { concierge, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'searches' | 'predictions'>('searches');
+  const [searches, setSearches] = useState<UHNIAvailabilitySearch[]>([]);
+  const [networkStats, setNetworkStats] = useState<GlobalNetworkStats | null>(null);
+  const [predictions, setPredictions] = useState<RestockPrediction[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadData = async () => {
+      setIsDataLoading(true);
+      try {
+        const [searchRes, statsRes, predRes] = await Promise.all([
+          getAvailabilitySearches(),
+          getGlobalNetworkStats(),
+          getRestockPredictions(),
+        ]);
+        setSearches(searchRes.data);
+        setNetworkStats(statsRes.data);
+        setPredictions(predRes.data);
+      } catch {
+        showToast('Failed to load sourcing data', 'error');
+      } finally {
+        setIsDataLoading(false);
+        setIsLoaded(true);
+      }
+    };
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI) {
+  if (isDataLoading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
+          <p className="text-stone text-sm">Loading sourcing data...</p>
         </div>
       </div>
     );
@@ -71,16 +88,32 @@ export default function GlobalSourcingPage() {
     return `${sign}${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(amount)}`;
   };
 
-  const handlePlaceHold = (searchId: string, altId: string, city: string) => {
-    showToast(`Hold placed for item in ${city}. Valid for 48 hours.`, 'success');
+  const handlePlaceHold = async (searchId: string, altId: string, city: string) => {
+    try {
+      await placeHold(searchId, altId);
+      showToast(`Hold placed for item in ${city}. Valid for 48 hours.`, 'success');
+    } catch {
+      showToast('Failed to place hold', 'error');
+    }
   };
 
-  const handleConfirmShipment = (searchId: string) => {
-    showToast('Shipment confirmed! Your concierge will arrange delivery.', 'success');
+  const handleConfirmShipment = async (searchId: string) => {
+    try {
+      await confirmShipment(searchId);
+      showToast('Shipment confirmed! Your concierge will arrange delivery.', 'success');
+    } catch {
+      showToast('Failed to confirm shipment', 'error');
+    }
   };
 
-  const handleEnableAlert = (productName: string) => {
-    showToast(`Restock alert enabled for ${productName}`, 'success');
+  const handleEnableAlert = async (productId: string, productName: string) => {
+    try {
+      await enableRestockAlert(productId);
+      setPredictions(prev => prev.map(p => p.productId === productId ? { ...p, alertEnabled: true } : p));
+      showToast(`Restock alert enabled for ${productName}`, 'success');
+    } catch {
+      showToast('Failed to enable alert', 'error');
+    }
   };
 
   return (
@@ -89,11 +122,11 @@ export default function GlobalSourcingPage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -124,27 +157,27 @@ export default function GlobalSourcingPage() {
           <div className="bg-white p-6">
             <Search size={20} className="text-gold-muted mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Active Searches</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockGlobalNetworkStats.activeSearches}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{networkStats?.activeSearches ?? 0}</p>
           </div>
           <div className="bg-white p-6">
             <MapPin size={20} className="text-gold-soft mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Regions Connected</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockGlobalNetworkStats.regionsConnected}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{networkStats?.regionsConnected ?? 0}</p>
           </div>
           <div className="bg-white p-6">
             <Building size={20} className="text-stone mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Boutique Network</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockGlobalNetworkStats.boutiquesNetwork.toLocaleString()}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{(networkStats?.boutiquesNetwork ?? 0).toLocaleString()}</p>
           </div>
           <div className="bg-white p-6">
             <Plane size={20} className="text-success mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Avg. Delivery</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockGlobalNetworkStats.averageDeliveryDays} days</p>
+            <p className="font-display text-2xl text-charcoal-deep">{networkStats?.averageDeliveryDays ?? 0} days</p>
           </div>
           <div className="bg-white p-6">
             <Check size={20} className="text-success mb-3" />
             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Success Rate</p>
-            <p className="font-display text-2xl text-charcoal-deep">{mockGlobalNetworkStats.successRate}%</p>
+            <p className="font-display text-2xl text-charcoal-deep">{networkStats?.successRate ?? 0}%</p>
           </div>
         </div>
 
@@ -158,7 +191,7 @@ export default function GlobalSourcingPage() {
                 : 'text-stone hover:text-charcoal-deep'
             }`}
           >
-            Availability Searches ({mockUHNIAvailabilitySearches.length})
+            Availability Searches ({searches.length})
           </button>
           <button
             onClick={() => setActiveTab('predictions')}
@@ -168,14 +201,14 @@ export default function GlobalSourcingPage() {
                 : 'text-stone hover:text-charcoal-deep'
             }`}
           >
-            Restock Predictions ({mockRestockPredictions.length})
+            Restock Predictions ({predictions.length})
           </button>
         </div>
 
         {/* Searches Tab */}
         {activeTab === 'searches' && (
           <div className="space-y-6">
-            {mockUHNIAvailabilitySearches.map((search) => {
+            {searches.map((search) => {
               const status = getStatusBadge(search.status);
               const priority = getPriorityBadge(search.priority);
               const StatusIcon = status.icon;
@@ -317,7 +350,7 @@ export default function GlobalSourcingPage() {
               );
             })}
 
-            {mockUHNIAvailabilitySearches.length === 0 && (
+            {searches.length === 0 && (
               <div className="text-center py-16 bg-white">
                 <Search size={32} className="text-taupe mx-auto mb-4" />
                 <p className="text-stone mb-4">No active searches.</p>
@@ -330,7 +363,7 @@ export default function GlobalSourcingPage() {
         {/* Predictions Tab */}
         {activeTab === 'predictions' && (
           <div className="space-y-4">
-            {mockRestockPredictions.map((prediction) => (
+            {predictions.map((prediction) => (
               <div key={prediction.productId} className="bg-white p-6">
                 <div className="flex flex-col md:flex-row gap-6">
                   <div className="relative w-full md:w-24 h-24 flex-shrink-0">
@@ -371,7 +404,7 @@ export default function GlobalSourcingPage() {
 
                     {!prediction.alertEnabled && (
                       <button
-                        onClick={() => handleEnableAlert(prediction.productName)}
+                        onClick={() => handleEnableAlert(prediction.productId, prediction.productName)}
                         className="flex items-center gap-2 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em] uppercase hover:bg-charcoal-deep hover:text-ivory-cream transition-colors"
                       >
                         <Bell size={14} />
@@ -383,7 +416,7 @@ export default function GlobalSourcingPage() {
               </div>
             ))}
 
-            {mockRestockPredictions.length === 0 && (
+            {predictions.length === 0 && (
               <div className="text-center py-16 bg-white">
                 <Bell size={32} className="text-taupe mx-auto mb-4" />
                 <p className="text-stone">No restock predictions available.</p>

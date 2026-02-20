@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Plus, X, ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
+import { useBrand } from '@/context/BrandContext';
+import { fetchCollectionNames, type CollectionNameItem } from '@/services/brand-product.service';
 import type { BrandProductStatus, BrandProduct } from '@/types/brand-portal';
 import type {
   ProductCategory,
@@ -21,7 +23,7 @@ import type {
 // ============================================
 
 interface FormErrors {
-  name?: string;
+  product_name?: string;
   sku?: string;
   price?: string;
   imageUrl?: string;
@@ -127,8 +129,8 @@ export default function NewProductPage() {
     setErrors(prev => {
       const next = { ...prev };
       switch (field) {
-        case 'name':
-          next.name = validateName(formData.name);
+        case 'product_name':
+          next.product_name = validateName(formData.product_name);
           break;
         case 'sku':
           next.sku = validateSku(formData.sku);
@@ -144,13 +146,13 @@ export default function NewProductPage() {
   // Validate all fields before submit
   const validateAll = (): boolean => {
     const newErrors: FormErrors = {
-      name: validateName(formData.name),
+      product_name: validateName(formData.product_name),
       sku: validateSku(formData.sku),
       price: validatePrice(formData.price, formData.status),
     };
     setErrors(newErrors);
-    setTouched(new Set(['name', 'sku', 'price']));
-    return !newErrors.name && !newErrors.sku && !newErrors.price;
+    setTouched(new Set(['product_name', 'sku', 'price']));
+    return !newErrors.product_name && !newErrors.sku && !newErrors.price;
   };
 
   // Generate unique slug
@@ -176,7 +178,7 @@ export default function NewProductPage() {
     const newImage: ProductImage = {
       id: `img-${Date.now()}`,
       url: imageUrl.trim(),
-      alt: formData.name || 'Product image',
+      alt: formData.product_name || 'Product image',
       type: imageType as ProductImage['type'],
     };
     setImages(prev => [...prev, newImage]);
@@ -200,15 +202,15 @@ export default function NewProductPage() {
       const newProduct: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'> = {
         brandId: partner?.brandId || 'dior',
         brandName: partner?.brandName || 'Dior',
-        name: formData.name.trim(),
-        slug: generateSlug(formData.name),
+        name: formData.product_name.trim(),
+        slug: generateSlug(formData.product_name),
         sku: formData.sku,
         price: parseFloat(formData.price) || 0,
-        collection_name: formData.collection_name,
+        currency: 'GBP',
         status: formData.status,
         tagline: formData.tagline,
-        narrative: formData.narrative || formData.description,
-        status: formData.status,
+        description: formData.product_description,
+        narrative: formData.narrative || formData.product_description,
         images,
         variants: [],
         materials: [],
@@ -219,7 +221,8 @@ export default function NewProductPage() {
           quantity: 0,
           regions: []
         },
-        collection: '',
+        collection: formData.collection_name,
+        category: 'ready-to-wear' as ProductCategory,
         tags: [],
         visibility: formData.visibility,
         experienceMode: formData.experienceMode,
@@ -295,14 +298,14 @@ export default function NewProductPage() {
                 </label>
                 <input
                   type="text"
-                  value={formData.name}
-                  onChange={(e) => updateField('name', e.target.value)}
-                  onBlur={() => handleBlur('name')}
-                  className={touched.has('name') && errors.name ? inputError : inputNormal}
+                  value={formData.product_name}
+                  onChange={(e) => updateField('product_name', e.target.value)}
+                  onBlur={() => handleBlur('product_name')}
+                  className={touched.has('product_name') && errors.product_name ? inputError : inputNormal}
                   placeholder="e.g., Lady Dior Small"
                 />
-                {touched.has('name') && errors.name && (
-                  <p className="mt-1.5 text-xs text-error">{errors.name}</p>
+                {touched.has('product_name') && errors.product_name && (
+                  <p className="mt-1.5 text-xs text-error">{errors.product_name}</p>
                 )}
               </div>
 
@@ -347,8 +350,8 @@ export default function NewProductPage() {
                   Collection Name *
                 </label>
                 <select
-                  value={formData.category}
-                  onChange={(e) => updateField('category', e.target.value as ProductCategory)}
+                  value={formData.collection_name}
+                  onChange={(e) => updateField('collection_name', e.target.value)}
                   className={`${inputNormal} cursor-pointer`}
                 >
                   <option value="">Select collection</option>

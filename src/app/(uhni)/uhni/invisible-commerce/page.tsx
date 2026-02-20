@@ -26,6 +26,9 @@ export default function InvisibleCommercePage() {
   useEffect(() => {
     uhniService.getInvisibleTransactions().then(res => {
       if (res.data) setTransactions(res.data);
+    }).catch(() => {
+      showToast('Failed to load transactions', 'error');
+    }).finally(() => {
       setIsLoaded(true);
     });
   }, []);
@@ -72,7 +75,7 @@ export default function InvisibleCommercePage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(amount);
   };
 
   const formatDate = (dateStr: string) => {

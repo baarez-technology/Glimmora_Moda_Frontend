@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowLeft,
   Save,
@@ -15,18 +16,14 @@ import {
   MapPin,
   AlertTriangle,
   Loader2,
-  TrendingUp,
   Plus,
   X,
   Check,
-  Minus,,
-  Plus,
-  X,
-  ImageIcon,
-  Check
+  Minus,
+  ImageIcon
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { StockManagementModal } from '@/components/brand/StockManagementModal';
+import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload } from '@/services/brand-product.service';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
 import type {
@@ -87,7 +84,7 @@ export default function ProductDetailPage() {
     product_description: '',
     tagline: '',
     narrative: '',
-    status: 'draft',,
+    status: 'draft',
     ivEnabled: false,
     visibility: 'public' as ProductVisibility,
     experienceMode: 'standard' as ExperienceMode,
@@ -119,7 +116,8 @@ export default function ProductDetailPage() {
   const [newMaterial, setNewMaterial] = useState({ name: '', composition: '', origin: '' });
   const [newCraft, setNewCraft] = useState({ title: '', description: '', duration: '' });
 
-  // Initialize form from product  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  // Initialize form from product
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
 
   useEffect(() => {
@@ -136,34 +134,31 @@ export default function ProductDetailPage() {
       const data = await fetchProduct(productId);
       setProduct(data);
       setFormData({
-        name: product.name,
-        sku: product.sku,
-        price: product.price.toString(),
-        category: product.category,
-        description: product.description,
-        tagline: product.tagline,
-        narrative: product.narrative || '',
-        status: product.status,
-        ivEnabled: product.ivEnabled,
-        visibility: product.visibility,
-        experienceMode: product.experienceMode,
-        pricingVisibility: product.pricingVisibility,
-        commerceAction: product.commerceAction,
+        product_name: data.product_name,
+        sku: data.sku,
+        price: data.price.toString(),
+        collection_name: data.collection_name,
+        product_description: data.product_description,
+        tagline: data.tagline,
+        narrative: '',
+        status: data.status,
+        ivEnabled: false,
+        visibility: 'public' as ProductVisibility,
+        experienceMode: 'standard' as ExperienceMode,
+        pricingVisibility: 'visible' as PricingVisibility,
+        commerceAction: 'add_to_considerations' as CommerceAction,
       });
-      setImages(product.images ? [...product.images] : []);
-      setVariants(product.variants ? [...product.variants] : []);
-      setMaterials(product.materials ? [...product.materials] : []);
-      setCraftsmanship(product.craftsmanship ? [...product.craftsmanship] : []);
+      setProductImages(data.product_images ? [...data.product_images] : []);
+      setImages([]);
+      setVariants([]);
+      setMaterials([]);
+      setCraftsmanship([]);
+    } catch (err) {
+      setError('Failed to load product');
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 size={24} className="animate-spin text-taupe" />
-      </div>
-    );
-  }
 
   // Unsaved changes warning
   useEffect(() => {
@@ -175,6 +170,14 @@ export default function ProductDetailPage() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasChanges]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 size={24} className="animate-spin text-taupe" />
+      </div>
+    );
+  }
 
   if (error || !product) {
     return (
@@ -211,18 +214,8 @@ export default function ProductDetailPage() {
         collection_name: formData.collection_name,
         product_description: formData.product_description,
         tagline: formData.tagline,
-        narrative: formData.narrative || formData.description,
         status: formData.status,
-        product_images: productImages,,
-        ivEnabled: formData.ivEnabled,
-        visibility: formData.visibility,
-        experienceMode: formData.experienceMode,
-        pricingVisibility: formData.pricingVisibility,
-        commerceAction: formData.commerceAction,
-        images,
-        variants,
-        materials,
-        craftsmanship,
+        product_images: productImages,
       });
       setProduct(updated);
       setHasChanges(false);
@@ -257,10 +250,11 @@ export default function ProductDetailPage() {
   // DELETE
   // ============================================
 
-  const isDeleteDangerous = product.status === 'published' && product.totalStock > 0;
+  const computedTotalStock = product.regional_stocks.reduce((sum, s) => sum + s.units, 0);
+  const isDeleteDangerous = product.status === 'published' && computedTotalStock > 0;
 
   const handleDelete = () => {
-    deleteProduct(productId);
+    softDeleteProduct(productId);
     router.push('/brand/products');
   };
 
@@ -277,7 +271,7 @@ export default function ProductDetailPage() {
     setImages(prev => [...prev, {
       id: `img-${Date.now()}`,
       url: trimmed,
-      alt: formData.name || 'Product image',
+      alt: formData.product_name || 'Product image',
       type: imageType as ProductImage['type'],
     }]);
     setImageUrl('');
@@ -358,7 +352,7 @@ export default function ProductDetailPage() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
-      currency: product.currency,
+      currency: 'GBP',
       minimumFractionDigits: 0
     }).format(value);
   };
@@ -1141,13 +1135,13 @@ export default function ProductDetailPage() {
               </div>
               <h3 id="delete-modal-title" className="font-display text-xl text-charcoal-deep mb-2">Delete Product</h3>
               <p className="text-sm text-stone">
-                Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.name}</span>? This action cannot be undone.
+                Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.product_name}</span>? This action cannot be undone.
               </p>
               {isDeleteDangerous && (
                 <div className="mt-4 flex items-start gap-2 bg-warning/10 border border-warning/20 p-3 text-left">
                   <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
                   <p className="text-xs text-warning">
-                    This product is currently <strong>published</strong> with <strong>{product.totalStock} units</strong> in stock. Deleting it will remove it from all storefronts immediately.
+                    This product is currently <strong>published</strong> with <strong>{computedTotalStock} units</strong> in stock. Deleting it will remove it from all storefronts immediately.
                   </p>
                 </div>
               )}
