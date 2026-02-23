@@ -234,3 +234,134 @@ export function brandLogout(): void {
   localStorage.removeItem('moda-brand-data');
   localStorage.removeItem('moda-brand-auth');
 }
+
+// ============================================
+// Real User (Consumer / UHNI) Authentication
+// ============================================
+
+export interface UserData {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  role: string;
+  occasions: string[];
+  aesthetics: string[];
+  minimum_budget: number | null;
+  maximum_budget: number | null;
+  context_set: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserTokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  context_required: boolean;
+  user: UserData;
+}
+
+export interface UserRegisterPayload {
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  role: 'consumer' | 'uhni';
+}
+
+export interface UserContextPayload {
+  occasions: string[];
+  aesthetics: string[];
+  minimum_budget: number;
+  maximum_budget: number;
+}
+
+export async function userLogin(credentials: {
+  email: string;
+  password: string;
+  role: 'consumer' | 'uhni';
+}): Promise<UserTokenResponse> {
+  const res = await fetch(`/api/v1/user/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Login failed' }));
+    throw new Error(err.detail || `Login failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function userRegister(
+  payload: UserRegisterPayload
+): Promise<UserTokenResponse> {
+  const res = await fetch(`/api/v1/user/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+    throw new Error(err.detail || `Registration failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+export async function setUserContext(
+  payload: UserContextPayload
+): Promise<UserData> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetch(`/api/v1/user/auth/set-context`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to set context' }));
+    throw new Error(err.detail || `Failed to set context (${res.status})`);
+  }
+
+  const updated: UserData = await res.json();
+  localStorage.setItem('moda-user-data', JSON.stringify(updated));
+  return updated;
+}
+
+export function storeUserAuth(data: UserTokenResponse): void {
+  localStorage.setItem('moda-user-token', data.access_token);
+  localStorage.setItem('moda-user-refresh-token', data.refresh_token);
+  localStorage.setItem('moda-user-data', JSON.stringify(data.user));
+}
+
+export function getStoredUserData(): UserData | null {
+  try {
+    const raw = localStorage.getItem('moda-user-data');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredUserToken(): string | null {
+  try {
+    return localStorage.getItem('moda-user-token');
+  } catch {
+    return null;
+  }
+}
+
+export function userLogout(): void {
+  localStorage.removeItem('moda-user-token');
+  localStorage.removeItem('moda-user-refresh-token');
+  localStorage.removeItem('moda-user-data');
+}

@@ -3,19 +3,36 @@
 import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, Check } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Check, Crown, ShoppingBag } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
+import { userRegister, storeUserAuth } from '@/services/auth.service';
+
+type RegisterRole = 'consumer' | 'uhni';
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+const PASSWORD_RULES = [
+  { regex: /.{8,}/, label: 'At least 8 characters' },
+  { regex: /[a-z]/, label: 'A lowercase letter' },
+  { regex: /[A-Z]/, label: 'An uppercase letter' },
+  { regex: /[0-9]/, label: 'A number' },
+  { regex: /[^a-zA-Z0-9]/, label: 'A special character (!@#$...)' },
+];
 
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect');
-  const { setUserRole } = useAuth();
-  const { showToast } = useApp();
+  const { setUserData } = useAuth();
+  const { showToast, setUserRole: setAppUserRole } = useApp();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<RegisterRole>('consumer');
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -27,19 +44,58 @@ function RegisterForm() {
     setIsLoaded(true);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Set user as authenticated (standard tier for new users)
-    setUserRole('standard');
-    showToast('Account created successfully!', 'success');
+  // Validation
+  const emailError = touched.email && formData.email.length > 0 && !EMAIL_REGEX.test(formData.email)
+    ? 'Please enter a valid email address'
+    : null;
 
-    // If there's a redirect URL (e.g., from checkout), go to onboarding then checkout
-    // Otherwise just go to onboarding
-    if (redirectUrl) {
-      // Store redirect for after onboarding
-      localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+  const failedPasswordRules = PASSWORD_RULES.filter(rule => !rule.regex.test(formData.password));
+  const passwordErrors = touched.password && formData.password.length > 0 ? failedPasswordRules : [];
+
+  const isFormValid =
+    formData.firstName.trim().length > 0 &&
+    formData.lastName.trim().length > 0 &&
+    EMAIL_REGEX.test(formData.email) &&
+    failedPasswordRules.length === 0 &&
+    agreeTerms;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched({ email: true, password: true });
+
+    if (!isFormValid) return;
+
+    setIsSubmitting(true);
+    setRegisterError(null);
+
+    try {
+      const data = await userRegister({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        password: formData.password,
+        role: selectedRole,
+      });
+
+      storeUserAuth(data);
+      setUserData(data.user);
+
+      const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+      setAppUserRole(tier as 'uhni' | 'preferred');
+
+      showToast('Account created successfully!', 'success');
+
+      if (redirectUrl) {
+        localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+      }
+
+      router.push('/onboarding');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Registration failed';
+      setRegisterError(message);
+      showToast(message, 'error');
+      setIsSubmitting(false);
     }
-    router.push('/onboarding');
   };
 
   const benefits = [
@@ -98,6 +154,7 @@ function RegisterForm() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Name Fields */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
@@ -125,6 +182,7 @@ function RegisterForm() {
               </div>
             </div>
 
+            {/* Email */}
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                 Email
@@ -133,12 +191,19 @@ function RegisterForm() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                className={`w-full px-5 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                  emailError ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                }`}
                 placeholder="your@email.com"
                 required
               />
+              {emailError && (
+                <p className="text-xs text-error mt-2">{emailError}</p>
+              )}
             </div>
 
+            {/* Password */}
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                 Password
@@ -148,7 +213,10 @@ function RegisterForm() {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-5 py-4 pr-14 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                  className={`w-full px-5 py-4 pr-14 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                    passwordErrors.length > 0 ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                  }`}
                   placeholder="Create a password"
                   required
                 />
@@ -160,9 +228,72 @@ function RegisterForm() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <p className="text-xs text-taupe mt-2">At least 8 characters</p>
+              {passwordErrors.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                  {passwordErrors.map((rule) => (
+                    <p key={rule.label} className="text-xs text-error">
+                      Missing: {rule.label}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-taupe mt-2">
+                  Must include uppercase, lowercase, number, and special character
+                </p>
+              )}
             </div>
 
+            {/* Account Type — below password, above terms */}
+            <div>
+              <p className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                Account Type
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('consumer')}
+                  className={`p-4 border transition-all duration-300 flex flex-col items-center gap-2 ${
+                    selectedRole === 'consumer'
+                      ? 'border-charcoal-deep bg-charcoal-deep'
+                      : 'border-sand hover:border-charcoal-deep bg-transparent'
+                  }`}
+                >
+                  <ShoppingBag size={20} className={selectedRole === 'consumer' ? 'text-gold-soft' : 'text-stone'} />
+                  <span className={`text-sm font-medium ${selectedRole === 'consumer' ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                    Consumer
+                  </span>
+                  <span className={`text-[10px] ${selectedRole === 'consumer' ? 'text-taupe' : 'text-stone'}`}>
+                    Standard shopping experience
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRole('uhni')}
+                  className={`p-4 border transition-all duration-300 flex flex-col items-center gap-2 ${
+                    selectedRole === 'uhni'
+                      ? 'border-gold-deep bg-gold-soft/10'
+                      : 'border-sand hover:border-gold-muted/50 bg-transparent'
+                  }`}
+                >
+                  <Crown size={20} className={selectedRole === 'uhni' ? 'text-gold-deep' : 'text-stone'} />
+                  <span className={`text-sm font-medium ${selectedRole === 'uhni' ? 'text-gold-deep' : 'text-charcoal-deep'}`}>
+                    UHNI
+                  </span>
+                  <span className={`text-[10px] ${selectedRole === 'uhni' ? 'text-gold-muted' : 'text-stone'}`}>
+                    Exclusive concierge access
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Register Error */}
+            {registerError && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm">
+                {registerError}
+              </div>
+            )}
+
+            {/* Terms & Conditions */}
             <label className="flex items-start gap-4 cursor-pointer group">
               <div className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
                 agreeTerms
@@ -190,12 +321,29 @@ function RegisterForm() {
               </span>
             </label>
 
+            {/* Submit Button */}
             <button
               type="submit"
-              className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 hover:bg-noir transition-all duration-300"
+              disabled={isSubmitting || !isFormValid}
+              className={`w-full py-4 px-6 flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed ${
+                selectedRole === 'uhni'
+                  ? 'bg-gold-deep text-white hover:bg-gold-deep/90'
+                  : 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
+              }`}
             >
-              <span className="text-sm tracking-[0.15em] uppercase">Create Account</span>
-              <ArrowRight size={16} />
+              {isSubmitting ? (
+                <>
+                  <div className={`w-4 h-4 border-2 border-t-transparent rounded-full animate-spin ${
+                    selectedRole === 'uhni' ? 'border-white' : 'border-ivory-cream'
+                  }`} />
+                  <span className="text-sm tracking-[0.15em] uppercase">Creating Account...</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm tracking-[0.15em] uppercase">Create Account</span>
+                  <ArrowRight size={16} />
+                </>
+              )}
             </button>
           </form>
 

@@ -6,9 +6,19 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { brandLogin } from '@/services/auth.service';
+import { brandLogin, userLogin, storeUserAuth } from '@/services/auth.service';
 
-type DemoTier = 'consumer' | 'uhni' | 'brand';
+type LoginTier = 'consumer' | 'uhni' | 'brand';
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+const PASSWORD_RULES = [
+  { regex: /.{8,}/, label: 'At least 8 characters' },
+  { regex: /[a-z]/, label: 'A lowercase letter' },
+  { regex: /[A-Z]/, label: 'An uppercase letter' },
+  { regex: /[0-9]/, label: 'A number' },
+  { regex: /[^a-zA-Z0-9]/, label: 'A special character (!@#$...)' },
+];
 
 function LoginForm() {
   const router = useRouter();
@@ -16,10 +26,10 @@ function LoginForm() {
   const redirectUrl = searchParams.get('redirect') || '/';
   const initialMode = searchParams.get('mode');
   const { showToast, setUserRole: setAppUserRole } = useApp();
-  const { setUserRole: setAuthUserRole } = useAuth();
+  const { setUserData } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<DemoTier>(
+  const [selectedTier, setSelectedTier] = useState<LoginTier>(
     initialMode === 'brand' ? 'brand' : 'consumer'
   );
   const [formData, setFormData] = useState({
@@ -28,25 +38,38 @@ function LoginForm() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
+  // Validation
+  const emailError = touched.email && formData.email.length > 0 && !EMAIL_REGEX.test(formData.email)
+    ? 'Please enter a valid email address'
+    : null;
+
+  const failedPasswordRules = PASSWORD_RULES.filter(rule => !rule.regex.test(formData.password));
+  const passwordErrors = touched.password && formData.password.length > 0 ? failedPasswordRules : [];
+
+  const isFormValid = EMAIL_REGEX.test(formData.email) && failedPasswordRules.length === 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched({ email: true, password: true });
+
+    if (!isFormValid) return;
+
     setIsSubmitting(true);
     setLoginError(null);
 
     if (selectedTier === 'brand') {
-      // Real brand partner login via API
       try {
         const data = await brandLogin({
           email: formData.email,
           password: formData.password,
         });
 
-        // Store tokens and brand data for persistent login
         localStorage.setItem('moda-brand-token', data.access_token);
         localStorage.setItem('moda-brand-refresh-token', data.refresh_token);
         localStorage.setItem('moda-brand-data', JSON.stringify(data.brand));
@@ -60,20 +83,40 @@ function LoginForm() {
         setIsSubmitting(false);
       }
     } else {
-      // Consumer/UHNI login (demo mode)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Consumer or UHNI login — send role to backend
+      try {
+        const data = await userLogin({
+          email: formData.email,
+          password: formData.password,
+          role: selectedTier,
+        });
 
-      const tier = selectedTier === 'uhni' ? 'uhni' : 'preferred';
-      setAuthUserRole(tier);
-      setAppUserRole(tier);
+        storeUserAuth(data);
+        setUserData(data.user);
 
-      if (selectedTier === 'uhni') {
-        showToast('Welcome back. Your personal concierge is available.', 'success');
-      } else {
-        showToast('Welcome back to ModaGlimmora!', 'success');
+        const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+        setAppUserRole(tier as 'uhni' | 'preferred');
+
+        if (data.user.role === 'uhni') {
+          showToast('Welcome back. Your personal concierge is available.', 'success');
+        } else {
+          showToast('Welcome back to ModaGlimmora!', 'success');
+        }
+
+        if (data.context_required) {
+          if (redirectUrl && redirectUrl !== '/') {
+            localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+          }
+          router.push('/onboarding');
+        } else {
+          router.push(redirectUrl);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        setLoginError(message);
+        showToast(message, 'error');
+        setIsSubmitting(false);
       }
-
-      router.push(redirectUrl);
     }
   };
 
@@ -150,6 +193,7 @@ function LoginForm() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email */}
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                 Email
@@ -158,12 +202,19 @@ function LoginForm() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                className={`w-full px-5 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                  emailError ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                }`}
                 placeholder={selectedTier === 'brand' ? 'partner@brand.com' : 'your@email.com'}
                 required
               />
+              {emailError && (
+                <p className="text-xs text-error mt-2">{emailError}</p>
+              )}
             </div>
 
+            {/* Password */}
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                 Password
@@ -173,7 +224,10 @@ function LoginForm() {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-5 py-4 pr-14 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                  className={`w-full px-5 py-4 pr-14 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                    passwordErrors.length > 0 ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                  }`}
                   placeholder="Enter your password"
                   required
                 />
@@ -185,6 +239,15 @@ function LoginForm() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {passwordErrors.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {passwordErrors.map((rule) => (
+                    <p key={rule.label} className="text-xs text-error">
+                      Missing: {rule.label}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Login Error */}
@@ -194,10 +257,10 @@ function LoginForm() {
               </div>
             )}
 
-            {/* Demo Mode Tier Selector */}
+            {/* Account Type Selector */}
             <div className="p-4 bg-parchment/50 border border-sand/50">
               <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-4">
-                Demo Mode — Select Experience
+                Select Account Type
               </p>
               <div className="grid grid-cols-3 gap-3">
                 <button
@@ -250,12 +313,10 @@ function LoginForm() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isFormValid}
               className={`w-full py-4 px-6 flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed ${
                 selectedTier === 'uhni'
                   ? 'bg-gold-deep text-white hover:bg-gold-deep/90'
-                  : selectedTier === 'brand'
-                  ? 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
                   : 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
               }`}
             >
@@ -277,13 +338,6 @@ function LoginForm() {
                 </>
               )}
             </button>
-
-            {/* Demo hint */}
-            <p className="text-center text-taupe text-xs">
-              {selectedTier === 'brand'
-                ? 'Demo mode: Access the Dior brand partner dashboard'
-                : 'Demo mode: Use any email and password to explore'}
-            </p>
           </form>
 
           <p className="text-center text-stone mt-10">
@@ -299,7 +353,7 @@ function LoginForm() {
               </>
             ) : (
               <>
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link href="/auth/register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
                   Create account
                 </Link>

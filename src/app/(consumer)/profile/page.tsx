@@ -12,12 +12,43 @@ import type { User } from '@/types';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, isHydrated, isLoggingOut } = useAuth();
+  const { isAuthenticated, isHydrated, isLoggingOut, userData: authUserData } = useAuth();
   const { considerations, wardrobe, calendarEvents, orders, isUHNI, concierge, sourcingRequests, bespokeOrders, autonomousSettings, fashionIdentity } = useApp();
-  const [userData, setUserData] = useState<User | null>(null);
-  const user = userData ? { ...userData, fashionIdentity } : null;
+  const [mockUserData, setMockUserData] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
+
+  // Build a unified user object: real backend data takes priority, fallback to mock
+  const user = (() => {
+    if (authUserData) {
+      return {
+        id: authUserData.user_id,
+        email: authUserData.email,
+        name: `${authUserData.first_name} ${authUserData.last_name}`,
+        firstName: authUserData.first_name,
+        lastName: authUserData.last_name,
+        role: authUserData.role,
+        memberSince: authUserData.created_at,
+        fashionIdentity: authUserData.context_set ? {
+          occasions: authUserData.occasions,
+          aesthetics: authUserData.aesthetics,
+          confidenceLevel: fashionIdentity?.confidenceLevel || ('guided' as const),
+          budgetRange: authUserData.minimum_budget && authUserData.maximum_budget
+            ? { min: authUserData.minimum_budget, max: authUserData.maximum_budget }
+            : fashionIdentity?.budgetRange,
+          primaryLocation: fashionIdentity?.primaryLocation || 'Paris',
+          travelDestinations: fashionIdentity?.travelDestinations || [],
+        } : fashionIdentity,
+        wardrobe: [],
+        considerations: [],
+        orders: [],
+      };
+    }
+    if (mockUserData) {
+      return { ...mockUserData, fashionIdentity, role: 'consumer', memberSince: '', firstName: '', lastName: '' };
+    }
+    return null;
+  })();
 
   // Redirect to login if not authenticated (but not during logout - let Header handle navigation)
   useEffect(() => {
@@ -27,15 +58,18 @@ export default function ProfilePage() {
   }, [isAuthenticated, isHydrated, isLoggingOut, router]);
 
   useEffect(() => {
-    if (isHydrated && isAuthenticated) {
+    if (isHydrated && isAuthenticated && !authUserData) {
+      // Only load mock data if no real user data is available
       const loadUser = async () => {
         const response = await userService.getCurrentUser();
-        setUserData(response.data);
+        setMockUserData(response.data);
         setIsLoaded(true);
       };
       loadUser();
+    } else if (isHydrated && isAuthenticated && authUserData) {
+      setIsLoaded(true);
     }
-  }, [isHydrated, isAuthenticated]);
+  }, [isHydrated, isAuthenticated, authUserData]);
 
   // Show loading while checking auth or loading user data
   if (!isHydrated || !isAuthenticated || !user) {
@@ -172,10 +206,23 @@ export default function ProfilePage() {
 
             {/* Info */}
             <div className="text-center md:text-left flex-1">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center gap-3 mb-3 justify-center md:justify-start">
                 <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">
-                  Member Since 2024
+                  {user.memberSince
+                    ? `Member Since ${new Date(user.memberSince).getFullYear()}`
+                    : 'Member Since 2024'}
                 </span>
+                {user.role === 'uhni' && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold-soft/10 border border-gold-soft/30">
+                    <Crown size={10} className="text-gold-soft" />
+                    <span className="text-[9px] tracking-[0.3em] uppercase text-gold-soft">UHNI</span>
+                  </span>
+                )}
+                {user.role === 'consumer' && (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-ivory-cream/10 border border-ivory-cream/20">
+                    <span className="text-[9px] tracking-[0.3em] uppercase text-ivory-cream/70">Consumer</span>
+                  </span>
+                )}
               </div>
               <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-3">
                 {user.name}
