@@ -20,9 +20,22 @@ export default function ImageUploader({
   const [preview, setPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [error, setError] = useState<string | null>(null);
+
+  const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+  const MAX_SIZE_MB = 10;
+  const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
+
   const handleFile = useCallback((file: File) => {
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+    setError(null);
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Please select a JPG, PNG, or WEBP image');
+      return;
+    }
+
+    if (file.size > MAX_SIZE_BYTES) {
+      setError(`File size must be under ${MAX_SIZE_MB}MB`);
       return;
     }
 
@@ -131,7 +144,7 @@ export default function ImageUploader({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept=".jpg,.jpeg,.png,.webp"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -183,6 +196,11 @@ export default function ImageUploader({
                   Take Photo
                 </button>
               </div>
+
+              {/* Error message */}
+              {error && (
+                <p className="text-sm text-error mt-4">{error}</p>
+              )}
 
               {/* Supported formats */}
               <p className="text-xs text-stone/40 mt-6">

@@ -18,27 +18,51 @@ export default function StoryPage({ params }: StoryPageProps) {
   const { slug } = use(params);
   const { showToast } = useApp();
   const [story, setStory] = useState<BrandStory | null>(null);
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [allStories, setAllStories] = useState<BrandStory[]>([]);
+  const [brand, setBrand] = useState<Brand | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [moreStories, setMoreStories] = useState<BrandStory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [isBookmarked, setIsBookmarked] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const saved = localStorage.getItem('moda-bookmarked-stories');
+      return saved ? (JSON.parse(saved) as string[]).includes(slug) : false;
+    } catch { return false; }
+  });
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [storyRes, brandsRes, productsRes, storiesRes] = await Promise.all([
-          brandService.getStoryBySlug(slug),
-          brandService.getAllBrands(),
-          productService.getAllProducts(),
-          brandService.getAllStories(),
+        // 1. Load the story first
+        const storyRes = await brandService.getStoryBySlug(slug);
+        const loadedStory = storyRes.data ?? null;
+        setStory(loadedStory);
+
+        if (!loadedStory) return;
+
+        // 2. Load brand by ID and related products in parallel
+        const [brandRes, ...productResults] = await Promise.all([
+          brandService.getBrandById(loadedStory.brandId),
+          ...loadedStory.relatedProducts.map(id => productService.getProductById(id)),
         ]);
-        setStory(storyRes.data ?? null);
-        setBrands(brandsRes.data ?? []);
-        setProducts(productsRes.data ?? []);
-        setAllStories(storiesRes.data ?? []);
+        setBrand(brandRes.data ?? null);
+        setRelatedProducts(productResults.map(r => r.data).filter(Boolean) as Product[]);
+
+        // 3. Load a few more stories (from same brand, then others)
+        const brandStoriesRes = await brandService.getStoriesByBrand(loadedStory.brandId);
+        const otherStories = (brandStoriesRes.data ?? []).filter(s => s.id !== loadedStory.id);
+        if (otherStories.length >= 3) {
+          setMoreStories(otherStories.slice(0, 3));
+        } else {
+          // Supplement with featured stories from other brands
+          const featuredRes = await brandService.getFeaturedStories();
+          const additional = (featuredRes.data ?? []).filter(
+            s => s.id !== loadedStory.id && !otherStories.some(o => o.id === s.id)
+          );
+          setMoreStories([...otherStories, ...additional].slice(0, 3));
+        }
       } catch (error) {
         console.error('Failed to load story data:', error);
       } finally {
@@ -61,23 +85,17 @@ export default function StoryPage({ params }: StoryPageProps) {
     notFound();
   }
 
-  const brand = brands.find(b => b.id === story.brandId);
-  const relatedProducts = story.relatedProducts
-    .map(id => products.find(p => p.id === id))
-    .filter(Boolean);
-
-  // Get more stories from same brand or other brands
-  const moreStories = allStories
-    .filter(s => s.id !== story.id)
-    .slice(0, 3);
-
   const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked);
-    if (!isBookmarked) {
-      showToast('Story saved to your reading list', 'success');
-    } else {
-      showToast('Story removed from reading list', 'info');
-    }
+    const newState = !isBookmarked;
+    setIsBookmarked(newState);
+    try {
+      const saved = JSON.parse(localStorage.getItem('moda-bookmarked-stories') || '[]') as string[];
+      const updated = newState
+        ? [...saved.filter(s => s !== slug), slug]
+        : saved.filter(s => s !== slug);
+      localStorage.setItem('moda-bookmarked-stories', JSON.stringify(updated));
+    } catch { /* ignore */ }
+    showToast(newState ? 'Story saved to your reading list' : 'Story removed from reading list', newState ? 'success' : 'info');
   };
 
   const handleShare = async () => {
@@ -131,7 +149,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                 </span>
                 <span className="w-8 h-px bg-ivory-cream/30" />
                 <Link
-                  href={`/brand/${brand?.slug || ''}`}
+                  href="/discover"
                   className="text-[10px] tracking-[0.3em] uppercase text-gold-soft hover:text-ivory-cream transition-colors"
                 >
                   {brand?.name}
@@ -255,7 +273,7 @@ export default function StoryPage({ params }: StoryPageProps) {
 
             {/* Products Grid */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-10">
-              {relatedProducts.map((product, index) => product && (
+              {relatedProducts.map((product, index) => (
                 <Link
                   key={product.id}
                   href={`/product/${product.slug}`}
@@ -325,9 +343,7 @@ export default function StoryPage({ params }: StoryPageProps) {
 
             {/* Stories Grid */}
             <div className="grid md:grid-cols-3 gap-6 md:gap-8">
-              {moreStories.map((storyItem) => {
-                const storyBrand = brands.find(b => b.id === storyItem.brandId);
-                return (
+              {moreStories.map((storyItem) => (
                   <Link
                     key={storyItem.id}
                     href={`/story/${storyItem.slug}`}
@@ -348,15 +364,14 @@ export default function StoryPage({ params }: StoryPageProps) {
                       </div>
                     </div>
                     <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-2">
-                      {storyBrand?.name}
+                      {storyItem.brandId === story.brandId ? brand?.name : ''}
                     </p>
                     <h3 className="font-display text-xl text-ivory-cream leading-tight group-hover:text-gold-soft transition-colors mb-2">
                       {storyItem.title}
                     </h3>
                     <p className="text-sm text-taupe line-clamp-2">{storyItem.excerpt}</p>
                   </Link>
-                );
-              })}
+              ))}
             </div>
           </div>
         </section>

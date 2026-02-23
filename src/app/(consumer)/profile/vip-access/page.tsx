@@ -28,81 +28,108 @@ interface VIPAlert {
   createdAt: string;
 }
 
+const VIP_STORAGE_KEY = 'moda-vip-alerts-state';
+
+function loadVIPState(): { readIds: string[]; dismissedIds: string[] } {
+  if (typeof window === 'undefined') return { readIds: [], dismissedIds: [] };
+  try {
+    const stored = localStorage.getItem(VIP_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : { readIds: [], dismissedIds: [] };
+  } catch {
+    return { readIds: [], dismissedIds: [] };
+  }
+}
+
+function saveVIPState(readIds: string[], dismissedIds: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(VIP_STORAGE_KEY, JSON.stringify({ readIds, dismissedIds }));
+  } catch { /* ignore */ }
+}
+
+const defaultAlerts: VIPAlert[] = [
+  {
+    id: '1',
+    type: 'product_launch',
+    title: 'Exclusive First Access: Hermès Spring Collection',
+    description: 'Be among the first to shop the new Spring/Summer collection. Limited pieces available with priority access for UHNI members.',
+    brand: 'Hermès',
+    priority: 'urgent',
+    image: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=600',
+    expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    actionLabel: 'Shop Now',
+    actionUrl: '/discover',
+    metadata: {
+      discount: 'VIP Early Access'
+    },
+    read: false,
+    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: '2',
+    type: 'event',
+    title: 'Private Viewing: Bottega Veneta Atelier',
+    description: 'Invitation-only showcase of the new collection with the creative director. Personalized styling session included.',
+    brand: 'Bottega Veneta',
+    priority: 'high',
+    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    actionLabel: 'RSVP',
+    actionUrl: '#',
+    metadata: {
+      location: 'Paris Flagship',
+      date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+      availableSpots: 3
+    },
+    read: false,
+    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: '3',
+    type: 'private_sale',
+    title: 'Private Sale: Chanel Classics',
+    description: 'Curated selection of classic flap bags and timeless pieces. 48-hour exclusive access before public release.',
+    brand: 'Chanel',
+    priority: 'high',
+    image: 'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=600',
+    expiresAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
+    actionLabel: 'View Collection',
+    actionUrl: '/discover',
+    metadata: {
+      discount: 'Member Pricing'
+    },
+    read: true,
+    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+  },
+  {
+    id: '4',
+    type: 'collection_preview',
+    title: 'Pre-Order: Fall/Winter 2025 Preview',
+    description: 'Preview and pre-order from multiple maisons before the official launch. Guaranteed allocation for reserved pieces.',
+    brand: 'Multiple Brands',
+    priority: 'normal',
+    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    actionLabel: 'Preview',
+    actionUrl: '/discover',
+    read: true,
+    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+  }
+];
+
 export default function VIPAccessPage() {
   const router = useRouter();
   const { isUHNI, isHydrated, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [filter, setFilter] = useState<'all' | 'product_launch' | 'private_sale' | 'event'>('all');
-  const [alerts, setAlerts] = useState<VIPAlert[]>([
-    {
-      id: '1',
-      type: 'product_launch',
-      title: 'Exclusive First Access: Hermès Spring Collection',
-      description: 'Be among the first to shop the new Spring/Summer collection. Limited pieces available with priority access for UHNI members.',
-      brand: 'Hermès',
-      priority: 'urgent',
-      image: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=600',
-      expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-      actionLabel: 'Shop Now',
-      actionUrl: '/discover',
-      metadata: {
-        discount: 'VIP Early Access'
-      },
-      read: false,
-      createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '2',
-      type: 'event',
-      title: 'Private Viewing: Bottega Veneta Atelier',
-      description: 'Invitation-only showcase of the new collection with the creative director. Personalized styling session included.',
-      brand: 'Bottega Veneta',
-      priority: 'high',
-      image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600',
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      actionLabel: 'RSVP',
-      actionUrl: '#',
-      metadata: {
-        location: 'Paris Flagship',
-        date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-        availableSpots: 3
-      },
-      read: false,
-      createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '3',
-      type: 'private_sale',
-      title: 'Private Sale: Chanel Classics',
-      description: 'Curated selection of classic flap bags and timeless pieces. 48-hour exclusive access before public release.',
-      brand: 'Chanel',
-      priority: 'high',
-      image: 'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=600',
-      expiresAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-      actionLabel: 'View Collection',
-      actionUrl: '/discover',
-      metadata: {
-        discount: 'Member Pricing'
-      },
-      read: true,
-      createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-    },
-    {
-      id: '4',
-      type: 'collection_preview',
-      title: 'Pre-Order: Fall/Winter 2025 Preview',
-      description: 'Preview and pre-order from multiple maisons before the official launch. Guaranteed allocation for reserved pieces.',
-      brand: 'Multiple Brands',
-      priority: 'normal',
-      expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-      actionLabel: 'Preview',
-      actionUrl: '/discover',
-      read: true,
-      createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-    }
-  ]);
+  const [alerts, setAlerts] = useState<VIPAlert[]>([]);
 
+  // Load persisted read/dismiss state on mount
   useEffect(() => {
+    const { readIds, dismissedIds } = loadVIPState();
+    const hydrated = defaultAlerts
+      .filter(a => !dismissedIds.includes(a.id))
+      .map(a => ({ ...a, read: a.read || readIds.includes(a.id) }));
+    setAlerts(hydrated);
     setIsLoaded(true);
   }, []);
 
@@ -125,18 +152,29 @@ export default function VIPAccessPage() {
   }
 
   const handleMarkAsRead = (id: string) => {
-    setAlerts(alerts.map(alert =>
+    const updated = alerts.map(alert =>
       alert.id === id ? { ...alert, read: true } : alert
-    ));
+    );
+    setAlerts(updated);
+    const state = loadVIPState();
+    if (!state.readIds.includes(id)) state.readIds.push(id);
+    saveVIPState(state.readIds, state.dismissedIds);
   };
 
   const handleMarkAllAsRead = () => {
-    setAlerts(alerts.map(alert => ({ ...alert, read: true })));
+    const updated = alerts.map(alert => ({ ...alert, read: true }));
+    setAlerts(updated);
+    const state = loadVIPState();
+    const allIds = [...new Set([...state.readIds, ...alerts.map(a => a.id)])];
+    saveVIPState(allIds, state.dismissedIds);
     showToast('All alerts marked as read', 'success');
   };
 
   const handleDismiss = (id: string) => {
     setAlerts(alerts.filter(alert => alert.id !== id));
+    const state = loadVIPState();
+    if (!state.dismissedIds.includes(id)) state.dismissedIds.push(id);
+    saveVIPState(state.readIds, state.dismissedIds);
     showToast('Alert dismissed', 'success');
   };
 

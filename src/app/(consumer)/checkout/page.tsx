@@ -32,6 +32,13 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // Payment card state
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCVV, setCardCVV] = useState('');
+  const [cardName, setCardName] = useState('');
+  const [cardErrors, setCardErrors] = useState<Record<string, string>>({});
+
   useEffect(() => {
     setIsLoaded(true);
   }, []);
@@ -62,7 +69,7 @@ export default function CheckoutPage() {
   }
 
   const total = (currentStep === 'confirmation' ? orderItems : considerations)
-    .reduce((sum, item) => sum + item.product.price, 0);
+    .reduce((sum, item) => sum + item.product.price * (item.quantity || 1), 0);
 
   const displayItems = currentStep === 'confirmation' ? orderItems : considerations;
 
@@ -128,6 +135,81 @@ export default function CheckoutPage() {
     setErrors({ ...errors, [name]: validateField(name, value) });
   };
 
+  // — Card helpers —
+  const luhnCheck = (num: string): boolean => {
+    const digits = num.replace(/\D/g, '');
+    let sum = 0;
+    let isEven = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let digit = parseInt(digits[i], 10);
+      if (isEven) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      isEven = !isEven;
+    }
+    return sum % 10 === 0;
+  };
+
+  const formatCardNumber = (value: string): string => {
+    const digits = value.replace(/\D/g, '').slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
+  };
+
+  const formatExpiry = (value: string): string => {
+    const digits = value.replace(/\D/g, '').slice(0, 4);
+    if (digits.length >= 3) return digits.slice(0, 2) + '/' + digits.slice(2);
+    return digits;
+  };
+
+  const maskedCardDisplay = cardNumber ? '•••• •••• •••• ' + cardNumber.replace(/\s/g, '').slice(-4) : '';
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCardNumber(formatCardNumber(e.target.value));
+    if (cardErrors.cardNumber) setCardErrors(prev => ({ ...prev, cardNumber: '' }));
+  };
+
+  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCardExpiry(formatExpiry(e.target.value));
+    if (cardErrors.cardExpiry) setCardErrors(prev => ({ ...prev, cardExpiry: '' }));
+  };
+
+  const handleCVVChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
+    setCardCVV(digits);
+    if (cardErrors.cardCVV) setCardErrors(prev => ({ ...prev, cardCVV: '' }));
+  };
+
+  const validateCard = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    const digits = cardNumber.replace(/\s/g, '');
+
+    if (!digits) newErrors.cardNumber = 'Card number is required';
+    else if (digits.length !== 16) newErrors.cardNumber = 'Card number must be 16 digits';
+    else if (!luhnCheck(digits)) newErrors.cardNumber = 'Invalid card number';
+
+    if (!cardExpiry) newErrors.cardExpiry = 'Expiry date is required';
+    else if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) newErrors.cardExpiry = 'Use MM/YY format';
+    else {
+      const [month, year] = cardExpiry.split('/').map(Number);
+      if (month < 1 || month > 12) newErrors.cardExpiry = 'Invalid month';
+      else {
+        const now = new Date();
+        const expiry = new Date(2000 + year, month);
+        if (expiry <= now) newErrors.cardExpiry = 'Card has expired';
+      }
+    }
+
+    if (!cardCVV) newErrors.cardCVV = 'CVV is required';
+    else if (cardCVV.length < 3) newErrors.cardCVV = 'CVV must be 3-4 digits';
+
+    if (!cardName.trim()) newErrors.cardName = 'Name on card is required';
+
+    setCardErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (currentStep === 'details') {
@@ -137,6 +219,10 @@ export default function CheckoutPage() {
       }
       setCurrentStep('payment');
     } else if (currentStep === 'payment') {
+      if (!validateCard()) {
+        showToast('Please check your payment details', 'error');
+        return;
+      }
       setOrderItems([...considerations]);
       const newOrderId = addOrder(considerations, total);
       setOrderId(newOrderId);
@@ -454,10 +540,15 @@ export default function CheckoutPage() {
                           <label className="text-[10px] tracking-[0.3em] uppercase text-taupe block mb-3">Card Number</label>
                           <input
                             type="text"
+                            value={cardNumber}
+                            onChange={handleCardNumberChange}
                             placeholder="1234 5678 9012 3456"
-                            className="w-full px-4 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                            required
+                            maxLength={19}
+                            className={`w-full px-4 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors ${
+                              cardErrors.cardNumber ? 'border-error' : 'border-sand'
+                            }`}
                           />
+                          {cardErrors.cardNumber && <p className="text-error text-xs mt-2">{cardErrors.cardNumber}</p>}
                         </div>
 
                         <div className="grid grid-cols-2 gap-6">
@@ -465,19 +556,29 @@ export default function CheckoutPage() {
                             <label className="text-[10px] tracking-[0.3em] uppercase text-taupe block mb-3">Expiry Date</label>
                             <input
                               type="text"
+                              value={cardExpiry}
+                              onChange={handleExpiryChange}
                               placeholder="MM/YY"
-                              className="w-full px-4 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                              required
+                              maxLength={5}
+                              className={`w-full px-4 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors ${
+                                cardErrors.cardExpiry ? 'border-error' : 'border-sand'
+                              }`}
                             />
+                            {cardErrors.cardExpiry && <p className="text-error text-xs mt-2">{cardErrors.cardExpiry}</p>}
                           </div>
                           <div>
                             <label className="text-[10px] tracking-[0.3em] uppercase text-taupe block mb-3">CVV</label>
                             <input
-                              type="text"
-                              placeholder="123"
-                              className="w-full px-4 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                              required
+                              type="password"
+                              value={cardCVV}
+                              onChange={handleCVVChange}
+                              placeholder="•••"
+                              maxLength={4}
+                              className={`w-full px-4 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors ${
+                                cardErrors.cardCVV ? 'border-error' : 'border-sand'
+                              }`}
                             />
+                            {cardErrors.cardCVV && <p className="text-error text-xs mt-2">{cardErrors.cardCVV}</p>}
                           </div>
                         </div>
 
@@ -485,10 +586,23 @@ export default function CheckoutPage() {
                           <label className="text-[10px] tracking-[0.3em] uppercase text-taupe block mb-3">Name on Card</label>
                           <input
                             type="text"
-                            className="w-full px-4 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                            required
+                            value={cardName}
+                            onChange={(e) => { setCardName(e.target.value); if (cardErrors.cardName) setCardErrors(prev => ({ ...prev, cardName: '' })); }}
+                            placeholder="Full name as shown on card"
+                            className={`w-full px-4 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors ${
+                              cardErrors.cardName ? 'border-error' : 'border-sand'
+                            }`}
                           />
+                          {cardErrors.cardName && <p className="text-error text-xs mt-2">{cardErrors.cardName}</p>}
                         </div>
+
+                        {/* Masked card preview */}
+                        {cardNumber.replace(/\s/g, '').length >= 8 && (
+                          <div className="p-4 bg-parchment border border-sand/50">
+                            <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Card Preview</p>
+                            <p className="text-charcoal-deep font-mono">{maskedCardDisplay}</p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3 mt-8 text-sm text-taupe">

@@ -52,7 +52,13 @@ export const products: Product[] = [
     },
     collection: 'Icons',
     category: 'bags',
-    tags: ['iconic', 'heritage', 'leather', 'evening']
+    tags: ['iconic', 'heritage', 'leather', 'evening'],
+    visibility: 'public',
+    experienceMode: 'iv_immersive',
+    pricingVisibility: 'visible',
+    commerceAction: 'add_to_considerations',
+    commerceEligible: true,
+    craftTags: ['cannage-quilting', 'hand-stitching', 'lambskin'],
   },
   {
     id: 'dior-bar-jacket',
@@ -98,7 +104,13 @@ export const products: Product[] = [
     },
     collection: 'Autumn/Winter 2024',
     category: 'clothing',
-    tags: ['tailoring', 'heritage', 'occasion', 'investment']
+    tags: ['tailoring', 'heritage', 'occasion', 'investment'],
+    visibility: 'public',
+    experienceMode: 'iv_immersive',
+    pricingVisibility: 'visible',
+    commerceAction: 'add_to_considerations',
+    commerceEligible: true,
+    craftTags: ['tailoring', 'couture', 'structured-shoulder'],
   },
   // Gucci Products
   {
@@ -141,7 +153,13 @@ export const products: Product[] = [
     },
     collection: 'Icons',
     category: 'bags',
-    tags: ['iconic', 'heritage', 'everyday', 'leather']
+    tags: ['iconic', 'heritage', 'everyday', 'leather'],
+    visibility: 'public',
+    experienceMode: 'iv_immersive',
+    pricingVisibility: 'visible',
+    commerceAction: 'add_to_considerations',
+    commerceEligible: true,
+    craftTags: ['hand-painted-edges', 'calfskin', 'piston-closure'],
   },
   {
     id: 'gucci-horsebit-loafer',
@@ -182,7 +200,13 @@ export const products: Product[] = [
     },
     collection: 'Icons',
     category: 'shoes',
-    tags: ['iconic', 'classic', 'everyday', 'leather']
+    tags: ['iconic', 'classic', 'everyday', 'leather'],
+    visibility: 'public',
+    experienceMode: 'standard',
+    pricingVisibility: 'visible',
+    commerceAction: 'direct_purchase',
+    commerceEligible: true,
+    craftTags: ['blake-stitch', 'calfskin', 'metal-hardware'],
   },
   // Bottega Veneta Products
   {
@@ -222,7 +246,13 @@ export const products: Product[] = [
     },
     collection: 'Core',
     category: 'bags',
-    tags: ['signature', 'contemporary', 'leather', 'everyday']
+    tags: ['signature', 'contemporary', 'leather', 'everyday'],
+    visibility: 'public',
+    experienceMode: 'iv_immersive',
+    pricingVisibility: 'visible',
+    commerceAction: 'add_to_considerations',
+    commerceEligible: true,
+    craftTags: ['intrecciato', 'nappa-leather', 'hand-woven'],
   },
   // Hermès Products
   {
@@ -267,7 +297,13 @@ export const products: Product[] = [
     },
     collection: 'Icons',
     category: 'bags',
-    tags: ['iconic', 'investment', 'heritage', 'exclusive']
+    tags: ['iconic', 'investment', 'heritage', 'exclusive'],
+    visibility: 'invite_only',
+    experienceMode: 'bespoke_only',
+    pricingVisibility: 'on_request',
+    commerceAction: 'request_access',
+    commerceEligible: false,
+    craftTags: ['saddle-stitch', 'single-artisan', 'togo-leather'],
   },
   {
     id: 'hermes-silk-scarf',
@@ -308,7 +344,13 @@ export const products: Product[] = [
     },
     collection: 'Accessories',
     category: 'accessories',
-    tags: ['silk', 'art', 'heritage', 'gift']
+    tags: ['silk', 'art', 'heritage', 'gift'],
+    visibility: 'public',
+    experienceMode: 'standard',
+    pricingVisibility: 'visible',
+    commerceAction: 'direct_purchase',
+    commerceEligible: true,
+    craftTags: ['screen-printing', 'silk-twill', 'hand-rolled'],
   },
   // Louis Vuitton Products
   {
@@ -351,7 +393,13 @@ export const products: Product[] = [
     },
     collection: 'Icons',
     category: 'bags',
-    tags: ['iconic', 'heritage', 'everyday', 'canvas']
+    tags: ['iconic', 'heritage', 'everyday', 'canvas'],
+    visibility: 'public',
+    experienceMode: 'iv_immersive',
+    pricingVisibility: 'visible',
+    commerceAction: 'direct_purchase',
+    commerceEligible: true,
+    craftTags: ['monogram', 'vachetta-leather', 'pattern-alignment'],
   }
 ];
 

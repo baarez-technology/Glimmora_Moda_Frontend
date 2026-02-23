@@ -14,6 +14,17 @@ export type ProductCategory =
   | 'jewelry'
   | 'watches';
 
+// SOW V10.3 Product Visibility & Commerce Types
+export type ProductVisibility = 'private' | 'invite_only' | 'public';
+export type ExperienceMode = 'standard' | 'iv_immersive' | 'bespoke_only';
+export type PricingVisibility = 'visible' | 'on_request' | 'private';
+export type CommerceAction = 'add_to_considerations' | 'request_access' | 'direct_purchase';
+
+export interface ProductMedia {
+  video?: string;
+  motion?: string;
+}
+
 // Product Image
 export interface ProductImage {
   id: string;
@@ -87,4 +98,12 @@ export interface Product {
   category: ProductCategory;
   tags: string[];
   care?: string[]; // Care instructions for the product
+  // SOW V10.3 fields
+  visibility: ProductVisibility;
+  experienceMode: ExperienceMode;
+  pricingVisibility: PricingVisibility;
+  commerceAction: CommerceAction;
+  commerceEligible: boolean;
+  craftTags: string[];
+  media?: ProductMedia;
 }

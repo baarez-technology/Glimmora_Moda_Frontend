@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -48,15 +48,16 @@ export default function WardrobeAnalyticsPage() {
     );
   }
 
-  // Generate analytics data for wardrobe items
+  // TODO: Pull real analytics from wardrobe tracking API when available
+  // Currently generating sample data for demonstration purposes
+  // Uses seeded values per item index instead of Math.random() to avoid hydration mismatches
   const wardrobeAnalytics: WardrobeItemAnalytics[] = wardrobe.map((item, index) => {
     const purchasePrice = item.product.price;
-    // Simulate appreciation/depreciation
-    const appreciationRate = item.product.category === 'bags' ? 0.08 : -0.15; // Bags appreciate, clothing depreciates
-    const monthsOwned = Math.floor(Math.random() * 24) + 1;
+    const appreciationRate = item.product.category === 'bags' ? 0.08 : -0.15;
+    const monthsOwned = ((index * 7 + 3) % 24) + 1; // Deterministic per-item
     const appreciation = appreciationRate * (monthsOwned / 12);
     const currentValue = purchasePrice * (1 + appreciation);
-    const wearCount = Math.floor(Math.random() * 50) + 1;
+    const wearCount = item.wearCount || ((index * 13 + 5) % 50) + 1; // Use actual wearCount if available
     const costPerWear = purchasePrice / wearCount;
 
     return {
@@ -68,7 +69,7 @@ export default function WardrobeAnalyticsPage() {
       appreciation: appreciation * 100,
       wearCount,
       costPerWear,
-      lastWorn: new Date(Date.now() - Math.floor(Math.random() * 90) * 24 * 60 * 60 * 1000).toISOString(),
+      lastWorn: item.lastWorn || new Date(Date.now() - ((index * 11 + 2) % 90) * 24 * 60 * 60 * 1000).toISOString(),
       category: item.product.category
     };
   });
@@ -107,8 +108,8 @@ export default function WardrobeAnalyticsPage() {
     return acc;
   }, {} as Record<string, { count: number; value: number; appreciation: number }>);
 
-  // Sort function
-  const getSortedItems = () => {
+  // Memoized sorted items to avoid re-creating array every render
+  const sortedItems = useMemo(() => {
     const sorted = [...wardrobeAnalytics];
     switch (sortBy) {
       case 'appreciation':
@@ -122,7 +123,7 @@ export default function WardrobeAnalyticsPage() {
       default:
         return sorted;
     }
-  };
+  }, [sortBy, wardrobeAnalytics]);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -160,6 +161,18 @@ export default function WardrobeAnalyticsPage() {
       </div>
 
       <div className={`max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        {/* Sample Data Banner */}
+        <div className="mb-8 p-4 bg-amber-50 border border-amber-200 flex items-start gap-3">
+          <Info size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium text-amber-900 text-sm">Sample Data</p>
+            <p className="text-xs text-amber-700 mt-1">
+              Values shown are estimates based on category trends and general market data.
+              Connect purchase history for accurate portfolio tracking.
+            </p>
+          </div>
+        </div>
+
         {/* Key Metrics */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
           <div className="bg-white p-6">
@@ -204,9 +217,9 @@ export default function WardrobeAnalyticsPage() {
                 <Award size={18} className="text-gold-soft" />
               </div>
             </div>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Investment Grade</p>
-            <p className="font-display text-2xl text-charcoal-deep">A+</p>
-            <p className="text-xs text-stone mt-2">Top 5% of luxury portfolios</p>
+            <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Total Pieces</p>
+            <p className="font-display text-2xl text-charcoal-deep">{wardrobe.length}</p>
+            <p className="text-xs text-stone mt-2">In your collection</p>
           </div>
         </div>
 
@@ -317,7 +330,7 @@ export default function WardrobeAnalyticsPage() {
               </div>
 
               <div className="divide-y divide-sand max-h-[600px] overflow-y-auto">
-                {getSortedItems().map((item) => (
+                {sortedItems.map((item) => (
                   <Link
                     key={item.id}
                     href={`/product/${item.product.slug}`}

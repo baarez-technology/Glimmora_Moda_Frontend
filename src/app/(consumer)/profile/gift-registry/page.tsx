@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -57,7 +57,11 @@ function loadRegistries(): GiftRegistry[] {
 
 function saveRegistries(registries: GiftRegistry[]) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(registries));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(registries));
+  } catch (error) {
+    console.error('Failed to save gift registries:', error);
+  }
 }
 
 export default function GiftRegistryPage() {
@@ -79,14 +83,15 @@ export default function GiftRegistryPage() {
   }, [giftRegistries, isHydrated]);
 
   const createGiftRegistry = useCallback((name: string, eventType: string, eventDate: string, description?: string) => {
+    const id = `reg-${Date.now()}`;
     const newRegistry: GiftRegistry = {
-      id: `reg-${Date.now()}`,
+      id,
       name,
       eventType: eventType as GiftRegistry['eventType'],
       eventDate,
       description,
       items: [],
-      shareLink: `${typeof window !== 'undefined' ? window.location.origin : ''}/gift-registry/reg-${Date.now()}`
+      shareLink: typeof window !== 'undefined' ? window.location.href : ''
     };
     setGiftRegistries(prev => [...prev, newRegistry]);
     showToast('Gift registry created', 'success');
@@ -120,6 +125,30 @@ export default function GiftRegistryPage() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedRegistry, setSelectedRegistry] = useState<GiftRegistry | null>(null);
+  const registryNameRef = useRef<HTMLInputElement>(null);
+  const manageCloseRef = useRef<HTMLButtonElement>(null);
+
+  // ESC key handler for create and manage modals
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedRegistry) setSelectedRegistry(null);
+        else if (showCreateModal) setShowCreateModal(false);
+      }
+    };
+    if (showCreateModal || selectedRegistry) {
+      document.addEventListener('keydown', handleEsc);
+      return () => document.removeEventListener('keydown', handleEsc);
+    }
+  }, [showCreateModal, selectedRegistry]);
+
+  // Auto-focus when modals open
+  useEffect(() => {
+    if (showCreateModal) registryNameRef.current?.focus();
+  }, [showCreateModal]);
+  useEffect(() => {
+    if (selectedRegistry) manageCloseRef.current?.focus();
+  }, [selectedRegistry]);
 
   // Keep selectedRegistry in sync with state
   useEffect(() => {
@@ -168,10 +197,20 @@ export default function GiftRegistryPage() {
       } catch {
         // Share cancelled
       }
-    } else {
-      // Fallback: copy to clipboard
-      if (registry.shareLink) {
-        navigator.clipboard.writeText(registry.shareLink);
+    } else if (registry.shareLink) {
+      try {
+        await navigator.clipboard.writeText(registry.shareLink);
+        showToast('Link copied to clipboard', 'success');
+      } catch {
+        // Fallback for non-secure contexts
+        const textarea = document.createElement('textarea');
+        textarea.value = registry.shareLink;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
         showToast('Link copied to clipboard', 'success');
       }
     }
@@ -335,10 +374,10 @@ export default function GiftRegistryPage() {
 
       {/* Create Registry Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" role="dialog" aria-modal="true" aria-labelledby="create-registry-title">
           <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-sand/30 px-8 py-6 flex items-center justify-between">
-              <h2 className="font-display text-2xl text-charcoal-deep">Create Gift Registry</h2>
+              <h2 id="create-registry-title" className="font-display text-2xl text-charcoal-deep">Create Gift Registry</h2>
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="p-2 hover:bg-sand/20 rounded transition-colors"
@@ -354,6 +393,7 @@ export default function GiftRegistryPage() {
                   Registry Name *
                 </label>
                 <input
+                  ref={registryNameRef}
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -430,14 +470,15 @@ export default function GiftRegistryPage() {
 
       {/* Manage Registry Modal */}
       {selectedRegistry && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" role="dialog" aria-modal="true" aria-labelledby="manage-registry-title">
           <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-sand/30 px-8 py-6 flex items-center justify-between">
               <div>
-                <h2 className="font-display text-2xl text-charcoal-deep">{selectedRegistry.name}</h2>
+                <h2 id="manage-registry-title" className="font-display text-2xl text-charcoal-deep">{selectedRegistry.name}</h2>
                 <p className="text-sm text-stone mt-1">{selectedRegistry.items.length} items</p>
               </div>
               <button
+                ref={manageCloseRef}
                 onClick={() => setSelectedRegistry(null)}
                 className="p-2 hover:bg-sand/20 rounded transition-colors"
               >

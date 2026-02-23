@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { MessageCircle, X, Send, Sparkles, Calendar } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
@@ -33,6 +33,22 @@ export default function AGIConcierge() {
   const [messages, setMessages] = useState<Message[]>([defaultInitialMessage]);
   const [input, setInput] = useState('');
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+
+  // ESC key handler for chat panel
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isOpen]);
+
+  // Auto-focus input when chat opens
+  useEffect(() => {
+    if (isOpen) chatInputRef.current?.focus();
+  }, [isOpen]);
 
   // Load calendar events from service on mount
   useEffect(() => {
@@ -140,13 +156,14 @@ export default function AGIConcierge() {
             : 'bg-gold-muted text-noir hover:bg-gold-deep'
         }`}
         aria-label="Toggle AI Concierge"
+        aria-expanded={isOpen}
       >
         {isOpen ? <X size={24} /> : <MessageCircle size={24} />}
       </button>
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-[380px] max-w-[calc(100vw-48px)] bg-white rounded-2xl shadow-xl overflow-hidden animate-slide-up">
+        <div className="fixed bottom-24 right-6 z-50 w-[380px] max-w-[calc(100vw-48px)] bg-white rounded-2xl shadow-xl overflow-hidden animate-slide-up" role="dialog" aria-modal="false" aria-labelledby="concierge-panel-title">
           {/* Header */}
           <div className="bg-gradient-to-r from-charcoal-deep to-sapphire-deep p-4">
             <div className="flex items-center gap-3">
@@ -154,7 +171,7 @@ export default function AGIConcierge() {
                 <Sparkles size={20} className="text-gold-soft" />
               </div>
               <div>
-                <h3 className="text-ivory-cream font-display text-lg">Fashion Intelligence</h3>
+                <h3 id="concierge-panel-title" className="text-ivory-cream font-display text-lg">Fashion Intelligence</h3>
                 <p className="text-xs text-taupe">Your personal style guide</p>
               </div>
             </div>
@@ -211,6 +228,7 @@ export default function AGIConcierge() {
           <div className="p-4 bg-white border-t border-sand/30">
             <div className="flex items-center gap-2">
               <input
+                ref={chatInputRef}
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}

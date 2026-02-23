@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Plus, Lock, Sparkles, Users, Calendar, ChevronRight } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
@@ -145,10 +146,11 @@ export default function PrivateCollectionsPage() {
                 >
                   {/* Hero Image */}
                   <div className="aspect-[16/9] bg-parchment relative overflow-hidden">
-                    <img
+                    <Image
                       src={collection.heroImage}
                       alt={collection.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                     <div className="absolute top-3 left-3 flex gap-2">
                       <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${statusBadge.class}`}>

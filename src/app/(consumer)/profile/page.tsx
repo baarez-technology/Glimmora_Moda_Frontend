@@ -512,12 +512,20 @@ export default function ProfilePage() {
                         <MessageCircle size={16} />
                         <span className="text-xs tracking-[0.15em] uppercase">Message</span>
                       </Link>
-                      <button className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors">
+                      <a
+                        href={`tel:${concierge.phone}`}
+                        className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors"
+                        aria-label={`Call ${concierge.name}`}
+                      >
                         <Phone size={16} />
-                      </button>
-                      <button className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors">
+                      </a>
+                      <a
+                        href={`mailto:${concierge.email}`}
+                        className="flex items-center justify-center gap-2 px-5 py-3 border border-ivory-cream/20 text-ivory-cream/60 hover:border-ivory-cream/40 hover:text-ivory-cream transition-colors"
+                        aria-label={`Email ${concierge.name}`}
+                      >
                         <Mail size={16} />
-                      </button>
+                      </a>
                     </div>
                   </div>
                 </div>

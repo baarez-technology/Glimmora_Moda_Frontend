@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, Clock, User, Video, Store, Home, CheckCircle, XCircle, RotateCcw, MapPin, Mail } from 'lucide-react';
+import { Calendar, Clock, User, Video, Store, Home, CheckCircle, XCircle, RotateCcw, MapPin, Mail, AlertTriangle } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { StylingSession, StylingSessionType, StylingSessionStatus } from '@/types/brand-portal';
 
 type FilterTab = 'all' | 'upcoming' | 'past';
@@ -117,6 +118,24 @@ export default function StylingSessionsPage() {
         return 'bg-parchment text-charcoal-deep';
       default:
         return 'bg-taupe/20 text-stone';
+    }
+  };
+
+  const [confirmAction, setConfirmAction] = useState<{ sessionId: string; status: StylingSessionStatus; customerName: string } | null>(null);
+
+  const confirmModalRef = useModalAccessibility(
+    !!confirmAction,
+    () => setConfirmAction(null)
+  );
+
+  const requestStatusUpdate = (sessionId: string, newStatus: StylingSessionStatus, customerName: string) => {
+    setConfirmAction({ sessionId, status: newStatus, customerName });
+  };
+
+  const handleConfirmedUpdate = () => {
+    if (confirmAction) {
+      updateStylingSessionStatus(confirmAction.sessionId, confirmAction.status);
+      setConfirmAction(null);
     }
   };
 
@@ -303,13 +322,13 @@ export default function StylingSessionsPage() {
                             {canManage ? (
                               <>
                                 <button
-                                  onClick={() => handleStatusUpdate(session.id, 'completed')}
+                                  onClick={() => requestStatusUpdate(session.id, 'completed', session.customerName)}
                                   className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success hover:bg-success/20 transition-colors"
                                 >
                                   Complete
                                 </button>
                                 <button
-                                  onClick={() => handleStatusUpdate(session.id, 'cancelled')}
+                                  onClick={() => requestStatusUpdate(session.id, 'cancelled', session.customerName)}
                                   className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-error/10 text-error hover:bg-error/20 transition-colors"
                                 >
                                   Cancel
@@ -394,13 +413,13 @@ export default function StylingSessionsPage() {
                     {canManage && (
                       <div className="flex items-center gap-2 pt-3 border-t border-sand/30">
                         <button
-                          onClick={() => handleStatusUpdate(session.id, 'completed')}
+                          onClick={() => requestStatusUpdate(session.id, 'completed', session.customerName)}
                           className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success hover:bg-success/20 transition-colors"
                         >
                           Complete
                         </button>
                         <button
-                          onClick={() => handleStatusUpdate(session.id, 'cancelled')}
+                          onClick={() => requestStatusUpdate(session.id, 'cancelled', session.customerName)}
                           className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-error/10 text-error hover:bg-error/20 transition-colors"
                         >
                           Cancel
@@ -414,6 +433,55 @@ export default function StylingSessionsPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-noir/40 z-50 flex items-center justify-center p-4">
+          <div
+            ref={confirmModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-session-title"
+            className="bg-white border border-sand/50 max-w-md w-full p-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`w-10 h-10 flex items-center justify-center ${
+                confirmAction.status === 'cancelled' ? 'bg-error/10 text-error' : 'bg-success/10 text-success'
+              }`}>
+                <AlertTriangle size={18} />
+              </div>
+              <h3 id="confirm-session-title" className="font-medium text-charcoal-deep">
+                {confirmAction.status === 'cancelled' ? 'Cancel Session' : 'Complete Session'}
+              </h3>
+            </div>
+            <p className="text-sm text-stone mb-6">
+              Are you sure you want to mark {confirmAction.customerName}&apos;s session as{' '}
+              <span className={confirmAction.status === 'cancelled' ? 'text-error font-medium' : 'text-success font-medium'}>
+                {confirmAction.status}
+              </span>
+              ? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="px-4 py-2 text-sm text-stone border border-sand hover:border-charcoal-deep transition-colors"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleConfirmedUpdate}
+                className={`px-4 py-2 text-sm text-ivory-cream transition-colors ${
+                  confirmAction.status === 'cancelled'
+                    ? 'bg-error hover:bg-error/80'
+                    : 'bg-success hover:bg-success/80'
+                }`}
+              >
+                {confirmAction.status === 'cancelled' ? 'Cancel Session' : 'Mark Complete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

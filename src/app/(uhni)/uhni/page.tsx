@@ -12,10 +12,13 @@ import {
   MessageCircle,
   Globe,
   Lock,
-  TrendingUp,
   ArrowRight,
   DollarSign,
-  Sparkles
+  Sparkles,
+  EyeOff,
+  ClipboardList,
+  Radio,
+  Layers
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
@@ -50,7 +53,11 @@ export default function UHNIDashboardPage() {
     { href: '/uhni/private-shopping', icon: ShoppingBag, label: 'Private Shopping', description: 'VIP events' },
     { href: '/uhni/events', icon: Calendar, label: 'Events', description: 'Exclusive experiences' },
     { href: '/uhni/heritage-archive', icon: Crown, label: 'Heritage', description: 'Brand archives' },
-    { href: '/uhni/intelligence', icon: Sparkles, label: 'Intelligence', description: 'AI insights' }
+    { href: '/uhni/intelligence', icon: Sparkles, label: 'Intelligence', description: 'AI insights' },
+    { href: '/uhni/zero-ui', icon: Layers, label: 'Zero-UI Commerce', description: 'Invisible shopping' },
+    { href: '/uhni/invisible-commerce', icon: EyeOff, label: 'Invisible Commerce', description: 'Discreet transactions' },
+    { href: '/uhni/concierge-tasks', icon: ClipboardList, label: 'Concierge Tasks', description: 'Task management' },
+    { href: '/uhni/silent-commerce', icon: Radio, label: 'Silent Commerce', description: 'Ambient awareness' }
   ];
 
   return (

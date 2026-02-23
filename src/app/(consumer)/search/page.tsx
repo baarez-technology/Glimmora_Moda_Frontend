@@ -28,6 +28,7 @@ function SearchContent() {
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [sortBy, setSortBy] = useState('relevance');
 
   useEffect(() => {
     async function loadData() {
@@ -91,13 +92,23 @@ function SearchContent() {
       c.description.toLowerCase().includes(q)
     );
 
+    const sortedProducts = [...matchedProducts].sort((a, b) => {
+      switch (sortBy) {
+        case 'price-asc': return a.price - b.price;
+        case 'price-desc': return b.price - a.price;
+        case 'newest': return -1;
+        case 'brand-az': return a.brandName.localeCompare(b.brandName);
+        default: return 0;
+      }
+    });
+
     return {
-      products: matchedProducts,
+      products: sortedProducts,
       brands: matchedBrands,
       stories: matchedStories,
       collections: matchedCollections
     };
-  }, [query, priceRange, selectedBrands, products, brands, brandStories, collections]);
+  }, [query, priceRange, selectedBrands, products, brands, brandStories, collections, sortBy]);
 
   const totalResults = results.products.length + results.brands.length + results.stories.length + results.collections.length;
 
@@ -203,13 +214,27 @@ function SearchContent() {
                   <span className="text-charcoal-deep font-medium ml-1">"{query}"</span>
                 </p>
 
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center gap-2 px-5 py-3 border border-sand text-sm tracking-[0.1em] uppercase text-charcoal-deep hover:border-charcoal-deep transition-colors lg:hidden"
-                >
-                  <SlidersHorizontal size={14} />
-                  Filters
-                </button>
+                <div className="flex items-center gap-3">
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="px-4 py-2 border border-sand bg-white text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  >
+                    <option value="relevance">Relevance</option>
+                    <option value="price-asc">Price: Low to High</option>
+                    <option value="price-desc">Price: High to Low</option>
+                    <option value="newest">Newest</option>
+                    <option value="brand-az">Brand A-Z</option>
+                  </select>
+
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center gap-2 px-5 py-3 border border-sand text-sm tracking-[0.1em] uppercase text-charcoal-deep hover:border-charcoal-deep transition-colors lg:hidden"
+                  >
+                    <SlidersHorizontal size={14} />
+                    Filters
+                  </button>
+                </div>
               </div>
 
               <div className="grid lg:grid-cols-4 gap-12 lg:gap-16">

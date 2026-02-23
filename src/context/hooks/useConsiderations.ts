@@ -39,7 +39,8 @@ export function useConsiderations({ showToast, safeLocalStorageSave }: UseConsid
         product,
         addedAt: new Date().toISOString(),
         selectedVariants: variants || {},
-        agiNote
+        agiNote,
+        quantity: 1
       };
       setConsiderations(prev => [...prev, newItem]);
       showToast(`${product.name} added to considerations`, 'success');
@@ -54,6 +55,13 @@ export function useConsiderations({ showToast, safeLocalStorageSave }: UseConsid
       showToast(`${item.product.name} removed from considerations`, 'info');
     }
   }, [showToast, considerations]);
+
+  const updateQuantity = useCallback((id: string, quantity: number) => {
+    if (quantity < 1) return;
+    setConsiderations(prev => prev.map(item =>
+      item.id === id ? { ...item, quantity } : item
+    ));
+  }, []);
 
   const clearConsiderations = useCallback(() => {
     setConsiderations([]);
@@ -73,6 +81,7 @@ export function useConsiderations({ showToast, safeLocalStorageSave }: UseConsid
     setConsiderations,
     addToConsiderations,
     removeFromConsiderations,
+    updateQuantity,
     clearConsiderations,
     isInConsiderations,
     persistConsiderations

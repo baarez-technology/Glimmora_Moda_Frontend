@@ -35,6 +35,7 @@ interface AppContextType {
   considerations: ConsiderationItem[];
   addToConsiderations: (product: Product, variants?: { size?: string; color?: string }, agiNote?: string) => void;
   removeFromConsiderations: (id: string) => void;
+  updateQuantity: (id: string, quantity: number) => void;
   clearConsiderations: () => void;
   isInConsiderations: (productId: string) => boolean;
 
@@ -124,6 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setConsiderations,
     addToConsiderations,
     removeFromConsiderations,
+    updateQuantity,
     clearConsiderations,
     isInConsiderations,
     persistConsiderations
@@ -307,6 +309,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       considerations,
       addToConsiderations,
       removeFromConsiderations,
+      updateQuantity,
       clearConsiderations,
       isInConsiderations,
 

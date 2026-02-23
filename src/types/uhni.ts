@@ -318,3 +318,174 @@ export interface RestockPrediction {
   probability: number;
   alertEnabled: boolean;
 }
+
+// ============================================
+// Exclusive Events (UHNI Events Page)
+// ============================================
+
+export type ExclusiveEventType = 'exhibition' | 'gala' | 'masterclass' | 'launch' | 'experience';
+export type RegistrationStatus = 'open' | 'registered' | 'waitlist' | 'closed';
+
+export interface ExclusiveEvent {
+  id: string;
+  title: string;
+  type: ExclusiveEventType;
+  host: string;
+  venue: string;
+  city: string;
+  country: string;
+  date: string;
+  time: string;
+  description: string;
+  highlights: string[];
+  registrationStatus: RegistrationStatus;
+  maxAttendees: number;
+  spotsLeft: number;
+  image?: string;
+}
+
+// ============================================
+// Private Shopping Events
+// ============================================
+
+export type PrivateShoppingStatus = 'upcoming' | 'rsvp_confirmed' | 'completed' | 'invite_only';
+
+export interface PrivateShoppingEvent {
+  id: string;
+  title: string;
+  designer: string;
+  venue: string;
+  city: string;
+  date: string;
+  time: string;
+  duration: string;
+  description: string;
+  status: PrivateShoppingStatus;
+  maxGuests: number;
+  guestsConfirmed: number;
+  dressCode?: string;
+  perks: string[];
+  image?: string;
+}
+
+// ============================================
+// Heritage Archive
+// ============================================
+
+export interface HeritageArchiveItem {
+  id: string;
+  title: string;
+  brand: string;
+  era: string;
+  description: string;
+  significance: string;
+  image: string;
+  relatedProducts: string[];
+}
+
+// ============================================
+// Intelligence Insights
+// ============================================
+
+export type InsightCategory = 'style_trend' | 'market_signal' | 'wardrobe_gap' | 'investment_piece';
+export type InsightTrend = 'rising' | 'stable' | 'declining';
+
+export interface IntelligenceInsight {
+  id: string;
+  title: string;
+  category: InsightCategory;
+  summary: string;
+  impact: 'high' | 'medium' | 'low';
+  trend: InsightTrend;
+  confidence: number;
+  date: string;
+}
+
+// ============================================
+// U13: Zero-UI Commerce
+// ============================================
+
+export interface ZeroUITrigger {
+  id: string;
+  type: 'restock' | 'seasonal' | 'event' | 'travel';
+  description: string;
+  enabled: boolean;
+  lastTriggered?: string;
+}
+
+export interface ZeroUIConfig {
+  autoReplenish: boolean;
+  invisibleCheckout: boolean;
+  wardrobePreparation: boolean;
+  triggers: ZeroUITrigger[];
+  preferences: {
+    maxAutoSpend: number;
+    preferredBrands: string[];
+    excludedCategories: string[];
+    notifyBefore: boolean;
+    notifyAfter: boolean;
+  };
+}
+
+// ============================================
+// U14: Invisible Commerce
+// ============================================
+
+export type InvisibleMethod = 'concierge' | 'auto' | 'scheduled';
+export type DiscretionLevel = 'standard' | 'high' | 'maximum';
+
+export interface InvisibleTransaction {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  method: InvisibleMethod;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  discretionLevel: DiscretionLevel;
+  noDigitalTrail: boolean;
+  amount: number;
+  date: string;
+}
+
+// ============================================
+// U15: Concierge Execution Tasks
+// ============================================
+
+export type ConciergeTaskType = 'styling' | 'sourcing' | 'delivery' | 'reservation' | 'alteration';
+export type ConciergeTaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+export type ConciergeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export interface ConciergeTask {
+  id: string;
+  type: ConciergeTaskType;
+  title: string;
+  description: string;
+  status: ConciergeTaskStatus;
+  assignedTo: string;
+  priority: ConciergeTaskPriority;
+  dueDate: string;
+  notes: string[];
+  clientInstructions?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================
+// U16: Silent Commerce
+// ============================================
+
+export type AwarenessLevel = 'passive' | 'active' | 'urgent';
+export type DisplayMode = 'ambient' | 'card' | 'notification';
+
+export interface SilentCommerceItem {
+  id: string;
+  productId: string;
+  productName: string;
+  productImage: string;
+  brandName: string;
+  price: number;
+  awareness: AwarenessLevel;
+  context: string;
+  displayMode: DisplayMode;
+  relevanceScore: number;
+}

@@ -8,6 +8,7 @@ import { ArrowLeft, Edit2, Eye, ShoppingBag, TrendingUp, Trash2, Loader2, Packag
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchCollectionDetail, fetchCollectionBasicInfo, softDeleteCollection } from '@/services/brand-collection.service';
 import type { CollectionDetailResponse } from '@/services/brand-collection.service';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 
 export default function CollectionDetailPage() {
   const params = useParams();
@@ -19,6 +20,7 @@ export default function CollectionDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const deleteModalRef = useModalAccessibility(showDeleteModal, () => setShowDeleteModal(false));
 
   useEffect(() => {
     loadCollection();
@@ -299,8 +301,14 @@ export default function CollectionDetailPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowDeleteModal(false)}
           />
-          <div className="relative bg-white border border-sand p-8 max-w-md w-full mx-4">
-            <h3 className="font-display text-xl text-charcoal-deep mb-3">Delete Collection</h3>
+          <div
+            ref={deleteModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-collection-title"
+            className="relative bg-white border border-sand p-8 max-w-md w-full mx-4"
+          >
+            <h3 id="delete-collection-title" className="font-display text-xl text-charcoal-deep mb-3">Delete Collection</h3>
             <p className="text-stone text-sm leading-relaxed mb-2">
               Are you sure you want to delete <span className="font-medium text-charcoal-deep">{collection.collection_name}</span>?
             </p>

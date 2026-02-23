@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   X,
   MapPin,
@@ -10,6 +10,7 @@ import {
   Minus,
   Trash2,
 } from 'lucide-react';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { RegionalStock } from '@/types/brand-portal';
 
 interface StockManagementModalProps {
@@ -35,6 +36,16 @@ export function StockManagementModal({
   const [isSaving, setIsSaving] = useState(false);
   const [showAddRow, setShowAddRow] = useState(false);
   const [newRow, setNewRow] = useState({ region: 'Europe', city: '', units: 0, threshold: 5 });
+  const [duplicateError, setDuplicateError] = useState('');
+
+  const modalRef = useModalAccessibility(isOpen, onClose);
+
+  // Sync editableStock when regionalStock prop changes (fixes stale data on reopen)
+  useEffect(() => {
+    setEditableStock(regionalStock.map(s => ({ ...s })));
+    setShowAddRow(false);
+    setDuplicateError('');
+  }, [regionalStock]);
 
   if (!isOpen) return null;
 
@@ -59,6 +70,17 @@ export function StockManagementModal({
 
   const handleAddRow = () => {
     if (!newRow.city.trim()) return;
+
+    // Duplicate location check (region + city combo)
+    const isDuplicate = editableStock.some(
+      s => s.region === newRow.region && s.city.toLowerCase() === newRow.city.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      setDuplicateError(`${newRow.city.trim()} in ${newRow.region} already exists`);
+      return;
+    }
+
+    setDuplicateError('');
     const entry: RegionalStock = {
       region: newRow.region,
       city: newRow.city.trim(),
@@ -90,11 +112,17 @@ export function StockManagementModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-white w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div
+        ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="stock-modal-title"
+        className="relative bg-white w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-sand/50">
           <div>
-            <h2 className="font-display text-xl text-charcoal-deep">Manage Stock</h2>
+            <h2 id="stock-modal-title" className="font-display text-xl text-charcoal-deep">Manage Stock</h2>
             <p className="text-xs text-stone mt-1">{productName}</p>
           </div>
           <button
@@ -258,6 +286,9 @@ export function StockManagementModal({
                   />
                 </div>
               </div>
+              {duplicateError && (
+                <p className="text-xs text-error">{duplicateError}</p>
+              )}
               <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={handleAddRow}

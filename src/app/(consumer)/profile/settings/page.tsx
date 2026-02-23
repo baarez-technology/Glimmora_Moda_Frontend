@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut, User, Crown } from 'lucide-react';
+import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut, User, Crown, AlertTriangle, Sun, Moon, Monitor } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { userLogout } from '@/services/auth.service';
@@ -13,13 +13,26 @@ export default function SettingsPage() {
   const { isAuthenticated, isHydrated, userData: authUserData, logout: authLogout } = useAuth();
   const { showToast, setUserRole, userTier } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [notifications, setNotifications] = useState({
-    newArrivals: true,
-    priceChanges: false,
-    restockAlerts: true,
-    styleInsights: true
+  const [notifications, setNotifications] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('moda-settings-notifications');
+        if (saved) return JSON.parse(saved);
+      } catch { /* ignore */ }
+    }
+    return {
+      newArrivals: true,
+      priceChanges: false,
+      restockAlerts: true,
+      styleInsights: true
+    };
   });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [showDeleteFinal, setShowDeleteFinal] = useState(false);
+  const [language, setLanguage] = useState('en');
+  const [currency, setCurrency] = useState('EUR');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -31,6 +44,15 @@ export default function SettingsPage() {
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
       setIsLoaded(true);
+      // Load saved locale and theme preferences
+      try {
+        const savedLang = localStorage.getItem('moda-language');
+        const savedCurrency = localStorage.getItem('moda-currency');
+        const savedTheme = localStorage.getItem('moda-theme') as 'light' | 'dark' | 'system' | null;
+        if (savedLang) setLanguage(savedLang);
+        if (savedCurrency) setCurrency(savedCurrency);
+        if (savedTheme) setTheme(savedTheme);
+      } catch { /* ignore */ }
     }
   }, [isHydrated, isAuthenticated]);
 
@@ -51,7 +73,8 @@ export default function SettingsPage() {
   };
 
   const handleClearBrowsingHistory = () => {
-    // Note: browsing history tracking will be implemented with backend integration
+    const browsingKeys = ['moda-recent-searches', 'moda-browsing-history', 'moda-recently-viewed'];
+    browsingKeys.forEach(key => localStorage.removeItem(key));
     showToast('Browsing history cleared', 'success');
   };
 
@@ -90,19 +113,46 @@ export default function SettingsPage() {
     router.push('/');
   };
 
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setLanguage(val);
+    localStorage.setItem('moda-language', val);
+    showToast('Language updated', 'success');
+  };
+
+  const handleCurrencyChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setCurrency(val);
+    localStorage.setItem('moda-currency', val);
+    showToast('Currency updated', 'success');
+  };
+
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
+    setTheme(newTheme);
+    localStorage.setItem('moda-theme', newTheme);
+    if (newTheme === 'system') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', newTheme);
+    }
+    showToast(`Theme set to ${newTheme}`, 'success');
+  };
+
+  const clearAllUserData = () => {
+    const keys = Object.keys(localStorage).filter(k => k.startsWith('moda-'));
+    keys.forEach(k => localStorage.removeItem(k));
+  };
+
   const handleDeleteAccount = () => {
+    if (deleteConfirmText !== 'DELETE') return;
+    clearAllUserData();
     userLogout();
-    localStorage.removeItem('moda-user-tier');
-    localStorage.removeItem('moda-fashion-identity');
-    localStorage.removeItem('moda-considerations');
-    localStorage.removeItem('moda-wardrobe');
-    localStorage.removeItem('moda-outfits');
-    localStorage.removeItem('moda-orders');
-    localStorage.removeItem('moda-restock-alerts');
     authLogout();
     setUserRole('standard');
     showToast('Account data deleted', 'success');
     setShowDeleteConfirm(false);
+    setShowDeleteFinal(false);
+    setDeleteConfirmText('');
     router.push('/');
   };
 
@@ -250,10 +300,11 @@ export default function SettingsPage() {
                   <p className="text-sm text-stone">{item.desc}</p>
                 </div>
                 <button
-                  onClick={() => setNotifications({
-                    ...notifications,
-                    [item.id]: !notifications[item.id as keyof typeof notifications]
-                  })}
+                  onClick={() => {
+                    const updated = { ...notifications, [item.id]: !notifications[item.id as keyof typeof notifications] };
+                    setNotifications(updated);
+                    localStorage.setItem('moda-settings-notifications', JSON.stringify(updated));
+                  }}
                   className={`w-12 h-7 transition-colors relative ${
                     notifications[item.id as keyof typeof notifications]
                       ? 'bg-charcoal-deep'
@@ -353,12 +404,12 @@ export default function SettingsPage() {
                 <p className="font-medium text-charcoal-deep">Two-Factor Authentication</p>
                 <p className="text-sm text-stone">Add an extra layer of security</p>
               </div>
-              <button
-                onClick={handleEnable2FA}
-                className="text-sm text-charcoal-deep hover:text-gold-muted transition-colors tracking-[0.1em] uppercase"
+              <span
+                className="text-sm text-taupe tracking-[0.1em] uppercase cursor-default"
+                title="Two-factor authentication is coming soon"
               >
-                Enable
-              </button>
+                Coming Soon
+              </span>
             </div>
           </div>
         </div>
@@ -378,20 +429,64 @@ export default function SettingsPage() {
           <div className="grid grid-cols-2 gap-6">
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">Language</label>
-              <select className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors">
-                <option>English</option>
-                <option>Français</option>
-                <option>Italiano</option>
+              <select
+                value={language}
+                onChange={handleLanguageChange}
+                className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+              >
+                <option value="en">English</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
               </select>
             </div>
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">Currency</label>
-              <select className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors">
-                <option>EUR (€)</option>
-                <option>USD ($)</option>
-                <option>GBP (£)</option>
+              <select
+                value={currency}
+                onChange={handleCurrencyChange}
+                className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+              >
+                <option value="EUR">EUR (€)</option>
+                <option value="USD">USD ($)</option>
+                <option value="GBP">GBP (£)</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        {/* Appearance */}
+        <div className="bg-white p-8">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+              <Sun size={18} className="text-charcoal-deep" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl text-charcoal-deep">Appearance</h2>
+              <p className="text-sm text-stone">Choose your preferred theme</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {([
+              { value: 'light' as const, label: 'Light', icon: Sun },
+              { value: 'dark' as const, label: 'Dark', icon: Moon },
+              { value: 'system' as const, label: 'System', icon: Monitor },
+            ]).map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handleThemeChange(option.value)}
+                className={`flex flex-col items-center gap-3 p-6 border-2 transition-all ${
+                  theme === option.value
+                    ? 'border-charcoal-deep bg-parchment'
+                    : 'border-sand hover:border-charcoal-deep'
+                }`}
+              >
+                <option.icon size={24} className={theme === option.value ? 'text-charcoal-deep' : 'text-stone'} />
+                <span className={`text-sm ${theme === option.value ? 'text-charcoal-deep font-medium' : 'text-stone'}`}>
+                  {option.label}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
@@ -446,20 +541,54 @@ export default function SettingsPage() {
             >
               Delete Account
             </button>
-          ) : (
+          ) : !showDeleteFinal ? (
             <div className="p-6 bg-error/5 border border-error/20">
-              <p className="text-charcoal-deep font-medium mb-6">
-                Are you sure? This will permanently delete all your data.
-              </p>
+              <div className="flex items-start gap-3 mb-6">
+                <AlertTriangle size={20} className="text-error flex-shrink-0 mt-0.5" />
+                <p className="text-charcoal-deep font-medium">
+                  Are you sure? This will permanently delete all your data, including your wardrobe, orders, style profile, and preferences.
+                </p>
+              </div>
               <div className="flex gap-4">
                 <button
-                  onClick={handleDeleteAccount}
+                  onClick={() => setShowDeleteFinal(true)}
                   className="px-6 py-3 bg-error text-ivory-cream hover:bg-error/90 transition-colors text-sm tracking-[0.15em] uppercase"
                 >
-                  Yes, Delete Everything
+                  Yes, I Understand
                 </button>
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
+                  className="px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="p-6 bg-error/5 border border-error/20">
+              <p className="text-charcoal-deep font-medium mb-2">
+                Final confirmation required
+              </p>
+              <p className="text-stone text-sm mb-4">
+                Type <span className="font-mono font-bold text-error">DELETE</span> to permanently delete your account.
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder='Type "DELETE" to confirm'
+                className="w-full px-4 py-3 border border-error/30 bg-white text-charcoal-deep focus:outline-none focus:border-error mb-4"
+              />
+              <div className="flex gap-4">
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirmText !== 'DELETE'}
+                  className="px-6 py-3 bg-error text-ivory-cream hover:bg-error/90 transition-colors text-sm tracking-[0.15em] uppercase disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Delete Everything
+                </button>
+                <button
+                  onClick={() => { setShowDeleteConfirm(false); setShowDeleteFinal(false); setDeleteConfirmText(''); }}
                   className="px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
                 >
                   Cancel
