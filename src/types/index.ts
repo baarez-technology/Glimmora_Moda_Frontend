@@ -89,7 +89,9 @@ export {
   type OutfitSuggestion,
   type CalendarEvent,
   type CalendarConnection,
-  type UserPreferences
+  type UserPreferences,
+  type BackendCalendarEvent,
+  type CalendarConnectionStatus
 } from './calendar';
 
 // ============================================

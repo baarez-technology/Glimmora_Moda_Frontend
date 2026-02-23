@@ -76,6 +76,36 @@ export interface CalendarConnection {
 }
 
 // User Preferences
+// ─── Backend Response Types ──────────────────────────────────────────────────
+
+export interface BackendCalendarEvent {
+  customer_id: string;
+  event_id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_day: string;
+  event_time: string | null;
+  location: string | null;
+  tags: string[];
+  weather: string | null;
+  tempressure: number | null;
+  sky_tag: string | null;
+  role: string;
+}
+
+export interface CalendarConnectionStatus {
+  connected: boolean;
+  your_user_id?: string;
+  email?: string;
+  grant_id?: string;
+  provider?: string;
+  calendar_id?: string | null;
+  detail?: string;
+}
+
+// ─── User Preferences ───────────────────────────────────────────────────────
+
 export interface UserPreferences {
   id: string;
   userId: string;

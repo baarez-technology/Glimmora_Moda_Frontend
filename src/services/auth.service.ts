@@ -365,3 +365,26 @@ export function userLogout(): void {
   localStorage.removeItem('moda-user-refresh-token');
   localStorage.removeItem('moda-user-data');
 }
+
+// ============================================
+// Firebase Social Auth (Google / Apple)
+// ============================================
+
+export async function socialSignIn(
+  provider: 'google' | 'apple',
+  idToken: string,
+  role: 'consumer' | 'uhni'
+): Promise<UserTokenResponse> {
+  const res = await fetch(`/api/v1/user/auth/${provider}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_token: idToken, role }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Social sign-in failed' }));
+    throw new Error(err.detail || `Social sign-in failed (${res.status})`);
+  }
+
+  return res.json();
+}

@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
 import { useApp } from '@/context/AppContext';
-import type { CalendarEvent, CalendarConnection, EventType } from '@/types';
+import type { CalendarConnection, EventType } from '@/types';
 
 const eventTypeIcons: Record<EventType, React.ReactNode> = {
   business_meeting: <Briefcase size={16} />,
@@ -89,8 +89,19 @@ export default function CalendarPage() {
   useEffect(() => {
     setIsLoaded(true);
     const loadConnections = async () => {
-      const response = await calendarService.getCalendarConnections();
-      setCalendarConnections(response.data);
+      try {
+        const status = await calendarService.getConnectionStatus();
+        if (status.connected && status.provider) {
+          setCalendarConnections([{
+            provider: status.provider as CalendarConnection['provider'],
+            connected: true,
+            email: status.email,
+            lastSynced: new Date().toISOString(),
+          }]);
+        }
+      } catch {
+        // Not connected — show empty state
+      }
     };
     loadConnections();
   }, []);
@@ -188,7 +199,12 @@ export default function CalendarPage() {
                 <div className="flex items-center gap-3 text-sm">
                   <div className="flex items-center gap-2 px-4 py-2 border border-success/30 text-success">
                     <Check size={14} />
-                    <span>{connectedCalendar.provider === 'google' ? 'Google Calendar' : connectedCalendar.provider}</span>
+                    <span>
+                      {connectedCalendar.provider === 'google' ? 'Google Calendar'
+                        : connectedCalendar.provider === 'apple' ? 'Apple Calendar'
+                        : connectedCalendar.provider === 'outlook' ? 'Outlook Calendar'
+                        : connectedCalendar.provider}
+                    </span>
                   </div>
                 </div>
               )}
