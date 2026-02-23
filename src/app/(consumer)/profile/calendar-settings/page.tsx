@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield, ChevronDown, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield, ChevronDown, AlertCircle, X, MapPin, Clock } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import * as calendarService from '@/services/calendar.service';
-import type { CalendarConnectionStatus } from '@/types';
+import type { CalendarConnectionStatus, SuggestionPreferences } from '@/types';
 
 interface CalendarProviderInfo {
   id: string;
@@ -40,7 +40,7 @@ const calendarProviders: CalendarProviderInfo[] = [
 ];
 
 export default function CalendarSettingsPage() {
-  const { showToast, refreshCalendarEvents } = useApp();
+  const { showToast, refreshCalendarEvents, reloadCalendarEvents } = useApp();
 
   const [connectionStatus, setConnectionStatus] = useState<CalendarConnectionStatus | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -56,6 +56,21 @@ export default function CalendarSettingsPage() {
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
   const [loadingCalendars, setLoadingCalendars] = useState(false);
   const [needsCalendarSelection, setNeedsCalendarSelection] = useState(false);
+
+  // Manual event form
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    event_date: '',
+    event_time: '',
+    location: '',
+    description: '',
+  });
+  const [addingEvent, setAddingEvent] = useState(false);
+
+  // Suggestion preferences
+  const [suggestionPrefs, setSuggestionPrefs] = useState<SuggestionPreferences | null>(null);
+  const [updatingPref, setUpdatingPref] = useState<string | null>(null);
 
   const isConnected = connectionStatus?.connected === true;
 
@@ -106,6 +121,12 @@ export default function CalendarSettingsPage() {
 
   useEffect(() => {
     loadConnectionStatus();
+    // Load suggestion preferences
+    calendarService.getSuggestionPreferences()
+      .then(setSuggestionPrefs)
+      .catch(() => {
+        // Defaults if endpoint not available yet
+      });
   }, [loadConnectionStatus]);
 
   // ─── Connect: get OAuth URL and redirect browser ─────────────────────────
@@ -180,6 +201,50 @@ export default function CalendarSettingsPage() {
       setNeedsCalendarSelection(true);
     } else {
       showToast('No calendars found. Try syncing later.', 'info');
+    }
+  };
+
+  // ─── Add manual event ──────────────────────────────────────────────────
+  const handleAddManualEvent = async () => {
+    if (!eventForm.title.trim() || !eventForm.event_date) {
+      showToast('Title and date are required.', 'error');
+      return;
+    }
+    setAddingEvent(true);
+    try {
+      await calendarService.addManualEvent({
+        title: eventForm.title.trim(),
+        event_date: eventForm.event_date,
+        event_time: eventForm.event_time || undefined,
+        location: eventForm.location.trim() || undefined,
+        description: eventForm.description.trim() || undefined,
+      });
+      showToast('Event added successfully!', 'success');
+      setEventForm({ title: '', event_date: '', event_time: '', location: '', description: '' });
+      setShowEventForm(false);
+      // Reload events from DB so calendar page picks it up (works without Nylas connection)
+      await reloadCalendarEvents();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to add event';
+      showToast(message, 'error');
+    } finally {
+      setAddingEvent(false);
+    }
+  };
+
+  // ─── Toggle a suggestion preference ───────────────────────────────────
+  const handleTogglePref = async (key: keyof SuggestionPreferences) => {
+    if (!suggestionPrefs) return;
+    const newValue = !suggestionPrefs[key];
+    setUpdatingPref(key);
+    try {
+      const updated = await calendarService.updateSuggestionPreferences({ [key]: newValue });
+      setSuggestionPrefs(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update preference';
+      showToast(message, 'error');
+    } finally {
+      setUpdatingPref(null);
     }
   };
 
@@ -422,10 +487,115 @@ export default function CalendarSettingsPage() {
           <p className="text-stone text-sm mb-6">
             Don&apos;t want to connect a calendar? You can add events manually to get outfit suggestions.
           </p>
-          <button className="flex items-center gap-2 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.15em] uppercase">
-            <Plus size={16} />
-            Add Manual Event
-          </button>
+
+          {showEventForm ? (
+            <div className="space-y-5">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                  Event Title <span className="text-error">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. Brunch with friends"
+                  className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                    <Calendar size={14} className="inline mr-1.5" />
+                    Date <span className="text-error">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={eventForm.event_date}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, event_date: e.target.value }))}
+                    className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                    <Clock size={14} className="inline mr-1.5" />
+                    Time (optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={eventForm.event_time}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, event_time: e.target.value }))}
+                    className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                  <MapPin size={14} className="inline mr-1.5" />
+                  Location (optional)
+                </label>
+                <input
+                  type="text"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder="e.g. Melbourne"
+                  className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Any notes about the event..."
+                  rows={3}
+                  className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={handleAddManualEvent}
+                  disabled={addingEvent || !eventForm.title.trim() || !eventForm.event_date}
+                  className="flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+                >
+                  {addingEvent ? (
+                    <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                  {addingEvent ? 'Adding...' : 'Add Event'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowEventForm(false);
+                    setEventForm({ title: '', event_date: '', event_time: '', location: '', description: '' });
+                  }}
+                  className="flex items-center gap-2 px-6 py-3 border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  <X size={16} />
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowEventForm(true)}
+              className="flex items-center gap-2 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.15em] uppercase"
+            >
+              <Plus size={16} />
+              Add Manual Event
+            </button>
+          )}
         </div>
 
         {/* Preferences */}
@@ -433,30 +603,42 @@ export default function CalendarSettingsPage() {
           <h2 className="font-display text-xl text-charcoal-deep mb-8">Suggestion Preferences</h2>
 
           <div className="space-y-1">
-            {[
-              { label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations', checked: true },
-              { label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first', checked: true },
-              { label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events", checked: false },
-              { label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks', checked: true }
-            ].map((item, index) => (
-              <label key={index} className="flex items-center justify-between p-5 bg-parchment cursor-pointer">
-                <div>
-                  <p className="font-medium text-charcoal-deep">{item.label}</p>
-                  <p className="text-sm text-stone">{item.desc}</p>
-                </div>
-                <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${
-                  item.checked
-                    ? 'border-charcoal-deep bg-charcoal-deep'
-                    : 'border-sand'
-                }`}>
-                  {item.checked && (
-                    <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </label>
-            ))}
+            {([
+              { key: 'include_weather_in_suggestions' as const, label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations' },
+              { key: 'prioritize_wardrobe_items' as const, label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first' },
+              { key: 'daily_outfit_reminders' as const, label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events" },
+              { key: 'suggest_new_pieces' as const, label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks' },
+            ]).map((item) => {
+              const checked = suggestionPrefs ? suggestionPrefs[item.key] : false;
+              const isUpdating = updatingPref === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => handleTogglePref(item.key)}
+                  disabled={!suggestionPrefs || isUpdating}
+                  className="w-full flex items-center justify-between p-5 bg-parchment text-left disabled:opacity-70 transition-opacity"
+                >
+                  <div>
+                    <p className="font-medium text-charcoal-deep">{item.label}</p>
+                    <p className="text-sm text-stone">{item.desc}</p>
+                  </div>
+                  <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                    checked
+                      ? 'border-charcoal-deep bg-charcoal-deep'
+                      : 'border-sand'
+                  }`}>
+                    {isUpdating ? (
+                      <div className="w-3 h-3 border border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                    ) : checked ? (
+                      <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 

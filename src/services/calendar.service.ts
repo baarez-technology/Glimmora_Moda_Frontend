@@ -9,6 +9,8 @@ import type {
   EventType,
   BackendCalendarEvent,
   CalendarConnectionStatus,
+  ManualEventRequest,
+  SuggestionPreferences,
 } from '@/types';
 
 // ─── Auth helper ─────────────────────────────────────────────────────────────
@@ -215,6 +217,62 @@ export async function refreshCalendarEvents(): Promise<BackendCalendarEvent[]> {
       .json()
       .catch(() => ({ detail: 'Failed to refresh events' }));
     throw new Error(err.detail || `Refresh failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+/** Add a manual event (no calendar connection required) */
+export async function addManualEvent(
+  data: ManualEventRequest
+): Promise<BackendCalendarEvent> {
+  const res = await fetch(`/api/v1/calendar/events`, {
+    method: 'POST',
+    headers: getUserAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ detail: 'Failed to add event' }));
+    throw new Error(err.detail || `Add event failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+/** Get suggestion preferences */
+export async function getSuggestionPreferences(): Promise<SuggestionPreferences> {
+  const res = await fetch(`/api/v1/suggestion-preferences`, {
+    headers: getUserAuthHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ detail: 'Failed to get preferences' }));
+    throw new Error(err.detail || `Get preferences failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+/** Update suggestion preferences (partial) */
+export async function updateSuggestionPreferences(
+  data: Partial<SuggestionPreferences>
+): Promise<SuggestionPreferences> {
+  const res = await fetch(`/api/v1/suggestion-preferences`, {
+    method: 'PATCH',
+    headers: getUserAuthHeaders(),
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ detail: 'Failed to update preferences' }));
+    throw new Error(err.detail || `Update preferences failed (${res.status})`);
   }
 
   return res.json();

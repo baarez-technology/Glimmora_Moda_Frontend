@@ -91,7 +91,9 @@ export {
   type CalendarConnection,
   type UserPreferences,
   type BackendCalendarEvent,
-  type CalendarConnectionStatus
+  type CalendarConnectionStatus,
+  type ManualEventRequest,
+  type SuggestionPreferences
 } from './calendar';
 
 // ============================================

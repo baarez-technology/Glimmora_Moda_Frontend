@@ -104,6 +104,25 @@ export interface CalendarConnectionStatus {
   detail?: string;
 }
 
+// ─── Manual Event Request ────────────────────────────────────────────────────
+
+export interface ManualEventRequest {
+  title: string;
+  event_date: string; // YYYY-MM-DD
+  event_time?: string;
+  location?: string;
+  description?: string;
+}
+
+// ─── Suggestion Preferences ─────────────────────────────────────────────────
+
+export interface SuggestionPreferences {
+  include_weather_in_suggestions: boolean;
+  prioritize_wardrobe_items: boolean;
+  daily_outfit_reminders: boolean;
+  suggest_new_pieces: boolean;
+}
+
 // ─── User Preferences ───────────────────────────────────────────────────────
 
 export interface UserPreferences {

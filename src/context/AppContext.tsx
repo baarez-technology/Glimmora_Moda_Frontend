@@ -62,6 +62,7 @@ interface AppContextType {
   // Calendar Events
   calendarEvents: CalendarEvent[];
   refreshCalendarEvents: () => Promise<void>;
+  reloadCalendarEvents: () => Promise<void>;
 
   // Toast Notifications
   toasts: Toast[];
@@ -165,7 +166,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   }, [baseCalendarEvents, wardrobe, allProducts]);
 
-  // Refresh calendar events from Nylas backend
+  // Refresh calendar events from Nylas backend (requires calendar connection)
   const refreshCalendarEvents = useCallback(async () => {
     try {
       const backendEvents = await calendarService.refreshCalendarEvents();
@@ -173,6 +174,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setBaseCalendarEvents(mapped);
     } catch (err) {
       console.error('Failed to refresh calendar events:', err);
+    }
+  }, []);
+
+  // Reload calendar events from DB (works for manual events too)
+  const reloadCalendarEvents = useCallback(async () => {
+    try {
+      const backendEvents = await calendarService.getCalendarEvents(false);
+      const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
+      setBaseCalendarEvents(mapped);
+    } catch (err) {
+      console.error('Failed to reload calendar events:', err);
     }
   }, []);
 
@@ -322,6 +334,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // Calendar
       calendarEvents,
       refreshCalendarEvents,
+      reloadCalendarEvents,
 
       // Toasts
       toasts,
