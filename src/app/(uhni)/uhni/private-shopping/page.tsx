@@ -25,6 +25,9 @@ export default function PrivateShoppingPage() {
   useEffect(() => {
     uhniService.getPrivateShopping().then(res => {
       if (res.data) setEvents(res.data);
+    }).catch(() => {
+      showToast('Failed to load shopping events', 'error');
+    }).finally(() => {
       setIsLoaded(true);
     });
   }, []);
@@ -56,6 +59,11 @@ export default function PrivateShoppingPage() {
   };
 
   const handleRSVP = (event: PrivateShoppingEvent) => {
+    setEvents(prev => prev.map(e =>
+      e.id === event.id
+        ? { ...e, status: 'rsvp_confirmed' as const, guestsConfirmed: e.guestsConfirmed + 1 }
+        : e
+    ));
     showToast(`RSVP confirmed for ${event.title}`, 'success');
   };
 

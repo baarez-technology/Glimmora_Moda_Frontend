@@ -16,40 +16,47 @@ interface Message {
 
 export default function ConciergePage() {
   const router = useRouter();
-  const { isUHNI, concierge, showToast } = useApp();
+  const { concierge, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [newMessage, setNewMessage] = useState('');
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'concierge',
-      content: 'Good morning! I hope you\'re having a wonderful day. I wanted to let you know that I\'ve identified a beautiful Hermès piece that matches your sourcing request. Would you like me to share the details?',
-      timestamp: '2024-12-30T09:30:00Z'
-    },
-    {
-      id: '2',
-      sender: 'client',
-      content: 'Yes, please! I\'d love to see what you\'ve found.',
-      timestamp: '2024-12-30T10:15:00Z'
-    },
-    {
-      id: '3',
-      sender: 'concierge',
-      content: 'Wonderful! I\'ve added it to your sourcing request with full details. It\'s a stunning Birkin 25 in Gold Togo leather. The condition is exceptional - practically new. Shall I arrange a viewing?',
-      timestamp: '2024-12-30T10:20:00Z'
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window === 'undefined') return [];
+    const saved = localStorage.getItem('uhni-concierge-messages');
+    if (saved) {
+      try { return JSON.parse(saved); } catch { return []; }
     }
-  ]);
+    // Return default welcome messages if nothing saved
+    return [
+      { id: '1', sender: 'concierge', content: 'Welcome back. How may I assist you today? I have updates on several items you may find interesting.', timestamp: new Date().toISOString() },
+      { id: '2', sender: 'concierge', content: 'I noticed a private viewing event for Hermès next week in your area. Shall I arrange an invitation?', timestamp: new Date().toISOString() },
+    ];
+  });
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [appointmentTime, setAppointmentTime] = useState('');
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  // Redirect non-UHNI users
+  // Persist messages to localStorage whenever they change
   useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
+    if (messages.length > 0) {
+      localStorage.setItem('uhni-concierge-messages', JSON.stringify(messages));
     }
-  }, [isUHNI, router]);
+  }, [messages]);
+
+  const conciergeResponses = [
+    'Thank you for your message. Let me look into that for you right away.',
+    'Absolutely. I will coordinate the details and follow up with you shortly.',
+    'That is an excellent choice. I will make the necessary arrangements immediately.',
+    'I understand completely. Allow me to check availability and get back to you within the hour.',
+    'Of course. I will prioritize this and ensure everything is handled to your satisfaction.',
+    'Wonderful. I have noted your preference and will curate some options for you.',
+  ];
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,12 +68,71 @@ export default function ConciergePage() {
       content: newMessage,
       timestamp: new Date().toISOString()
     };
-    setMessages([...messages, message]);
+    setMessages(prev => [...prev, message]);
     setNewMessage('');
     showToast('Message sent', 'success');
+
+    // Simulated concierge response after a short delay
+    setTimeout(() => {
+      const response: Message = {
+        id: `msg-${Date.now()}-reply`,
+        sender: 'concierge',
+        content: conciergeResponses[Math.floor(Math.random() * conciergeResponses.length)],
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, response]);
+    }, 1500);
   };
 
-  if (!isUHNI || !concierge) {
+  const handleScheduleSubmit = () => {
+    if (!scheduleDate || !scheduleTime) return;
+    const userMsg: Message = {
+      id: `msg-${Date.now()}`,
+      sender: 'client',
+      content: `I'd like to schedule a call on ${scheduleDate} at ${scheduleTime}.`,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setTimeout(() => {
+      const reply: Message = {
+        id: `msg-${Date.now()}-reply`,
+        sender: 'concierge',
+        content: `Your call has been scheduled for ${scheduleDate} at ${scheduleTime}. You'll receive a confirmation shortly.`,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, reply]);
+    }, 1500);
+    setShowScheduleModal(false);
+    setScheduleDate('');
+    setScheduleTime('');
+    showToast('Call scheduled successfully', 'success');
+  };
+
+  const handleAppointmentSubmit = () => {
+    if (!appointmentDate || !appointmentTime) return;
+    const userMsg: Message = {
+      id: `msg-${Date.now()}`,
+      sender: 'client',
+      content: `I'd like to book an in-person appointment on ${appointmentDate} at ${appointmentTime}.`,
+      timestamp: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setTimeout(() => {
+      const reply: Message = {
+        id: `msg-${Date.now()}-reply`,
+        sender: 'concierge',
+        content: `Your appointment has been booked for ${appointmentDate} at ${appointmentTime}. You'll receive a confirmation shortly.`,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, reply]);
+    }, 1500);
+    setShowAppointmentModal(false);
+    setAppointmentDate('');
+    setAppointmentTime('');
+    showToast('Appointment booked successfully', 'success');
+  };
+
+  if (!concierge) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
@@ -78,9 +144,9 @@ export default function ConciergePage() {
   }
 
   const quickActions = [
-    { label: 'Schedule a Call', icon: Phone, description: 'Book a consultation' },
-    { label: 'Request Sourcing', icon: Award, description: 'Find a specific item' },
-    { label: 'Book Appointment', icon: Calendar, description: 'In-person meeting' },
+    { label: 'Schedule a Call', icon: Phone, description: 'Book a consultation', onClick: () => setShowScheduleModal(true) },
+    { label: 'Request Sourcing', icon: Award, description: 'Find a specific item', onClick: () => router.push('/uhni/sourcing/new') },
+    { label: 'Book Appointment', icon: Calendar, description: 'In-person meeting', onClick: () => setShowAppointmentModal(true) },
   ];
 
   return (
@@ -89,11 +155,11 @@ export default function ConciergePage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -221,6 +287,7 @@ export default function ConciergePage() {
               {quickActions.map((action) => (
                 <button
                   key={action.label}
+                  onClick={action.onClick}
                   className="group flex flex-col items-center p-6 bg-white hover:bg-charcoal-deep transition-all duration-300"
                 >
                   <action.icon size={24} className="text-stone group-hover:text-gold-soft mb-3 transition-colors" />
@@ -321,6 +388,113 @@ export default function ConciergePage() {
           </div>
         </div>
       </div>
+      {/* Schedule a Call Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-noir/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md p-8 relative">
+            <button
+              onClick={() => setShowScheduleModal(false)}
+              className="absolute top-4 right-4 text-stone hover:text-charcoal-deep transition-colors text-xl leading-none"
+            >
+              &times;
+            </button>
+            <div className="flex items-center gap-2 mb-2">
+              <Crown size={14} className="text-gold-soft" />
+              <span className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/70">Concierge Service</span>
+            </div>
+            <h3 className="font-display text-2xl text-charcoal-deep mb-6">Schedule a Call</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.3em] uppercase text-taupe mb-2">Preferred Date</label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.3em] uppercase text-taupe mb-2">Preferred Time</label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowScheduleModal(false)}
+                  className="flex-1 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleScheduleSubmit}
+                  disabled={!scheduleDate || !scheduleTime}
+                  className="flex-1 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Book Appointment Modal */}
+      {showAppointmentModal && (
+        <div className="fixed inset-0 bg-noir/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md p-8 relative">
+            <button
+              onClick={() => setShowAppointmentModal(false)}
+              className="absolute top-4 right-4 text-stone hover:text-charcoal-deep transition-colors text-xl leading-none"
+            >
+              &times;
+            </button>
+            <div className="flex items-center gap-2 mb-2">
+              <Crown size={14} className="text-gold-soft" />
+              <span className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/70">Concierge Service</span>
+            </div>
+            <h3 className="font-display text-2xl text-charcoal-deep mb-6">Book Appointment</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.3em] uppercase text-taupe mb-2">Preferred Date</label>
+                <input
+                  type="date"
+                  value={appointmentDate}
+                  onChange={(e) => setAppointmentDate(e.target.value)}
+                  className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.3em] uppercase text-taupe mb-2">Preferred Time</label>
+                <input
+                  type="time"
+                  value={appointmentTime}
+                  onChange={(e) => setAppointmentTime(e.target.value)}
+                  className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowAppointmentModal(false)}
+                  className="flex-1 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAppointmentSubmit}
+                  disabled={!appointmentDate || !appointmentTime}
+                  className="flex-1 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

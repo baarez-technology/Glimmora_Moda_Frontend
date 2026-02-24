@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useMemo, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   User,
@@ -55,21 +55,27 @@ export default function UserProfilePage() {
     firstName: currentUser?.name.split(' ')[0] || '',
     lastName: currentUser?.name.split(' ').slice(1).join(' ') || '',
     email: currentUser?.email || '',
-    phone: brandApiData?.phone_number || '',
-    jobTitle: brandApiData?.job_title || '',
+    phone: '',
+    jobTitle: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
 
   const [notifications, setNotifications] = useState({
-    emailOrders: brandApiData?.email_notification?.order_updates ?? true,
-    emailAlerts: brandApiData?.email_notification?.inventory_alerts ?? true,
-    emailReports: brandApiData?.email_notification?.weekly_reports ?? false,
-    pushOrders: brandApiData?.push_notification?.order_updates ?? true,
-    pushAlerts: brandApiData?.push_notification?.urgent_alerts ?? true,
-    pushReports: brandApiData?.push_notification?.daily_digest ?? false
+    emailOrders: true,
+    emailAlerts: true,
+    emailReports: false,
+    pushOrders: true,
+    pushAlerts: true,
+    pushReports: false
   });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const twoFAModalRef = useModalAccessibility(show2FAModal, () => setShow2FAModal(false));
 
@@ -292,11 +298,8 @@ export default function UserProfilePage() {
                   )}
                   <button
                     onClick={() => setShowAvatarInput(!showAvatarInput)}
-                   
-                    onClick={() => avatarInputRef.current?.click()}
                     disabled={isUploadingAvatar}
                     className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors disabled:opacity-50"
-                  
                   >
                     <Camera size={14} />
                   </button>
@@ -311,7 +314,7 @@ export default function UserProfilePage() {
                     ref={avatarInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleAvatarChange}
+                    onChange={handleAvatarFileChange}
                     className="hidden"
                   />
                 </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, Search, Upload, Calendar, DollarSign, Tag, FileText, ChevronRight } from 'lucide-react';
@@ -9,9 +9,11 @@ import type { SourcingRequestType } from '@/types';
 
 export default function NewSourcingRequestPage() {
   const router = useRouter();
-  const { isUHNI, showToast } = useApp();
+  const { showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [step, setStep] = useState(1);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [formData, setFormData] = useState({
     type: '' as SourcingRequestType | '',
     title: '',
@@ -20,30 +22,23 @@ export default function NewSourcingRequestPage() {
     budgetMax: '',
     budgetFlexible: false,
     deadline: '',
-    occasion: ''
+    occasion: '',
+    notes: '',
   });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setUploadedFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
-
-  // Redirect non-UHNI users
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI) {
-    return (
-      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   const requestTypes: { value: SourcingRequestType; label: string; description: string }[] = [
     {
@@ -70,6 +65,29 @@ export default function NewSourcingRequestPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const newRequest = {
+      id: `src-${Date.now()}`,
+      type: formData.type,
+      title: formData.title,
+      description: formData.description,
+      budget: {
+        min: Number(formData.budgetMin),
+        max: Number(formData.budgetMax),
+        flexible: formData.budgetFlexible,
+      },
+      deadline: formData.deadline || null,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      notes: formData.notes || '',
+    };
+
+    // Load existing requests from localStorage, append, and save back
+    const existingRaw = localStorage.getItem('uhni-sourcing-requests');
+    const existing = existingRaw ? JSON.parse(existingRaw) : [];
+    existing.push(newRequest);
+    localStorage.setItem('uhni-sourcing-requests', JSON.stringify(existing));
+
     showToast('Sourcing request submitted! Your concierge will review it shortly.', 'success');
     router.push('/uhni/sourcing');
   };
@@ -197,14 +215,45 @@ export default function NewSourcingRequestPage() {
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                     Reference Images (Optional)
                   </label>
-                  <div className="border-2 border-dashed border-sand p-8 text-center bg-white">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,.pdf"
+                    multiple
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-sand p-8 text-center bg-white cursor-pointer hover:border-charcoal-deep transition-colors"
+                  >
                     <Upload size={32} className="mx-auto text-stone mb-4" />
                     <p className="text-sm text-stone mb-2">Drag and drop images here, or click to browse</p>
-                    <p className="text-xs text-taupe">PNG, JPG up to 10MB each</p>
-                    <button type="button" className="mt-4 px-6 py-2 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm">
+                    <p className="text-xs text-taupe">PNG, JPG, PDF up to 10MB each</p>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                      className="mt-4 px-6 py-2 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm"
+                    >
                       Browse Files
                     </button>
                   </div>
+                  {uploadedFiles.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {uploadedFiles.map((file, i) => (
+                        <div key={i} className="flex items-center justify-between bg-parchment px-3 py-2 rounded text-sm text-charcoal-deep/80">
+                          <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(i)}
+                            className="text-taupe hover:text-charcoal-deep ml-2"
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -269,6 +318,7 @@ export default function NewSourcingRequestPage() {
                   <input
                     type="date"
                     value={formData.deadline}
+                    min={new Date().toISOString().split('T')[0]}
                     onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                     className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
                   />

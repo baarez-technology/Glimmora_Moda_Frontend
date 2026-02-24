@@ -12,6 +12,13 @@ import type {
   BespokeOrder,
   AutonomousActivity,
   PriceNegotiation,
+  UHNIPriceOffer,
+  UHNIPriceAlert,
+  UHNIPricingTier,
+  UHNIPricingSummary,
+  UHNIAvailabilitySearch,
+  GlobalNetworkStats,
+  RestockPrediction,
   PrivateCollection,
   ExclusiveEvent,
   PrivateShoppingEvent,
@@ -22,6 +29,8 @@ import type {
   ConciergeTask,
   SilentCommerceItem
 } from '@/types/uhni';
+import type { HeritageEvent, CulturalJourney } from '@/types/heritage';
+import type { Brand } from '@/types/brand';
 import {
   mockConcierge,
   mockAutonomousSettings,
@@ -29,6 +38,13 @@ import {
   mockBespokeOrders,
   mockAutonomousActivity,
   mockPriceNegotiations,
+  mockPriceOffers,
+  mockPriceAlerts,
+  mockPricingTiers,
+  mockPricingSummary,
+  mockUHNIAvailabilitySearches,
+  mockGlobalNetworkStats,
+  mockRestockPredictions,
   mockPrivateCollections,
   mockExclusiveEvents,
   mockPrivateShoppingEvents,
@@ -39,6 +55,8 @@ import {
   mockConciergeTasks,
   mockSilentCommerceItems
 } from '@/data/uhni';
+import { heritageEvents, culturalJourneys } from '@/data/intelligence';
+import { brands } from '@/data/brands';
 
 // ============================================
 // Concierge
@@ -133,6 +151,125 @@ export async function getBespokeOrders(): Promise<ApiResponse<BespokeOrder[]>> {
 export async function getPriceNegotiations(): Promise<ApiResponse<PriceNegotiation[]>> {
   return apiRequest<PriceNegotiation[]>('/api/uhni/pricing/negotiations', {
     mockHandler: () => mockPriceNegotiations,
+  });
+}
+
+export async function getPriceOffers(): Promise<ApiResponse<UHNIPriceOffer[]>> {
+  return apiRequest<UHNIPriceOffer[]>('/api/uhni/pricing/offers', {
+    mockHandler: () => mockPriceOffers,
+  });
+}
+
+export async function getPriceAlerts(): Promise<ApiResponse<UHNIPriceAlert[]>> {
+  return apiRequest<UHNIPriceAlert[]>('/api/uhni/pricing/alerts', {
+    mockHandler: () => mockPriceAlerts,
+  });
+}
+
+export async function getPricingTiers(): Promise<ApiResponse<UHNIPricingTier[]>> {
+  return apiRequest<UHNIPricingTier[]>('/api/uhni/pricing/tiers', {
+    mockHandler: () => mockPricingTiers,
+  });
+}
+
+export async function getPricingSummary(): Promise<ApiResponse<UHNIPricingSummary>> {
+  return apiRequest<UHNIPricingSummary>('/api/uhni/pricing/summary', {
+    mockHandler: () => mockPricingSummary,
+  });
+}
+
+export async function acceptNegotiation(id: string): Promise<ApiResponse<PriceNegotiation>> {
+  return apiRequest<PriceNegotiation>(`/api/uhni/pricing/negotiations/${id}/accept`, {
+    method: 'POST',
+    mockHandler: () => {
+      const negotiation = mockPriceNegotiations.find(n => n.id === id);
+      if (!negotiation) throw new Error(`Negotiation ${id} not found`);
+      return { ...negotiation, status: 'accepted' as const };
+    },
+  });
+}
+
+export async function claimOffer(id: string): Promise<ApiResponse<UHNIPriceOffer>> {
+  return apiRequest<UHNIPriceOffer>(`/api/uhni/pricing/offers/${id}/claim`, {
+    method: 'POST',
+    mockHandler: () => {
+      const offer = mockPriceOffers.find(o => o.id === id);
+      if (!offer) throw new Error(`Offer ${id} not found`);
+      return { ...offer, claimed: true };
+    },
+  });
+}
+
+// ============================================
+// Global Sourcing / Availability
+// ============================================
+
+export async function getAvailabilitySearches(): Promise<ApiResponse<UHNIAvailabilitySearch[]>> {
+  return apiRequest<UHNIAvailabilitySearch[]>('/api/uhni/sourcing/availability', {
+    mockHandler: () => mockUHNIAvailabilitySearches,
+  });
+}
+
+export async function getGlobalNetworkStats(): Promise<ApiResponse<GlobalNetworkStats>> {
+  return apiRequest<GlobalNetworkStats>('/api/uhni/sourcing/network-stats', {
+    mockHandler: () => mockGlobalNetworkStats,
+  });
+}
+
+export async function getRestockPredictions(): Promise<ApiResponse<RestockPrediction[]>> {
+  return apiRequest<RestockPrediction[]>('/api/uhni/sourcing/restock-predictions', {
+    mockHandler: () => mockRestockPredictions,
+  });
+}
+
+export async function placeHold(searchId: string, alternativeId: string): Promise<ApiResponse<{ success: boolean }>> {
+  return apiRequest<{ success: boolean }>(`/api/uhni/sourcing/availability/${searchId}/hold`, {
+    method: 'POST',
+    body: { alternativeId },
+    mockHandler: () => ({ success: true }),
+  });
+}
+
+export async function confirmShipment(searchId: string): Promise<ApiResponse<{ success: boolean }>> {
+  return apiRequest<{ success: boolean }>(`/api/uhni/sourcing/availability/${searchId}/confirm`, {
+    method: 'POST',
+    mockHandler: () => ({ success: true }),
+  });
+}
+
+export async function enableRestockAlert(productId: string): Promise<ApiResponse<{ success: boolean }>> {
+  return apiRequest<{ success: boolean }>(`/api/uhni/sourcing/restock-alerts/${productId}`, {
+    method: 'POST',
+    mockHandler: () => ({ success: true }),
+  });
+}
+
+// ============================================
+// Heritage & Cultural
+// ============================================
+
+export async function getHeritageEvents(): Promise<ApiResponse<HeritageEvent[]>> {
+  return apiRequest<HeritageEvent[]>('/api/uhni/heritage/events', {
+    mockHandler: () => heritageEvents,
+  });
+}
+
+export async function getCulturalJourneys(): Promise<ApiResponse<CulturalJourney[]>> {
+  return apiRequest<CulturalJourney[]>('/api/uhni/heritage/journeys', {
+    mockHandler: () => culturalJourneys,
+  });
+}
+
+export async function getBrands(): Promise<ApiResponse<Brand[]>> {
+  return apiRequest<Brand[]>('/api/brands', {
+    mockHandler: () => brands,
+  });
+}
+
+export async function requestCollectionAccess(collectionId: string): Promise<ApiResponse<{ success: boolean }>> {
+  return apiRequest<{ success: boolean }>(`/api/uhni/private-collections/${collectionId}/request-access`, {
+    method: 'POST',
+    mockHandler: () => ({ success: true }),
   });
 }
 

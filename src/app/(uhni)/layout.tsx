@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
+import { Crown } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 // UHNI Portal Layout
@@ -14,6 +16,7 @@ export default function UHNILayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isUHNI, isHydrated } = useApp();
 
   useEffect(() => {
@@ -41,6 +44,42 @@ export default function UHNILayout({
     return null;
   }
 
+  const navLinks = [
+    { href: '/uhni/concierge', label: 'Concierge' },
+    { href: '/uhni/sourcing', label: 'Sourcing' },
+    { href: '/uhni/bespoke', label: 'Bespoke' },
+    { href: '/uhni/autonomous', label: 'Autonomous' },
+    { href: '/', label: 'Main Site' },
+  ];
+
   // Render UHNI content for authenticated UHNI users
-  return <>{children}</>;
+  return (
+    <div className="min-h-screen bg-ivory-cream">
+      {/* UHNI Top Bar */}
+      <header className="sticky top-0 z-50 bg-charcoal-deep border-b border-gold-soft/10">
+        <div className="max-w-7xl mx-auto px-8 py-3 flex items-center justify-between">
+          <Link href="/uhni" className="flex items-center gap-2">
+            <Crown size={16} className="text-gold-soft" />
+            <span className="text-sm tracking-[0.2em] uppercase text-ivory-cream">UHNI</span>
+          </Link>
+          <nav className="hidden md:flex items-center gap-6">
+            {navLinks.map(link => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`text-xs tracking-wider uppercase transition-colors ${
+                  pathname.startsWith(link.href) && link.href !== '/'
+                    ? 'text-gold-soft'
+                    : 'text-sand hover:text-ivory-cream'
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+      </header>
+      {children}
+    </div>
+  );
 }

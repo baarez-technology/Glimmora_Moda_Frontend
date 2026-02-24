@@ -25,6 +25,9 @@ export default function SilentCommercePage() {
   useEffect(() => {
     uhniService.getSilentCommerceItems().then(res => {
       if (res.data) setItems(res.data);
+    }).catch(() => {
+      showToast('Failed to load items', 'error');
+    }).finally(() => {
       setIsLoaded(true);
     });
   }, []);
@@ -62,7 +65,7 @@ export default function SilentCommercePage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(amount);
   };
 
   return (

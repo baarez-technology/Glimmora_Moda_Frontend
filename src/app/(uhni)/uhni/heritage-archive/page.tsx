@@ -3,37 +3,51 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Archive, Calendar, Sparkles, ArrowRight, Crown, BookOpen } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { heritageEvents, culturalJourneys, brands } from '@/data';
-import type { HeritageEvent, HeritageEventSignificance } from '@/types';
+import { getHeritageEvents, getCulturalJourneys, getBrands } from '@/services/uhni.service';
+import type { HeritageEvent, HeritageEventSignificance, CulturalJourney, Brand } from '@/types';
 
 type SignificanceFilter = 'all' | HeritageEventSignificance;
 
 export default function HeritageArchivePage() {
-  const router = useRouter();
-  const { isUHNI, concierge } = useApp();
+  const { concierge } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<string>('all');
   const [significanceFilter, setSignificanceFilter] = useState<SignificanceFilter>('all');
+  const [events, setEvents] = useState<HeritageEvent[]>([]);
+  const [journeys, setJourneys] = useState<CulturalJourney[]>([]);
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadData = async () => {
+      setIsDataLoading(true);
+      try {
+        const [evtRes, jrnRes, brdRes] = await Promise.all([
+          getHeritageEvents(),
+          getCulturalJourneys(),
+          getBrands(),
+        ]);
+        setEvents(evtRes.data);
+        setJourneys(jrnRes.data);
+        setAllBrands(brdRes.data);
+      } catch {
+        // Data loading failed silently - empty states will show
+      } finally {
+        setIsDataLoading(false);
+        setIsLoaded(true);
+      }
+    };
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI) {
+  if (isDataLoading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
+          <p className="text-stone text-sm">Loading heritage archive...</p>
         </div>
       </div>
     );
@@ -47,7 +61,7 @@ export default function HeritageArchivePage() {
     { value: 'cultural', label: 'Cultural' },
   ];
 
-  const filteredEvents = heritageEvents
+  const filteredEvents = events
     .filter(event => selectedBrand === 'all' || event.brandId === selectedBrand)
     .filter(event => significanceFilter === 'all' || event.significance === significanceFilter)
     .sort((a, b) => b.year - a.year);
@@ -67,8 +81,8 @@ export default function HeritageArchivePage() {
     }
   };
 
-  const availableBrands = [...new Set(heritageEvents.map(e => e.brandId))];
-  const brandOptions = brands.filter(b => availableBrands.includes(b.id));
+  const availableBrands = [...new Set(events.map(e => e.brandId))];
+  const brandOptions = allBrands.filter(b => availableBrands.includes(b.id));
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -76,11 +90,11 @@ export default function HeritageArchivePage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -193,7 +207,7 @@ export default function HeritageArchivePage() {
                           </h3>
                         </div>
                         <span className="text-xs text-taupe whitespace-nowrap">
-                          {brands.find(b => b.id === event.brandId)?.name}
+                          {allBrands.find(b => b.id === event.brandId)?.name}
                         </span>
                       </div>
 
@@ -254,7 +268,7 @@ export default function HeritageArchivePage() {
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
-            {culturalJourneys.slice(0, 4).map((journey) => (
+            {journeys.slice(0, 4).map((journey) => (
               <Link
                 key={journey.id}
                 href={`/discover/journeys/${journey.id}`}
