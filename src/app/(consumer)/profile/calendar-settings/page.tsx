@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield, X, Clock } from 'lucide-react';
-import * as calendarService from '@/services/calendar.service';
-import { useAuth } from '@/context/AuthContext';
+import { ArrowLeft, Calendar, Check, RefreshCw, Trash2, Plus, Shield, X, MapPin, Clock } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import type { CalendarConnection, CalendarProvider } from '@/types';
+import * as calendarService from '@/services/calendar.service';
+import type { CalendarConnectionStatus, SuggestionPreferences } from '@/types';
 
 interface CalendarProviderInfo {
-  id: CalendarProvider;
+  id: string;
   name: string;
   icon: string;
   color: string;
@@ -26,14 +24,14 @@ const calendarProviders: CalendarProviderInfo[] = [
     description: 'Connect your Google Calendar to sync events automatically'
   },
   {
-    id: 'apple',
+    id: 'icloud',
     name: 'Apple Calendar',
     icon: 'A',
     color: 'bg-gray-800',
     description: 'Sync events from your iCloud Calendar'
   },
   {
-    id: 'outlook',
+    id: 'microsoft',
     name: 'Outlook Calendar',
     icon: 'O',
     color: 'bg-blue-600',
@@ -41,98 +39,158 @@ const calendarProviders: CalendarProviderInfo[] = [
   }
 ];
 
+type GrantKey = keyof NonNullable<CalendarConnectionStatus['grants']>;
+
 export default function CalendarSettingsPage() {
-  const router = useRouter();
-  const { isAuthenticated, isHydrated } = useAuth();
-  const { showToast } = useApp();
+  const { showToast, refreshCalendarEvents, reloadCalendarEvents } = useApp();
 
-  useEffect(() => {
-    if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/calendar-settings');
-  }, [isAuthenticated, isHydrated, router]);
-
-  const [connections, setConnections] = useState<CalendarConnection[]>([]);
-  const [syncing, setSyncing] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<CalendarConnectionStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [connecting, setConnecting] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [showManualEvent, setShowManualEvent] = useState(false);
-  const [manualEvent, setManualEvent] = useState({ title: '', date: '', time: '', location: '', type: 'meeting' });
-  const [manualEventErrors, setManualEventErrors] = useState<Record<string, string>>({});
-  const [preferences, setPreferences] = useState(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('moda-calendar-preferences');
-        if (saved) return JSON.parse(saved);
-      } catch { /* ignore */ }
-    }
-    return { includeWeather: true, prioritizeWardrobe: true, dailyReminders: false, suggestNew: true };
-  });
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadConnections = async () => {
-      const response = await calendarService.getCalendarConnections();
-      setConnections(response.data);
+  // Manual event form
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    event_date: '',
+    event_time: '',
+    location: '',
+    description: '',
+  });
+  const [addingEvent, setAddingEvent] = useState(false);
+
+  // Suggestion preferences
+  const [suggestionPrefs, setSuggestionPrefs] = useState<SuggestionPreferences | null>(null);
+  const [updatingPref, setUpdatingPref] = useState<string | null>(null);
+
+  const isConnected = connectionStatus?.connected === true;
+
+  // Helper to check if a specific provider is connected
+  const isProviderConnected = (providerId: string) => {
+    return !!connectionStatus?.grants?.[providerId as GrantKey];
+  };
+
+  // Get email for a specific provider
+  const getProviderEmail = (providerId: string) => {
+    return connectionStatus?.emails?.[providerId as keyof NonNullable<CalendarConnectionStatus['emails']>];
+  };
+
+  // Load connection status
+  const loadConnectionStatus = useCallback(async () => {
+    try {
+      const status = await calendarService.getConnectionStatus();
+      setConnectionStatus(status);
+    } catch {
+      setConnectionStatus({ connected: false });
+    } finally {
       setLoading(false);
       setIsLoaded(true);
-    };
-    loadConnections();
+    }
   }, []);
 
-  const [connectingProvider, setConnectingProvider] = useState<CalendarProvider | null>(null);
+  useEffect(() => {
+    loadConnectionStatus();
+    // Load suggestion preferences
+    calendarService.getSuggestionPreferences()
+      .then(setSuggestionPrefs)
+      .catch(() => {
+        // Defaults if endpoint not available yet
+      });
+  }, [loadConnectionStatus]);
 
-  const handleConnect = (providerId: CalendarProvider) => {
-    // Show coming soon — OAuth integration requires backend
-    setConnectingProvider(providerId);
+  // ─── Connect: get OAuth URL and redirect browser ─────────────────────────
+  const handleConnect = async (providerId: string) => {
+    setConnecting(providerId);
+    try {
+      const { auth_url } = await calendarService.connectCalendar(providerId);
+      // Redirect browser to provider OAuth — backend callback handles the rest
+      // User returns to FRONTEND_URL (e.g. /profile) after backend HTML page
+      window.location.href = auth_url;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to connect';
+      showToast(message, 'error');
+      setConnecting(null);
+    }
   };
 
-  const handleDisconnect = (providerId: CalendarProvider) => {
-    setConnections(prev =>
-      prev.map(c =>
-        c.provider === providerId
-          ? { ...c, connected: false, email: undefined, lastSynced: undefined }
-          : c
-      )
-    );
+  // ─── Disconnect a specific provider ────────────────────────────────────────
+  const handleDisconnect = async (providerId: string) => {
+    setDisconnecting(providerId);
+    try {
+      await calendarService.disconnectCalendar(providerId);
+      // Re-fetch full status from backend to accurately reflect remaining connections
+      const status = await calendarService.getConnectionStatus();
+      setConnectionStatus(status);
+      showToast(`Calendar disconnected.`, 'info');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to disconnect';
+      showToast(message, 'error');
+    } finally {
+      setDisconnecting(null);
+    }
   };
 
-  const handleSync = async (providerId: CalendarProvider) => {
-    setSyncing(providerId);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setConnections(prev =>
-      prev.map(c =>
-        c.provider === providerId
-          ? { ...c, lastSynced: new Date().toISOString() }
-          : c
-      )
-    );
-    setSyncing(null);
+  // ─── Sync events from all connected providers ─────────────────────────────
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await refreshCalendarEvents();
+      setLastSynced(new Date().toISOString());
+      showToast('Events synced successfully!', 'success');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to sync';
+      showToast(message, 'error');
+    } finally {
+      setSyncing(false);
+    }
   };
 
-  const handleAddManualEvent = () => {
-    const errors: Record<string, string> = {};
-    if (!manualEvent.title.trim()) errors.title = 'Event title is required';
-    if (!manualEvent.date) errors.date = 'Event date is required';
-    if (Object.keys(errors).length > 0) {
-      setManualEventErrors(errors);
-      showToast('Please fill in all required fields', 'error');
+  // ─── Add manual event ──────────────────────────────────────────────────
+  const handleAddManualEvent = async () => {
+    if (!eventForm.title.trim() || !eventForm.event_date) {
+      showToast('Title and date are required.', 'error');
       return;
     }
-    setManualEventErrors({});
-    const events = JSON.parse(localStorage.getItem('moda-manual-events') || '[]');
-    events.push({ ...manualEvent, id: `manual-${Date.now()}`, createdAt: new Date().toISOString() });
-    localStorage.setItem('moda-manual-events', JSON.stringify(events));
-    setManualEvent({ title: '', date: '', time: '', location: '', type: 'meeting' });
-    setShowManualEvent(false);
-    showToast('Event added successfully', 'success');
+    setAddingEvent(true);
+    try {
+      await calendarService.addManualEvent({
+        title: eventForm.title.trim(),
+        event_date: eventForm.event_date,
+        event_time: eventForm.event_time || undefined,
+        location: eventForm.location.trim() || undefined,
+        description: eventForm.description.trim() || undefined,
+      });
+      showToast('Event added successfully!', 'success');
+      setEventForm({ title: '', event_date: '', event_time: '', location: '', description: '' });
+      setShowEventForm(false);
+      // Reload events from DB so calendar page picks it up (works without Nylas connection)
+      await reloadCalendarEvents();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to add event';
+      showToast(message, 'error');
+    } finally {
+      setAddingEvent(false);
+    }
   };
 
-  const togglePreference = (key: string) => {
-    const updated = { ...preferences, [key]: !preferences[key as keyof typeof preferences] };
-    setPreferences(updated);
-    localStorage.setItem('moda-calendar-preferences', JSON.stringify(updated));
-  };
-
-  const getConnection = (providerId: CalendarProvider) => {
-    return connections.find(c => c.provider === providerId);
+  // ─── Toggle a suggestion preference ───────────────────────────────────
+  const handleTogglePref = async (key: keyof SuggestionPreferences) => {
+    if (!suggestionPrefs) return;
+    const newValue = !suggestionPrefs[key];
+    setUpdatingPref(key);
+    try {
+      const updated = await calendarService.updateSuggestionPreferences({ [key]: newValue });
+      setSuggestionPrefs(updated);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to update preference';
+      showToast(message, 'error');
+    } finally {
+      setUpdatingPref(null);
+    }
   };
 
   if (loading) {
@@ -185,39 +243,41 @@ export default function CalendarSettingsPage() {
               <ol className="space-y-2 text-sm text-stone">
                 <li className="flex items-start gap-3">
                   <span className="text-charcoal-deep font-medium">01</span>
-                  Connect your calendar to sync upcoming events
+                  Connect one or more calendars (Google, Apple, or Outlook)
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-charcoal-deep font-medium">02</span>
-                  Our system analyzes each event type, venue, and weather
+                  Events sync automatically from all connected calendars
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-charcoal-deep font-medium">03</span>
-                  Receive personalized outfit suggestions combining your wardrobe with new pieces
+                  Our system analyzes each event type, venue, and weather
                 </li>
                 <li className="flex items-start gap-3">
                   <span className="text-charcoal-deep font-medium">04</span>
-                  Save looks and add items to your considerations with one click
+                  Receive personalized outfit suggestions for every occasion
                 </li>
               </ol>
             </div>
           </div>
         </div>
 
-        {/* Connected Calendars */}
+        {/* Calendar Providers — multiple can be connected */}
         <div className="bg-white p-8">
           <h2 className="font-display text-xl text-charcoal-deep mb-8">Calendar Connections</h2>
 
           <div className="space-y-4">
             {calendarProviders.map((provider) => {
-              const connection = getConnection(provider.id);
-              const isConnected = connection?.connected;
+              const thisConnected = isProviderConnected(provider.id);
+              const isThisConnecting = connecting === provider.id;
+              const isThisDisconnecting = disconnecting === provider.id;
+              const email = getProviderEmail(provider.id);
 
               return (
                 <div
                   key={provider.id}
                   className={`p-5 border transition-all ${
-                    isConnected ? 'border-success/30 bg-success/5' : 'border-sand'
+                    thisConnected ? 'border-success/30 bg-success/5' : 'border-sand'
                   }`}
                 >
                   <div className="flex items-center justify-between gap-4">
@@ -228,17 +288,15 @@ export default function CalendarSettingsPage() {
                       <div>
                         <div className="flex items-center gap-3">
                           <h3 className="font-medium text-charcoal-deep">{provider.name}</h3>
-                          {isConnected && (
+                          {thisConnected && (
                             <span className="flex items-center gap-1 px-2 py-0.5 bg-success/20 text-success text-xs">
                               <Check size={12} />
                               Connected
                             </span>
                           )}
                         </div>
-                        {isConnected ? (
-                          <p className="text-sm text-stone">
-                            {connection?.email && connection.email !== 'user@example.com' ? connection.email : 'Connected'}
-                          </p>
+                        {thisConnected && email ? (
+                          <p className="text-sm text-stone">{email}</p>
                         ) : (
                           <p className="text-sm text-taupe">{provider.description}</p>
                         )}
@@ -246,46 +304,51 @@ export default function CalendarSettingsPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {isConnected ? (
+                      {thisConnected ? (
                         <>
                           <button
-                            onClick={() => handleSync(provider.id)}
-                            disabled={syncing === provider.id}
+                            onClick={handleSync}
+                            disabled={syncing}
                             className="p-2 text-stone hover:text-charcoal-deep transition-colors disabled:opacity-50"
                             title="Sync now"
                           >
-                            <RefreshCw size={18} className={syncing === provider.id ? 'animate-spin' : ''} />
+                            <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
                           </button>
                           <button
                             onClick={() => handleDisconnect(provider.id)}
-                            className="p-2 text-stone hover:text-error transition-colors"
+                            disabled={isThisDisconnecting}
+                            className="p-2 text-stone hover:text-error transition-colors disabled:opacity-50"
                             title="Disconnect"
                           >
-                            <Trash2 size={18} />
+                            {isThisDisconnecting ? (
+                              <div className="w-[18px] h-[18px] border-2 border-stone border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
                           </button>
                         </>
                       ) : (
                         <button
                           onClick={() => handleConnect(provider.id)}
-                          className="flex items-center gap-2 px-5 py-2 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                          disabled={isThisConnecting || connecting !== null}
+                          className="flex items-center gap-2 px-5 py-2 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
                         >
-                          <Plus size={16} />
-                          Connect
+                          {isThisConnecting ? (
+                            <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Plus size={16} />
+                          )}
+                          {isThisConnecting ? 'Redirecting...' : 'Connect'}
                         </button>
                       )}
                     </div>
                   </div>
 
-                  {isConnected && connection?.lastSynced && (
-                    <div className="mt-4 pt-4 border-t border-sand/50 flex items-center justify-between text-sm">
+                  {thisConnected && lastSynced && (
+                    <div className="mt-4 pt-4 border-t border-sand/50 text-sm">
                       <span className="text-taupe">
-                        Last synced: {new Date(connection.lastSynced).toLocaleString()}
+                        Last synced: {new Date(lastSynced).toLocaleString()}
                       </span>
-                      {connection.calendarsSelected && (
-                        <span className="text-stone">
-                          {connection.calendarsSelected.length} calendar{connection.calendarsSelected.length !== 1 ? 's' : ''} selected
-                        </span>
-                      )}
                     </div>
                   )}
                 </div>
@@ -300,74 +363,109 @@ export default function CalendarSettingsPage() {
           <p className="text-stone text-sm mb-6">
             Don&apos;t want to connect a calendar? You can add events manually to get outfit suggestions.
           </p>
-          {showManualEvent ? (
-            <div className="space-y-4">
+
+          {showEventForm ? (
+            <div className="space-y-5">
+              {/* Title */}
               <div>
+                <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                  Event Title <span className="text-error">*</span>
+                </label>
                 <input
                   type="text"
-                  value={manualEvent.title}
-                  onChange={(e) => { setManualEvent({ ...manualEvent, title: e.target.value }); setManualEventErrors(prev => ({ ...prev, title: '' })); }}
-                  placeholder="Event title *"
-                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${manualEventErrors.title ? 'border-red-400' : 'border-sand'}`}
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="e.g. Brunch with friends"
+                  className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
-                {manualEventErrors.title && <p className="text-xs text-red-500 mt-1">{manualEventErrors.title}</p>}
               </div>
+
+              {/* Date & Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                    <Calendar size={14} className="inline mr-1.5" />
+                    Date <span className="text-error">*</span>
+                  </label>
                   <input
                     type="date"
-                    value={manualEvent.date}
-                    onChange={(e) => { setManualEvent({ ...manualEvent, date: e.target.value }); setManualEventErrors(prev => ({ ...prev, date: '' })); }}
-                    min={new Date().toISOString().split('T')[0]}
-                    className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${manualEventErrors.date ? 'border-red-400' : 'border-sand'}`}
+                    value={eventForm.event_date}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, event_date: e.target.value }))}
+                    className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
-                  {manualEventErrors.date && <p className="text-xs text-red-500 mt-1">{manualEventErrors.date}</p>}
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                    <Clock size={14} className="inline mr-1.5" />
+                    Time (optional)
+                  </label>
+                  <input
+                    type="time"
+                    value={eventForm.event_time}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, event_time: e.target.value }))}
+                    className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                  <MapPin size={14} className="inline mr-1.5" />
+                  Location (optional)
+                </label>
                 <input
-                  type="time"
-                  value={manualEvent.time}
-                  onChange={(e) => setManualEvent({ ...manualEvent, time: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  type="text"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder="e.g. Melbourne"
+                  className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
               </div>
-              <input
-                type="text"
-                value={manualEvent.location}
-                onChange={(e) => setManualEvent({ ...manualEvent, location: e.target.value })}
-                placeholder="Location (optional)"
-                className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-              />
-              <select
-                value={manualEvent.type}
-                onChange={(e) => setManualEvent({ ...manualEvent, type: e.target.value })}
-                className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-              >
-                <option value="meeting">Business Meeting</option>
-                <option value="dinner">Dinner</option>
-                <option value="party">Party / Social</option>
-                <option value="wedding">Wedding</option>
-                <option value="travel">Travel</option>
-                <option value="casual">Casual Outing</option>
-              </select>
-              <div className="flex gap-3">
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-charcoal-deep mb-2">
+                  Description (optional)
+                </label>
+                <textarea
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Any notes about the event..."
+                  rows={3}
+                  className="w-full px-4 py-3 border border-sand bg-parchment text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-3 pt-2">
                 <button
                   onClick={handleAddManualEvent}
-                  disabled={!manualEvent.title || !manualEvent.date}
-                  className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={addingEvent || !eventForm.title.trim() || !eventForm.event_date}
+                  className="flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
                 >
-                  Save Event
+                  {addingEvent ? (
+                    <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                  {addingEvent ? 'Adding...' : 'Add Event'}
                 </button>
                 <button
-                  onClick={() => { setShowManualEvent(false); setManualEvent({ title: '', date: '', time: '', location: '', type: 'meeting' }); setManualEventErrors({}); }}
-                  className="px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                  onClick={() => {
+                    setShowEventForm(false);
+                    setEventForm({ title: '', event_date: '', event_time: '', location: '', description: '' });
+                  }}
+                  className="flex items-center gap-2 px-6 py-3 border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
                 >
+                  <X size={16} />
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
             <button
-              onClick={() => setShowManualEvent(true)}
+              onClick={() => setShowEventForm(true)}
               className="flex items-center gap-2 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.15em] uppercase"
             >
               <Plus size={16} />
@@ -381,34 +479,42 @@ export default function CalendarSettingsPage() {
           <h2 className="font-display text-xl text-charcoal-deep mb-8">Suggestion Preferences</h2>
 
           <div className="space-y-1">
-            {[
-              { key: 'includeWeather', label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations' },
-              { key: 'prioritizeWardrobe', label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first' },
-              { key: 'dailyReminders', label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events" },
-              { key: 'suggestNew', label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks' }
-            ].map((item) => (
-              <button
-                key={item.key}
-                onClick={() => togglePreference(item.key)}
-                className="flex items-center justify-between p-5 bg-parchment cursor-pointer w-full text-left"
-              >
-                <div>
-                  <p className="font-medium text-charcoal-deep">{item.label}</p>
-                  <p className="text-sm text-stone">{item.desc}</p>
-                </div>
-                <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${
-                  preferences[item.key as keyof typeof preferences]
-                    ? 'border-charcoal-deep bg-charcoal-deep'
-                    : 'border-sand'
-                }`}>
-                  {preferences[item.key as keyof typeof preferences] && (
-                    <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </button>
-            ))}
+            {([
+              { key: 'include_weather_in_suggestions' as const, label: 'Include weather in suggestions', desc: 'Factor in weather conditions for outfit recommendations' },
+              { key: 'prioritize_wardrobe_items' as const, label: 'Prioritize wardrobe items', desc: 'Show items from your Digital Wardrobe first' },
+              { key: 'daily_outfit_reminders' as const, label: 'Daily outfit reminders', desc: "Get a notification with outfit ideas for tomorrow's events" },
+              { key: 'suggest_new_pieces' as const, label: 'Suggest new pieces', desc: 'Include product recommendations to complete your looks' },
+            ]).map((item) => {
+              const checked = suggestionPrefs ? suggestionPrefs[item.key] : false;
+              const isUpdating = updatingPref === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => handleTogglePref(item.key)}
+                  disabled={!suggestionPrefs || isUpdating}
+                  className="w-full flex items-center justify-between p-5 bg-parchment text-left disabled:opacity-70 transition-opacity"
+                >
+                  <div>
+                    <p className="font-medium text-charcoal-deep">{item.label}</p>
+                    <p className="text-sm text-stone">{item.desc}</p>
+                  </div>
+                  <div className={`w-6 h-6 border-2 flex items-center justify-center transition-all flex-shrink-0 ${
+                    checked
+                      ? 'border-charcoal-deep bg-charcoal-deep'
+                      : 'border-sand'
+                  }`}>
+                    {isUpdating ? (
+                      <div className="w-3 h-3 border border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                    ) : checked ? (
+                      <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -425,40 +531,6 @@ export default function CalendarSettingsPage() {
           </div>
         </div>
       </div>
-
-      {/* Coming Soon Modal */}
-      {connectingProvider && (
-        <div
-          className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
-          onClick={() => setConnectingProvider(null)}
-          onKeyDown={(e) => { if (e.key === 'Escape') setConnectingProvider(null); }}
-        >
-          <div className="bg-white max-w-md w-full p-8 relative" role="dialog" aria-modal="true" aria-labelledby="coming-soon-title" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setConnectingProvider(null)}
-              className="absolute top-4 right-4 p-2 hover:bg-sand/20 transition-colors"
-            >
-              <X size={18} />
-            </button>
-            <div className="text-center">
-              <div className="w-14 h-14 bg-parchment flex items-center justify-center mx-auto mb-6">
-                <Clock size={24} className="text-stone" />
-              </div>
-              <h3 id="coming-soon-title" className="font-display text-xl text-charcoal-deep mb-3">Coming Soon</h3>
-              <p className="text-stone text-sm mb-6">
-                {calendarProviders.find(p => p.id === connectingProvider)?.name} OAuth integration
-                is currently in development. Calendar sync will be available in an upcoming release.
-              </p>
-              <button
-                onClick={() => setConnectingProvider(null)}
-                className="px-8 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
-              >
-                Got It
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

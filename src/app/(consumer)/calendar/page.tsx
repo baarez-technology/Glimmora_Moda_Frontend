@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
 import { useApp } from '@/context/AppContext';
-import type { CalendarEvent, CalendarConnection, EventType } from '@/types';
+import type { CalendarConnection, EventType } from '@/types';
+import { PROVIDER_DISPLAY_NAMES } from '@/types';
 
 const eventTypeIcons: Record<EventType, React.ReactNode> = {
   business_meeting: <Briefcase size={16} />,
@@ -89,8 +90,26 @@ export default function CalendarPage() {
   useEffect(() => {
     setIsLoaded(true);
     const loadConnections = async () => {
-      const response = await calendarService.getCalendarConnections();
-      setCalendarConnections(response.data);
+      try {
+        const status = await calendarService.getConnectionStatus();
+        if (status.connected && status.grants) {
+          const connections: CalendarConnection[] = [];
+          const providerKeys = ['google', 'microsoft', 'icloud'] as const;
+          for (const key of providerKeys) {
+            if (status.grants[key]) {
+              connections.push({
+                provider: key as CalendarConnection['provider'],
+                connected: true,
+                email: status.emails?.[key],
+                lastSynced: new Date().toISOString(),
+              });
+            }
+          }
+          setCalendarConnections(connections);
+        }
+      } catch {
+        // Not connected — show empty state
+      }
     };
     loadConnections();
   }, []);
@@ -184,12 +203,14 @@ export default function CalendarPage() {
 
             <div className="flex items-center gap-6">
               {/* Connected Status */}
-              {connectedCalendar && (
-                <div className="flex items-center gap-3 text-sm">
-                  <div className="flex items-center gap-2 px-4 py-2 border border-success/30 text-success">
-                    <Check size={14} />
-                    <span>{connectedCalendar.provider === 'google' ? 'Google Calendar' : connectedCalendar.provider}</span>
-                  </div>
+              {calendarConnections.filter(c => c.connected).length > 0 && (
+                <div className="flex items-center gap-2 text-sm">
+                  {calendarConnections.filter(c => c.connected).map((conn) => (
+                    <div key={conn.provider} className="flex items-center gap-2 px-4 py-2 border border-success/30 text-success">
+                      <Check size={14} />
+                      <span>{PROVIDER_DISPLAY_NAMES[conn.provider] || conn.provider}</span>
+                    </div>
+                  ))}
                 </div>
               )}
 

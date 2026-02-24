@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Firebase Token Tester</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: #1a1a1a; color: #e0e0e0; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .container { background: #2a2a2a; border-radius: 12px; padding: 40px; max-width: 600px; width: 90%; }
+    h1 { font-size: 20px; margin-bottom: 8px; }
+    .sub { color: #888; font-size: 13px; margin-bottom: 30px; }
+    .buttons { display: flex; gap: 12px; margin-bottom: 24px; }
+    button { padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    .google { background: #4285f4; color: #fff; }
+    .apple { background: #fff; color: #000; }
+    .logout { background: #dc3545; color: #fff; }
+    .status { padding: 16px; border-radius: 8px; background: #333; margin-bottom: 16px; font-size: 13px; }
+    .status.success { border-left: 4px solid #4caf50; }
+    .status.error { border-left: 4px solid #f44336; }
+    .status.info { border-left: 4px solid #2196f3; }
+    label { display: block; font-size: 12px; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .token-box { width: 100%; background: #111; color: #4caf50; border: 1px solid #444; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 12px; min-height: 80px; resize: vertical; word-break: break-all; }
+    .copy-btn { margin-top: 8px; padding: 8px 16px; background: #555; color: #fff; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .copy-btn:hover { background: #666; }
+    .section { margin-bottom: 20px; }
+    .user-info { font-size: 13px; line-height: 1.8; }
+    .user-info span { color: #4caf50; }
+    hr { border: none; border-top: 1px solid #444; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Firebase Token Tester</h1>
+    <p class="sub">Sign in with Google or Apple to get a Firebase ID token for backend testing.</p>
+
+    <div class="buttons">
+      <button class="google" id="googleBtn" onclick="signIn('google')">Sign in with Google</button>
+      <button class="apple" id="appleBtn" onclick="signIn('apple')">Sign in with Apple</button>
+      <button class="logout" id="logoutBtn" onclick="logOut()" style="display:none">Sign Out</button>
+    </div>
+
+    <div id="statusBox" class="status info">Not signed in.</div>
+
+    <div id="result" style="display:none">
+      <div class="section">
+        <label>User Info</label>
+        <div class="user-info" id="userInfo"></div>
+      </div>
+
+      <hr />
+
+      <div class="section">
+        <label>ID Token (send this to your backend)</label>
+        <textarea class="token-box" id="tokenBox" readonly></textarea>
+        <button class="copy-btn" onclick="copyToken()">Copy Token</button>
+      </div>
+
+      <hr />
+
+      <div class="section">
+        <label>Example curl command</label>
+        <textarea class="token-box" id="curlBox" readonly style="min-height:60px;color:#2196f3;"></textarea>
+        <button class="copy-btn" onclick="copyCurl()">Copy curl</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-app.js";
+    import { getAuth, signInWithPopup, GoogleAuthProvider, OAuthProvider, signOut } from "https://www.gstatic.com/firebasejs/11.8.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA3KX2jAugsE8TZgdbM5xH_TTNzaytpI3Y",
+      authDomain: "clone-a5e95.firebaseapp.com",
+      projectId: "clone-a5e95",
+      storageBucket: "clone-a5e95.firebasestorage.app",
+      messagingSenderId: "350414825474",
+      appId: "1:350414825474:web:4ddc69f10d1c650d301f1b",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    const googleProvider = new GoogleAuthProvider();
+    const appleProvider = new OAuthProvider("apple.com");
+
+    window.signIn = async function (provider) {
+      const status = document.getElementById("statusBox");
+      const btn = provider === "google" ? document.getElementById("googleBtn") : document.getElementById("appleBtn");
+
+      btn.disabled = true;
+      status.className = "status info";
+      status.textContent = `Signing in with ${provider}...`;
+
+      try {
+        const result = provider === "google"
+          ? await signInWithPopup(auth, googleProvider)
+          : await signInWithPopup(auth, appleProvider);
+
+        const user = result.user;
+        const idToken = await user.getIdToken();
+
+        status.className = "status success";
+        status.textContent = `Signed in as ${user.email} (${provider})`;
+
+        document.getElementById("userInfo").innerHTML =
+          `<strong>Name:</strong> <span>${user.displayName || "N/A"}</span><br/>` +
+          `<strong>Email:</strong> <span>${user.email}</span><br/>` +
+          `<strong>UID:</strong> <span>${user.uid}</span><br/>` +
+          `<strong>Provider:</strong> <span>${provider}</span>`;
+
+        document.getElementById("tokenBox").value = idToken;
+
+        const curl = `curl -X POST http://localhost:8000/api/v1/user/auth/${provider} \\\n  -H "Content-Type: application/json" \\\n  -d '{"id_token": "${idToken}", "role": "consumer"}'`;
+        document.getElementById("curlBox").value = curl;
+
+        document.getElementById("result").style.display = "block";
+        document.getElementById("logoutBtn").style.display = "inline-block";
+      } catch (err) {
+        if (!err.message.includes("popup-closed-by-user")) {
+          status.className = "status error";
+          status.textContent = `Error: ${err.message}`;
+        } else {
+          status.className = "status info";
+          status.textContent = "Sign-in cancelled.";
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    };
+
+    window.logOut = async function () {
+      await signOut(auth);
+      document.getElementById("statusBox").className = "status info";
+      document.getElementById("statusBox").textContent = "Signed out.";
+      document.getElementById("result").style.display = "none";
+      document.getElementById("logoutBtn").style.display = "none";
+    };
+
+    window.copyToken = function () {
+      navigator.clipboard.writeText(document.getElementById("tokenBox").value);
+      const btn = document.querySelector(".copy-btn");
+      btn.textContent = "Copied!";
+      setTimeout(() => btn.textContent = "Copy Token", 1500);
+    };
+
+    window.copyCurl = function () {
+      navigator.clipboard.writeText(document.getElementById("curlBox").value);
+      const btns = document.querySelectorAll(".copy-btn");
+      btns[1].textContent = "Copied!";
+      setTimeout(() => btns[1].textContent = "Copy curl", 1500);
+    };
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,9 +8,8 @@ import {
   ArrowLeft,
   Save,
   Trash2,
-  TrendingUp,
   Eye,
-  Heart,
+  ShoppingCart,
   DollarSign,
   Clock,
   MapPin,
@@ -20,50 +19,26 @@ import {
   X,
   Check,
   Minus,
-  ImageIcon
+    ImageIcon
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload } from '@/services/brand-product.service';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
+import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
+import {
+  fetchProduct,
+  updateProduct,
+  softDeleteProduct,
+  setRegionalStocks,
+  fetchCollectionNames,
+} from '@/services/brand-product.service';
 import type {
-  ProductCategory,
-  ProductImage,
-  ProductVariant,
-  Material,
-  CraftsmanshipDetail,
-  ProductVisibility,
-  ExperienceMode,
-  PricingVisibility,
-  CommerceAction
-} from '@/types/product';
-
-// ============================================
-// TOAST COMPONENT
-// ============================================
-
-function SuccessToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
-  useEffect(() => {
-    const timer = setTimeout(onDismiss, 3000);
-    return () => clearTimeout(timer);
-  }, [onDismiss]);
-
-  return (
-    <div className="fixed top-6 right-6 z-[100] animate-in slide-in-from-top-2 fade-in duration-300">
-      <div className="flex items-center gap-3 bg-success text-white px-5 py-3 shadow-lg">
-        <Check size={16} />
-        <span className="text-sm font-medium">{message}</span>
-        <button onClick={onDismiss} className="ml-2 hover:opacity-70 transition-opacity">
-          <X size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// ============================================
-// COMPONENT
-// ============================================
+  BackendProduct,
+  RegionalStockItem,
+  RegionalStockAddPayload,
+  CollectionNameItem,
+} from '@/services/brand-product.service';
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -75,7 +50,6 @@ export default function ProductDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
   const [formData, setFormData] = useState({
     product_name: '',
     sku: '',
@@ -92,13 +66,6 @@ export default function ProductDetailPage() {
     commerceAction: 'add_to_considerations' as CommerceAction,
   });
 
-  // Editable arrays
-  const [images, setImages] = useState<ProductImage[]>([]);
-  const [variants, setVariants] = useState<ProductVariant[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [craftsmanship, setCraftsmanship] = useState<CraftsmanshipDetail[]>([]);
-
-  // UI state
   const [productImages, setProductImages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -193,17 +160,6 @@ export default function ProductDetailPage() {
     );
   }
 
-  const markDirty = () => setHasChanges(true);
-
-  const handleChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    markDirty();
-  };
-
-  // ============================================
-  // SAVE
-  // ============================================
-
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -219,7 +175,6 @@ export default function ProductDetailPage() {
       });
       setProduct(updated);
       setHasChanges(false);
-      setToastMessage('Product saved successfully');
     } catch (err) {
       console.error('Failed to save:', err);
     } finally {
@@ -227,9 +182,10 @@ export default function ProductDetailPage() {
     }
   };
 
-  // ============================================
-  // STOCK
-  // ============================================
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    setHasChanges(true);
+  };
 
   const handleImagesChange = (images: string[]) => {
     setProductImages(images);
@@ -360,17 +316,8 @@ export default function ProductDetailPage() {
   const totalUnits = product.performance_metrics.total_units;
   const isLowStock = product.is_low_stock;
 
-  const inputBase = 'w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors';
-  const inputErrorCls = 'w-full px-4 py-3 bg-transparent border border-error text-charcoal-deep focus:outline-none focus:border-error transition-colors';
-  const inputSmall = 'w-full px-3 py-2 bg-transparent border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors';
-
   return (
     <div>
-      {/* Success Toast */}
-      {toastMessage && (
-        <SuccessToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
-      )}
-
       <BrandPageHeader
         title={product.product_name}
         breadcrumbs={[
@@ -413,31 +360,31 @@ export default function ProductDetailPage() {
               <div className="grid grid-cols-2 gap-6">
                 <div className="col-span-2">
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Product Name *
+                    Product Name
                   </label>
                   <input
                     type="text"
                     value={formData.product_name}
                     onChange={(e) => handleChange('product_name', e.target.value)}
-                    className={inputBase}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    SKU *
+                    SKU
                   </label>
                   <input
                     type="text"
                     value={formData.sku}
                     onChange={(e) => handleChange('sku', e.target.value.toUpperCase())}
-                    className={`${inputBase} uppercase`}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors uppercase"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Price *
+                    Price
                   </label>
                   <input
                     type="number"
@@ -445,18 +392,18 @@ export default function ProductDetailPage() {
                     step="0.01"
                     value={formData.price}
                     onChange={(e) => handleChange('price', e.target.value)}
-                    className={inputBase}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
                 </div>
 
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Collection *
+                    Collection
                   </label>
                   <select
                     value={formData.collection_name}
                     onChange={(e) => handleChange('collection_name', e.target.value)}
-                    className={`${inputBase} cursor-pointer`}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                   >
                     <option value="">Select collection</option>
                     {collectionNames.map((col) => (
@@ -467,12 +414,12 @@ export default function ProductDetailPage() {
 
                 <div>
                   <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Status *
+                    Status
                   </label>
                   <select
                     value={formData.status}
                     onChange={(e) => handleChange('status', e.target.value)}
-                    className={`${inputBase} cursor-pointer`}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                   >
                     <option value="draft">Draft</option>
                     <option value="published">Published</option>
@@ -482,7 +429,7 @@ export default function ProductDetailPage() {
               </div>
             </section>
 
-            {/* Description & Narrative */}
+            {/* Description */}
             <section className="bg-white border border-sand/50 p-6 space-y-6">
               <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
                 Description
@@ -497,7 +444,7 @@ export default function ProductDetailPage() {
                     type="text"
                     value={formData.tagline}
                     onChange={(e) => handleChange('tagline', e.target.value)}
-                    className={inputBase}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
                 </div>
 
@@ -508,437 +455,10 @@ export default function ProductDetailPage() {
                   <textarea
                     value={formData.product_description}
                     onChange={(e) => handleChange('product_description', e.target.value)}
-                    rows={3}
-                    className={`${inputBase} resize-none`}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Narrative
-                  </label>
-                  <textarea
-                    value={formData.narrative}
-                    onChange={(e) => handleChange('narrative', e.target.value)}
                     rows={4}
-                    className={`${inputBase} resize-none`}
-                    placeholder="The story behind this product — its origins, craftsmanship journey, and cultural significance..."
-                  />
-                  <p className="mt-1.5 text-xs text-taupe">
-                    Rich storytelling content for the product detail page. Falls back to description if empty.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            {/* Commerce & Visibility */}
-            <section className="bg-white border border-sand/50 p-6 space-y-6">
-              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-                Commerce & Visibility
-              </h2>
-
-              <div className="grid grid-cols-2 gap-6">
-                {/* IV Toggle */}
-                <div className="col-span-2">
-                  <div className="flex items-center justify-between py-2">
-                    <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep">
-                        Intelligent Visualization (IV)
-                      </label>
-                      <p className="text-xs text-taupe mt-1">Enable immersive 3D visualization for this product</p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={formData.ivEnabled}
-                      onClick={() => handleChange('ivEnabled', !formData.ivEnabled)}
-                      className={`relative w-11 h-6 rounded-full transition-colors ${formData.ivEnabled ? 'bg-gold-deep' : 'bg-sand'}`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${formData.ivEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-                      />
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Visibility
-                  </label>
-                  <select
-                    value={formData.visibility}
-                    onChange={(e) => handleChange('visibility', e.target.value)}
-                    className={`${inputBase} cursor-pointer`}
-                  >
-                    <option value="public">Public</option>
-                    <option value="invite_only">Invite Only</option>
-                    <option value="private">Private</option>
-                  </select>
-                  <p className="mt-1.5 text-xs text-taupe">Controls who can discover this product</p>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Experience Mode
-                  </label>
-                  <select
-                    value={formData.experienceMode}
-                    onChange={(e) => handleChange('experienceMode', e.target.value)}
-                    className={`${inputBase} cursor-pointer`}
-                  >
-                    <option value="standard">Standard</option>
-                    <option value="iv_immersive">IV Immersive</option>
-                    <option value="bespoke_only">Bespoke Only</option>
-                  </select>
-                  <p className="mt-1.5 text-xs text-taupe">How clients experience this product</p>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Pricing Visibility
-                  </label>
-                  <select
-                    value={formData.pricingVisibility}
-                    onChange={(e) => handleChange('pricingVisibility', e.target.value)}
-                    className={`${inputBase} cursor-pointer`}
-                  >
-                    <option value="visible">Visible</option>
-                    <option value="on_request">On Request</option>
-                    <option value="private">Private</option>
-                  </select>
-                  <p className="mt-1.5 text-xs text-taupe">Whether the price is shown to clients</p>
-                </div>
-
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                    Commerce Action
-                  </label>
-                  <select
-                    value={formData.commerceAction}
-                    onChange={(e) => handleChange('commerceAction', e.target.value)}
-                    className={`${inputBase} cursor-pointer`}
-                  >
-                    <option value="add_to_considerations">Add to Considerations</option>
-                    <option value="request_access">Request Access</option>
-                    <option value="direct_purchase">Direct Purchase</option>
-                  </select>
-                  <p className="mt-1.5 text-xs text-taupe">Primary call-to-action for this product</p>
-                </div>
-              </div>
-            </section>
-
-            {/* Images */}
-            <section className="bg-white border border-sand/50 p-6 space-y-6">
-              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-                Images
-              </h2>
-
-              {images.length > 0 && (
-                <div className="grid grid-cols-4 gap-3">
-                  {images.map((img) => (
-                    <div key={img.id} className="relative group border border-sand/50 bg-parchment">
-                      <div className="relative w-full aspect-square">
-                        <Image
-                          src={img.url}
-                          alt={img.alt}
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                      <div className="px-2 py-1.5 flex items-center justify-between">
-                        <span className="text-[9px] tracking-[0.15em] uppercase text-stone">{img.type}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(img.id)}
-                          className="text-stone hover:text-error transition-colors"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Add Image URL
-                </label>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={imageUrl}
-                      onChange={(e) => { setImageUrl(e.target.value); if (imageUrlError) setImageUrlError(''); }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddImage(); } }}
-                      className={imageUrlError ? inputErrorCls : inputBase}
-                      placeholder="https://images.unsplash.com/photo-..."
-                    />
-                    {imageUrlError && <p className="mt-1.5 text-xs text-error">{imageUrlError}</p>}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAddImage}
-                    className="px-4 py-3 border border-sand text-sm text-stone hover:text-charcoal-deep hover:bg-parchment/30 transition-colors flex items-center gap-2 shrink-0"
-                  >
-                    <Plus size={16} /> Add
-                  </button>
-                </div>
-                <p className="mt-1.5 text-xs text-taupe">First image becomes the hero. Press Enter or click Add.</p>
-              </div>
-
-              {images.length === 0 && (
-                <div className="border-2 border-dashed border-sand p-6 text-center">
-                  <ImageIcon size={20} className="text-stone mx-auto mb-2" />
-                  <p className="text-sm text-stone">No images yet</p>
-                </div>
-              )}
-            </section>
-
-            {/* Variants */}
-            <section className="bg-white border border-sand/50 p-6 space-y-6">
-              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-                Variants
-              </h2>
-
-              {variants.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-sand/50">
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Type</th>
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Name</th>
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Value</th>
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Available</th>
-                        <th className="pb-3 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {variants.map((v) => (
-                        <tr key={v.id} className="border-b border-sand/20 last:border-0">
-                          <td className="py-2.5 pr-4">
-                            <span className="px-2 py-0.5 bg-parchment text-[10px] tracking-[0.1em] uppercase text-stone">{v.type}</span>
-                          </td>
-                          <td className="py-2.5 pr-4 text-charcoal-deep">{v.name}</td>
-                          <td className="py-2.5 pr-4 text-charcoal-deep">
-                            {v.type === 'color' ? (
-                              <span className="flex items-center gap-2">
-                                <span className="w-4 h-4 border border-sand/50" style={{ backgroundColor: v.value }} />
-                                {v.value}
-                              </span>
-                            ) : v.value}
-                          </td>
-                          <td className="py-2.5 pr-4">
-                            <span className={`text-[10px] tracking-[0.1em] uppercase ${v.available ? 'text-success' : 'text-stone'}`}>
-                              {v.available ? 'Yes' : 'No'}
-                            </span>
-                          </td>
-                          <td className="py-2.5">
-                            <button onClick={() => handleRemoveVariant(v.id)} className="text-stone hover:text-error transition-colors">
-                              <X size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Add variant row */}
-              <div className="flex items-end gap-3">
-                <div className="w-28">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Type</label>
-                  <select
-                    value={newVariant.type}
-                    onChange={(e) => setNewVariant(prev => ({ ...prev, type: e.target.value as ProductVariant['type'] }))}
-                    className={`${inputSmall} cursor-pointer`}
-                  >
-                    <option value="size">Size</option>
-                    <option value="color">Color</option>
-                    <option value="material">Material</option>
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Name</label>
-                  <input
-                    type="text"
-                    value={newVariant.name}
-                    onChange={(e) => setNewVariant(prev => ({ ...prev, name: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddVariant(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., Small"
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                   />
                 </div>
-                <div className="flex-1">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Value</label>
-                  <input
-                    type="text"
-                    value={newVariant.value}
-                    onChange={(e) => setNewVariant(prev => ({ ...prev, value: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddVariant(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., small"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddVariant}
-                  className="px-3 py-2 border border-sand text-sm text-stone hover:text-charcoal-deep hover:bg-parchment/30 transition-colors shrink-0"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-            </section>
-
-            {/* Materials */}
-            <section className="bg-white border border-sand/50 p-6 space-y-6">
-              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-                Materials
-              </h2>
-
-              {materials.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-sand/50">
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Name</th>
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Composition</th>
-                        <th className="text-left text-[10px] tracking-[0.15em] uppercase text-stone pb-3 pr-4">Origin</th>
-                        <th className="pb-3 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {materials.map((m, idx) => (
-                        <tr key={idx} className="border-b border-sand/20 last:border-0">
-                          <td className="py-2.5 pr-4 text-charcoal-deep font-medium">{m.name}</td>
-                          <td className="py-2.5 pr-4 text-charcoal-deep">{m.composition}</td>
-                          <td className="py-2.5 pr-4 text-stone">{m.origin}</td>
-                          <td className="py-2.5">
-                            <button onClick={() => handleRemoveMaterial(idx)} className="text-stone hover:text-error transition-colors">
-                              <X size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Name</label>
-                  <input
-                    type="text"
-                    value={newMaterial.name}
-                    onChange={(e) => setNewMaterial(prev => ({ ...prev, name: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMaterial(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., Lambskin"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Composition</label>
-                  <input
-                    type="text"
-                    value={newMaterial.composition}
-                    onChange={(e) => setNewMaterial(prev => ({ ...prev, composition: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMaterial(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., 100% Lambskin leather"
-                  />
-                </div>
-                <div className="w-32">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Origin</label>
-                  <input
-                    type="text"
-                    value={newMaterial.origin}
-                    onChange={(e) => setNewMaterial(prev => ({ ...prev, origin: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddMaterial(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., Italy"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddMaterial}
-                  className="px-3 py-2 border border-sand text-sm text-stone hover:text-charcoal-deep hover:bg-parchment/30 transition-colors shrink-0"
-                >
-                  <Plus size={16} />
-                </button>
-              </div>
-            </section>
-
-            {/* Craftsmanship */}
-            <section className="bg-white border border-sand/50 p-6 space-y-6">
-              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-                Craftsmanship
-              </h2>
-
-              {craftsmanship.length > 0 && (
-                <div className="space-y-3">
-                  {craftsmanship.map((c, idx) => (
-                    <div key={idx} className="flex items-start justify-between gap-4 py-3 border-b border-sand/20 last:border-0">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-charcoal-deep font-medium">{c.title}</p>
-                        <p className="text-xs text-stone mt-1">{c.description}</p>
-                        {c.duration && (
-                          <span className="inline-block mt-1.5 px-2 py-0.5 bg-parchment text-[10px] tracking-[0.1em] uppercase text-stone">
-                            {c.duration}
-                          </span>
-                        )}
-                      </div>
-                      <button onClick={() => handleRemoveCraft(idx)} className="text-stone hover:text-error transition-colors mt-1 shrink-0">
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-end gap-3">
-                <div className="flex-1">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Title</label>
-                  <input
-                    type="text"
-                    value={newCraft.title}
-                    onChange={(e) => setNewCraft(prev => ({ ...prev, title: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCraft(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., Cannage Quilting"
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Description</label>
-                  <input
-                    type="text"
-                    value={newCraft.description}
-                    onChange={(e) => setNewCraft(prev => ({ ...prev, description: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCraft(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., Signature quilted pattern"
-                  />
-                </div>
-                <div className="w-28">
-                  <label className="block text-[9px] tracking-[0.15em] uppercase text-stone mb-1">Duration</label>
-                  <input
-                    type="text"
-                    value={newCraft.duration}
-                    onChange={(e) => setNewCraft(prev => ({ ...prev, duration: e.target.value }))}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCraft(); } }}
-                    className={inputSmall}
-                    placeholder="e.g., 3 hours"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleAddCraft}
-                  className="px-3 py-2 border border-sand text-sm text-stone hover:text-charcoal-deep hover:bg-parchment/30 transition-colors shrink-0"
-                >
-                  <Plus size={16} />
-                </button>
               </div>
             </section>
 
@@ -1000,23 +520,13 @@ export default function ProductDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Product Image */}
-            <div className="bg-white border border-sand/50 p-4">
-              <div className="aspect-square bg-parchment relative overflow-hidden">
-                {images[0] ? (
-                  <Image
-                    src={images[0].url}
-                    alt={images[0].alt}
-                    fill
-                    className="object-cover"
-                    unoptimized
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-taupe text-sm">
-                    No image
-                  </div>
-                )}
-              </div>
+            {/* Product Images */}
+            <div className="bg-white border border-sand/50 p-6">
+              <h3 className="text-sm font-medium text-charcoal-deep mb-4">Images</h3>
+              <ProductImageUpload
+                images={productImages}
+                onChange={handleImagesChange}
+              />
             </div>
 
             {/* Performance Metrics */}
@@ -1033,7 +543,7 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-stone flex items-center gap-2">
-                    <Heart size={14} /> Add to Considerations
+                    <ShoppingCart size={14} /> Add to Cart
                   </span>
                   <span className="text-sm text-charcoal-deep">
                     {product.performance_metrics.add_to_cart.toLocaleString()}
@@ -1157,7 +667,7 @@ export default function ProductDetailPage() {
                 onClick={handleDelete}
                 className="px-5 py-2.5 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors"
               >
-                {isDeleteDangerous ? 'Delete Anyway' : 'Delete Product'}
+                Delete Product
               </button>
             </div>
           </div>

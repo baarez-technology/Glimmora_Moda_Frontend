@@ -7,7 +7,7 @@
 import type { Product } from './product';
 
 // Calendar Provider
-export type CalendarProvider = 'google' | 'apple' | 'outlook' | 'manual';
+export type CalendarProvider = 'google' | 'icloud' | 'microsoft' | 'manual';
 
 // Event Type
 export type EventType =
@@ -76,6 +76,59 @@ export interface CalendarConnection {
 }
 
 // User Preferences
+// ─── Backend Response Types ──────────────────────────────────────────────────
+
+export interface BackendCalendarEvent {
+  customer_id: string;
+  event_id: string;
+  title: string;
+  description: string | null;
+  event_date: string;
+  event_day: string;
+  event_time: string | null;
+  location: string | null;
+  tags: string[];
+  weather: string | null;
+  tempressure: number | null;
+  sky_tag: string | null;
+  role: string;
+}
+
+export interface CalendarConnectionStatus {
+  connected: boolean;
+  your_user_id?: string;
+  grants?: { google: string | null; microsoft: string | null; icloud: string | null };
+  emails?: { google?: string; microsoft?: string; icloud?: string };
+  detail?: string;
+}
+
+export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  google: 'Google Calendar',
+  icloud: 'Apple Calendar',
+  microsoft: 'Outlook Calendar',
+};
+
+// ─── Manual Event Request ────────────────────────────────────────────────────
+
+export interface ManualEventRequest {
+  title: string;
+  event_date: string; // YYYY-MM-DD
+  event_time?: string;
+  location?: string;
+  description?: string;
+}
+
+// ─── Suggestion Preferences ─────────────────────────────────────────────────
+
+export interface SuggestionPreferences {
+  include_weather_in_suggestions: boolean;
+  prioritize_wardrobe_items: boolean;
+  daily_outfit_reminders: boolean;
+  suggest_new_pieces: boolean;
+}
+
+// ─── User Preferences ───────────────────────────────────────────────────────
+
 export interface UserPreferences {
   id: string;
   userId: string;

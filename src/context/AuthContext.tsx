@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import type { UserTier } from '@/types';
 import * as authService from '@/services/auth.service';
+import type { UserData } from '@/services/auth.service';
 
 interface AuthContextType {
   userTier: UserTier;
@@ -11,14 +12,22 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isHydrated: boolean; // Indicates if auth state loaded from localStorage
   isLoggingOut: boolean; // Flag to prevent auth redirects during logout
+  userData: UserData | null; // Real user data from backend
   setUserRole: (tier: UserTier) => void;
+  setUserData: (data: UserData | null) => void;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function mapRoleToTier(role: string): UserTier {
+  if (role === 'uhni') return 'uhni';
+  return 'preferred'; // consumer maps to preferred
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [userTier, setUserTier] = useState<UserTier>('standard');
+  const [userData, setUserDataState] = useState<UserData | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
@@ -26,17 +35,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isUHNI = userTier === 'uhni';
   const isAuthenticated = userTier !== 'standard';
 
-  // Load session on mount via service
+  // Load session on mount
   useEffect(() => {
-    authService.getCurrentSession().then(response => {
-      if (response.success && response.data && response.data.userTier !== 'standard') {
-        setUserTier(response.data.userTier);
-      }
-    }).catch(() => {
-      // Failed to load session, stay as standard
-    }).finally(() => {
-      setIsHydrated(true);
-    });
+    // First check for real user data (API-based auth)
+    const storedUser = authService.getStoredUserData();
+    const storedToken = authService.getStoredUserToken();
+
+    if (storedUser && storedToken) {
+      setUserDataState(storedUser);
+      setUserTier(mapRoleToTier(storedUser.role));
+    } else {
+      // Fallback to legacy tier from localStorage (demo mode)
+      authService.getCurrentSession().then(response => {
+        if (response.success && response.data && response.data.userTier !== 'standard') {
+          setUserTier(response.data.userTier);
+        }
+      }).catch(() => {
+        // Failed to load session, stay as standard
+      });
+    }
+
+    setIsHydrated(true);
   }, []);
 
   // Persist tier changes to localStorage
@@ -46,21 +65,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [userTier, isHydrated]);
 
-  const setUserRole = (tier: UserTier) => {
+  const setUserRole = useCallback((tier: UserTier) => {
     setUserTier(tier);
-  };
+  }, []);
 
-  const logout = async () => {
+  const setUserData = useCallback((data: UserData | null) => {
+    setUserDataState(data);
+    if (data) {
+      setUserTier(mapRoleToTier(data.role));
+    }
+  }, []);
+
+  const logout = useCallback(() => {
     setIsLoggingOut(true);
     setUserTier('standard');
-    try {
-      await authService.logout();
-    } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
+    setUserDataState(null);
+    authService.userLogout();
+    authService.logout().catch(console.error);
+    setTimeout(() => setIsLoggingOut(false), 500);
+  }, []);
 
   return (
     <AuthContext.Provider
@@ -71,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated,
         isHydrated,
         isLoggingOut,
+        userData,
         setUserRole,
+        setUserData,
         logout
       }}
     >

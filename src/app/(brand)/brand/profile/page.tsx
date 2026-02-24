@@ -14,49 +14,50 @@ import {
   Clock,
   Monitor,
   Smartphone,
-  Globe,
-  X,
-  Shield,
-  LogOut,
-  AlertTriangle
+  Globe
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import { brandChangePassword, updateBrandProfile } from '@/services/auth.service';
 import { uploadImage } from '@/services/brand-product.service';
 
 type ProfileTab = 'personal' | 'security' | 'notifications' | 'sessions';
 
 export default function UserProfilePage() {
-  const router = useRouter();
   const { partner } = useBrand();
-
-  // Get current user (first team member in mock data)
-  const currentUser = partner?.teamMembers[0];
-
-  // ============================================
-  // ALL HOOKS MUST BE BEFORE ANY EARLY RETURN
-  // ============================================
-
   const [activeTab, setActiveTab] = useState<ProfileTab>('personal');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [show2FAModal, setShow2FAModal] = useState(false);
-  const [showAvatarInput, setShowAvatarInput] = useState(false);
-  const [avatarUrl, setAvatarUrl] = useState('');
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Get current user from partner team members
+  const currentUser = partner?.teamMembers[0];
+
+  // Read extra profile fields (phone, jobTitle) from stored API data
+  const brandApiData = useMemo(() => {
+    try {
+      const stored = localStorage.getItem('moda-brand-data');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  if (!partner || !currentUser) return null;
 
   const [formData, setFormData] = useState({
-    firstName: currentUser?.name.split(' ')[0] || '',
-    lastName: currentUser?.name.split(' ').slice(1).join(' ') || '',
-    email: currentUser?.email || '',
-    phone: '',
-    jobTitle: '',
+    firstName: currentUser.name.split(' ')[0],
+    lastName: currentUser.name.split(' ')[1] || '',
+    email: currentUser.email,
+    phone: brandApiData?.phone_number || '',
+    jobTitle: brandApiData?.job_title || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -122,40 +123,45 @@ export default function UserProfilePage() {
     }
   ];
 
-  // ============================================
-  // PASSWORD VALIDATION
-  // ============================================
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
 
-  const validatePassword = (password: string): string | null => {
-    if (password.length < 8) return 'Password must be at least 8 characters';
-    if (!/[a-zA-Z]/.test(password)) return 'Password must contain at least one letter';
-    if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
-    return null;
+    setIsUploadingAvatar(true);
+    setErrorMessage(null);
+    try {
+      const url = await uploadImage(file);
+      await updateBrandProfile({ profile_picture: url });
+      setAvatarUrl(url);
+      setSavedMessage('Profile picture updated');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to upload picture');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
-  const getPasswordStrength = (password: string): { label: string; color: string; width: string } => {
-    if (!password) return { label: '', color: '', width: '0%' };
-    if (password.length < 8) return { label: 'Too short', color: 'bg-error', width: '20%' };
-    const hasLetter = /[a-zA-Z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    const hasSpecial = /[^a-zA-Z0-9]/.test(password);
-    const score = (hasLetter ? 1 : 0) + (hasNumber ? 1 : 0) + (hasSpecial ? 1 : 0) + (password.length >= 12 ? 1 : 0);
-    if (score <= 1) return { label: 'Weak', color: 'bg-error', width: '33%' };
-    if (score <= 2) return { label: 'Fair', color: 'bg-warning', width: '50%' };
-    if (score <= 3) return { label: 'Good', color: 'bg-info', width: '75%' };
-    return { label: 'Strong', color: 'bg-success', width: '100%' };
-  };
-
-  const passwordStrength = getPasswordStrength(formData.newPassword);
-
-  // ============================================
-  // HANDLERS
-  // ============================================
-
-  const handleSave = () => {
-    console.log('Saving profile:', formData);
-    setSavedMessage('Changes saved successfully');
-    setTimeout(() => setSavedMessage(null), 3000);
+  const handleSave = async () => {
+    setIsSaving(true);
+    setErrorMessage(null);
+    try {
+      await updateBrandProfile({
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        phone_number: formData.phone,
+        job_title: formData.jobTitle,
+      });
+      setSavedMessage('Changes saved successfully');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to save profile');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveNotifications = async () => {
@@ -185,61 +191,29 @@ export default function UserProfilePage() {
   };
 
   const handlePasswordChange = async () => {
-    setPasswordError(null);
-
-    const strengthError = validatePassword(formData.newPassword);
-    if (strengthError) {
-      setPasswordError(strengthError);
-      return;
-    }
-
     if (formData.newPassword !== formData.confirmPassword) {
-      setPasswordError('Passwords do not match');
       setErrorMessage('Passwords do not match');
       setTimeout(() => setErrorMessage(null), 4000);
       return;
     }
 
-    console.log('Changing password');
-    setFormData({ ...formData, currentPassword: '', newPassword: '', confirmPassword: '' });
-    setPasswordError(null);
-    setSavedMessage('Password updated successfully');
-    setTimeout(() => setSavedMessage(null), 3000);
-  };
-
-  const handleLogoutSession = (sessionId: string) => {
-    console.log('Logging out session:', sessionId);
-    setSavedMessage('Session terminated successfully');
-    setTimeout(() => setSavedMessage(null), 3000);
-  };
-
-  const handleLogoutAll = () => {
+    setIsChangingPassword(true);
+    setErrorMessage(null);
     try {
-      localStorage.clear();
-    } catch { /* no-op */ }
-    router.push('/auth/login');
-  };
-
-  const handleLogoutSingle = () => {
-    try {
-      localStorage.clear();
-    } catch { /* no-op */ }
-    router.push('/auth/login');
-  };
-
-  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setAvatarPreview(url);
-    setShowAvatarInput(false);
-  };
-
-  const handleAvatarUrlSubmit = () => {
-    if (!avatarUrl.trim()) return;
-    setAvatarPreview(avatarUrl.trim());
-    setAvatarUrl('');
-    setShowAvatarInput(false);
+      await brandChangePassword({
+        current_password: formData.currentPassword,
+        new_password: formData.newPassword,
+        confirm_new_password: formData.confirmPassword,
+      });
+      setFormData({ ...formData, currentPassword: '', newPassword: '', confirmPassword: '' });
+      setSavedMessage('Password updated successfully');
+      setTimeout(() => setSavedMessage(null), 3000);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to change password');
+      setTimeout(() => setErrorMessage(null), 5000);
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -285,9 +259,9 @@ export default function UserProfilePage() {
             <div className="bg-white border border-sand/50 p-6 mb-6">
               <div className="text-center">
                 <div className={`relative inline-block ${isUploadingAvatar ? 'opacity-50' : ''}`}>
-                  {avatarPreview || (avatarUrl || currentUser.avatar) ? (
+                  {(avatarUrl || currentUser.avatar) ? (
                     <img
-                      src={avatarPreview || avatarUrl || currentUser.avatar}
+                      src={avatarUrl || currentUser.avatar}
                       alt={currentUser.name}
                       className="w-24 h-24 rounded-full object-cover mx-auto"
                     />
@@ -297,19 +271,12 @@ export default function UserProfilePage() {
                     </div>
                   )}
                   <button
-                    onClick={() => setShowAvatarInput(!showAvatarInput)}
+                    onClick={() => avatarInputRef.current?.click()}
                     disabled={isUploadingAvatar}
                     className="absolute bottom-0 right-0 w-8 h-8 bg-charcoal-deep text-ivory-cream rounded-full flex items-center justify-center hover:bg-noir transition-colors disabled:opacity-50"
                   >
                     <Camera size={14} />
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarFileChange}
-                    className="hidden"
-                  />
                   <input
                     ref={avatarInputRef}
                     type="file"
@@ -318,36 +285,6 @@ export default function UserProfilePage() {
                     className="hidden"
                   />
                 </div>
-
-                {/* Avatar input dropdown */}
-                {showAvatarInput && (
-                  <div className="mt-3 space-y-2 text-left">
-                    <button
-                      onClick={() => fileInputRef.current?.click()}
-                      className="w-full px-3 py-2 text-xs text-charcoal-deep border border-sand hover:bg-parchment transition-colors text-left"
-                    >
-                      Upload from file...
-                    </button>
-                    <div className="flex gap-2">
-                      <input
-                        type="url"
-                        value={avatarUrl}
-                        onChange={(e) => setAvatarUrl(e.target.value)}
-                        placeholder="Or paste image URL"
-                        className="flex-1 px-3 py-2 text-xs border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep"
-                        onKeyDown={(e) => { if (e.key === 'Enter') handleAvatarUrlSubmit(); }}
-                      />
-                      <button
-                        onClick={handleAvatarUrlSubmit}
-                        disabled={!avatarUrl.trim()}
-                        className="px-3 py-2 bg-charcoal-deep text-ivory-cream text-xs hover:bg-noir transition-colors disabled:opacity-40"
-                      >
-                        <Check size={12} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
                 <h3 className="font-medium text-charcoal-deep mt-4">{currentUser.name}</h3>
                 <p className="text-sm text-taupe">{currentUser.email}</p>
                 <span className={`inline-block mt-2 px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getRoleBadge(currentUser.role)}`}>
@@ -471,14 +408,6 @@ export default function UserProfilePage() {
                     Change Password
                   </h2>
 
-                  {/* Inline password error */}
-                  {passwordError && (
-                    <div className="mb-6 px-4 py-3 bg-error/10 text-error text-sm flex items-center gap-2">
-                      <AlertTriangle size={16} />
-                      {passwordError}
-                    </div>
-                  )}
-
                   <div className="space-y-6">
                     <div>
                       <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
@@ -510,10 +439,7 @@ export default function UserProfilePage() {
                         <input
                           type={showNewPassword ? 'text' : 'password'}
                           value={formData.newPassword}
-                          onChange={(e) => {
-                            setFormData({ ...formData, newPassword: e.target.value });
-                            setPasswordError(null);
-                          }}
+                          onChange={(e) => setFormData({ ...formData, newPassword: e.target.value })}
                           className="w-full px-4 py-3 pr-12 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                           placeholder="Enter new password"
                         />
@@ -525,25 +451,6 @@ export default function UserProfilePage() {
                           {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
-                      {/* Password strength indicator */}
-                      {formData.newPassword && (
-                        <div className="mt-2">
-                          <div className="h-1.5 bg-sand overflow-hidden">
-                            <div
-                              className={`h-full transition-all ${passwordStrength.color}`}
-                              style={{ width: passwordStrength.width }}
-                            />
-                          </div>
-                          <p className={`text-xs mt-1 ${
-                            passwordStrength.label === 'Strong' ? 'text-success' :
-                            passwordStrength.label === 'Good' ? 'text-info' :
-                            passwordStrength.label === 'Fair' ? 'text-warning' :
-                            'text-error'
-                          }`}>
-                            {passwordStrength.label}
-                          </p>
-                        </div>
-                      )}
                       <p className="text-xs text-taupe mt-2">At least 8 characters with a mix of letters and numbers</p>
                     </div>
 
@@ -555,10 +462,7 @@ export default function UserProfilePage() {
                         <input
                           type={showConfirmPassword ? 'text' : 'password'}
                           value={formData.confirmPassword}
-                          onChange={(e) => {
-                            setFormData({ ...formData, confirmPassword: e.target.value });
-                            setPasswordError(null);
-                          }}
+                          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                           className="w-full px-4 py-3 pr-12 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                           placeholder="Confirm new password"
                         />
@@ -570,9 +474,6 @@ export default function UserProfilePage() {
                           {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                       </div>
-                      {formData.confirmPassword && formData.newPassword !== formData.confirmPassword && (
-                        <p className="text-xs text-error mt-1">Passwords do not match</p>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -586,10 +487,7 @@ export default function UserProfilePage() {
                       <p className="text-sm text-charcoal-deep">Protect your account with 2FA</p>
                       <p className="text-xs text-taupe mt-1">Add an extra layer of security to your account</p>
                     </div>
-                    <button
-                      onClick={() => setShow2FAModal(true)}
-                      className="px-4 py-2 border border-sand text-sm text-charcoal-deep hover:bg-parchment transition-colors"
-                    >
+                    <button className="px-4 py-2 border border-sand text-sm text-charcoal-deep hover:bg-parchment transition-colors">
                       Enable 2FA
                     </button>
                   </div>
@@ -685,7 +583,7 @@ export default function UserProfilePage() {
                     Active Sessions
                   </h2>
                   <p className="text-sm text-stone mb-6">
-                    These are the devices currently logged into your account. You can log out of any session you don&apos;t recognize.
+                    These are the devices currently logged into your account. You can log out of any session you don't recognize.
                   </p>
 
                   <div className="space-y-4">
@@ -721,11 +619,7 @@ export default function UserProfilePage() {
                               </div>
                             </div>
                             {!session.current && (
-                              <button
-                                onClick={() => handleLogoutSession(session.id)}
-                                className="text-xs text-error hover:text-error/80 transition-colors flex items-center gap-1"
-                              >
-                                <LogOut size={12} />
+                              <button className="text-xs text-error hover:text-error/80 transition-colors">
                                 Log out
                               </button>
                             )}
@@ -742,11 +636,7 @@ export default function UserProfilePage() {
                       <p className="text-sm font-medium text-charcoal-deep">Log out of all other sessions</p>
                       <p className="text-xs text-taupe mt-1">This will log you out of all devices except this one</p>
                     </div>
-                    <button
-                      onClick={handleLogoutAll}
-                      className="px-4 py-2 border border-error/30 text-sm text-error hover:bg-error/5 transition-colors flex items-center gap-2"
-                    >
-                      <LogOut size={14} />
+                    <button className="px-4 py-2 border border-error/30 text-sm text-error hover:bg-error/5 transition-colors">
                       Log out all
                     </button>
                   </div>
@@ -756,84 +646,6 @@ export default function UserProfilePage() {
           </div>
         </div>
       </div>
-
-      {/* 2FA Setup Modal */}
-      {show2FAModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm"
-            onClick={() => setShow2FAModal(false)}
-          />
-          <div
-            ref={twoFAModalRef}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="2fa-modal-title"
-            className="relative bg-white w-full max-w-md shadow-2xl"
-          >
-            <div className="px-6 py-4 border-b border-sand flex items-center justify-between">
-              <h2 id="2fa-modal-title" className="font-display text-lg text-charcoal-deep">Set Up Two-Factor Authentication</h2>
-              <button
-                onClick={() => setShow2FAModal(false)}
-                className="text-stone hover:text-charcoal-deep transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              <div className="text-center">
-                <div className="w-48 h-48 bg-parchment border border-sand/50 flex items-center justify-center mx-auto">
-                  <div className="text-center">
-                    <Shield size={40} className="text-taupe mx-auto mb-2" />
-                    <p className="text-xs text-stone">QR Code Placeholder</p>
-                    <p className="text-[10px] text-taupe mt-1">Scan with your authenticator app</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Manual Entry Code
-                </label>
-                <div className="px-4 py-3 bg-parchment/50 border border-sand font-mono text-sm text-charcoal-deep text-center tracking-widest">
-                  XXXX-XXXX-XXXX-XXXX
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Verification Code
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter 6-digit code"
-                  maxLength={6}
-                  className="w-full px-4 py-3 border border-sand text-charcoal-deep text-center tracking-[0.5em] placeholder:tracking-normal focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-4 pt-4">
-                <button
-                  onClick={() => setShow2FAModal(false)}
-                  className="px-4 py-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    setShow2FAModal(false);
-                    setSavedMessage('Two-factor authentication enabled (placeholder)');
-                    setTimeout(() => setSavedMessage(null), 3000);
-                  }}
-                  className="px-6 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
-                >
-                  Verify & Enable
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

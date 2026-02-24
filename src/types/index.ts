@@ -94,7 +94,12 @@ export {
   type OutfitSuggestion,
   type CalendarEvent,
   type CalendarConnection,
-  type UserPreferences
+  type UserPreferences,
+  type BackendCalendarEvent,
+  type CalendarConnectionStatus,
+  type ManualEventRequest,
+  type SuggestionPreferences,
+  PROVIDER_DISPLAY_NAMES
 } from './calendar';
 
 // ============================================

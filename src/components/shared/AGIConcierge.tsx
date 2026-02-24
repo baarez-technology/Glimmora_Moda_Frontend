@@ -52,20 +52,21 @@ export default function AGIConcierge() {
 
   // Load calendar events from service on mount
   useEffect(() => {
-    calendarService.getCalendarEvents().then((res) => {
-      if (res.success && res.data) {
-        const today = new Date();
-        const upcoming = res.data.find(event => new Date(event.date) >= today);
-        if (upcoming) {
-          setNextEvent(upcoming);
-          setMessages([{
-            id: '1',
-            role: 'assistant',
-            content: `Welcome to ModaGlimmora. I noticed you have "${upcoming.title}" coming up on ${new Date(upcoming.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. I've prepared outfit suggestions for you. How may I assist you today?`,
-            hasCalendarLink: true
-          }]);
-        }
+    calendarService.getCalendarEvents(false).then((backendEvents) => {
+      const events = backendEvents.map(calendarService.mapBackendToFrontendEvent);
+      const today = new Date();
+      const upcoming = events.find(event => new Date(event.date) >= today);
+      if (upcoming) {
+        setNextEvent(upcoming);
+        setMessages([{
+          id: '1',
+          role: 'assistant',
+          content: `Welcome to ModaGlimmora. I noticed you have "${upcoming.title}" coming up on ${new Date(upcoming.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}. I've prepared outfit suggestions for you. How may I assist you today?`,
+          hasCalendarLink: true
+        }]);
       }
+    }).catch(() => {
+      // Calendar not connected — use default message
     });
   }, []);
 

@@ -62,6 +62,8 @@ interface AppContextType {
 
   // Calendar Events
   calendarEvents: CalendarEvent[];
+  refreshCalendarEvents: () => Promise<void>;
+  reloadCalendarEvents: () => Promise<void>;
 
   // Toast Notifications
   toasts: Toast[];
@@ -92,7 +94,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
 
   // Auth state — single source of truth from AuthContext
-  const { userTier, isUHNI, setUserRole, logout } = useAuth();
+  const { userTier, isUHNI, isAuthenticated, setUserRole, logout } = useAuth();
 
   // Wishlist state (TODO: Move to dedicated hook)
   const [wishlist, setWishlist] = useState<WardrobeItem[]>([]);
@@ -144,18 +146,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    calendarService.getCalendarEvents().then(response => {
-      if (response.success) setBaseCalendarEvents(response.data);
-    }).catch(() => {
-      showToast('Failed to load calendar events', 'error');
-    });
+    // Only load calendar events when user is authenticated
+    if (isAuthenticated) {
+      // 1. Load existing events from DB immediately (fast — includes manual events)
+      calendarService.getCalendarEvents(false).then(backendEvents => {
+        const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
+        setBaseCalendarEvents(mapped);
+      }).catch(() => {
+        // Silently fail — user may not have a calendar connected
+      });
+
+      // 2. Auto-sync from Nylas in background (if calendar is connected)
+      //    This ensures events appear after OAuth connect without manual sync
+      calendarService.refreshCalendarEvents().then(refreshedEvents => {
+        const mapped = refreshedEvents.map(calendarService.mapBackendToFrontendEvent);
+        setBaseCalendarEvents(mapped);
+      }).catch(() => {
+        // No calendar connected or refresh failed — that's fine, DB events already loaded
+      });
+    }
     productService.getAllProducts().then(response => {
       if (response.success) setAllProducts(response.data);
-    }).catch(() => {
-      showToast('Failed to load products', 'error');
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    }).catch(console.error);
+  }, [isAuthenticated]);
 
   // Generate dynamic calendar events with outfit suggestions based on wardrobe
   const calendarEvents = useMemo<CalendarEvent[]>(() => {
@@ -164,6 +177,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       outfitSuggestions: generateOutfitSuggestions(event as CalendarEvent, wardrobe, allProducts)
     }));
   }, [baseCalendarEvents, wardrobe, allProducts]);
+
+  // Refresh calendar events from Nylas backend (requires calendar connection)
+  const refreshCalendarEvents = useCallback(async () => {
+    try {
+      const backendEvents = await calendarService.refreshCalendarEvents();
+      const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
+      setBaseCalendarEvents(mapped);
+    } catch (err) {
+      console.error('Failed to refresh calendar events:', err);
+    }
+  }, []);
+
+  // Reload calendar events from DB (works for manual events too)
+  const reloadCalendarEvents = useCallback(async () => {
+    try {
+      const backendEvents = await calendarService.getCalendarEvents(false);
+      const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
+      setBaseCalendarEvents(mapped);
+    } catch (err) {
+      console.error('Failed to reload calendar events:', err);
+    }
+  }, []);
 
   const {
     savedOutfits,
@@ -311,6 +346,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // Calendar
       calendarEvents,
+      refreshCalendarEvents,
+      reloadCalendarEvents,
 
       // Toasts
       toasts,

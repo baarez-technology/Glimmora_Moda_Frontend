@@ -6,9 +6,20 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { brandLogin } from '@/services/auth.service';
+import { brandLogin, userLogin, storeUserAuth, socialSignIn } from '@/services/auth.service';
+import { signInWithGoogle, signInWithApple } from '@/lib/firebase';
 
-type DemoTier = 'consumer' | 'uhni' | 'brand';
+type LoginTier = 'consumer' | 'uhni' | 'brand';
+
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+const PASSWORD_RULES = [
+  { regex: /.{8,}/, label: 'At least 8 characters' },
+  { regex: /[a-z]/, label: 'A lowercase letter' },
+  { regex: /[A-Z]/, label: 'An uppercase letter' },
+  { regex: /[0-9]/, label: 'A number' },
+  { regex: /[^a-zA-Z0-9]/, label: 'A special character (!@#$...)' },
+];
 
 function LoginForm() {
   const router = useRouter();
@@ -16,10 +27,10 @@ function LoginForm() {
   const redirectUrl = searchParams.get('redirect') || '/';
   const initialMode = searchParams.get('mode');
   const { showToast, setUserRole: setAppUserRole } = useApp();
-  const { setUserRole: setAuthUserRole } = useAuth();
+  const { setUserData } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<DemoTier>(
+  const [selectedTier, setSelectedTier] = useState<LoginTier>(
     initialMode === 'brand' ? 'brand' : 'consumer'
   );
   const [formData, setFormData] = useState({
@@ -27,26 +38,40 @@ function LoginForm() {
     password: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSocialLoading, setIsSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [touched, setTouched] = useState({ email: false, password: false });
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
+  // Validation
+  const emailError = touched.email && formData.email.length > 0 && !EMAIL_REGEX.test(formData.email)
+    ? 'Please enter a valid email address'
+    : null;
+
+  const failedPasswordRules = PASSWORD_RULES.filter(rule => !rule.regex.test(formData.password));
+  const passwordErrors = touched.password && formData.password.length > 0 ? failedPasswordRules : [];
+
+  const isFormValid = EMAIL_REGEX.test(formData.email) && failedPasswordRules.length === 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setTouched({ email: true, password: true });
+
+    if (!isFormValid) return;
+
     setIsSubmitting(true);
     setLoginError(null);
 
     if (selectedTier === 'brand') {
-      // Real brand partner login via API
       try {
         const data = await brandLogin({
           email: formData.email,
           password: formData.password,
         });
 
-        // Store tokens and brand data for persistent login
         localStorage.setItem('moda-brand-token', data.access_token);
         localStorage.setItem('moda-brand-refresh-token', data.refresh_token);
         localStorage.setItem('moda-brand-data', JSON.stringify(data.brand));
@@ -60,20 +85,84 @@ function LoginForm() {
         setIsSubmitting(false);
       }
     } else {
-      // Consumer/UHNI login (demo mode)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Consumer or UHNI login — send role to backend
+      try {
+        const data = await userLogin({
+          email: formData.email,
+          password: formData.password,
+          role: selectedTier,
+        });
 
-      const tier = selectedTier === 'uhni' ? 'uhni' : 'preferred';
-      setAuthUserRole(tier);
-      setAppUserRole(tier);
+        storeUserAuth(data);
+        setUserData(data.user);
 
-      if (selectedTier === 'uhni') {
+        const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+        setAppUserRole(tier as 'uhni' | 'preferred');
+
+        if (data.user.role === 'uhni') {
+          showToast('Welcome back. Your personal concierge is available.', 'success');
+        } else {
+          showToast('Welcome back to ModaGlimmora!', 'success');
+        }
+
+        if (data.context_required) {
+          if (redirectUrl && redirectUrl !== '/') {
+            localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+          }
+          router.push('/onboarding');
+        } else {
+          router.push(redirectUrl);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        setLoginError(message);
+        showToast(message, 'error');
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleSocialSignIn = async (provider: 'google' | 'apple') => {
+    setIsSocialLoading(provider);
+    setLoginError(null);
+
+    try {
+      const firebaseUser = provider === 'google'
+        ? await signInWithGoogle()
+        : await signInWithApple();
+
+      const role = selectedTier === 'uhni' ? 'uhni' : 'consumer';
+      const idToken = await firebaseUser.getIdToken();
+      const data = await socialSignIn(provider, idToken, role);
+
+      storeUserAuth(data);
+      setUserData(data.user);
+
+      const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+      setAppUserRole(tier as 'uhni' | 'preferred');
+
+      if (data.user.role === 'uhni') {
         showToast('Welcome back. Your personal concierge is available.', 'success');
       } else {
         showToast('Welcome back to ModaGlimmora!', 'success');
       }
 
-      router.push(redirectUrl);
+      if (data.context_required) {
+        if (redirectUrl && redirectUrl !== '/') {
+          localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+        }
+        router.push('/onboarding');
+      } else {
+        router.push(redirectUrl);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Social sign-in failed';
+      if (!message.includes('popup-closed-by-user')) {
+        setLoginError(message);
+        showToast(message, 'error');
+      }
+    } finally {
+      setIsSocialLoading(null);
     }
   };
 
@@ -150,6 +239,7 @@ function LoginForm() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Email */}
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                 Email
@@ -158,12 +248,19 @@ function LoginForm() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                onBlur={() => setTouched(t => ({ ...t, email: true }))}
+                className={`w-full px-5 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                  emailError ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                }`}
                 placeholder={selectedTier === 'brand' ? 'partner@brand.com' : 'your@email.com'}
                 required
               />
+              {emailError && (
+                <p className="text-xs text-error mt-2">{emailError}</p>
+              )}
             </div>
 
+            {/* Password */}
             <div>
               <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
                 Password
@@ -173,7 +270,10 @@ function LoginForm() {
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-5 py-4 pr-14 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onBlur={() => setTouched(t => ({ ...t, password: true }))}
+                  className={`w-full px-5 py-4 pr-14 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                    passwordErrors.length > 0 ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                  }`}
                   placeholder="Enter your password"
                   required
                 />
@@ -185,6 +285,15 @@ function LoginForm() {
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
+              {passwordErrors.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {passwordErrors.map((rule) => (
+                    <p key={rule.label} className="text-xs text-error">
+                      Missing: {rule.label}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Login Error */}
@@ -194,10 +303,10 @@ function LoginForm() {
               </div>
             )}
 
-            {/* Demo Mode Tier Selector */}
+            {/* Account Type Selector */}
             <div className="p-4 bg-parchment/50 border border-sand/50">
               <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-4">
-                Demo Mode — Select Experience
+                Select Account Type
               </p>
               <div className="grid grid-cols-3 gap-3">
                 <button
@@ -250,12 +359,10 @@ function LoginForm() {
 
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isFormValid}
               className={`w-full py-4 px-6 flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed ${
                 selectedTier === 'uhni'
                   ? 'bg-gold-deep text-white hover:bg-gold-deep/90'
-                  : selectedTier === 'brand'
-                  ? 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
                   : 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
               }`}
             >
@@ -277,14 +384,59 @@ function LoginForm() {
                 </>
               )}
             </button>
-
-            {/* Demo hint */}
-            <p className="text-center text-taupe text-xs">
-              {selectedTier === 'brand'
-                ? 'Demo mode: Access the Dior brand partner dashboard'
-                : 'Demo mode: Use any email and password to explore'}
-            </p>
           </form>
+
+          {/* Social Login — only for consumer & uhni */}
+          {selectedTier !== 'brand' && (
+            <>
+              <div className="relative my-10">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-sand"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="px-4 bg-ivory-cream text-[10px] tracking-[0.2em] uppercase text-taupe">
+                    or sign in with
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  type="button"
+                  onClick={() => handleSocialSignIn('google')}
+                  disabled={isSocialLoading !== null}
+                  className="py-4 px-6 border border-sand text-charcoal-deep flex items-center justify-center gap-3 hover:border-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSocialLoading === 'google' ? (
+                    <div className="w-4 h-4 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" />
+                      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                    </svg>
+                  )}
+                  <span className="text-sm tracking-[0.1em] uppercase">Google</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSocialSignIn('apple')}
+                  disabled={isSocialLoading !== null}
+                  className="py-4 px-6 border border-sand text-charcoal-deep flex items-center justify-center gap-3 hover:border-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {isSocialLoading === 'apple' ? (
+                    <div className="w-4 h-4 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                    </svg>
+                  )}
+                  <span className="text-sm tracking-[0.1em] uppercase">Apple</span>
+                </button>
+              </div>
+            </>
+          )}
 
           <p className="text-center text-stone mt-10">
             {selectedTier === 'brand' ? (
@@ -299,7 +451,7 @@ function LoginForm() {
               </>
             ) : (
               <>
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <Link href="/auth/register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
                   Create account
                 </Link>

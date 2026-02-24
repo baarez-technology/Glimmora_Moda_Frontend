@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut, AlertTriangle, Sun, Moon, Monitor } from 'lucide-react';
+import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut, User, Crown, AlertTriangle, Sun, Moon, Monitor } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { userLogout } from '@/services/auth.service';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, isHydrated } = useAuth();
+  const { isAuthenticated, isHydrated, userData: authUserData, logout: authLogout } = useAuth();
   const { showToast, setUserRole, userTier } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [notifications, setNotifications] = useState(() => {
@@ -104,7 +105,9 @@ export default function SettingsPage() {
   };
 
   const handleSignOut = () => {
+    userLogout();
     localStorage.removeItem('moda-user-tier');
+    authLogout();
     setUserRole('standard');
     showToast('You have been signed out', 'success');
     router.push('/');
@@ -143,6 +146,9 @@ export default function SettingsPage() {
   const handleDeleteAccount = () => {
     if (deleteConfirmText !== 'DELETE') return;
     clearAllUserData();
+    userLogout();
+    authLogout();
+    setUserRole('standard');
     showToast('Account data deleted', 'success');
     setShowDeleteConfirm(false);
     setShowDeleteFinal(false);
@@ -176,6 +182,99 @@ export default function SettingsPage() {
 
       {/* Settings Sections */}
       <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 space-y-8 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        {/* Personal Information */}
+        <div className="bg-white p-8">
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+              <User size={18} className="text-charcoal-deep" />
+            </div>
+            <div>
+              <h2 className="font-display text-xl text-charcoal-deep">Personal Information</h2>
+              <p className="text-sm text-stone">Your account details</p>
+            </div>
+          </div>
+
+          {authUserData ? (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between py-5 border-b border-sand">
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Full Name</p>
+                  <p className="font-medium text-charcoal-deep">{authUserData.first_name} {authUserData.last_name}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-5 border-b border-sand">
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Email</p>
+                  <p className="font-medium text-charcoal-deep">{authUserData.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-5 border-b border-sand">
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Account Type</p>
+                  <div className="flex items-center gap-2">
+                    {authUserData.role === 'uhni' ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold-soft/10 border border-gold-soft/30">
+                        <Crown size={10} className="text-gold-deep" />
+                        <span className="text-xs tracking-[0.15em] uppercase text-gold-deep font-medium">UHNI</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-charcoal-deep/5 border border-sand">
+                        <span className="text-xs tracking-[0.15em] uppercase text-charcoal-deep font-medium">Consumer</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between py-5 border-b border-sand">
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Member Since</p>
+                  <p className="font-medium text-charcoal-deep">
+                    {new Date(authUserData.created_at).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+              </div>
+              {authUserData.context_set && (
+                <div className="flex items-center justify-between py-5">
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Style Preferences</p>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {authUserData.occasions.map((occ) => (
+                        <span key={occ} className="px-3 py-1 border border-sand text-xs text-charcoal-deep capitalize">
+                          {occ.replace('-', ' ')}
+                        </span>
+                      ))}
+                      {authUserData.aesthetics.map((aes) => (
+                        <span key={aes} className="px-3 py-1 border border-gold-muted/30 text-xs text-gold-deep capitalize">
+                          {aes.replace('-', ' ')}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleManageFashionIdentity}
+                    className="text-sm text-charcoal-deep hover:text-gold-muted transition-colors tracking-[0.1em] uppercase flex-shrink-0"
+                  >
+                    Update
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between py-5 border-b border-sand">
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Account</p>
+                  <p className="font-medium text-charcoal-deep capitalize">{userTier} Account</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Notifications */}
         <div className="bg-white p-8">
           <div className="flex items-center gap-3 mb-8">
@@ -400,7 +499,9 @@ export default function SettingsPage() {
             <div>
               <h2 className="font-display text-xl text-charcoal-deep">Sign Out</h2>
               <p className="text-sm text-stone">
-                {userTier === 'uhni' ? 'UHNI Account' : 'Consumer Account'}
+                {authUserData
+                  ? `${authUserData.email} — ${authUserData.role === 'uhni' ? 'UHNI' : 'Consumer'} Account`
+                  : userTier === 'uhni' ? 'UHNI Account' : 'Consumer Account'}
               </p>
             </div>
           </div>

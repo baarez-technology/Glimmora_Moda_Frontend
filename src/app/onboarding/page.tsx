@@ -4,12 +4,16 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palette } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import { setUserContext, getStoredUserToken } from '@/services/auth.service';
 
 type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
 
 export default function OnboardingPage() {
   const { showToast, fashionIdentity, updateFashionIdentity } = useApp();
+  const { setUserData } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>('welcome');
+  const [isSavingContext, setIsSavingContext] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -82,14 +86,13 @@ export default function OnboardingPage() {
     }));
   };
 
-  const nextStep = () => {
+  const nextStep = async () => {
     const steps: Step[] = ['welcome', 'occasions', 'aesthetics', 'confidence', 'budget', 'complete'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex < steps.length - 1) {
       const nextStepValue = steps[currentIndex + 1];
       if (nextStepValue === 'complete') {
         // Create complete FashionIdentity object matching the type schema
-        // Use default value for empty confidenceLevel
         const confidenceLevel = selections.confidenceLevel || 'guided';
         const newFashionIdentity = {
           occasions: selections.occasions,
@@ -102,6 +105,31 @@ export default function OnboardingPage() {
 
         // Update through AppContext (which also persists to localStorage)
         updateFashionIdentity(newFashionIdentity);
+
+        // Call set-context API if user is logged in with a real token
+        const token = getStoredUserToken();
+        if (token) {
+          setIsSavingContext(true);
+          try {
+            const minBudget = selections.budgetRange?.min ?? 0;
+            const maxBudget = selections.budgetRange?.max ?? 0;
+
+            const updatedUser = await setUserContext({
+              occasions: selections.occasions,
+              aesthetics: selections.aesthetics,
+              minimum_budget: minBudget,
+              maximum_budget: maxBudget,
+            });
+
+            // Update auth context with the fresh user data
+            setUserData(updatedUser);
+          } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to save preferences';
+            showToast(message, 'error');
+          } finally {
+            setIsSavingContext(false);
+          }
+        }
       }
       setCurrentStep(nextStepValue);
     }
@@ -434,13 +462,18 @@ export default function OnboardingPage() {
                 </button>
                 <button
                   onClick={nextStep}
-                  className="group inline-flex items-center gap-4"
+                  disabled={isSavingContext}
+                  className="group inline-flex items-center gap-4 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
                   <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
-                    Complete
+                    {isSavingContext ? 'Saving...' : 'Complete'}
                   </span>
                   <span className="w-12 h-12 bg-charcoal-deep flex items-center justify-center group-hover:bg-noir transition-all duration-300">
-                    <Check size={16} className="text-ivory-cream" />
+                    {isSavingContext ? (
+                      <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check size={16} className="text-ivory-cream" />
+                    )}
                   </span>
                 </button>
               </div>
