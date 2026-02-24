@@ -32,6 +32,9 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [collectionFilter, setCollectionFilter] = useState<string>('all');
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     loadProducts();
@@ -105,7 +108,11 @@ export default function ProductsPage() {
     { value: 'low-stock', label: 'Low Stock', count: activeProducts.filter(p => p.is_low_stock).length },
     { value: 'archived', label: 'Archived', count: activeProducts.filter(p => p.status === 'archived').length },
     { value: 'deleted', label: 'Deleted', count: deletedProducts.length },
-    // Apply sort
+  ];
+
+  const filteredAndSortedProducts = useMemo(() => {
+    const result = [...filteredProducts];
+
     result.sort((a, b) => {
       let cmp = 0;
       switch (sortField) {
@@ -126,7 +133,7 @@ export default function ProductsPage() {
     });
 
     return result;
-  }, [products, filter, collectionFilter, search, sortField, sortDir]);
+  }, [filteredProducts, sortField, sortDir]);
 
   // Pagination
   const totalPages = Math.max(1, Math.ceil(filteredAndSortedProducts.length / ITEMS_PER_PAGE));
@@ -151,14 +158,6 @@ export default function ProductsPage() {
     setCollectionFilter(value);
     setPage(1);
   };
-
-  const filterTabs: { value: FilterTab; label: string; count: number }[] = [
-    { value: 'all', label: 'All', count: products.length },
-    { value: 'published', label: 'Published', count: products.filter(p => p.status === 'published').length },
-    { value: 'draft', label: 'Draft', count: products.filter(p => p.status === 'draft').length },
-    { value: 'low-stock', label: 'Low Stock', count: products.filter(p => getTotalStock(p) <= 10).length },
-    { value: 'out-of-stock', label: 'Out of Stock', count: products.filter(p => getTotalStock(p) === 0).length }
-  ];
 
   if (isLoading) {
     return (
