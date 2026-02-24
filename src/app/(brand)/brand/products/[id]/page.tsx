@@ -19,26 +19,21 @@ import {
   X,
   Check,
   Minus,
-    ImageIcon
+    ImageIcon,
+    TrendingUp
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload } from '@/services/brand-product.service';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
+import type { ProductImage, ProductVariant, Material, ProductVisibility, ExperienceMode, PricingVisibility, CommerceAction } from '@/types';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
-import {
-  fetchProduct,
-  updateProduct,
-  softDeleteProduct,
-  setRegionalStocks,
-  fetchCollectionNames,
-} from '@/services/brand-product.service';
-import type {
-  BackendProduct,
-  RegionalStockItem,
-  RegionalStockAddPayload,
-  CollectionNameItem,
-} from '@/services/brand-product.service';
+
+interface CraftsmanshipItem {
+  title: string;
+  description: string;
+  duration?: string;
+}
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -67,8 +62,13 @@ export default function ProductDetailPage() {
   });
 
   const [productImages, setProductImages] = useState<string[]>([]);
+  const [images, setImages] = useState<ProductImage[]>([]);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [craftsmanship, setCraftsmanship] = useState<CraftsmanshipItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const markDirty = () => setHasChanges(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -121,7 +121,8 @@ export default function ProductDetailPage() {
       setMaterials([]);
       setCraftsmanship([]);
     } catch (err) {
-      setError('Failed to load product');
+      console.error('Failed to load product:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load product');
     } finally {
       setIsLoading(false);
     }
