@@ -148,11 +148,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Only load calendar events when user is authenticated
     if (isAuthenticated) {
+      // 1. Load existing events from DB immediately (fast — includes manual events)
       calendarService.getCalendarEvents(false).then(backendEvents => {
         const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
         setBaseCalendarEvents(mapped);
       }).catch(() => {
         // Silently fail — user may not have a calendar connected
+      });
+
+      // 2. Auto-sync from Nylas in background (if calendar is connected)
+      //    This ensures events appear after OAuth connect without manual sync
+      calendarService.refreshCalendarEvents().then(refreshedEvents => {
+        const mapped = refreshedEvents.map(calendarService.mapBackendToFrontendEvent);
+        setBaseCalendarEvents(mapped);
+      }).catch(() => {
+        // No calendar connected or refresh failed — that's fine, DB events already loaded
       });
     }
     productService.getAllProducts().then(response => {

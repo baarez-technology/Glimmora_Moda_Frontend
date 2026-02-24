@@ -98,7 +98,8 @@ export {
   type BackendCalendarEvent,
   type CalendarConnectionStatus,
   type ManualEventRequest,
-  type SuggestionPreferences
+  type SuggestionPreferences,
+  PROVIDER_DISPLAY_NAMES
 } from './calendar';
 
 // ============================================

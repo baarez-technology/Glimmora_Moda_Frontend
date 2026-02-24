@@ -81,6 +81,27 @@ function inferEventType(tags: string[]): EventType {
   return 'other';
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Strip HTML tags and decode entities (Outlook returns HTML descriptions) */
+function stripHtml(html: string): string {
+  if (typeof document !== 'undefined') {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    return (tmp.textContent || tmp.innerText || '').trim();
+  }
+  // SSR fallback: strip tags with regex
+  return html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .trim();
+}
+
 // ─── Backend → Frontend event mapping ────────────────────────────────────────
 
 export function mapBackendToFrontendEvent(
@@ -97,13 +118,13 @@ export function mapBackendToFrontendEvent(
 
   return {
     id: ev.event_id,
-    title: ev.title || 'Untitled Event',
+    title: ev.title ? stripHtml(ev.title) : 'Untitled Event',
     eventType: inferEventType(ev.tags || []),
     date: ev.event_date,
     time: ev.event_time || 'TBD',
     location: ev.location || undefined,
     venue: ev.location || undefined,
-    description: ev.description || undefined,
+    description: ev.description ? stripHtml(ev.description) : undefined,
     weather,
     // outfitSuggestions are generated client-side by AppContext
   };
@@ -145,11 +166,11 @@ export async function getConnectionStatus(): Promise<CalendarConnectionStatus> {
   return res.json();
 }
 
-/** List available calendars for connected user */
+/** List available calendars for all connected providers */
 export async function listCalendars(): Promise<{
   status: string;
   count: number;
-  calendars: Array<{ id: string; name: string; [key: string]: unknown }>;
+  calendars: Array<{ id: string; name: string; provider: string; [key: string]: unknown }>;
 }> {
   const res = await fetch(`/api/v1/calendar/calendars`, {
     headers: getUserAuthHeaders(),
@@ -163,24 +184,6 @@ export async function listCalendars(): Promise<{
   }
 
   return res.json();
-}
-
-/** Select which calendar to use for events */
-export async function selectCalendar(calendarId: string): Promise<void> {
-  const res = await fetch(
-    `/api/v1/calendar/calendars/select?calendar_id=${encodeURIComponent(calendarId)}`,
-    {
-      method: 'POST',
-      headers: getUserAuthHeaders(),
-    }
-  );
-
-  if (!res.ok) {
-    const err = await res
-      .json()
-      .catch(() => ({ detail: 'Failed to select calendar' }));
-    throw new Error(err.detail || `Select calendar failed (${res.status})`);
-  }
 }
 
 /** Get calendar events from DB (optionally refresh from Nylas first) */
@@ -278,9 +281,9 @@ export async function updateSuggestionPreferences(
   return res.json();
 }
 
-/** Disconnect calendar (revoke grant, remove connection) */
-export async function disconnectCalendar(): Promise<void> {
-  const res = await fetch(`/api/v1/calendar/disconnect`, {
+/** Disconnect a specific calendar provider */
+export async function disconnectCalendar(provider: string): Promise<void> {
+  const res = await fetch(`/api/v1/calendar/disconnect?provider=${encodeURIComponent(provider)}`, {
     method: 'DELETE',
     headers: getUserAuthHeaders(),
   });

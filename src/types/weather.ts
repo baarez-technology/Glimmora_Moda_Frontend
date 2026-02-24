@@ -9,7 +9,7 @@
 // ============================================
 
 export interface CalendarProviderConfig {
-  id: 'google' | 'apple' | 'outlook' | 'manual';
+  id: 'google' | 'icloud' | 'microsoft' | 'manual';
   name: string;
   icon: string;
   connected: boolean;

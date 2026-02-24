@@ -7,7 +7,7 @@
 import type { Product } from './product';
 
 // Calendar Provider
-export type CalendarProvider = 'google' | 'apple' | 'outlook' | 'manual';
+export type CalendarProvider = 'google' | 'icloud' | 'microsoft' | 'manual';
 
 // Event Type
 export type EventType =
@@ -97,12 +97,16 @@ export interface BackendCalendarEvent {
 export interface CalendarConnectionStatus {
   connected: boolean;
   your_user_id?: string;
-  email?: string;
-  grant_id?: string;
-  provider?: string;
-  calendar_id?: string | null;
+  grants?: { google: string | null; microsoft: string | null; icloud: string | null };
+  emails?: { google?: string; microsoft?: string; icloud?: string };
   detail?: string;
 }
+
+export const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
+  google: 'Google Calendar',
+  icloud: 'Apple Calendar',
+  microsoft: 'Outlook Calendar',
+};
 
 // ─── Manual Event Request ────────────────────────────────────────────────────
 

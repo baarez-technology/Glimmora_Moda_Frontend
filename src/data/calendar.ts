@@ -13,11 +13,11 @@ export const mockCalendarConnections: CalendarConnection[] = [
     calendarsSelected: ['Personal', 'Work']
   },
   {
-    provider: 'apple',
+    provider: 'icloud',
     connected: false
   },
   {
-    provider: 'outlook',
+    provider: 'microsoft',
     connected: false
   }
 ];
