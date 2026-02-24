@@ -3,37 +3,18 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, Search, Plus, Clock, CheckCircle, Package, MessageCircle, ChevronRight, AlertCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 
 export default function SourcingPage() {
-  const router = useRouter();
-  const { isUHNI, sourcingRequests, concierge } = useApp();
+  const { sourcingRequests, concierge } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
-
-  // Redirect non-UHNI users
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI) {
-    return (
-      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -108,11 +89,11 @@ export default function SourcingPage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`flex items-start justify-between gap-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -298,11 +279,97 @@ export default function SourcingPage() {
                         </span>
                       )}
                     </div>
-                    <button className="flex items-center gap-1 text-sm text-charcoal-deep hover:text-gold-muted transition-colors">
-                      <span className="tracking-[0.1em] uppercase">View Details</span>
-                      <ChevronRight size={14} />
+                    <button
+                      onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
+                      className="flex items-center gap-1 text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
+                    >
+                      <span className="tracking-[0.1em] uppercase">
+                        {expandedRequest === request.id ? 'Hide Details' : 'View Details'}
+                      </span>
+                      <ChevronRight size={14} className={`transition-transform ${expandedRequest === request.id ? 'rotate-90' : ''}`} />
                     </button>
                   </div>
+
+                  {/* Expanded Details */}
+                  {expandedRequest === request.id && (
+                    <div className="mt-4 pt-4 border-t border-sand space-y-4">
+                      {/* All Concierge Notes */}
+                      {request.conciergeNotes.length > 0 && (
+                        <div>
+                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Conversation History</p>
+                          <div className="space-y-3">
+                            {request.conciergeNotes.map((note) => (
+                              <div key={note.id} className={`p-3 text-sm ${note.author === 'concierge' ? 'bg-parchment text-charcoal-deep' : 'bg-charcoal-deep/5 text-stone'}`}>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="text-[10px] tracking-[0.15em] uppercase font-medium">
+                                    {note.author === 'concierge' ? concierge?.name || 'Concierge' : 'You'}
+                                  </span>
+                                  <span className="text-[10px] text-taupe">
+                                    {new Date(note.timestamp).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                <p>{note.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* All Found Options */}
+                      {request.foundOptions.length > 0 && (
+                        <div>
+                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">All Options ({request.foundOptions.length})</p>
+                          <div className="space-y-3">
+                            {request.foundOptions.map((option) => (
+                              <div key={option.id} className="flex gap-4 p-3 bg-parchment/50">
+                                <div className="relative w-20 h-20 bg-parchment flex-shrink-0">
+                                  {option.images[0] && (
+                                    <Image src={option.images[0]} alt={option.customDescription || 'Option'} fill className="object-cover" />
+                                  )}
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-charcoal-deep">{option.customDescription}</p>
+                                  <p className="text-xs text-stone mt-0.5">Source: {option.source}</p>
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <span className="text-sm font-medium text-charcoal-deep">€{option.price.toLocaleString()}</span>
+                                    {option.originalPrice && (
+                                      <span className="text-xs text-stone line-through">€{option.originalPrice.toLocaleString()}</span>
+                                    )}
+                                    <span className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-white text-stone">{option.condition}</span>
+                                  </div>
+                                  {option.conciergeRecommendation && (
+                                    <p className="text-xs text-gold-muted mt-1">{option.conciergeRecommendation}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Request Metadata */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-parchment/30">
+                        <div>
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Type</p>
+                          <p className="text-sm text-charcoal-deep capitalize">{request.type.replace('_', ' ')}</p>
+                        </div>
+                        {request.occasion && (
+                          <div>
+                            <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Occasion</p>
+                            <p className="text-sm text-charcoal-deep">{request.occasion}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Last Updated</p>
+                          <p className="text-sm text-charcoal-deep">{new Date(request.updatedAt).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Notes</p>
+                          <p className="text-sm text-charcoal-deep">{request.conciergeNotes.length} messages</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

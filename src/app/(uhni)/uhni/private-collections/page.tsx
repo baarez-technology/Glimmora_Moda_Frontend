@@ -3,36 +3,42 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Lock, Sparkles, Calendar, Eye, Crown, MessageCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { mockPrivateCollections } from '@/data';
+import { getPrivateCollections, requestCollectionAccess } from '@/services/uhni.service';
 import type { PrivateCollection } from '@/types';
 
 type FilterType = 'all' | 'available' | 'upcoming' | 'invitation';
 
 export default function PrivateCollectionsPage() {
-  const router = useRouter();
-  const { isUHNI, concierge, showToast } = useApp();
+  const { concierge, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
+  const [collections, setCollections] = useState<PrivateCollection[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   useEffect(() => {
-    setIsLoaded(true);
+    const loadData = async () => {
+      setIsDataLoading(true);
+      try {
+        const res = await getPrivateCollections();
+        setCollections(res.data);
+      } catch {
+        showToast('Failed to load collections', 'error');
+      } finally {
+        setIsDataLoading(false);
+        setIsLoaded(true);
+      }
+    };
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI) {
+  if (isDataLoading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
+          <p className="text-stone text-sm">Loading collections...</p>
         </div>
       </div>
     );
@@ -45,7 +51,7 @@ export default function PrivateCollectionsPage() {
     { value: 'invitation', label: 'Invitation Required' },
   ];
 
-  const filteredCollections = mockPrivateCollections.filter(collection => {
+  const filteredCollections = collections.filter(collection => {
     if (filter === 'all') return true;
     if (filter === 'available') return collection.hasAccess && new Date(collection.previewDate) <= new Date();
     if (filter === 'upcoming') return new Date(collection.previewDate) > new Date();
@@ -66,8 +72,13 @@ export default function PrivateCollectionsPage() {
     return { text: 'Preview Available', className: 'bg-gold-muted/10 text-gold-muted' };
   };
 
-  const handleRequestAccess = (collection: PrivateCollection) => {
-    showToast(`Access request sent for ${collection.name}`, 'success');
+  const handleRequestAccess = async (collection: PrivateCollection) => {
+    try {
+      await requestCollectionAccess(collection.id);
+      showToast(`Access request sent for ${collection.name}`, 'success');
+    } catch {
+      showToast('Failed to send access request', 'error');
+    }
   };
 
   return (
@@ -76,11 +87,11 @@ export default function PrivateCollectionsPage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>

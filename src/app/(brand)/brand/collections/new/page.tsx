@@ -7,6 +7,8 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Upload } from 'lucide-react';
 import { createCollection } from '@/services/brand-collection.service';
 import { uploadImage } from '@/services/brand-product.service';
+import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
+import { useBrand } from '@/context/BrandContext';
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -29,6 +31,8 @@ export default function NewCollectionPage() {
 
   const validateAndSetImage = (file: File) => {
     setImageError(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
     if (!ACCEPTED_TYPES.includes(file.type)) {
       setImageError('Invalid file type. Please upload a PNG, JPG, or WebP image.');
@@ -208,6 +212,14 @@ export default function NewCollectionPage() {
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                 placeholder="Describe the collection, its inspiration, and key themes..."
               />
+              <select
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value as 'draft' | 'published' })}
+                className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors bg-white"
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </select>
             </div>
           </div>
 
@@ -281,22 +293,21 @@ export default function NewCollectionPage() {
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-4">
-            <Link
-              href="/brand/collections"
-              className="px-6 py-3 text-sm text-stone hover:text-charcoal-deep transition-colors"
-            >
-              Cancel
-            </Link>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors disabled:opacity-50"
-            >
-              {isSubmitting ? 'Creating...' : 'Create Collection'}
-            </button>
-          </div>
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-4">
+          <Link
+            href="/brand/collections"
+            className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-wide hover:bg-parchment transition-colors"
+          >
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            disabled={isSubmitting || !formData.name.trim()}
+            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+          >
+            {isSubmitting ? 'Creating...' : 'Create Collection'}
+          </button>
         </div>
       </form>
     </div>

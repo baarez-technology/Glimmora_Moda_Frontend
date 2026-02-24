@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   User,
   Mail,
@@ -63,13 +64,24 @@ export default function UserProfilePage() {
   });
 
   const [notifications, setNotifications] = useState({
-    emailOrders: brandApiData?.email_notification?.order_updates ?? true,
-    emailAlerts: brandApiData?.email_notification?.inventory_alerts ?? true,
-    emailReports: brandApiData?.email_notification?.weekly_reports ?? false,
-    pushOrders: brandApiData?.push_notification?.order_updates ?? true,
-    pushAlerts: brandApiData?.push_notification?.urgent_alerts ?? true,
-    pushReports: brandApiData?.push_notification?.daily_digest ?? false
+    emailOrders: true,
+    emailAlerts: true,
+    emailReports: false,
+    pushOrders: true,
+    pushAlerts: true,
+    pushReports: false
   });
+
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const twoFAModalRef = useModalAccessibility(show2FAModal, () => setShow2FAModal(false));
+
+  // Early return AFTER all hooks
+  if (!partner || !currentUser) return null;
 
   const tabs: { id: ProfileTab; label: string; icon: React.ElementType }[] = [
     { id: 'personal', label: 'Personal Info', icon: User },
@@ -269,7 +281,7 @@ export default function UserProfilePage() {
                     ref={avatarInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleAvatarChange}
+                    onChange={handleAvatarFileChange}
                     className="hidden"
                   />
                 </div>

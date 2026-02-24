@@ -9,8 +9,6 @@ import {
   RefreshCw,
   Eye,
   Shirt,
-  ToggleLeft,
-  ToggleRight,
   DollarSign,
   Heart,
   XCircle,
@@ -29,6 +27,9 @@ export default function ZeroUIPage() {
   useEffect(() => {
     uhniService.getZeroUIConfig().then(res => {
       if (res.data) setConfig(res.data);
+    }).catch(() => {
+      showToast('Failed to load configuration', 'error');
+    }).finally(() => {
       setIsLoaded(true);
     });
   }, []);
@@ -69,7 +70,7 @@ export default function ZeroUIPage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount);
   };
 
   return (
@@ -117,13 +118,29 @@ export default function ZeroUIPage() {
                             <FeatureIcon size={20} className={isActive ? 'text-gold-deep' : 'text-stone'} />
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          {isActive ? (
-                            <ToggleRight size={28} className="text-gold-deep" />
-                          ) : (
-                            <ToggleLeft size={28} className="text-stone/40" />
-                          )}
-                        </div>
+                        <button
+                          role="switch"
+                          aria-checked={isActive}
+                          aria-label={`Toggle ${feature.name}`}
+                          onClick={async () => {
+                            try {
+                              const updated = { ...config, [feature.key]: !isActive };
+                              setConfig(updated);
+                              await uhniService.updateZeroUIConfig({ [feature.key]: !isActive });
+                              showToast(`${feature.name} ${!isActive ? 'enabled' : 'disabled'}`, 'success');
+                            } catch {
+                              setConfig(config);
+                              showToast('Failed to update setting', 'error');
+                            }
+                          }}
+                          className={`w-14 h-8 rounded-full transition-colors relative ${
+                            isActive ? 'bg-gold-deep' : 'bg-sand'
+                          }`}
+                        >
+                          <div className={`w-6 h-6 bg-white rounded-full absolute top-1 transition-transform ${
+                            isActive ? 'translate-x-7' : 'translate-x-1'
+                          }`} />
+                        </button>
                       </div>
                       <h3 className="font-display text-lg text-charcoal-deep mb-2">{feature.name}</h3>
                       <p className="text-sm text-stone leading-relaxed">{feature.description}</p>

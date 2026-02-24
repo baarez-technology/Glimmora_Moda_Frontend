@@ -2,28 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, Zap, DollarSign, ShoppingBag, Eye, EyeOff, Package, Bell, ChevronRight, Info } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { ProductCategory } from '@/types';
 
 export default function AutonomousShoppingPage() {
-  const router = useRouter();
-  const { isUHNI, autonomousSettings, updateAutonomousSettings, autonomousActivity, showToast } = useApp();
+  const { autonomousSettings, updateAutonomousSettings, autonomousActivity, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  // Redirect non-UHNI users
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI || !autonomousSettings) {
+  if (!autonomousSettings) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
@@ -65,11 +56,11 @@ export default function AutonomousShoppingPage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`flex items-center gap-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -126,6 +117,9 @@ export default function AutonomousShoppingPage() {
                 </div>
               </div>
               <button
+                role="switch"
+                aria-checked={autonomousSettings.enabled}
+                aria-label="Toggle autonomous shopping"
                 onClick={() => handleToggle('enabled')}
                 className={`w-14 h-8 rounded-full transition-colors relative ${
                   autonomousSettings.enabled ? 'bg-success' : 'bg-sand'
@@ -238,6 +232,9 @@ export default function AutonomousShoppingPage() {
                   <p className="text-sm text-stone">No email confirmations, minimal digital trail</p>
                 </div>
                 <button
+                  role="switch"
+                  aria-checked={autonomousSettings.invisibleCommerceMode}
+                  aria-label="Toggle invisible commerce mode"
                   onClick={() => handleToggle('invisibleCommerceMode')}
                   className={`w-14 h-8 rounded-full transition-colors relative ${
                     autonomousSettings.invisibleCommerceMode ? 'bg-charcoal-deep' : 'bg-sand'
@@ -256,6 +253,9 @@ export default function AutonomousShoppingPage() {
                   <p className="text-sm text-stone">Unbranded exterior, no product descriptions visible</p>
                 </div>
                 <button
+                  role="switch"
+                  aria-checked={autonomousSettings.discreetPackaging}
+                  aria-label="Toggle discreet packaging"
                   onClick={() => handleToggle('discreetPackaging')}
                   className={`w-14 h-8 rounded-full transition-colors relative ${
                     autonomousSettings.discreetPackaging ? 'bg-charcoal-deep' : 'bg-sand'

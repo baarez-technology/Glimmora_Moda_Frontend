@@ -31,6 +31,9 @@ export default function ConciergeTasksPage() {
   useEffect(() => {
     uhniService.getConciergeTasks().then(res => {
       if (res.data) setTasks(res.data);
+    }).catch(() => {
+      showToast('Failed to load tasks', 'error');
+    }).finally(() => {
       setIsLoaded(true);
     });
   }, []);

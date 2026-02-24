@@ -15,7 +15,10 @@
       "Bash(npx mammoth:*)",
       "Bash(npm install:*)",
       "Bash(node -e:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(echo:*)",
+      "Bash(npx next lint:*)",
+      "Bash(curl:*)"
     ]
   }
 }

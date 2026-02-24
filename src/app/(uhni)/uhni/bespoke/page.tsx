@@ -2,38 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { ArrowLeft, Crown, Gem, Plus, Clock, CheckCircle, Ruler, Palette, Scissors, Eye, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { BespokeOrderStatus } from '@/types';
 
 export default function BespokeOrdersPage() {
-  const router = useRouter();
-  const { isUHNI, bespokeOrders, concierge } = useApp();
+  const { bespokeOrders, concierge } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
-
-  // Redirect non-UHNI users
-  useEffect(() => {
-    if (!isUHNI) {
-      router.push('/profile');
-    }
-  }, [isUHNI, router]);
-
-  if (!isUHNI) {
-    return (
-      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading...</p>
-        </div>
-      </div>
-    );
-  }
 
   const getStatusIcon = (status: BespokeOrderStatus) => {
     switch (status) {
@@ -90,11 +71,11 @@ export default function BespokeOrdersPage() {
       <div className="bg-charcoal-deep">
         <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
-            href="/profile"
+            href="/uhni"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
           >
             <ArrowLeft size={16} />
-            Back to Profile
+            Back to Dashboard
           </Link>
 
           <div className={`flex items-start justify-between gap-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
@@ -200,6 +181,7 @@ export default function BespokeOrdersPage() {
                 <div className="p-6 bg-parchment/30">
                   <button
                     onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                    aria-expanded={expandedOrder === order.id}
                     className="w-full flex items-center justify-between"
                   >
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Production Timeline</span>
@@ -295,8 +277,8 @@ export default function BespokeOrdersPage() {
                     <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Progress Photos</p>
                     <div className="flex gap-2 overflow-x-auto">
                       {order.progressImages.map((img, index) => (
-                        <div key={index} className="w-20 h-20 bg-parchment flex-shrink-0">
-                          {/* Placeholder for images */}
+                        <div key={index} className="w-20 h-20 bg-parchment flex-shrink-0 relative overflow-hidden">
+                          <Image src={img} alt={`Progress ${index + 1}`} fill className="object-cover" />
                         </div>
                       ))}
                     </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowLeft,
   Save,
@@ -14,13 +15,16 @@ import {
   MapPin,
   AlertTriangle,
   Loader2,
-  TrendingUp,
   Plus,
   X,
   Check,
   Minus,
+    ImageIcon
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
+import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload } from '@/services/brand-product.service';
+import { useModalAccessibility } from '@/hooks/useModalAccessibility';
+import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
 import {
   fetchProduct,
@@ -53,13 +57,33 @@ export default function ProductDetailPage() {
     collection_name: '',
     product_description: '',
     tagline: '',
+    narrative: '',
     status: 'draft',
+    ivEnabled: false,
+    visibility: 'public' as ProductVisibility,
+    experienceMode: 'standard' as ExperienceMode,
+    pricingVisibility: 'visible' as PricingVisibility,
+    commerceAction: 'add_to_considerations' as CommerceAction,
   });
 
   const [productImages, setProductImages] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const deleteModalRef = useModalAccessibility(showDeleteConfirm, () => setShowDeleteConfirm(false));
+
+  // Image URL input
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrlError, setImageUrlError] = useState('');
+
+  // Inline add forms
+  const [newVariant, setNewVariant] = useState({ type: 'size' as ProductVariant['type'], name: '', value: '' });
+  const [newMaterial, setNewMaterial] = useState({ name: '', composition: '', origin: '' });
+  const [newCraft, setNewCraft] = useState({ title: '', description: '', duration: '' });
+
+  // Initialize form from product
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
 
@@ -83,15 +107,36 @@ export default function ProductDetailPage() {
         collection_name: data.collection_name,
         product_description: data.product_description,
         tagline: data.tagline,
+        narrative: '',
         status: data.status,
+        ivEnabled: false,
+        visibility: 'public' as ProductVisibility,
+        experienceMode: 'standard' as ExperienceMode,
+        pricingVisibility: 'visible' as PricingVisibility,
+        commerceAction: 'add_to_considerations' as CommerceAction,
       });
-      setProductImages(data.product_images || []);
+      setProductImages(data.product_images ? [...data.product_images] : []);
+      setImages([]);
+      setVariants([]);
+      setMaterials([]);
+      setCraftsmanship([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load product');
+      setError('Failed to load product');
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Unsaved changes warning
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (hasChanges) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasChanges]);
 
   if (isLoading) {
     return (
@@ -154,15 +199,118 @@ export default function ProductDetailPage() {
     } catch (err) {
       console.error('Failed to save stocks:', err);
     }
+    setToastMessage('Stock updated successfully');
   };
 
-  const handleDelete = async () => {
-    try {
-      await softDeleteProduct(productId);
-      router.push('/brand/products');
-    } catch (err) {
-      console.error('Failed to delete:', err);
-    }
+  // ============================================
+  // DELETE
+  // ============================================
+
+  const computedTotalStock = product.regional_stocks.reduce((sum, s) => sum + s.units, 0);
+  const isDeleteDangerous = product.status === 'published' && computedTotalStock > 0;
+
+  const handleDelete = () => {
+    softDeleteProduct(productId);
+    router.push('/brand/products');
+  };
+
+  // ============================================
+  // IMAGES
+  // ============================================
+
+  const handleAddImage = () => {
+    const trimmed = imageUrl.trim();
+    if (!trimmed) { setImageUrlError('URL cannot be empty'); return; }
+    try { new URL(trimmed); } catch { setImageUrlError('Please enter a valid URL'); return; }
+    setImageUrlError('');
+    const imageType = images.length === 0 ? 'hero' : 'detail';
+    setImages(prev => [...prev, {
+      id: `img-${Date.now()}`,
+      url: trimmed,
+      alt: formData.product_name || 'Product image',
+      type: imageType as ProductImage['type'],
+    }]);
+    setImageUrl('');
+    markDirty();
+  };
+
+  const handleRemoveImage = (id: string) => {
+    setImages(prev => prev.filter(img => img.id !== id));
+    markDirty();
+  };
+
+  // ============================================
+  // VARIANTS
+  // ============================================
+
+  const handleAddVariant = () => {
+    if (!newVariant.name.trim() || !newVariant.value.trim()) return;
+    setVariants(prev => [...prev, {
+      id: `var-${Date.now()}`,
+      type: newVariant.type,
+      name: newVariant.name.trim(),
+      value: newVariant.value.trim(),
+      available: true,
+    }]);
+    setNewVariant({ type: 'size', name: '', value: '' });
+    markDirty();
+  };
+
+  const handleRemoveVariant = (id: string) => {
+    setVariants(prev => prev.filter(v => v.id !== id));
+    markDirty();
+  };
+
+  // ============================================
+  // MATERIALS
+  // ============================================
+
+  const handleAddMaterial = () => {
+    if (!newMaterial.name.trim() || !newMaterial.composition.trim()) return;
+    setMaterials(prev => [...prev, {
+      name: newMaterial.name.trim(),
+      composition: newMaterial.composition.trim(),
+      origin: newMaterial.origin.trim(),
+    }]);
+    setNewMaterial({ name: '', composition: '', origin: '' });
+    markDirty();
+  };
+
+  const handleRemoveMaterial = (index: number) => {
+    setMaterials(prev => prev.filter((_, i) => i !== index));
+    markDirty();
+  };
+
+  // ============================================
+  // CRAFTSMANSHIP
+  // ============================================
+
+  const handleAddCraft = () => {
+    if (!newCraft.title.trim() || !newCraft.description.trim()) return;
+    setCraftsmanship(prev => [...prev, {
+      title: newCraft.title.trim(),
+      description: newCraft.description.trim(),
+      duration: newCraft.duration.trim() || undefined,
+    }]);
+    setNewCraft({ title: '', description: '', duration: '' });
+    markDirty();
+  };
+
+  const handleRemoveCraft = (index: number) => {
+    setCraftsmanship(prev => prev.filter((_, i) => i !== index));
+    markDirty();
+  };
+
+  // ============================================
+  // HELPERS
+  // ============================================
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 0
+    }).format(value);
   };
 
   const totalUnits = product.performance_metrics.total_units;
@@ -484,15 +632,31 @@ export default function ProductDetailPage() {
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowDeleteConfirm(false)}
           />
-          <div className="relative bg-white border border-sand p-8 max-w-md w-full mx-4">
-            <h3 className="font-display text-xl text-charcoal-deep mb-3">Delete Product</h3>
-            <p className="text-stone text-sm leading-relaxed mb-2">
-              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.product_name}</span>?
-            </p>
-            <p className="text-taupe text-xs mb-6">
-              This product will be soft-deleted and set as inactive.
-            </p>
-            <div className="flex items-center justify-end gap-3">
+          <div
+            ref={deleteModalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            className="relative bg-white w-full max-w-md shadow-2xl p-8"
+          >
+            <div className="text-center mb-6">
+              <div className="w-14 h-14 bg-error/10 flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-error" />
+              </div>
+              <h3 id="delete-modal-title" className="font-display text-xl text-charcoal-deep mb-2">Delete Product</h3>
+              <p className="text-sm text-stone">
+                Are you sure you want to delete <span className="font-medium text-charcoal-deep">{product.product_name}</span>? This action cannot be undone.
+              </p>
+              {isDeleteDangerous && (
+                <div className="mt-4 flex items-start gap-2 bg-warning/10 border border-warning/20 p-3 text-left">
+                  <AlertTriangle size={16} className="text-warning shrink-0 mt-0.5" />
+                  <p className="text-xs text-warning">
+                    This product is currently <strong>published</strong> with <strong>{computedTotalStock} units</strong> in stock. Deleting it will remove it from all storefronts immediately.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 className="px-5 py-2.5 text-sm text-stone hover:text-charcoal-deep transition-colors"

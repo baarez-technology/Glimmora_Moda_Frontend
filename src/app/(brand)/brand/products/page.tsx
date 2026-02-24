@@ -10,6 +10,16 @@ import type { BackendProduct } from '@/services/brand-product.service';
 
 type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'archived' | 'deleted';
 type ViewMode = 'list' | 'grid';
+type SortField = 'name' | 'price' | 'totalStock' | 'demandScore';
+type SortDir = 'asc' | 'desc';
+
+const getTotalStock = (p: BackendProduct): number =>
+  (p.regional_stocks ?? []).reduce((sum, s) => sum + s.units, 0);
+
+const getDemandScore = (p: BackendProduct): number =>
+  (p.performance_metrics?.conversion_rate ?? 0) * 100;
+
+const ITEMS_PER_PAGE = 20;
 
 export default function ProductsPage() {
   const searchParams = useSearchParams();
@@ -63,10 +73,10 @@ export default function ProductsPage() {
         result = result.filter(p => p.status === 'draft');
         break;
       case 'low-stock':
-        result = result.filter(p => p.is_low_stock);
+        result = result.filter(p => getTotalStock(p) <= 10);
         break;
-      case 'archived':
-        result = result.filter(p => p.status === 'archived');
+      case 'out-of-stock':
+        result = result.filter(p => getTotalStock(p) === 0);
         break;
     }
 
@@ -95,6 +105,59 @@ export default function ProductsPage() {
     { value: 'low-stock', label: 'Low Stock', count: activeProducts.filter(p => p.is_low_stock).length },
     { value: 'archived', label: 'Archived', count: activeProducts.filter(p => p.status === 'archived').length },
     { value: 'deleted', label: 'Deleted', count: deletedProducts.length },
+    // Apply sort
+    result.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'name':
+          cmp = a.product_name.localeCompare(b.product_name);
+          break;
+        case 'price':
+          cmp = a.price - b.price;
+          break;
+        case 'totalStock':
+          cmp = getTotalStock(a) - getTotalStock(b);
+          break;
+        case 'demandScore':
+          cmp = getDemandScore(a) - getDemandScore(b);
+          break;
+      }
+      return sortDir === 'desc' ? -cmp : cmp;
+    });
+
+    return result;
+  }, [products, filter, collectionFilter, search, sortField, sortDir]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedProducts.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(page, totalPages);
+  const paginatedProducts = filteredAndSortedProducts.slice(
+    (safeCurrentPage - 1) * ITEMS_PER_PAGE,
+    safeCurrentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when filters change
+  const handleFilterChange = (newFilter: FilterTab) => {
+    setFilter(newFilter);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleCollectionChange = (value: string) => {
+    setCollectionFilter(value);
+    setPage(1);
+  };
+
+  const filterTabs: { value: FilterTab; label: string; count: number }[] = [
+    { value: 'all', label: 'All', count: products.length },
+    { value: 'published', label: 'Published', count: products.filter(p => p.status === 'published').length },
+    { value: 'draft', label: 'Draft', count: products.filter(p => p.status === 'draft').length },
+    { value: 'low-stock', label: 'Low Stock', count: products.filter(p => getTotalStock(p) <= 10).length },
+    { value: 'out-of-stock', label: 'Out of Stock', count: products.filter(p => getTotalStock(p) === 0).length }
   ];
 
   if (isLoading) {
@@ -192,7 +255,7 @@ export default function ProductsPage() {
           <div className="relative">
             <select
               value={collectionFilter}
-              onChange={(e) => setCollectionFilter(e.target.value)}
+              onChange={(e) => handleCollectionChange(e.target.value)}
               className="appearance-none px-4 py-3 pr-10 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
             >
               {collections.map(col => (

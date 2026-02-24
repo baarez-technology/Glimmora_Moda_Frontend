@@ -1,13 +1,69 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
-import { createProduct, fetchCollectionNames } from '@/services/brand-product.service';
-import type { CollectionNameItem } from '@/services/brand-product.service';
+import { useBrand } from '@/context/BrandContext';
+import { createProduct, fetchCollectionNames, type CollectionNameItem } from '@/services/brand-product.service';
+import type { BrandProductStatus, BrandProduct } from '@/types/brand-portal';
+import type {
+  ProductCategory,
+  ProductImage,
+  ProductVisibility,
+  ExperienceMode,
+  PricingVisibility,
+  CommerceAction
+} from '@/types/product';
+
+// ============================================
+// VALIDATION
+// ============================================
+
+interface FormErrors {
+  product_name?: string;
+  sku?: string;
+  price?: string;
+  imageUrl?: string;
+}
+
+function validateName(name: string): string | undefined {
+  if (!name.trim()) return 'Product name is required';
+  if (name.trim().length < 2) return 'Name must be at least 2 characters';
+  return undefined;
+}
+
+function validateSku(sku: string): string | undefined {
+  if (!sku.trim()) return 'SKU is required';
+  if (!/^[A-Z0-9]([A-Z0-9-]*[A-Z0-9])?$/.test(sku)) {
+    return 'SKU must be alphanumeric with dashes (e.g., DLD-001)';
+  }
+  return undefined;
+}
+
+function validatePrice(price: string, status: BrandProductStatus): string | undefined {
+  if (!price) return 'Price is required';
+  const num = parseFloat(price);
+  if (isNaN(num) || num < 0) return 'Price must be a valid number';
+  if (status === 'published' && num <= 0) return 'Published products must have a price greater than 0';
+  return undefined;
+}
+
+function validateImageUrl(url: string): string | undefined {
+  if (!url.trim()) return 'URL cannot be empty';
+  try {
+    new URL(url);
+  } catch {
+    return 'Please enter a valid URL';
+  }
+  return undefined;
+}
+
+// ============================================
+// COMPONENT
+// ============================================
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -32,22 +88,144 @@ export default function NewProductPage() {
     status: 'draft',
   });
 
+  // Track unsaved changes
+  const updateField = useCallback(<K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
+    setFormData(prev => ({ ...prev, [key]: value }));
+    setIsDirty(true);
+  }, []);
+
+  // Unsaved changes warning
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // Validate on blur
+  const handleBlur = (field: string) => {
+    setTouched(prev => new Set(prev).add(field));
+    validateField(field);
+  };
+
+  const validateField = (field: string) => {
+    setErrors(prev => {
+      const next = { ...prev };
+      switch (field) {
+        case 'product_name':
+          next.product_name = validateName(formData.product_name);
+          break;
+        case 'sku':
+          next.sku = validateSku(formData.sku);
+          break;
+        case 'price':
+          next.price = validatePrice(formData.price, formData.status);
+          break;
+      }
+      return next;
+    });
+  };
+
+  // Validate all fields before submit
+  const validateAll = (): boolean => {
+    const newErrors: FormErrors = {
+      product_name: validateName(formData.product_name),
+      sku: validateSku(formData.sku),
+      price: validatePrice(formData.price, formData.status),
+    };
+    setErrors(newErrors);
+    setTouched(new Set(['product_name', 'sku', 'price']));
+    return !newErrors.product_name && !newErrors.sku && !newErrors.price;
+  };
+
+  // Generate unique slug
+  const generateSlug = (name: string): string => {
+    let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const existingSlugs = new Set(products.map(p => p.slug));
+    if (existingSlugs.has(slug)) {
+      const suffix = Math.random().toString(36).substring(2, 6);
+      slug = `${slug}-${suffix}`;
+    }
+    return slug;
+  };
+
+  // Add image
+  const handleAddImage = () => {
+    const urlError = validateImageUrl(imageUrl);
+    if (urlError) {
+      setErrors(prev => ({ ...prev, imageUrl: urlError }));
+      return;
+    }
+    setErrors(prev => ({ ...prev, imageUrl: undefined }));
+    const imageType = images.length === 0 ? 'hero' : 'detail';
+    const newImage: ProductImage = {
+      id: `img-${Date.now()}`,
+      url: imageUrl.trim(),
+      alt: formData.product_name || 'Product image',
+      type: imageType as ProductImage['type'],
+    };
+    setImages(prev => [...prev, newImage]);
+    setImageUrl('');
+    setIsDirty(true);
+  };
+
+  const handleRemoveImage = (id: string) => {
+    setImages(prev => prev.filter(img => img.id !== id));
+    setIsDirty(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const created = await createProduct({
-        product_name: formData.product_name,
+      const newProduct: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'> = {
+        brandId: partner?.brandId || 'dior',
+        brandName: partner?.brandName || 'Dior',
+        name: formData.product_name.trim(),
+        slug: generateSlug(formData.product_name),
         sku: formData.sku,
         price: parseFloat(formData.price) || 0,
-        collection_name: formData.collection_name,
+        currency: 'GBP',
         status: formData.status,
         tagline: formData.tagline,
-        product_description: formData.product_description,
-        product_images: productImages,
-      });
+        description: formData.product_description,
+        narrative: formData.narrative || formData.product_description,
+        images,
+        variants: [],
+        materials: [],
+        craftsmanship: [],
+        ivEnabled: formData.ivEnabled,
+        availability: {
+          status: 'unavailable',
+          quantity: 0,
+          regions: []
+        },
+        collection: formData.collection_name,
+        category: 'ready-to-wear' as ProductCategory,
+        tags: [],
+        visibility: formData.visibility,
+        experienceMode: formData.experienceMode,
+        pricingVisibility: formData.pricingVisibility,
+        commerceAction: formData.commerceAction,
+        commerceEligible: true,
+        craftTags: [],
+        totalStock: 0,
+        regionalStock: [],
+        demandScore: 0,
+        performanceMetrics: {
+          views: 0,
+          addToCart: 0,
+          purchases: 0,
+          conversionRate: 0,
+          revenue: 0,
+          avgTimeToDecision: 0
+        }
+      };
 
       router.push(`/brand/products/${created.product_id}`);
     } catch (err) {
