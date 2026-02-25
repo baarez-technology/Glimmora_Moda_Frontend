@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RotateCcw, Eye, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Product, DigitalBodyTwin, BodyVisualizationConfig } from '@/types';
-import BodySilhouette from './BodySilhouette';
-import ProductOnBody from './ProductOnBody';
+import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon } from 'lucide-react';
+import Image from 'next/image';
+import { Product, BodyVisualizationConfig } from '@/types';
 
 interface BodyVisualizationProps {
   product: Product;
@@ -14,59 +13,40 @@ interface BodyVisualizationProps {
   initialConfig?: Partial<BodyVisualizationConfig>;
 }
 
-const viewAngles: Array<'front' | 'side' | 'back'> = ['front', 'side', 'back'];
-const silhouetteOptions: Array<DigitalBodyTwin['silhouette']> = ['petite', 'average', 'tall', 'curvy', 'athletic'];
-
 export default function BodyVisualization({
   product,
   isOpen,
   onClose,
-  initialConfig
 }: BodyVisualizationProps) {
-  const [viewAngle, setViewAngle] = useState<'front' | 'side' | 'back'>(initialConfig?.viewAngle || 'front');
-  const [silhouette, setSilhouette] = useState<DigitalBodyTwin['silhouette']>(
-    initialConfig?.silhouette || 'average'
-  );
-  const [showGuides, setShowGuides] = useState(false);
-  const [autoRotate, setAutoRotate] = useState(false);
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load user's body twin silhouette from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined' && !initialConfig?.silhouette) {
-      const savedBodyTwin = localStorage.getItem('moda-body-twin');
-      if (savedBodyTwin) {
-        try {
-          const bodyTwin: DigitalBodyTwin = JSON.parse(savedBodyTwin);
-          setSilhouette(bodyTwin.silhouette);
-        } catch (e) {
-          console.error('Failed to parse body twin data');
-        }
-      }
-    }
-  }, [initialConfig?.silhouette]);
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // Auto-rotate through views
-  useEffect(() => {
-    if (!autoRotate) return;
-    const interval = setInterval(() => {
-      setViewAngle(prev => {
-        const currentIndex = viewAngles.indexOf(prev);
-        return viewAngles[(currentIndex + 1) % viewAngles.length];
-      });
-    }, 2000);
-    return () => clearInterval(interval);
-  }, [autoRotate]);
+    if (!file.type.startsWith('image/')) return;
 
-  const cycleView = (direction: 'next' | 'prev') => {
-    const currentIndex = viewAngles.indexOf(viewAngle);
-    if (direction === 'next') {
-      setViewAngle(viewAngles[(currentIndex + 1) % viewAngles.length]);
-    } else {
-      setViewAngle(viewAngles[(currentIndex - 1 + viewAngles.length) % viewAngles.length]);
+    setUploadedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setUploadedImage(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleReset = () => {
+    setUploadedImage(null);
+    setUploadedFileName(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   if (!isOpen) return null;
+
+  const productImage = product.images?.[0]?.url;
 
   return (
     <AnimatePresence>
@@ -114,57 +94,21 @@ export default function BodyVisualization({
 
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-            {/* Visualization Area */}
-            <div className="lg:col-span-2 relative bg-gradient-to-b from-ivory-cream to-stone/10 p-8">
-              {/* View angle navigation */}
-              <button
-                onClick={() => cycleView('prev')}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5 text-charcoal-deep" />
-              </button>
-              <button
-                onClick={() => cycleView('next')}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-10 p-2 bg-white/80 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-colors"
-              >
-                <ChevronRight className="w-5 h-5 text-charcoal-deep" />
-              </button>
-
-              {/* Body + Product visualization */}
-              <div className="relative w-full max-w-xs mx-auto aspect-[1/2]">
-                <BodySilhouette
-                  silhouette={silhouette}
-                  viewAngle={viewAngle}
-                  showGuides={showGuides}
-                  className="w-full h-full"
-                />
-                <ProductOnBody
-                  product={product}
-                  silhouette={silhouette}
-                  viewAngle={viewAngle}
-                />
-              </div>
-
-              {/* View angle indicator */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                {viewAngles.map((angle) => (
-                  <button
-                    key={angle}
-                    onClick={() => setViewAngle(angle)}
-                    className={`px-3 py-1.5 text-xs tracking-wider uppercase rounded-full transition-all ${
-                      viewAngle === angle
-                        ? 'bg-charcoal-deep text-ivory-cream'
-                        : 'bg-white/80 text-charcoal-deep hover:bg-white'
-                    }`}
-                  >
-                    {angle}
-                  </button>
-                ))}
+            {/* AI Preview Area (Left) — fixed placeholder, will show backend result */}
+            <div className="lg:col-span-2 relative bg-gradient-to-b from-ivory-cream to-stone/10 p-8 flex items-center justify-center min-h-[400px]">
+              <div className="w-full max-w-sm mx-auto aspect-[3/4] border-2 border-dashed border-stone/30 rounded-xl flex flex-col items-center justify-center gap-4 bg-white/50">
+                <div className="w-16 h-16 bg-stone/10 rounded-full flex items-center justify-center">
+                  <ImageIcon className="w-8 h-8 text-stone/40" />
+                </div>
+                <div className="text-center px-6">
+                  <p className="text-sm font-medium text-charcoal-deep mb-1">Virtual Try-On Preview</p>
+                  <p className="text-xs text-stone/60">Your AI-generated preview will appear here</p>
+                </div>
               </div>
             </div>
 
-            {/* Controls Panel */}
-            <div className="bg-white p-6 space-y-6 border-l border-stone/20">
+            {/* Controls Panel (Right) */}
+            <div className="bg-white p-6 space-y-5 border-l border-stone/20 overflow-y-auto max-h-[70vh]">
               {/* Product Info */}
               <div>
                 <h3 className="font-medium text-charcoal-deep">{product.name}</h3>
@@ -174,78 +118,65 @@ export default function BodyVisualization({
                 </p>
               </div>
 
-              {/* Silhouette Selection */}
-              <div>
-                <label className="text-xs tracking-wider uppercase text-stone/70 mb-3 block">
-                  Body Type
-                </label>
-                <div className="grid grid-cols-5 gap-2">
-                  {silhouetteOptions.map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => setSilhouette(option)}
-                      className={`aspect-square rounded-lg border-2 transition-all ${
-                        silhouette === option
-                          ? 'border-gold-soft bg-gold-soft/10'
-                          : 'border-stone/20 hover:border-stone/40'
-                      }`}
-                    >
-                      <span className="text-[8px] tracking-wider uppercase text-charcoal-deep">
-                        {option.slice(0, 3)}
-                      </span>
-                    </button>
-                  ))}
+              {/* Product Image */}
+              {productImage && (
+                <div className="border border-stone/20 rounded-lg overflow-hidden">
+                  <div className="relative aspect-square w-full">
+                    <Image
+                      src={productImage}
+                      alt={product.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Toggle Options */}
-              <div className="space-y-3">
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-sm text-charcoal-deep">Show Guides</span>
-                  <button
-                    onClick={() => setShowGuides(!showGuides)}
-                    className={`w-10 h-6 rounded-full transition-colors ${
-                      showGuides ? 'bg-gold-soft' : 'bg-stone/30'
-                    }`}
-                  >
-                    <motion.div
-                      className="w-4 h-4 bg-white rounded-full shadow-sm"
-                      animate={{ x: showGuides ? 22 : 4 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              {/* Uploaded Image Preview */}
+              {uploadedImage && (
+                <div>
+                  <label className="text-xs tracking-wider uppercase text-stone/70 mb-2 block">
+                    Your Photo
+                  </label>
+                  <div className="relative aspect-[3/4] w-full rounded-lg overflow-hidden border border-stone/20">
+                    <Image
+                      src={uploadedImage}
+                      alt="Your uploaded photo"
+                      fill
+                      className="object-cover"
                     />
-                  </button>
-                </label>
+                  </div>
+                  <p className="text-[10px] text-stone/50 mt-1.5 truncate">{uploadedFileName}</p>
+                </div>
+              )}
 
-                <label className="flex items-center justify-between cursor-pointer group">
-                  <span className="text-sm text-charcoal-deep">Auto-Rotate</span>
-                  <button
-                    onClick={() => setAutoRotate(!autoRotate)}
-                    className={`w-10 h-6 rounded-full transition-colors ${
-                      autoRotate ? 'bg-gold-soft' : 'bg-stone/30'
-                    }`}
-                  >
-                    <motion.div
-                      className="w-4 h-4 bg-white rounded-full shadow-sm"
-                      animate={{ x: autoRotate ? 22 : 4 }}
-                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-                    />
-                  </button>
-                </label>
-              </div>
-
-              {/* Quick Actions */}
+              {/* Actions */}
               <div className="pt-4 border-t border-stone/20 space-y-2">
                 <button className="w-full flex items-center justify-center gap-2 py-3 bg-charcoal-deep text-ivory-cream rounded-lg hover:bg-charcoal-deep/90 transition-colors">
                   <Sparkles className="w-4 h-4" />
                   <span className="text-sm tracking-wider">Add to Outfit</span>
                 </button>
+
+                {/* Upload Your Image */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
                 <button
-                  onClick={() => {
-                    setViewAngle('front');
-                    setSilhouette('average');
-                    setShowGuides(false);
-                    setAutoRotate(false);
-                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gold-soft/10 text-charcoal-deep border border-gold-soft/30 rounded-lg hover:bg-gold-soft/20 transition-colors"
+                >
+                  <Upload className="w-4 h-4 text-gold-soft" />
+                  <span className="text-sm tracking-wider">
+                    {uploadedImage ? 'Change Photo' : 'Upload Your Image'}
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleReset}
                   className="w-full flex items-center justify-center gap-2 py-3 border border-stone/30 text-charcoal-deep rounded-lg hover:bg-stone/5 transition-colors"
                 >
                   <RotateCcw className="w-4 h-4" />
@@ -262,7 +193,7 @@ export default function BodyVisualization({
                   <div>
                     <p className="text-xs font-medium text-charcoal-deep mb-1">Personalized Fit</p>
                     <p className="text-xs text-stone/70 leading-relaxed">
-                      Based on your body twin profile, this piece would complement your {silhouette} frame beautifully.
+                      Upload your photo and our AI will show you how this piece looks on you.
                     </p>
                   </div>
                 </div>
