@@ -10,6 +10,7 @@ import { createProduct, fetchCollectionNames, type CollectionNameItem, type Colo
 
 export default function NewProductPage() {
   const router = useRouter();
+  const { partner } = useBrand();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
@@ -28,6 +29,12 @@ export default function NewProductPage() {
   // Per-color images state
   const [colorImages, setColorImages] = useState<ColorImages>({});
   const [activeColorTab, setActiveColorTab] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  const [products, setProducts] = useState<{ slug: string }[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
+  const [images, setImages] = useState<ProductImage[]>([]);
 
   useEffect(() => {
     fetchCollectionNames()
@@ -42,7 +49,7 @@ export default function NewProductPage() {
     collection_name: '',
     product_description: '',
     tagline: '',
-    status: 'draft',
+    status: 'draft' as BrandProductStatus,
   });
 
   const updateField = useCallback(<K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
@@ -266,7 +273,7 @@ export default function NewProductPage() {
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => updateField('status', e.target.value)}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as BrandProductStatus })}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                 >
                   <option value="draft">Draft</option>

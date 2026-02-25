@@ -302,3 +302,13 @@ export {
   type ShareSettings
 } from './sharing';
 
+// ============================================
+// RECOMMENDATION TYPES
+// ============================================
+export {
+  type ProductRecommendationRequest,
+  type ProductRecommendationResponse,
+  type RecommendedProduct,
+  type RecommendedBrand
+} from './recommendation';
+
