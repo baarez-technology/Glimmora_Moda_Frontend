@@ -1,95 +1,149 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, X, Minus, Plus, ShoppingBag, Crown, Shield, Check, Trash2 } from 'lucide-react';
+import { ArrowRight, X, ShoppingBag, Crown, Shield, RefreshCw } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import * as cartService from '@/services/customer-collection.service';
+import type { CartItem } from '@/services/customer-collection.service';
 
 export default function UHNICartPage() {
-  const { considerations, removeFromConsiderations, updateQuantity, clearConsiderations } = useApp();
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { showToast } = useApp();
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    setIsLoaded(true);
+  const fetchCart = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const items = await cartService.getCart();
+      setCartItems(items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load cart');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const total = considerations.reduce((sum, item) => sum + item.product.price * (item.quantity || 1), 0);
-  const itemCount = considerations.reduce((sum, item) => sum + (item.quantity || 1), 0);
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
+
+  const handleRemove = async (cartId: string) => {
+    setRemovingId(cartId);
+    try {
+      await cartService.removeFromCart(cartId);
+      setCartItems((prev) => prev.filter((item) => item.cart_id !== cartId));
+      showToast('Item removed from bag', 'info');
+    } catch {
+      showToast('Failed to remove item', 'error');
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-noir flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-gold-soft border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-sand text-sm">Loading your private bag...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-noir">
       {/* Header */}
       <section className="border-b border-gold-soft/10">
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 py-10">
-          <div className={`transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <div className="flex items-center gap-2 mb-3">
-              <Crown size={14} className="text-gold-soft" />
-              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft">
-                {itemCount} {itemCount === 1 ? 'piece' : 'pieces'} curated
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1]">
-                Your Private Bag
-              </h1>
-              {considerations.length > 0 && (
-                <button
-                  onClick={clearConsiderations}
-                  className="flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors"
-                >
-                  <Trash2 size={14} />
-                  <span className="tracking-[0.1em] uppercase">Clear All</span>
-                </button>
-              )}
-            </div>
+          <div className="flex items-center gap-2 mb-3">
+            <Crown size={14} className="text-gold-soft" />
+            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft">
+              {itemCount} {itemCount === 1 ? 'piece' : 'pieces'} curated
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1]">
+              Your Private Bag
+            </h1>
+            <button
+              onClick={fetchCart}
+              className="flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors"
+              title="Refresh"
+            >
+              <RefreshCw size={14} />
+            </button>
           </div>
         </div>
       </section>
 
+      {/* Error Banner */}
+      {error && (
+        <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 pt-6">
+          <div className="p-4 bg-red-900/20 border border-red-500/30 text-red-300 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={fetchCart} className="text-red-200 underline text-xs uppercase tracking-wider">
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <section className="py-12 lg:py-20">
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
-          {considerations.length > 0 ? (
+          {cartItems.length > 0 ? (
             <div className="grid lg:grid-cols-3 gap-12 lg:gap-16">
               {/* Items List */}
               <div className="lg:col-span-2 space-y-0">
-                {considerations.map((item, index) => (
+                {cartItems.map((item, index) => (
                   <div
-                    key={item.id}
+                    key={item.cart_id}
                     className={`flex gap-6 md:gap-8 py-8 ${
-                      index !== considerations.length - 1 ? 'border-b border-gold-soft/10' : ''
-                    }`}
+                      index !== cartItems.length - 1 ? 'border-b border-gold-soft/10' : ''
+                    } ${removingId === item.cart_id ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {/* Product Image */}
                     <Link
-                      href={`/product/${item.product.slug}`}
-                      className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0"
+                      href={`/product/${item.product_id}`}
+                      className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-charcoal-deep"
                     >
-                      <Image
-                        src={item.product.images[0]?.url || ''}
-                        alt={item.product.name}
-                        fill
-                        className="object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
+                      {item.image_urls[0] ? (
+                        <Image
+                          src={item.image_urls[0]}
+                          alt={item.product_name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ShoppingBag size={24} className="text-gold-soft/40" />
+                        </div>
+                      )}
                     </Link>
 
                     {/* Details */}
                     <div className="flex-1 py-1">
                       <div className="flex justify-between items-start gap-4">
                         <div>
-                          <p className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/60 mb-2">
-                            {item.product.brandName}
-                          </p>
-                          <Link
-                            href={`/product/${item.product.slug}`}
-                            className="font-display text-xl md:text-2xl text-ivory-cream hover:text-gold-soft transition-colors"
-                          >
-                            {item.product.name}
+                          <Link href={`/product/${item.product_id}`}>
+                            <h3 className="font-display text-xl md:text-2xl text-ivory-cream hover:text-gold-soft transition-colors">
+                              {item.product_name}
+                            </h3>
                           </Link>
                         </div>
                         <button
-                          onClick={() => removeFromConsiderations(item.id)}
+                          onClick={() => handleRemove(item.cart_id)}
+                          disabled={removingId === item.cart_id}
                           className="w-10 h-10 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream transition-all flex-shrink-0"
                           aria-label="Remove item"
                         >
@@ -97,55 +151,26 @@ export default function UHNICartPage() {
                         </button>
                       </div>
 
-                      {/* Selected Variants */}
-                      {(item.selectedVariants.size || item.selectedVariants.color) && (
-                        <div className="flex gap-3 mt-4">
-                          {item.selectedVariants.size && (
-                            <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
-                              Size: {item.selectedVariants.size}
-                            </span>
-                          )}
-                          {item.selectedVariants.color && (
-                            <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
-                              Color: {item.selectedVariants.color}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* AGI Note */}
-                      {item.agiNote && (
-                        <div className="mt-4 p-3 bg-gold-soft/5 border-l-2 border-gold-soft/30">
-                          <p className="text-[10px] tracking-[0.2em] uppercase text-gold-soft/60 mb-1">Concierge Note</p>
-                          <p className="text-sm text-sand">{item.agiNote}</p>
-                        </div>
-                      )}
+                      {/* Variants */}
+                      <div className="flex gap-3 mt-4">
+                        {item.size && (
+                          <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
+                            Size: {item.size}
+                          </span>
+                        )}
+                        {item.color && (
+                          <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
+                            Color: {item.color}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Price & Quantity */}
                       <div className="flex items-center justify-between mt-6">
                         <p className="font-display text-xl text-ivory-cream">
-                          €{(item.product.price * (item.quantity || 1)).toLocaleString()}
+                          €{(item.price * item.quantity).toLocaleString()}
                         </p>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => updateQuantity(item.id, (item.quantity || 1) - 1)}
-                            disabled={(item.quantity || 1) <= 1}
-                            className="w-8 h-8 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-                            aria-label="Decrease quantity"
-                          >
-                            <Minus size={14} />
-                          </button>
-                          <span className="text-sm font-medium text-ivory-cream w-6 text-center">
-                            {item.quantity || 1}
-                          </span>
-                          <button
-                            onClick={() => updateQuantity(item.id, (item.quantity || 1) + 1)}
-                            className="w-8 h-8 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream transition-all"
-                            aria-label="Increase quantity"
-                          >
-                            <Plus size={14} />
-                          </button>
-                        </div>
+                        <span className="text-sm text-sand">Qty: {item.quantity}</span>
                       </div>
                     </div>
                   </div>
@@ -164,13 +189,13 @@ export default function UHNICartPage() {
 
                   {/* Items */}
                   <div className="space-y-3 border-b border-gold-soft/10 pb-6 mb-6">
-                    {considerations.map((item) => (
-                      <div key={item.id} className="flex justify-between text-sm">
+                    {cartItems.map((item) => (
+                      <div key={item.cart_id} className="flex justify-between text-sm">
                         <span className="text-sand truncate pr-4">
-                          {item.product.name}{(item.quantity || 1) > 1 ? ` ×${item.quantity}` : ''}
+                          {item.product_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
                         </span>
                         <span className="text-ivory-cream flex-shrink-0">
-                          €{(item.product.price * (item.quantity || 1)).toLocaleString()}
+                          €{(item.price * item.quantity).toLocaleString()}
                         </span>
                       </div>
                     ))}
