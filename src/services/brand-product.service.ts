@@ -26,6 +26,17 @@ function authHeaders(): Record<string, string> {
   return headers;
 }
 
+// ─── Variant Types ──────────────────────────────────────────────────────────
+
+export interface ColorOption {
+  name: string;
+  hex: string;
+}
+
+export interface ColorImages {
+  [colorName: string]: string[];
+}
+
 // ─── Backend Response Types ──────────────────────────────────────────────────
 
 export interface ProductPerformanceMetrics {
@@ -66,6 +77,9 @@ export interface BackendProduct {
   product_image: string | null;
   regional_stocks: RegionalStockItem[];
   performance_metrics: ProductPerformanceMetrics;
+  sizes?: string[];
+  colors?: ColorOption[];
+  color_images?: ColorImages;
   is_low_stock: boolean;
   is_active: boolean;
   created_at: string;
@@ -81,6 +95,9 @@ export interface ProductCreatePayload {
   tagline: string;
   product_description: string;
   product_images: string[];
+  sizes?: string[];
+  colors?: ColorOption[];
+  color_images?: ColorImages;
 }
 
 export interface ProductUpdatePayload {
@@ -92,6 +109,9 @@ export interface ProductUpdatePayload {
   tagline?: string;
   product_description?: string;
   product_images?: string[];
+  sizes?: string[];
+  colors?: ColorOption[];
+  color_images?: ColorImages;
   regional_stocks?: RegionalStockItem[];
   performance_metrics?: Partial<ProductPerformanceMetrics>;
 }
