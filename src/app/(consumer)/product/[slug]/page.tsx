@@ -3,7 +3,9 @@
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import * as productService from '@/services/product.service';
+import { getProductDetail, getRecommendedBrands } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import ImmersiveVisualization from '@/components/product/ImmersiveVisualization';
 import OutfitSuggestions from '@/components/product/OutfitSuggestions';
@@ -189,14 +191,33 @@ function ProductPageContent({ product }: { product: Product }) {
 
 export default function ProductPage({ params }: ProductPageProps) {
   const { slug } = use(params);
+  const searchParams = useSearchParams();
+  const productIdParam = searchParams.get('productId');
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await productService.getProductBySlug(slug);
-        setProduct(res.data ?? null);
+        if (productIdParam) {
+          // Real API — fetch product detail, resolve brand name
+          let brandName = '';
+          try {
+            const brands = await getRecommendedBrands();
+            const loaded = await getProductDetail(productIdParam);
+            const matchBrand = brands.find(b => b.id === loaded.brandId);
+            if (matchBrand) brandName = matchBrand.name;
+            setProduct({ ...loaded, brandName });
+          } catch {
+            // Fall back to mock if real API fails
+            const res = await productService.getProductBySlug(slug);
+            setProduct(res.data ?? null);
+          }
+        } else {
+          // No productId — fall back to mock data
+          const res = await productService.getProductBySlug(slug);
+          setProduct(res.data ?? null);
+        }
       } catch (error) {
         console.error('Failed to load product:', error);
         setProduct(null);
@@ -205,7 +226,7 @@ export default function ProductPage({ params }: ProductPageProps) {
       }
     }
     loadData();
-  }, [slug]);
+  }, [slug, productIdParam]);
 
   if (loading) {
     return (

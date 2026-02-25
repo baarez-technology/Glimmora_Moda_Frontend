@@ -7,7 +7,8 @@ import { ArrowRight, X, SlidersHorizontal } from 'lucide-react';
 import * as collectionService from '@/services/collection.service';
 import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
-import { notFound } from 'next/navigation';
+import { getCollections, getRecommendedProducts, getRecommendedBrands } from '@/services/recommendation.service';
+import { notFound, useSearchParams } from 'next/navigation';
 import type { Product, Brand, Collection } from '@/types';
 
 interface CollectionPageProps {
@@ -18,6 +19,9 @@ type CategoryFilter = 'all' | 'bags' | 'clothing' | 'shoes' | 'accessories';
 
 export default function CollectionPage({ params }: CollectionPageProps) {
   const { slug } = use(params);
+  const searchParams = useSearchParams();
+  const collectionIdParam = searchParams.get('collectionId');
+  const brandIdParam = searchParams.get('brandId');
   const [collection, setCollection] = useState<Collection | null>(null);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -28,6 +32,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
   const [visibleCount, setVisibleCount] = useState(12);
   const [sortBy, setSortBy] = useState('relevance');
+  const [isRealApi, setIsRealApi] = useState(false);
   const filterCloseRef = useRef<HTMLButtonElement>(null);
 
   // ESC key handler for filter drawer
@@ -48,23 +53,55 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        const [collectionRes, productsRes, brandsRes] = await Promise.all([
-          collectionService.getCollectionBySlug(slug),
-          productService.getAllProducts(),
-          brandService.getAllBrands(),
-        ]);
-        setCollection(collectionRes.data ?? null);
-        setAllProducts(productsRes.data ?? []);
-        setBrands(brandsRes.data ?? []);
+        if (collectionIdParam) {
+          // Real API — load collection and brand products
+          const [apiCollections, apiProducts, apiBrands] = await Promise.all([
+            getCollections(brandIdParam || undefined),
+            getRecommendedProducts(brandIdParam ? { filter_brand_id: brandIdParam } : {}),
+            getRecommendedBrands(),
+          ]);
+
+          const match = apiCollections.find(c => c.id === collectionIdParam);
+          if (match) {
+            setCollection({ ...match, products: apiProducts });
+            setIsRealApi(true);
+          }
+          setAllProducts(apiProducts);
+          // Map API brands to frontend Brand shape for the "More Maisons" section
+          setBrands(apiBrands);
+        } else {
+          // No collectionId param — fall back to mock data
+          const [collectionRes, productsRes, brandsRes] = await Promise.all([
+            collectionService.getCollectionBySlug(slug),
+            productService.getAllProducts(),
+            brandService.getAllBrands(),
+          ]);
+          setCollection(collectionRes.data ?? null);
+          setAllProducts(productsRes.data ?? []);
+          setBrands(brandsRes.data ?? []);
+        }
       } catch (error) {
         console.error('Failed to load collection data:', error);
+        // If real API fails, try mock as fallback
+        if (collectionIdParam) {
+          try {
+            const [collectionRes, productsRes, brandsRes] = await Promise.all([
+              collectionService.getCollectionBySlug(slug),
+              productService.getAllProducts(),
+              brandService.getAllBrands(),
+            ]);
+            setCollection(collectionRes.data ?? null);
+            setAllProducts(productsRes.data ?? []);
+            setBrands(brandsRes.data ?? []);
+          } catch { /* ignore fallback errors */ }
+        }
       } finally {
         setLoading(false);
         setIsLoaded(true);
       }
     }
     loadData();
-  }, [slug]);
+  }, [slug, collectionIdParam, brandIdParam]);
 
   // If no specific collection found, show all products
   const isAllProducts = slug === 'all';
@@ -259,7 +296,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
               {displayProducts.slice(0, visibleCount).map((product, index) => (
                 <Link
                   key={product.id}
-                  href={`/product/${product.slug}`}
+                  href={`/product/${product.slug}${isRealApi ? `?productId=${product.id}` : ''}`}
                   className="group"
                   onMouseEnter={() => setActiveProductHover(index)}
                   onMouseLeave={() => setActiveProductHover(null)}
@@ -298,7 +335,8 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                       {product.name}
                     </h3>
                     <p className="text-sm text-stone">
-                      €{product.price.toLocaleString()}
+                      {product.currency === 'INR' ? '₹' : product.currency === 'GBP' ? '£' : product.currency === 'EUR' ? '€' : '$'}
+                      {product.price.toLocaleString()}
                     </p>
                   </div>
                 </Link>
@@ -375,7 +413,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
             {brands.slice(0, 4).map((brand) => (
               <Link
                 key={brand.id}
-                href={`/brand/${brand.slug}`}
+                href={`/brand/${brand.slug}${isRealApi ? `?brandId=${brand.id}` : ''}`}
                 className="group relative aspect-[4/3] overflow-hidden"
               >
                 <Image

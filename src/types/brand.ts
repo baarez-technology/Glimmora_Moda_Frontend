@@ -32,6 +32,7 @@ export interface BrandStory {
 // Collection
 export interface Collection {
   id: string;
+  brandId?: string;
   name: string;
   slug: string;
   season: string;
@@ -39,6 +40,7 @@ export interface Collection {
   description: string;
   heroImage: string;
   products: Product[];
+  productCount?: number;
 }
 
 // Brand

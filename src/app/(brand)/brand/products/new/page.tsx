@@ -7,6 +7,11 @@ import Link from 'next/link';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
 import { createProduct, fetchCollectionNames, type CollectionNameItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
+import { useBrand } from '@/context/BrandContext';
+
+type FormErrors = Record<string, string>;
+type ProductImage = { id: string; url: string; alt: string; type: string };
+type BrandProductStatus = 'draft' | 'active' | 'archived';
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -29,7 +34,6 @@ export default function NewProductPage() {
   // Per-color images state
   const [colorImages, setColorImages] = useState<ColorImages>({});
   const [activeColorTab, setActiveColorTab] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Set<string>>(new Set());
   const [products, setProducts] = useState<{ slug: string }[]>([]);

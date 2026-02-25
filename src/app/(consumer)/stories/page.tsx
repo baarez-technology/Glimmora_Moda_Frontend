@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Search, X } from 'lucide-react';
-import * as brandService from '@/services/brand.service';
+import { searchStories } from '@/services/recommendation.service';
 import type { BrandStory } from '@/types';
 
 function safeImageSrc(src: string | undefined) {
@@ -33,8 +33,8 @@ export default function StoriesIndexPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const res = await brandService.getFeaturedStories();
-        setStories(res.data ?? []);
+        const stories = await searchStories();
+        setStories(stories);
       } catch (error) {
         console.error('Failed to load stories:', error);
       } finally {
@@ -181,7 +181,7 @@ export default function StoriesIndexPage() {
         {/* Stories Grid */}
         <div className="mt-6 lg:mt-8 grid md:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
           {filteredStories.map((s) => (
-            <Link key={s.id} href={`/story/${s.slug}`} className="group bg-white border border-sand/60 overflow-hidden">
+            <Link key={s.id} href={`/story/${s.slug}?storyId=${s.id}`} className="group bg-white border border-sand/60 overflow-hidden">
               <div className="relative aspect-[16/11] bg-parchment">
                 <Image
                   src={safeImageSrc(s.heroImage)}
