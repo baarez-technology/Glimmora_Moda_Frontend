@@ -23,7 +23,7 @@ import {
     TrendingUp
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload } from '@/services/brand-product.service';
+import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload, type ColorOption, type ColorImages } from '@/services/brand-product.service';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
 import type { ProductImage, ProductVariant, Material, ProductVisibility, ExperienceMode, PricingVisibility, CommerceAction } from '@/types';
@@ -66,6 +66,15 @@ export default function ProductDetailPage() {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [craftsmanship, setCraftsmanship] = useState<CraftsmanshipItem[]>([]);
+  // Sizes & Colors state
+  const [sizes, setSizes] = useState<string[]>([]);
+  const [sizeInput, setSizeInput] = useState('');
+  const [colors, setColors] = useState<ColorOption[]>([]);
+  const [colorNameInput, setColorNameInput] = useState('');
+  const [colorHexInput, setColorHexInput] = useState('#000000');
+  const [colorImages, setColorImages] = useState<ColorImages>({});
+  const [activeColorTab, setActiveColorTab] = useState<string | null>(null);
+
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const markDirty = () => setHasChanges(true);
@@ -120,6 +129,13 @@ export default function ProductDetailPage() {
       setVariants([]);
       setMaterials([]);
       setCraftsmanship([]);
+      // Load sizes, colors, color_images from backend
+      setSizes(data.sizes || []);
+      setColors(data.colors || []);
+      const loadedColorImages = data.color_images || {};
+      setColorImages(loadedColorImages);
+      const colorNames = (data.colors || []).map(c => c.name);
+      setActiveColorTab(colorNames.length > 0 ? colorNames[0] : null);
     } catch (err) {
       console.error('Failed to load product:', err);
       setError(err instanceof Error ? err.message : 'Failed to load product');
@@ -173,6 +189,9 @@ export default function ProductDetailPage() {
         tagline: formData.tagline,
         status: formData.status,
         product_images: productImages,
+        sizes,
+        colors,
+        color_images: colorImages,
       });
       setProduct(updated);
       setHasChanges(false);
@@ -303,6 +322,72 @@ export default function ProductDetailPage() {
   };
 
   // ============================================
+  // SIZES
+  // ============================================
+
+  const handleAddSize = () => {
+    const val = sizeInput.trim().toUpperCase();
+    if (!val || sizes.includes(val)) return;
+    setSizes(prev => [...prev, val]);
+    setSizeInput('');
+    markDirty();
+  };
+
+  const handleRemoveSize = (size: string) => {
+    setSizes(prev => prev.filter(s => s !== size));
+    markDirty();
+  };
+
+  const handleSizeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddSize();
+    }
+  };
+
+  // ============================================
+  // COLORS
+  // ============================================
+
+  const handleAddColor = () => {
+    const name = colorNameInput.trim();
+    if (!name || colors.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+    const newColor: ColorOption = { name, hex: colorHexInput };
+    setColors(prev => [...prev, newColor]);
+    setColorImages(prev => ({ ...prev, [name]: prev[name] || [] }));
+    if (!activeColorTab) setActiveColorTab(name);
+    setColorNameInput('');
+    setColorHexInput('#000000');
+    markDirty();
+  };
+
+  const handleRemoveColor = (name: string) => {
+    setColors(prev => prev.filter(c => c.name !== name));
+    setColorImages(prev => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+    if (activeColorTab === name) {
+      const remaining = colors.filter(c => c.name !== name);
+      setActiveColorTab(remaining.length > 0 ? remaining[0].name : null);
+    }
+    markDirty();
+  };
+
+  const handleColorImagesChange = (colorName: string, imgs: string[]) => {
+    setColorImages(prev => ({ ...prev, [colorName]: imgs }));
+    markDirty();
+  };
+
+  const handleColorKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddColor();
+    }
+  };
+
+  // ============================================
   // HELPERS
   // ============================================
 
@@ -428,6 +513,157 @@ export default function ProductDetailPage() {
                   </select>
                 </div>
               </div>
+            </section>
+
+            {/* Sizes */}
+            <section className="bg-white border border-sand/50 p-6 space-y-6">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+                Sizes
+              </h2>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={sizeInput}
+                  onChange={(e) => setSizeInput(e.target.value)}
+                  onKeyDown={handleSizeKeyDown}
+                  className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  placeholder="e.g., XS, S, M, L, XL, 38, 40..."
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSize}
+                  disabled={!sizeInput.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} /> Add
+                </button>
+              </div>
+
+              {sizes.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {sizes.map((size) => (
+                    <span
+                      key={size}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep"
+                    >
+                      {size}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSize(size)}
+                        className="text-taupe hover:text-error transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Colors & Variant Images */}
+            <section className="bg-white border border-sand/50 p-6 space-y-6">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+                Colors & Variant Images
+              </h2>
+
+              {/* Add Color */}
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={colorNameInput}
+                  onChange={(e) => setColorNameInput(e.target.value)}
+                  onKeyDown={handleColorKeyDown}
+                  className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  placeholder="Color name (e.g., Noir, Ivory, Rouge)"
+                />
+                <div className="flex items-center gap-2 border border-sand px-3 py-2">
+                  <input
+                    type="color"
+                    value={colorHexInput}
+                    onChange={(e) => setColorHexInput(e.target.value)}
+                    className="w-8 h-8 border-0 cursor-pointer bg-transparent"
+                  />
+                  <span className="text-xs text-stone uppercase">{colorHexInput}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddColor}
+                  disabled={!colorNameInput.trim()}
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Plus size={14} /> Add Color
+                </button>
+              </div>
+
+              {/* Color Chips */}
+              {colors.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {colors.map((color) => (
+                    <span
+                      key={color.name}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep"
+                    >
+                      <span
+                        className="w-4 h-4 rounded-full border border-sand/50"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      {color.name}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveColor(color.name)}
+                        className="text-taupe hover:text-error transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Per-Color Image Upload */}
+              {colors.length > 0 && (
+                <div className="space-y-4">
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-stone">
+                    Images for color
+                  </label>
+
+                  {/* Color Tabs */}
+                  <div className="flex gap-1 border-b border-sand/50">
+                    {colors.map((color) => (
+                      <button
+                        key={color.name}
+                        type="button"
+                        onClick={() => setActiveColorTab(color.name)}
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs tracking-wider uppercase transition-colors border-b-2 -mb-[1px] ${
+                          activeColorTab === color.name
+                            ? 'border-charcoal-deep text-charcoal-deep'
+                            : 'border-transparent text-stone hover:text-charcoal-deep'
+                        }`}
+                      >
+                        <span
+                          className="w-3 h-3 rounded-full border border-sand/50"
+                          style={{ backgroundColor: color.hex }}
+                        />
+                        {color.name}
+                        {(colorImages[color.name]?.length || 0) > 0 && (
+                          <span className="text-[9px] text-taupe">
+                            ({colorImages[color.name].length})
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Image Upload for Active Color */}
+                  {activeColorTab && (
+                    <ProductImageUpload
+                      images={colorImages[activeColorTab] || []}
+                      onChange={(imgs) => handleColorImagesChange(activeColorTab, imgs)}
+                    />
+                  )}
+                </div>
+              )}
             </section>
 
             {/* Description */}

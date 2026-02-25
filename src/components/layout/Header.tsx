@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Heart, Menu, X, LogOut, Settings, Building2 } from 'lucide-react';
+import { User, Heart, ShoppingBag, Menu, X, LogOut, Settings, Building2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { brandLogout } from '@/services/auth.service';
@@ -184,13 +184,22 @@ export default function Header() {
 
           {/* Navigation Right */}
           <div className="flex items-center gap-4 lg:gap-6">
-            {/* Consideration Space */}
+            {/* Wishlist */}
             <Link
-              href="/consideration"
+              href="/profile/wishlist"
               className="p-2 text-charcoal-warm hover:text-noir transition-colors relative"
-              aria-label="Considerations"
+              aria-label="Wishlist"
             >
               <Heart size={20} />
+            </Link>
+
+            {/* Cart */}
+            <Link
+              href="/cart"
+              className="p-2 text-charcoal-warm hover:text-noir transition-colors relative"
+              aria-label="Shopping Bag"
+            >
+              <ShoppingBag size={20} />
               {considerations.length > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
                   {considerations.length}
