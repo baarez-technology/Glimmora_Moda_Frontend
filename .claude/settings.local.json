@@ -21,7 +21,9 @@
       "Bash(curl:*)",
       "Bash(grep -l \"brands/recommendations\\\\|products/recommendations\" \"C:/Users/sanjay/.claude/projects/z--Moda-Glimmora-new-v2/df48e7d2-40e6-4bcf-ac8f-3a70a2437558/subagents/\"*.jsonl)",
       "WebFetch(domain:3.25.253.77)",
-      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTllYWQ4NTBlYjU3YjBhZDRmZTY1MTQiLCJlbWFpbCI6InRlc3R1c2VyQG1vZGFnbGltbW9yYS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc3MjIyMjc4OSwidHlwZSI6ImFjY2VzcyJ9.gLpgl1rlLBhQzinhaYBNKOt7D74scfdU_aVXJ3M6bWU\")"
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTllYWQ4NTBlYjU3YjBhZDRmZTY1MTQiLCJlbWFpbCI6InRlc3R1c2VyQG1vZGFnbGltbW9yYS5jb20iLCJyb2xlIjoidXNlciIsImV4cCI6MTc3MjIyMjc4OSwidHlwZSI6ImFjY2VzcyJ9.gLpgl1rlLBhQzinhaYBNKOt7D74scfdU_aVXJ3M6bWU\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTllZTMxMTM4OTVkYjljNzMzMTFkZmMiLCJlbWFpbCI6InRlc3RkZXZAbW9kYWdsaW1tb3JhLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzcyMjM2NDk4LCJ0eXBlIjoiYWNjZXNzIn0.eHrblzGUSfWAsAVhnebBBuV3wkoLc2w1-4jpNTwSFN8\")",
+      "Bash(export TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTllZTMxMTM4OTVkYjljNzMzMTFkZmMiLCJlbWFpbCI6InRlc3RkZXZAbW9kYWdsaW1tb3JhLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzcyMjM2NDk4LCJ0eXBlIjoiYWNjZXNzIn0.eHrblzGUSfWAsAVhnebBBuV3wkoLc2w1-4jpNTwSFN8\")"
     ]
   }
 }

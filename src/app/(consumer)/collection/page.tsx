@@ -5,18 +5,32 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import * as collectionService from '@/services/collection.service';
+import { getCollections } from '@/services/recommendation.service';
 import type { Collection } from '@/types';
 
 export default function CollectionsPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
+  const [isRealApi, setIsRealApi] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    collectionService.getAllCollections().then(response => {
-      if (response.success) {
-        setCollections(response.data);
+    // Try real API first, fall back to mock data
+    getCollections().then(apiCollections => {
+      if (apiCollections.length > 0) {
+        setCollections(apiCollections);
+        setIsRealApi(true);
+      } else {
+        // No real collections — fall back to mock
+        return collectionService.getAllCollections().then(response => {
+          if (response.success) setCollections(response.data);
+        });
       }
-    }).catch(console.error).finally(() => setIsLoaded(true));
+    }).catch(() => {
+      // Real API failed — fall back to mock
+      return collectionService.getAllCollections().then(response => {
+        if (response.success) setCollections(response.data);
+      }).catch(console.error);
+    }).finally(() => setIsLoaded(true));
   }, []);
 
   return (
@@ -52,16 +66,22 @@ export default function CollectionsPage() {
             {collections.map((collection, index) => (
               <Link
                 key={collection.id}
-                href={`/collection/${collection.slug}`}
+                href={`/collection/${collection.slug}${isRealApi ? `?collectionId=${collection.id}${collection.brandId ? `&brandId=${collection.brandId}` : ''}` : ''}`}
                 className="group block"
               >
                 <div className="relative aspect-[4/5] bg-parchment overflow-hidden mb-4">
+                  {collection.heroImage ? (
                   <Image
                     src={collection.heroImage}
                     alt={collection.name}
                     fill
                     className="object-cover group-hover:scale-105 transition-transform duration-700"
                   />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center bg-sand/20">
+                      <span className="font-display text-2xl text-stone/40">{collection.name}</span>
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-noir/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-500">
                     <span className="inline-flex items-center gap-2 text-ivory-cream text-sm">
@@ -80,7 +100,7 @@ export default function CollectionsPage() {
                     {collection.description}
                   </p>
                   <p className="text-xs text-taupe mt-2">
-                    {collection.products.length} piece{collection.products.length !== 1 ? 's' : ''}
+                    {(collection.productCount ?? collection.products.length)} piece{(collection.productCount ?? collection.products.length) !== 1 ? 's' : ''}
                   </p>
                 </div>
               </Link>

@@ -5,8 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
-import * as brandService from '@/services/brand.service';
-import { getRecommendedBrands, getRecommendedProducts } from '@/services/recommendation.service';
+import { getRecommendedBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 function DiscoverContent() {
@@ -49,14 +48,14 @@ function DiscoverContent() {
     async function loadData() {
       try {
         const productParams = brandIdParam ? { filter_brand_id: brandIdParam, page_size: 100 } : { page_size: 100 };
-        const [recommendedProducts, recommendedBrands, storiesRes] = await Promise.all([
+        const [recommendedProducts, recommendedBrands, stories] = await Promise.all([
           getRecommendedProducts(productParams),
           getRecommendedBrands(),
-          brandService.getAllStories(),
+          searchStories(),
         ]);
         setProducts(recommendedProducts);
         setBrands(recommendedBrands);
-        setBrandStories(storiesRes.data ?? []);
+        setBrandStories(stories);
       } catch (error) {
         console.error('Failed to load discover page data:', error);
       } finally {
@@ -363,7 +362,7 @@ function DiscoverContent() {
                 {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
@@ -641,7 +640,7 @@ function DiscoverContent() {
               {filteredStories.slice(0, 3).map((story) => (
                 <Link
                   key={story.id}
-                  href={`/story/${story.slug}`}
+                  href={`/story/${story.slug}?storyId=${story.id}`}
                   className="group"
                 >
                   <div className="relative aspect-[4/5] overflow-hidden mb-6">

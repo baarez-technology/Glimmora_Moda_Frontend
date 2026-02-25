@@ -4,8 +4,10 @@ import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Clock, Share2, Bookmark, BookmarkCheck, ArrowRight } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import * as brandService from '@/services/brand.service';
 import * as productService from '@/services/product.service';
+import { getStoryById, getRecommendedBrands, searchStories } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
 import type { Product, Brand, BrandStory } from '@/types';
@@ -16,6 +18,8 @@ interface StoryPageProps {
 
 export default function StoryPage({ params }: StoryPageProps) {
   const { slug } = use(params);
+  const searchParams = useSearchParams();
+  const storyIdParam = searchParams.get('storyId');
   const { showToast } = useApp();
   const [story, setStory] = useState<BrandStory | null>(null);
   const [brand, setBrand] = useState<Brand | null>(null);
@@ -35,30 +39,47 @@ export default function StoryPage({ params }: StoryPageProps) {
   useEffect(() => {
     async function loadData() {
       try {
-        // 1. Load the story first
-        const storyRes = await brandService.getStoryBySlug(slug);
-        const loadedStory = storyRes.data ?? null;
-        setStory(loadedStory);
+        let loadedStory: BrandStory | null = null;
 
+        // 1. Load the story — real API if storyId present, else mock
+        if (storyIdParam) {
+          loadedStory = await getStoryById(storyIdParam);
+        } else {
+          const storyRes = await brandService.getStoryBySlug(slug);
+          loadedStory = storyRes.data ?? null;
+        }
+
+        setStory(loadedStory);
         if (!loadedStory) return;
 
-        // 2. Load brand by ID and related products in parallel
-        const [brandRes, ...productResults] = await Promise.all([
-          brandService.getBrandById(loadedStory.brandId),
-          ...loadedStory.relatedProducts.map(id => productService.getProductById(id)),
-        ]);
-        setBrand(brandRes.data ?? null);
-        setRelatedProducts(productResults.map(r => r.data).filter(Boolean) as Product[]);
+        // 2. Load brand info — try real API first, fall back to mock
+        let loadedBrand: Brand | null = null;
+        if (storyIdParam) {
+          const apiBrands = await getRecommendedBrands();
+          loadedBrand = apiBrands.find(b => b.id === loadedStory.brandId) ?? null;
+        }
+        if (!loadedBrand) {
+          const brandRes = await brandService.getBrandById(loadedStory.brandId);
+          loadedBrand = brandRes.data ?? null;
+        }
+        setBrand(loadedBrand);
 
-        // 3. Load a few more stories (from same brand, then others)
-        const brandStoriesRes = await brandService.getStoriesByBrand(loadedStory.brandId);
-        const otherStories = (brandStoriesRes.data ?? []).filter(s => s.id !== loadedStory.id);
+        // 3. Load related products (mock lookup — product IDs may not match real API)
+        if (loadedStory.relatedProducts.length > 0) {
+          const productResults = await Promise.all(
+            loadedStory.relatedProducts.map(id => productService.getProductById(id))
+          );
+          setRelatedProducts(productResults.map(r => r.data).filter(Boolean) as Product[]);
+        }
+
+        // 4. Load more stories — real API search, then supplement
+        const brandStories = await searchStories({ brand_id: loadedStory.brandId });
+        const otherStories = brandStories.filter(s => s.id !== loadedStory.id);
         if (otherStories.length >= 3) {
           setMoreStories(otherStories.slice(0, 3));
         } else {
-          // Supplement with featured stories from other brands
-          const featuredRes = await brandService.getFeaturedStories();
-          const additional = (featuredRes.data ?? []).filter(
+          const allStories = await searchStories();
+          const additional = allStories.filter(
             s => s.id !== loadedStory.id && !otherStories.some(o => o.id === s.id)
           );
           setMoreStories([...otherStories, ...additional].slice(0, 3));
@@ -71,7 +92,7 @@ export default function StoryPage({ params }: StoryPageProps) {
       }
     }
     loadData();
-  }, [slug]);
+  }, [slug, storyIdParam]);
 
   if (loading) {
     return (
@@ -346,7 +367,7 @@ export default function StoryPage({ params }: StoryPageProps) {
               {moreStories.map((storyItem) => (
                   <Link
                     key={storyItem.id}
-                    href={`/story/${storyItem.slug}`}
+                    href={`/story/${storyItem.slug}?storyId=${storyItem.id}`}
                     className="group"
                   >
                     <div className="relative aspect-[4/5] overflow-hidden mb-5">
@@ -392,7 +413,7 @@ export default function StoryPage({ params }: StoryPageProps) {
             Discover the complete collection and heritage of this distinguished maison.
           </p>
           <Link
-            href={`/brand/${brand?.slug || ''}`}
+            href={`/brand/${brand?.slug || ''}${brand?.id ? `?brandId=${brand.id}` : ''}`}
             className="group inline-flex items-center gap-5"
           >
             <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">

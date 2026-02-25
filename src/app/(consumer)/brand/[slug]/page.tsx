@@ -5,8 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
-import * as collectionService from '@/services/collection.service';
-import { getRecommendedProducts, getRecommendedBrands } from '@/services/recommendation.service';
+import { getRecommendedProducts, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import type { Product, Brand, BrandStory, Collection } from '@/types';
@@ -71,16 +70,16 @@ export default function BrandPage({ params }: BrandPageProps) {
 
         setBrand(loadedBrand);
 
-        // Load products from real API, stories/collections from mock
-        const [recommendedProducts, storiesRes, collectionsRes] = await Promise.all([
+        // Load products, stories, and collections from real API
+        const [recommendedProducts, brandStories, brandCollections] = await Promise.all([
           getRecommendedProducts({ filter_brand_id: loadedBrand.id }),
-          brandService.getStoriesByBrand(loadedBrand.id),
-          collectionService.getCollectionsByBrand(loadedBrand.id),
+          searchStories({ brand_id: loadedBrand.id }),
+          getCollections(loadedBrand.id),
         ]);
 
         setProducts(recommendedProducts);
-        setStories(storiesRes.data ?? []);
-        setCollections(collectionsRes.data ?? []);
+        setStories(brandStories);
+        setCollections(brandCollections);
       } catch (err) {
         if (!brand) {
           notFound();
@@ -256,7 +255,7 @@ export default function BrandPage({ params }: BrandPageProps) {
                 {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
@@ -339,7 +338,7 @@ export default function BrandPage({ params }: BrandPageProps) {
               {collections.map((collection) => (
                 <Link
                   key={collection.id}
-                  href={`/collection/${collection.slug}`}
+                  href={`/collection/${collection.slug}?collectionId=${collection.id}&brandId=${brand.id}`}
                   className="group"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden bg-parchment mb-4">
@@ -381,7 +380,7 @@ export default function BrandPage({ params }: BrandPageProps) {
               {stories.map((story) => (
                 <Link
                   key={story.id}
-                  href={`/story/${story.slug}`}
+                  href={`/story/${story.slug}?storyId=${story.id}`}
                   className="group bg-white"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">

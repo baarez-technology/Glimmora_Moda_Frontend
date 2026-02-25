@@ -1,16 +1,22 @@
 /**
  * Recommendation Service (Real Backend API)
  *
- * Calls the real recommendation endpoints:
+ * Calls the real consumer endpoints:
  * - GET  /api/v1/brands/recommendations
  * - POST /api/v1/products/recommendations
+ * - GET  /api/v1/stories/search
+ * - GET  /api/v1/stories/{story_id}
+ * - GET  /api/v1/customer/collections
+ * - GET  /api/v1/customer/products/{product_id}
+ * - GET  /api/v1/customer/wardrobe
+ * - POST /api/v1/customer/wardrobe
  *
  * Uses relative URLs so requests go through Next.js rewrite proxy
  * (next.config.js proxies /api/v1/* → backend, avoiding CORS issues).
  * Throws on failure so pages can show error states.
  */
 
-import type { Brand, Product } from '@/types';
+import type { Brand, BrandStory, StorySection, Product, Collection } from '@/types';
 import type {
   ProductRecommendationRequest,
   ProductRecommendationResponse,
@@ -150,4 +156,367 @@ export async function getRecommendedProducts(
 
   const data: ProductRecommendationResponse = await res.json();
   return data.products_data.map(mapToProduct);
+}
+
+// ============================================
+// Story Types (API response shapes)
+// ============================================
+
+/** Story from /api/v1/stories/search (list view — no content blocks) */
+interface ApiStorySearchResult {
+  story_id: string;
+  brand_id: string;
+  title: string;
+  story_type: string;
+  story_type_subtype: string;
+  excerpt: string;
+  image_url: string;
+  product_list: string[];
+  status: string;
+  sections: number;
+  read_time: number;
+  is_active: boolean;
+  created_at_ms: number;
+  updated_at_ms: number;
+}
+
+/** Story from /api/v1/stories/{id} (detail view — includes content blocks) */
+interface ApiStoryDetail extends Omit<ApiStorySearchResult, 'created_at_ms' | 'updated_at_ms'> {
+  content: { id: string; type: string; content: string }[];
+  created_at: string;
+  updated_at: string;
+}
+
+// ============================================
+// Story Mappers
+// ============================================
+
+function generateSlug(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+/** Map search-result story → frontend BrandStory (no content) */
+function mapSearchStory(raw: ApiStorySearchResult): BrandStory {
+  return {
+    id: raw.story_id,
+    brandId: raw.brand_id,
+    title: raw.title,
+    slug: generateSlug(raw.title),
+    type: (raw.story_type as BrandStory['type']) || 'heritage',
+    excerpt: raw.excerpt,
+    content: [],
+    heroImage: raw.image_url,
+    publishedAt: new Date(raw.created_at_ms).toISOString(),
+    readTime: raw.read_time,
+    relatedProducts: raw.product_list,
+  };
+}
+
+/** Map detail story → frontend BrandStory (with content) */
+function mapDetailStory(raw: ApiStoryDetail): BrandStory {
+  return {
+    id: raw.story_id,
+    brandId: raw.brand_id,
+    title: raw.title,
+    slug: generateSlug(raw.title),
+    type: (raw.story_type as BrandStory['type']) || 'heritage',
+    excerpt: raw.excerpt,
+    content: raw.content.map((s): StorySection => ({
+      type: s.type as StorySection['type'],
+      content: s.content,
+    })),
+    heroImage: raw.image_url,
+    publishedAt: raw.created_at,
+    readTime: raw.read_time,
+    relatedProducts: raw.product_list,
+  };
+}
+
+// ============================================
+// Story Search
+// ============================================
+
+export interface StorySearchParams {
+  limit?: number;
+  brand_id?: string;
+  story_id?: string;
+}
+
+/**
+ * GET /api/v1/stories/search
+ *
+ * - No params → all stories (latest first)
+ * - brand_id → stories for that brand
+ * - story_id → semantically similar stories (kNN)
+ */
+export async function searchStories(params?: StorySearchParams): Promise<BrandStory[]> {
+  const query = new URLSearchParams();
+  if (params?.limit) query.set('limit', String(params.limit));
+  if (params?.brand_id) query.set('brand_id', params.brand_id);
+  if (params?.story_id) query.set('story_id', params.story_id);
+
+  const qs = query.toString();
+  const res = await fetch(`/api/v1/stories/search${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Stories search failed: ${res.status}`);
+  }
+
+  const data: ApiStorySearchResult[] = await res.json();
+  return data.map(mapSearchStory);
+}
+
+/**
+ * GET /api/v1/stories/{story_id}
+ *
+ * Returns full story detail including content blocks.
+ */
+export async function getStoryById(storyId: string): Promise<BrandStory> {
+  const res = await fetch(`/api/v1/stories/${storyId}`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Story fetch failed: ${res.status}`);
+  }
+
+  const data: ApiStoryDetail = await res.json();
+  return mapDetailStory(data);
+}
+
+// ============================================
+// Collection Types (API response shape)
+// ============================================
+
+interface ApiCollection {
+  collection_id: string;
+  brand_id: string;
+  collection_name: string;
+  season: string;
+  year: string;
+  collection_description: string;
+  collection_image: string;
+  total_products_count: number;
+}
+
+function mapToCollection(raw: ApiCollection): Collection {
+  return {
+    id: raw.collection_id,
+    brandId: raw.brand_id,
+    name: raw.collection_name,
+    slug: generateSlug(raw.collection_name),
+    season: raw.season,
+    year: parseInt(raw.year, 10) || 0,
+    description: raw.collection_description,
+    heroImage: raw.collection_image,
+    products: [],
+    productCount: raw.total_products_count,
+  };
+}
+
+// ============================================
+// Collections
+// ============================================
+
+/**
+ * GET /api/v1/customer/collections
+ *
+ * Returns all brand collections (latest first).
+ * Pass brand_id to filter for a specific brand.
+ */
+export async function getCollections(brandId?: string): Promise<Collection[]> {
+  const query = new URLSearchParams();
+  if (brandId) query.set('brand_id', brandId);
+
+  const qs = query.toString();
+  const res = await fetch(`/api/v1/customer/collections${qs ? `?${qs}` : ''}`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Collections fetch failed: ${res.status}`);
+  }
+
+  const data: ApiCollection[] = await res.json();
+  return data.map(mapToCollection);
+}
+
+// ============================================
+// Product Detail Types (API response shape)
+// ============================================
+
+interface ApiProductDetail {
+  product_id: string;
+  brand_id: string;
+  product_name: string;
+  sku: string;
+  price: number;
+  collection_name: string;
+  status: string;
+  tagline: string;
+  product_description: string;
+  product_images: string[];
+  product_image: string;
+  regional_stocks: {
+    stock_id: string;
+    city: string;
+    country: string;
+    units: number;
+    threshold: number;
+    is_low_stock: boolean;
+  }[];
+  performance_metrics: {
+    views: number;
+    add_to_cart: number;
+    purchases: number;
+    conversion_rate: number;
+  };
+  ai_metadata: {
+    product_category: string;
+    color: string;
+    pattern: string;
+    fabrics: string;
+  };
+  occasions: string[];
+  aesthetics: string[];
+  is_low_stock: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
+  const slug = raw.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  return {
+    id: raw.product_id,
+    brandId: raw.brand_id,
+    brandName: brandName || '',
+    name: raw.product_name,
+    slug,
+    tagline: raw.tagline,
+    description: raw.product_description,
+    narrative: '',
+    price: raw.price,
+    currency: 'INR',
+    images: raw.product_images.map((url, i) => ({
+      id: String(i + 1),
+      url,
+      alt: raw.product_name,
+      type: i === 0 ? 'hero' as const : 'detail' as const,
+    })),
+    variants: [],
+    materials: raw.ai_metadata?.fabrics
+      ? [{ name: raw.ai_metadata.fabrics, composition: '100%', origin: '' }]
+      : [],
+    craftsmanship: [],
+    ivEnabled: false,
+    availability: {
+      status: raw.is_low_stock ? 'limited' : 'available',
+      regions: raw.regional_stocks.map(s => ({
+        region: s.country,
+        city: s.city,
+        available: s.units > 0,
+        confidence: 1,
+        deliveryDays: 5,
+      })),
+    },
+    collection: raw.collection_name,
+    category: (raw.ai_metadata?.product_category as Product['category']) || 'clothing',
+    tags: [...raw.occasions, ...raw.aesthetics],
+    visibility: 'public',
+    experienceMode: 'standard',
+    pricingVisibility: 'visible',
+    commerceAction: 'add_to_considerations',
+    commerceEligible: true,
+    craftTags: [],
+  };
+}
+
+// ============================================
+// Product Detail
+// ============================================
+
+/**
+ * GET /api/v1/customer/products/{product_id}
+ *
+ * Returns full product detail from MongoDB.
+ * Optionally pass brandName to include it in the mapped Product.
+ */
+export async function getProductDetail(productId: string, brandName?: string): Promise<Product> {
+  const res = await fetch(`/api/v1/customer/products/${productId}`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Product detail fetch failed: ${res.status}`);
+  }
+
+  const data: ApiProductDetail = await res.json();
+  return mapProductDetail(data, brandName);
+}
+
+// ============================================
+// Wardrobe Types (API response shape)
+// ============================================
+
+export interface ApiWardrobeItem {
+  wardrobe_id: string;
+  customer_id: string;
+  product_id: string;
+  color: string;
+  size: string;
+  price: number;
+  image_urls: string[];
+  product_name: string;
+  how_many_buyed_count: number;
+  created_at: string;
+}
+
+export interface AddToWardrobeRequest {
+  product_id: string;
+  color: string;
+  size: string;
+  how_many_buyed_count: number;
+}
+
+// ============================================
+// Wardrobe
+// ============================================
+
+/**
+ * GET /api/v1/customer/wardrobe
+ *
+ * Returns all wardrobe items for the authenticated customer.
+ */
+export async function getWardrobe(): Promise<ApiWardrobeItem[]> {
+  const res = await fetch(`/api/v1/customer/wardrobe`, {
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Wardrobe fetch failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * POST /api/v1/customer/wardrobe
+ *
+ * Adds a product to the customer's wardrobe.
+ */
+export async function addToWardrobe(params: AddToWardrobeRequest): Promise<ApiWardrobeItem> {
+  const res = await fetch(`/api/v1/customer/wardrobe`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(params),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Add to wardrobe failed: ${res.status}`);
+  }
+
+  return res.json();
 }

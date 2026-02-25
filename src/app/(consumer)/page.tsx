@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import * as brandService from '@/services/brand.service';
-import { getRecommendedBrands, getRecommendedProducts } from '@/services/recommendation.service';
+import { getRecommendedBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 export default function HomePage() {
@@ -19,14 +18,14 @@ export default function HomePage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [recommendedBrands, recommendedProducts, storiesRes] = await Promise.all([
+        const [recommendedBrands, recommendedProducts, stories] = await Promise.all([
           getRecommendedBrands(),
           getRecommendedProducts(),
-          brandService.getFeaturedStories(),
+          searchStories({ limit: 4 }),
         ]);
         setBrands(recommendedBrands);
         setFeaturedProducts(recommendedProducts);
-        setFeaturedStories(storiesRes.data ?? []);
+        setFeaturedStories(stories);
       } catch (err) {
         console.error('Failed to load home page data:', err);
         setError(err instanceof Error ? err.message : 'Unable to load recommendations. Please try again later.');
@@ -251,7 +250,7 @@ export default function HomePage() {
             {/* Left - Large Featured Product */}
             {featuredProducts[0] && (
               <Link
-                href={`/product/${featuredProducts[0].slug}`}
+                href={`/product/${featuredProducts[0].slug}?productId=${featuredProducts[0].id}`}
                 className="group"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-5">
@@ -284,7 +283,7 @@ export default function HomePage() {
               {featuredProducts.slice(1, 5).map((product) => (
                 <Link
                   key={product.id}
-                  href={`/product/${product.slug}`}
+                  href={`/product/${product.slug}?productId=${product.id}`}
                   className="group"
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-3">
@@ -354,7 +353,7 @@ export default function HomePage() {
                   {featuredStories[0].excerpt}
                 </p>
                 <Link
-                  href={`/story/${featuredStories[0].slug}`}
+                  href={`/story/${featuredStories[0].slug}?storyId=${featuredStories[0].id}`}
                   className="inline-flex items-center gap-3 text-charcoal-deep group"
                 >
                   <span className="font-body text-sm tracking-[0.1em] uppercase border-b border-charcoal-deep pb-1 group-hover:border-stone transition-colors">
@@ -384,7 +383,7 @@ export default function HomePage() {
             {featuredStories.slice(0, 3).map((story) => (
               <Link
                 key={story.id}
-                href={`/story/${story.slug}`}
+                href={`/story/${story.slug}?storyId=${story.id}`}
                 className="group"
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-sand-light mb-4">
