@@ -2,75 +2,32 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
-import { useBrand } from '@/context/BrandContext';
-import { createProduct, fetchCollectionNames, type CollectionNameItem } from '@/services/brand-product.service';
-import type { BrandProductStatus, BrandProduct } from '@/types/brand-portal';
-import type {
-  ProductCategory,
-  ProductImage,
-  ProductVisibility,
-  ExperienceMode,
-  PricingVisibility,
-  CommerceAction
-} from '@/types/product';
-
-// ============================================
-// VALIDATION
-// ============================================
-
-interface FormErrors {
-  product_name?: string;
-  sku?: string;
-  price?: string;
-  imageUrl?: string;
-}
-
-function validateName(name: string): string | undefined {
-  if (!name.trim()) return 'Product name is required';
-  if (name.trim().length < 2) return 'Name must be at least 2 characters';
-  return undefined;
-}
-
-function validateSku(sku: string): string | undefined {
-  if (!sku.trim()) return 'SKU is required';
-  if (!/^[A-Z0-9]([A-Z0-9-]*[A-Z0-9])?$/.test(sku)) {
-    return 'SKU must be alphanumeric with dashes (e.g., DLD-001)';
-  }
-  return undefined;
-}
-
-function validatePrice(price: string, status: BrandProductStatus): string | undefined {
-  if (!price) return 'Price is required';
-  const num = parseFloat(price);
-  if (isNaN(num) || num < 0) return 'Price must be a valid number';
-  if (status === 'published' && num <= 0) return 'Published products must have a price greater than 0';
-  return undefined;
-}
-
-function validateImageUrl(url: string): string | undefined {
-  if (!url.trim()) return 'URL cannot be empty';
-  try {
-    new URL(url);
-  } catch {
-    return 'Please enter a valid URL';
-  }
-  return undefined;
-}
-
-// ============================================
-// COMPONENT
-// ============================================
+import { createProduct, fetchCollectionNames, type CollectionNameItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
 
 export default function NewProductPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
+
+  // Sizes state
+  const [sizes, setSizes] = useState<string[]>([]);
+  const [sizeInput, setSizeInput] = useState('');
+
+  // Colors state
+  const [colors, setColors] = useState<ColorOption[]>([]);
+  const [colorNameInput, setColorNameInput] = useState('');
+  const [colorHexInput, setColorHexInput] = useState('#000000');
+
+  // Per-color images state
+  const [colorImages, setColorImages] = useState<ColorImages>({});
+  const [activeColorTab, setActiveColorTab] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCollectionNames()
@@ -88,7 +45,6 @@ export default function NewProductPage() {
     status: 'draft',
   });
 
-  // Track unsaved changes
   const updateField = useCallback(<K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [key]: value }));
     setIsDirty(true);
@@ -105,128 +61,103 @@ export default function NewProductPage() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  // Validate on blur
-  const handleBlur = (field: string) => {
-    setTouched(prev => new Set(prev).add(field));
-    validateField(field);
+  const handleImagesChange = (images: string[]) => {
+    setProductImages(images);
+    setIsDirty(true);
   };
 
-  const validateField = (field: string) => {
-    setErrors(prev => {
+  // ── Sizes ──────────────────────────────────────────────
+  const handleAddSize = () => {
+    const val = sizeInput.trim().toUpperCase();
+    if (!val || sizes.includes(val)) return;
+    setSizes(prev => [...prev, val]);
+    setSizeInput('');
+    setIsDirty(true);
+  };
+
+  const handleRemoveSize = (size: string) => {
+    setSizes(prev => prev.filter(s => s !== size));
+    setIsDirty(true);
+  };
+
+  const handleSizeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddSize();
+    }
+  };
+
+  // ── Colors ─────────────────────────────────────────────
+  const handleAddColor = () => {
+    const name = colorNameInput.trim();
+    if (!name || colors.some(c => c.name.toLowerCase() === name.toLowerCase())) return;
+    const newColor: ColorOption = { name, hex: colorHexInput };
+    setColors(prev => [...prev, newColor]);
+    setColorImages(prev => ({ ...prev, [name]: [] }));
+    if (!activeColorTab) setActiveColorTab(name);
+    setColorNameInput('');
+    setColorHexInput('#000000');
+    setIsDirty(true);
+  };
+
+  const handleRemoveColor = (name: string) => {
+    setColors(prev => prev.filter(c => c.name !== name));
+    setColorImages(prev => {
       const next = { ...prev };
-      switch (field) {
-        case 'product_name':
-          next.product_name = validateName(formData.product_name);
-          break;
-        case 'sku':
-          next.sku = validateSku(formData.sku);
-          break;
-        case 'price':
-          next.price = validatePrice(formData.price, formData.status);
-          break;
-      }
+      delete next[name];
       return next;
     });
-  };
-
-  // Validate all fields before submit
-  const validateAll = (): boolean => {
-    const newErrors: FormErrors = {
-      product_name: validateName(formData.product_name),
-      sku: validateSku(formData.sku),
-      price: validatePrice(formData.price, formData.status),
-    };
-    setErrors(newErrors);
-    setTouched(new Set(['product_name', 'sku', 'price']));
-    return !newErrors.product_name && !newErrors.sku && !newErrors.price;
-  };
-
-  // Generate unique slug
-  const generateSlug = (name: string): string => {
-    let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const existingSlugs = new Set(products.map(p => p.slug));
-    if (existingSlugs.has(slug)) {
-      const suffix = Math.random().toString(36).substring(2, 6);
-      slug = `${slug}-${suffix}`;
+    if (activeColorTab === name) {
+      const remaining = colors.filter(c => c.name !== name);
+      setActiveColorTab(remaining.length > 0 ? remaining[0].name : null);
     }
-    return slug;
-  };
-
-  // Add image
-  const handleAddImage = () => {
-    const urlError = validateImageUrl(imageUrl);
-    if (urlError) {
-      setErrors(prev => ({ ...prev, imageUrl: urlError }));
-      return;
-    }
-    setErrors(prev => ({ ...prev, imageUrl: undefined }));
-    const imageType = images.length === 0 ? 'hero' : 'detail';
-    const newImage: ProductImage = {
-      id: `img-${Date.now()}`,
-      url: imageUrl.trim(),
-      alt: formData.product_name || 'Product image',
-      type: imageType as ProductImage['type'],
-    };
-    setImages(prev => [...prev, newImage]);
-    setImageUrl('');
     setIsDirty(true);
   };
 
-  const handleRemoveImage = (id: string) => {
-    setImages(prev => prev.filter(img => img.id !== id));
+  const handleColorImagesChange = (colorName: string, images: string[]) => {
+    setColorImages(prev => ({ ...prev, [colorName]: images }));
     setIsDirty(true);
   };
 
+  const handleColorKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddColor();
+    }
+  };
+
+  // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.product_name.trim()) {
+      setError('Product name is required');
+      return;
+    }
+    if (!formData.sku.trim()) {
+      setError('SKU is required');
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
     try {
-      const newProduct: Omit<BrandProduct, 'id' | 'createdAt' | 'updatedAt'> = {
-        brandId: partner?.brandId || 'dior',
-        brandName: partner?.brandName || 'Dior',
-        name: formData.product_name.trim(),
-        slug: generateSlug(formData.product_name),
-        sku: formData.sku,
+      const created = await createProduct({
+        product_name: formData.product_name.trim(),
+        sku: formData.sku.trim(),
         price: parseFloat(formData.price) || 0,
-        currency: 'GBP',
+        collection_name: formData.collection_name,
         status: formData.status,
         tagline: formData.tagline,
-        description: formData.product_description,
-        narrative: formData.narrative || formData.product_description,
-        images,
-        variants: [],
-        materials: [],
-        craftsmanship: [],
-        ivEnabled: formData.ivEnabled,
-        availability: {
-          status: 'unavailable',
-          quantity: 0,
-          regions: []
-        },
-        collection: formData.collection_name,
-        category: 'ready-to-wear' as ProductCategory,
-        tags: [],
-        visibility: formData.visibility,
-        experienceMode: formData.experienceMode,
-        pricingVisibility: formData.pricingVisibility,
-        commerceAction: formData.commerceAction,
-        commerceEligible: true,
-        craftTags: [],
-        totalStock: 0,
-        regionalStock: [],
-        demandScore: 0,
-        performanceMetrics: {
-          views: 0,
-          addToCart: 0,
-          purchases: 0,
-          conversionRate: 0,
-          revenue: 0,
-          avgTimeToDecision: 0
-        }
-      };
+        product_description: formData.product_description,
+        product_images: productImages,
+        ...(sizes.length > 0 ? { sizes } : {}),
+        ...(colors.length > 0 ? { colors } : {}),
+        ...(Object.keys(colorImages).length > 0 ? { color_images: colorImages } : {}),
+      });
 
+      setIsDirty(false);
       router.push(`/brand/products/${created.product_id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create product');
@@ -276,7 +207,7 @@ export default function NewProductPage() {
                   type="text"
                   required
                   value={formData.product_name}
-                  onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
+                  onChange={(e) => updateField('product_name', e.target.value)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   placeholder="e.g., Lady Dior Small"
                 />
@@ -290,7 +221,7 @@ export default function NewProductPage() {
                   type="text"
                   required
                   value={formData.sku}
-                  onChange={(e) => setFormData({ ...formData, sku: e.target.value.toUpperCase() })}
+                  onChange={(e) => updateField('sku', e.target.value.toUpperCase())}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors uppercase"
                   placeholder="e.g., DLD-001"
                 />
@@ -306,7 +237,7 @@ export default function NewProductPage() {
                   min="0"
                   step="0.01"
                   value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  onChange={(e) => updateField('price', e.target.value)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   placeholder="0.00"
                 />
@@ -319,7 +250,7 @@ export default function NewProductPage() {
                 <select
                   required
                   value={formData.collection_name}
-                  onChange={(e) => setFormData({ ...formData, collection_name: e.target.value })}
+                  onChange={(e) => updateField('collection_name', e.target.value)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                 >
                   <option value="">Select collection</option>
@@ -335,7 +266,7 @@ export default function NewProductPage() {
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={(e) => updateField('status', e.target.value)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                 >
                   <option value="draft">Draft</option>
@@ -343,6 +274,157 @@ export default function NewProductPage() {
                 </select>
               </div>
             </div>
+          </section>
+
+          {/* Sizes */}
+          <section className="bg-white border border-sand/50 p-6 space-y-6">
+            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+              Sizes
+            </h2>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={sizeInput}
+                onChange={(e) => setSizeInput(e.target.value)}
+                onKeyDown={handleSizeKeyDown}
+                className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                placeholder="e.g., XS, S, M, L, XL, 38, 40..."
+              />
+              <button
+                type="button"
+                onClick={handleAddSize}
+                disabled={!sizeInput.trim()}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus size={14} /> Add
+              </button>
+            </div>
+
+            {sizes.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {sizes.map((size) => (
+                  <span
+                    key={size}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep"
+                  >
+                    {size}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSize(size)}
+                      className="text-taupe hover:text-error transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Colors & Variant Images */}
+          <section className="bg-white border border-sand/50 p-6 space-y-6">
+            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+              Colors & Variant Images
+            </h2>
+
+            {/* Add Color */}
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={colorNameInput}
+                onChange={(e) => setColorNameInput(e.target.value)}
+                onKeyDown={handleColorKeyDown}
+                className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                placeholder="Color name (e.g., Noir, Ivory, Rouge)"
+              />
+              <div className="flex items-center gap-2 border border-sand px-3 py-2">
+                <input
+                  type="color"
+                  value={colorHexInput}
+                  onChange={(e) => setColorHexInput(e.target.value)}
+                  className="w-8 h-8 border-0 cursor-pointer bg-transparent"
+                />
+                <span className="text-xs text-stone uppercase">{colorHexInput}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddColor}
+                disabled={!colorNameInput.trim()}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Plus size={14} /> Add Color
+              </button>
+            </div>
+
+            {/* Color Chips */}
+            {colors.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {colors.map((color) => (
+                  <span
+                    key={color.name}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep"
+                  >
+                    <span
+                      className="w-4 h-4 rounded-full border border-sand/50"
+                      style={{ backgroundColor: color.hex }}
+                    />
+                    {color.name}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveColor(color.name)}
+                      className="text-taupe hover:text-error transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Per-Color Image Upload */}
+            {colors.length > 0 && (
+              <div className="space-y-4">
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone">
+                  Images for color
+                </label>
+
+                {/* Color Tabs */}
+                <div className="flex gap-1 border-b border-sand/50">
+                  {colors.map((color) => (
+                    <button
+                      key={color.name}
+                      type="button"
+                      onClick={() => setActiveColorTab(color.name)}
+                      className={`inline-flex items-center gap-2 px-4 py-2.5 text-xs tracking-wider uppercase transition-colors border-b-2 -mb-[1px] ${
+                        activeColorTab === color.name
+                          ? 'border-charcoal-deep text-charcoal-deep'
+                          : 'border-transparent text-stone hover:text-charcoal-deep'
+                      }`}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full border border-sand/50"
+                        style={{ backgroundColor: color.hex }}
+                      />
+                      {color.name}
+                      {(colorImages[color.name]?.length || 0) > 0 && (
+                        <span className="text-[9px] text-taupe">
+                          ({colorImages[color.name].length})
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Image Upload for Active Color */}
+                {activeColorTab && (
+                  <ProductImageUpload
+                    images={colorImages[activeColorTab] || []}
+                    onChange={(imgs) => handleColorImagesChange(activeColorTab, imgs)}
+                  />
+                )}
+              </div>
+            )}
           </section>
 
           {/* Description */}
@@ -359,7 +441,7 @@ export default function NewProductPage() {
                 <input
                   type="text"
                   value={formData.tagline}
-                  onChange={(e) => setFormData({ ...formData, tagline: e.target.value })}
+                  onChange={(e) => updateField('tagline', e.target.value)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   placeholder="A short, evocative tagline"
                 />
@@ -371,7 +453,7 @@ export default function NewProductPage() {
                 </label>
                 <textarea
                   value={formData.product_description}
-                  onChange={(e) => setFormData({ ...formData, product_description: e.target.value })}
+                  onChange={(e) => updateField('product_description', e.target.value)}
                   rows={4}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                   placeholder="Describe the product, its heritage, and unique qualities..."
@@ -388,7 +470,7 @@ export default function NewProductPage() {
 
             <ProductImageUpload
               images={productImages}
-              onChange={setProductImages}
+              onChange={handleImagesChange}
             />
           </section>
 
