@@ -4,10 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { User, Heart, Menu, X, LogOut, Settings, Building2 } from 'lucide-react';
-import * as brandService from '@/services/brand.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { brandLogout } from '@/services/auth.service';
+import { getRecommendedBrands } from '@/services/recommendation.service';
 import type { Brand } from '@/types';
 
 export default function Header() {
@@ -45,13 +45,11 @@ export default function Header() {
     } catch { /* ignore */ }
   }, []);
 
-  // Load brands from service on mount
+  // Load brands from recommendation API on mount
   useEffect(() => {
-    brandService.getAllBrands().then((res) => {
-      if (res.success && res.data) {
-        setBrands(res.data);
-      }
-    });
+    getRecommendedBrands()
+      .then(setBrands)
+      .catch(() => { /* silently fail — dropdown will be empty */ });
   }, []);
 
   const handleLogout = () => {
@@ -150,7 +148,7 @@ export default function Header() {
                       {brands.map((brand) => (
                         <Link
                           key={brand.id}
-                          href={`/brand/${brand.slug}`}
+                          href={`/brand/${brand.slug}?brandId=${brand.id}`}
                           role="menuitem"
                           className="block text-charcoal-deep hover:text-gold-muted transition-colors"
                           onClick={() => setIsBrandDropdownOpen(false)}
@@ -342,7 +340,7 @@ export default function Header() {
                   {brands.map((brand) => (
                     <Link
                       key={brand.id}
-                      href={`/brand/${brand.slug}`}
+                      href={`/brand/${brand.slug}?brandId=${brand.id}`}
                       className="block font-display text-xl text-charcoal-deep"
                       onClick={() => setIsMenuOpen(false)}
                     >

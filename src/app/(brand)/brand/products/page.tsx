@@ -8,7 +8,7 @@ import { ApiProductCard, ApiProductGridCard } from '@/components/brand/ProductCa
 import { fetchProducts } from '@/services/brand-product.service';
 import type { BackendProduct } from '@/services/brand-product.service';
 
-type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'archived' | 'deleted';
+type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'out-of-stock' | 'archived' | 'deleted';
 type ViewMode = 'list' | 'grid';
 type SortField = 'name' | 'price' | 'totalStock' | 'demandScore';
 type SortDir = 'asc' | 'desc';

@@ -67,10 +67,17 @@ function validateImageUrl(url: string): string | undefined {
 
 export default function NewProductPage() {
   const router = useRouter();
+  const { partner } = useBrand();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
+  const [isDirty, setIsDirty] = useState(false);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Set<string>>(new Set());
+  const [products, setProducts] = useState<{ slug: string }[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
+  const [images, setImages] = useState<ProductImage[]>([]);
 
   useEffect(() => {
     fetchCollectionNames()
@@ -85,7 +92,7 @@ export default function NewProductPage() {
     collection_name: '',
     product_description: '',
     tagline: '',
-    status: 'draft',
+    status: 'draft' as BrandProductStatus,
   });
 
   // Track unsaved changes
@@ -194,12 +201,12 @@ export default function NewProductPage() {
         status: formData.status,
         tagline: formData.tagline,
         description: formData.product_description,
-        narrative: formData.narrative || formData.product_description,
+        narrative: formData.product_description,
         images,
         variants: [],
         materials: [],
         craftsmanship: [],
-        ivEnabled: formData.ivEnabled,
+        ivEnabled: false,
         availability: {
           status: 'unavailable',
           quantity: 0,
@@ -208,10 +215,10 @@ export default function NewProductPage() {
         collection: formData.collection_name,
         category: 'ready-to-wear' as ProductCategory,
         tags: [],
-        visibility: formData.visibility,
-        experienceMode: formData.experienceMode,
-        pricingVisibility: formData.pricingVisibility,
-        commerceAction: formData.commerceAction,
+        visibility: 'public',
+        experienceMode: 'standard' as ExperienceMode,
+        pricingVisibility: 'visible',
+        commerceAction: 'add_to_considerations' as CommerceAction,
         commerceEligible: true,
         craftTags: [],
         totalStock: 0,
@@ -227,7 +234,7 @@ export default function NewProductPage() {
         }
       };
 
-      router.push(`/brand/products/${created.product_id}`);
+      router.push('/brand/products');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create product');
       setIsSubmitting(false);
@@ -335,7 +342,7 @@ export default function NewProductPage() {
                 </label>
                 <select
                   value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as BrandProductStatus })}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                 >
                   <option value="draft">Draft</option>

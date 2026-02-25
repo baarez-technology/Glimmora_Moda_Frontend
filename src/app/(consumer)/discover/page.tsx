@@ -4,15 +4,16 @@ import { useState, useMemo, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { Search, ArrowRight, X, SlidersHorizontal } from 'lucide-react';
-import * as productService from '@/services/product.service';
+import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
+import { getRecommendedBrands, getRecommendedProducts } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
   const occasionParam = searchParams.get('occasion');
   const moodParam = searchParams.get('mood');
+  const brandIdParam = searchParams.get('brandId');
   const resultsRef = useRef<HTMLDivElement>(null);
 
   const [isLoaded, setIsLoaded] = useState(false);
@@ -28,6 +29,8 @@ function DiscoverContent() {
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [sortBy, setSortBy] = useState('relevance');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PRODUCTS_PER_PAGE = 20;
 
   // ESC key handler for filter drawer
   useEffect(() => {
@@ -45,13 +48,14 @@ function DiscoverContent() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [productsRes, brandsRes, storiesRes] = await Promise.all([
-          productService.getAllProducts(),
-          brandService.getAllBrands(),
+        const productParams = brandIdParam ? { filter_brand_id: brandIdParam, page_size: 100 } : { page_size: 100 };
+        const [recommendedProducts, recommendedBrands, storiesRes] = await Promise.all([
+          getRecommendedProducts(productParams),
+          getRecommendedBrands(),
           brandService.getAllStories(),
         ]);
-        setProducts(productsRes.data ?? []);
-        setBrands(brandsRes.data ?? []);
+        setProducts(recommendedProducts);
+        setBrands(recommendedBrands);
         setBrandStories(storiesRes.data ?? []);
       } catch (error) {
         console.error('Failed to load discover page data:', error);
@@ -61,7 +65,7 @@ function DiscoverContent() {
       }
     }
     loadData();
-  }, []);
+  }, [brandIdParam]);
 
   const budgetRanges: Record<string, { min: number; max: number }> = {
     'under-500': { min: 0, max: 500 },
@@ -123,6 +127,17 @@ function DiscoverContent() {
     });
   }, [budgetRange, searchQuery, selectedOccasion, selectedMood, products, sortBy]);
 
+  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
+  }, [filteredProducts, currentPage, PRODUCTS_PER_PAGE]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, sortBy]);
+
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
     const query = searchQuery.toLowerCase();
@@ -140,6 +155,7 @@ function DiscoverContent() {
     setSelectedMood(null);
     setSearchQuery('');
     setBudgetRange(null);
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = selectedOccasion || selectedMood || searchQuery || budgetRange;
@@ -344,7 +360,7 @@ function DiscoverContent() {
             {/* Product Grid */}
             {filteredProducts.length > 0 ? (
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-12 md:gap-y-20">
-                {filteredProducts.slice(0, 12).map((product, index) => (
+                {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
                     href={`/product/${product.slug}`}
@@ -386,7 +402,7 @@ function DiscoverContent() {
                         {product.name}
                       </h3>
                       <p className="text-sm text-stone">
-                        €{product.price.toLocaleString()}
+                        {product.currency === 'INR' ? '₹' : product.currency === 'GBP' ? '£' : product.currency === 'USD' ? '$' : '€'}{product.price.toLocaleString()}
                       </p>
                     </div>
                   </Link>
@@ -412,20 +428,46 @@ function DiscoverContent() {
               </div>
             )}
 
-            {/* View More */}
-            {filteredProducts.length > 12 && (
-              <div className="mt-16 lg:mt-20 text-center">
-                <Link
-                  href="/collection/all"
-                  className="group inline-flex items-center gap-4"
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-16 lg:mt-20 flex items-center justify-center gap-3">
+                {/* Previous */}
+                <button
+                  onClick={() => { setCurrentPage(p => p - 1); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                  disabled={currentPage === 1}
+                  className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
-                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep group-hover:text-charcoal-warm transition-colors">
-                    View All Pieces
-                  </span>
-                  <span className="w-12 h-12 rounded-full border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
-                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
-                  </span>
-                </Link>
+                  <ChevronLeft size={16} />
+                </button>
+
+                {/* Page Numbers */}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => { setCurrentPage(page); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                    className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all ${
+                      currentPage === page
+                        ? 'bg-charcoal-deep text-ivory-cream'
+                        : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                {/* Next */}
+                <button
+                  onClick={() => { setCurrentPage(p => p + 1); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                  disabled={currentPage === totalPages}
+                  className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  <ChevronRight size={16} />
+                </button>
+
+                {/* Count */}
+                <span className="ml-4 text-xs text-stone tracking-wider">
+                  {filteredProducts.length} pieces
+                </span>
               </div>
             )}
           </div>
@@ -453,42 +495,107 @@ function DiscoverContent() {
               </p>
             </div>
 
-            {/* Brand Grid */}
-            <div className="grid grid-cols-12 gap-3 md:gap-4">
-              {/* Featured Brand */}
-              {filteredBrands[0] && (
-                <Link
-                  href={`/brand/${filteredBrands[0].slug}`}
-                  className="col-span-12 lg:col-span-8 group relative aspect-[16/9] overflow-hidden"
-                >
-                  <Image
-                    src={filteredBrands[0].heroImage}
-                    alt={filteredBrands[0].name}
-                    fill
-                    className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-noir/30 group-hover:bg-noir/10 transition-colors duration-700" />
-                  <div className="absolute inset-0 flex items-end p-8 md:p-12">
-                    <div>
-                      <h3 className="font-display text-4xl md:text-6xl text-ivory-cream tracking-[-0.02em]">
-                        {filteredBrands[0].name}
-                      </h3>
-                      <div className="mt-4 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                        <span className="text-xs tracking-[0.2em] uppercase text-ivory-cream">Enter</span>
-                        <ArrowRight size={14} className="text-ivory-cream" />
+            {/* Brand Grid - Editorial (All tab: show 6) */}
+            {activeTab === 'all' && (
+              <>
+                <div className="grid grid-cols-12 gap-3 md:gap-4">
+                  {/* Featured Brand */}
+                  {filteredBrands[0] && (
+                    <Link
+                      href={`/brand/${filteredBrands[0].slug}?brandId=${filteredBrands[0].id}`}
+                      className="col-span-12 lg:col-span-8 group relative aspect-[16/9] overflow-hidden"
+                    >
+                      <Image
+                        src={filteredBrands[0].heroImage}
+                        alt={filteredBrands[0].name}
+                        fill
+                        className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-noir/30 group-hover:bg-noir/10 transition-colors duration-700" />
+                      <div className="absolute inset-0 flex items-end p-8 md:p-12">
+                        <div>
+                          <h3 className="font-display text-4xl md:text-6xl text-ivory-cream tracking-[-0.02em]">
+                            {filteredBrands[0].name}
+                          </h3>
+                          <div className="mt-4 flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                            <span className="text-xs tracking-[0.2em] uppercase text-ivory-cream">Enter</span>
+                            <ArrowRight size={14} className="text-ivory-cream" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </Link>
-              )}
+                    </Link>
+                  )}
 
-              {/* Secondary Brands */}
-              <div className="col-span-12 lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-3 md:gap-4">
-                {filteredBrands.slice(1, 3).map((brand) => (
+                  {/* Secondary Brands */}
+                  <div className="col-span-12 lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-3 md:gap-4">
+                    {filteredBrands.slice(1, 3).map((brand) => (
+                      <Link
+                        key={brand.id}
+                        href={`/brand/${brand.slug}?brandId=${brand.id}`}
+                        className="group relative aspect-[4/3] lg:aspect-[16/9] overflow-hidden"
+                      >
+                        <Image
+                          src={brand.heroImage}
+                          alt={brand.name}
+                          fill
+                          className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-noir/40 group-hover:bg-noir/20 transition-colors duration-500" />
+                        <div className="absolute inset-0 flex items-end p-5">
+                          <h3 className="font-display text-2xl text-ivory-cream">{brand.name}</h3>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {/* Remaining Brands */}
+                  {filteredBrands.slice(3, 6).map((brand) => (
+                    <Link
+                      key={brand.id}
+                      href={`/brand/${brand.slug}?brandId=${brand.id}`}
+                      className="col-span-4 group relative aspect-square overflow-hidden"
+                    >
+                      <Image
+                        src={brand.heroImage}
+                        alt={brand.name}
+                        fill
+                        className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-noir/40 group-hover:bg-noir/20 transition-colors duration-500" />
+                      <div className="absolute inset-0 flex items-end p-4 md:p-6">
+                        <h3 className="font-display text-lg md:text-xl text-ivory-cream">{brand.name}</h3>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+
+                {/* View All Brands */}
+                {filteredBrands.length > 6 && (
+                  <div className="mt-12 lg:mt-16 text-center">
+                    <button
+                      onClick={() => setActiveTab('brands')}
+                      className="group inline-flex items-center gap-4"
+                    >
+                      <span className="text-sm tracking-[0.15em] uppercase text-ivory-cream/60 group-hover:text-ivory-cream transition-colors">
+                        All Maisons ({filteredBrands.length})
+                      </span>
+                      <span className="w-10 h-10 rounded-full border border-ivory-cream/30 flex items-center justify-center group-hover:bg-ivory-cream group-hover:border-ivory-cream transition-all duration-500">
+                        <ArrowRight size={14} className="text-ivory-cream group-hover:text-charcoal-deep transition-colors duration-500" />
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Brand Grid - Full (Brands tab: show ALL) */}
+            {activeTab === 'brands' && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                {filteredBrands.map((brand) => (
                   <Link
                     key={brand.id}
-                    href={`/brand/${brand.slug}`}
-                    className="group relative aspect-[4/3] lg:aspect-[16/9] overflow-hidden"
+                    href={`/brand/${brand.slug}?brandId=${brand.id}`}
+                    className="group relative aspect-[4/3] overflow-hidden"
                   >
                     <Image
                       src={brand.heroImage}
@@ -497,48 +604,13 @@ function DiscoverContent() {
                       className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-noir/40 group-hover:bg-noir/20 transition-colors duration-500" />
-                    <div className="absolute inset-0 flex items-end p-5">
-                      <h3 className="font-display text-2xl text-ivory-cream">{brand.name}</h3>
+                    <div className="absolute inset-0 flex items-end p-5 md:p-6">
+                      <h3 className="font-display text-xl md:text-2xl text-ivory-cream">{brand.name}</h3>
                     </div>
                   </Link>
                 ))}
               </div>
-
-              {/* Remaining Brands */}
-              {filteredBrands.slice(3, 6).map((brand) => (
-                <Link
-                  key={brand.id}
-                  href={`/brand/${brand.slug}`}
-                  className="col-span-4 group relative aspect-square overflow-hidden"
-                >
-                  <Image
-                    src={brand.heroImage}
-                    alt={brand.name}
-                    fill
-                    className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-noir/40 group-hover:bg-noir/20 transition-colors duration-500" />
-                  <div className="absolute inset-0 flex items-end p-4 md:p-6">
-                    <h3 className="font-display text-lg md:text-xl text-ivory-cream">{brand.name}</h3>
-                  </div>
-                </Link>
-              ))}
-            </div>
-
-            {/* View All Brands */}
-            <div className="mt-12 lg:mt-16 text-center">
-              <Link
-                href="/discover?tab=brands"
-                className="group inline-flex items-center gap-4"
-              >
-                <span className="text-sm tracking-[0.15em] uppercase text-ivory-cream/60 group-hover:text-ivory-cream transition-colors">
-                  All Maisons
-                </span>
-                <span className="w-10 h-10 rounded-full border border-ivory-cream/30 flex items-center justify-center group-hover:bg-ivory-cream group-hover:border-ivory-cream transition-all duration-500">
-                  <ArrowRight size={14} className="text-ivory-cream group-hover:text-charcoal-deep transition-colors duration-500" />
-                </span>
-              </Link>
-            </div>
+            )}
           </div>
         </section>
       )}

@@ -50,14 +50,12 @@ export default function UserProfilePage() {
     }
   }, []);
 
-  if (!partner || !currentUser) return null;
-
   const [formData, setFormData] = useState({
-    firstName: currentUser.name.split(' ')[0],
-    lastName: currentUser.name.split(' ')[1] || '',
-    email: currentUser.email,
-    phone: brandApiData?.phone_number || '',
-    jobTitle: brandApiData?.job_title || '',
+    firstName: currentUser?.name.split(' ')[0] || '',
+    lastName: currentUser?.name.split(' ')[1] || '',
+    email: currentUser?.email || '',
+    phone: '',
+    jobTitle: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
@@ -71,14 +69,6 @@ export default function UserProfilePage() {
     pushAlerts: true,
     pushReports: false
   });
-
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const avatarInputRef = useRef<HTMLInputElement>(null);
-
-  const twoFAModalRef = useModalAccessibility(show2FAModal, () => setShow2FAModal(false));
 
   // Early return AFTER all hooks
   if (!partner || !currentUser) return null;
@@ -281,7 +271,7 @@ export default function UserProfilePage() {
                     ref={avatarInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleAvatarFileChange}
+                    onChange={handleAvatarChange}
                     className="hidden"
                   />
                 </div>

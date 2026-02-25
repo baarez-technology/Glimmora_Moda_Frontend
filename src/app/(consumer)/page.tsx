@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
+import { getRecommendedBrands, getRecommendedProducts } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 export default function HomePage() {
@@ -14,20 +14,22 @@ export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [featuredStories, setFeaturedStories] = useState<BrandStory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [brandsRes, productsRes, storiesRes] = await Promise.all([
-          brandService.getAllBrands(),
-          productService.getFeaturedProducts(),
+        const [recommendedBrands, recommendedProducts, storiesRes] = await Promise.all([
+          getRecommendedBrands(),
+          getRecommendedProducts(),
           brandService.getFeaturedStories(),
         ]);
-        setBrands(brandsRes.data ?? []);
-        setFeaturedProducts(productsRes.data ?? []);
+        setBrands(recommendedBrands);
+        setFeaturedProducts(recommendedProducts);
         setFeaturedStories(storiesRes.data ?? []);
-      } catch (error) {
-        console.error('Failed to load home page data:', error);
+      } catch (err) {
+        console.error('Failed to load home page data:', err);
+        setError(err instanceof Error ? err.message : 'Unable to load recommendations. Please try again later.');
       } finally {
         setLoading(false);
         setIsLoaded(true);
@@ -42,6 +44,23 @@ export default function HomePage() {
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm text-ivory-cream/50 tracking-wider">Loading</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-noir flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <p className="font-display text-2xl text-ivory-cream mb-4">Something went wrong</p>
+          <p className="text-sm text-ivory-cream/50 leading-relaxed mb-8">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center gap-3 px-8 py-4 border border-ivory-cream/20 text-ivory-cream hover:bg-ivory-cream hover:text-charcoal-deep transition-all duration-300 text-sm tracking-[0.15em] uppercase"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -165,7 +184,7 @@ export default function HomePage() {
             {/* Large Feature - Spans 2x2 */}
             {brands[0] && (
               <Link
-                href={`/brand/${brands[0].slug}`}
+                href={`/brand/${brands[0].slug}?brandId=${brands[0].id}`}
                 className="col-span-2 row-span-2 group relative aspect-square overflow-hidden bg-sand-light"
               >
                 <Image
@@ -191,7 +210,7 @@ export default function HomePage() {
             {brands.slice(1, 5).map((brand) => (
               <Link
                 key={brand.id}
-                href={`/brand/${brand.slug}`}
+                href={`/brand/${brand.slug}?brandId=${brand.id}`}
                 className="group relative aspect-square overflow-hidden bg-sand-light"
               >
                 <Image
@@ -254,7 +273,7 @@ export default function HomePage() {
                     </h3>
                   </div>
                   <p className="font-body text-sm text-stone">
-                    €{featuredProducts[0].price.toLocaleString()}
+                    {featuredProducts[0].currency === 'INR' ? '₹' : '€'}{featuredProducts[0].price.toLocaleString()}
                   </p>
                 </div>
               </Link>
@@ -284,7 +303,7 @@ export default function HomePage() {
                     {product.name}
                   </h3>
                   <p className="font-body text-xs text-charcoal-warm mt-1">
-                    €{product.price.toLocaleString()}
+                    {product.currency === 'INR' ? '₹' : '€'}{product.price.toLocaleString()}
                   </p>
                 </Link>
               ))}
@@ -339,7 +358,7 @@ export default function HomePage() {
                   className="inline-flex items-center gap-3 text-charcoal-deep group"
                 >
                   <span className="font-body text-sm tracking-[0.1em] uppercase border-b border-charcoal-deep pb-1 group-hover:border-stone transition-colors">
-                    Read Story
+                    Read Heritage
                   </span>
                   <ArrowRight size={16} strokeWidth={1.5} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
