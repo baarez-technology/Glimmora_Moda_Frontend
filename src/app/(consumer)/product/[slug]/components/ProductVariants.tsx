@@ -1,5 +1,6 @@
 'use client';
 
+import { Minus, Plus } from 'lucide-react';
 import type { ProductVariant } from '@/types';
 
 interface ProductVariantsProps {
@@ -8,8 +9,11 @@ interface ProductVariantsProps {
   selectedSize: string | null;
   selectedColor: string | null;
   sizeError: boolean;
+  colorError: boolean;
+  quantity: number;
   onSizeSelect: (size: string) => void;
   onColorSelect: (color: string) => void;
+  onQuantityChange: (qty: number) => void;
 }
 
 export default function ProductVariants({
@@ -18,8 +22,11 @@ export default function ProductVariants({
   selectedSize,
   selectedColor,
   sizeError,
+  colorError,
+  quantity,
   onSizeSelect,
-  onColorSelect
+  onColorSelect,
+  onQuantityChange
 }: ProductVariantsProps) {
   return (
     <>
@@ -58,31 +65,62 @@ export default function ProductVariants({
         </div>
       )}
 
-      {/* Color Selection */}
-      {colorVariants.length > 0 && (
-        <div className="mb-10">
-          <p className="text-[11px] tracking-[0.3em] uppercase text-taupe mb-4">
-            Select Color
-          </p>
-          <div className="flex flex-wrap gap-3">
-            {colorVariants.map((variant) => (
-              <button
-                key={variant.id}
-                onClick={() => onColorSelect(variant.value)}
-                disabled={!variant.available}
-                className={`w-10 h-10 transition-all duration-300 ${
-                  selectedColor === variant.value
-                    ? 'ring-1 ring-charcoal-deep ring-offset-2'
-                    : 'hover:ring-1 hover:ring-sand hover:ring-offset-1'
-                } ${!variant.available ? 'opacity-30 cursor-not-allowed' : ''}`}
-                style={{ backgroundColor: variant.value }}
-                title={variant.name}
-                aria-label={`Select ${variant.name} color`}
-              />
-            ))}
+      {/* Color Selection + Quantity — side by side */}
+      <div className="mb-10 flex items-start gap-8">
+        {colorVariants.length > 0 && (
+          <div className="flex-1">
+            <p className={`text-[11px] tracking-[0.3em] uppercase mb-4 ${colorError ? 'text-error' : 'text-taupe'}`}>
+              Select Color {colorError && <span className="text-error">*</span>}
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {colorVariants.map((variant) => (
+                <button
+                  key={variant.id}
+                  onClick={() => onColorSelect(variant.value)}
+                  disabled={!variant.available}
+                  className={`w-10 h-10 transition-all duration-300 ${
+                    selectedColor === variant.value
+                      ? 'ring-1 ring-charcoal-deep ring-offset-2'
+                      : `hover:ring-1 hover:ring-sand hover:ring-offset-1 ${colorError ? 'ring-1 ring-error/50 ring-offset-1' : ''}`
+                  } ${!variant.available ? 'opacity-30 cursor-not-allowed' : ''}`}
+                  style={{ backgroundColor: variant.value }}
+                  title={variant.name}
+                  aria-label={`Select ${variant.name} color`}
+                />
+              ))}
+            </div>
+            {colorError && (
+              <p className="text-xs text-error mt-3">Please select a color to continue</p>
+            )}
+          </div>
+        )}
+
+        {/* Quantity Selector */}
+        <div>
+          <p className="text-[11px] tracking-[0.3em] uppercase text-taupe mb-3">Quantity</p>
+          <div className="inline-flex items-center border border-sand">
+            <button
+              onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+              disabled={quantity <= 1}
+              className="w-10 h-10 flex items-center justify-center text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Decrease quantity"
+            >
+              <Minus size={14} />
+            </button>
+            <span className="w-12 h-10 flex items-center justify-center text-sm font-medium text-charcoal-deep border-x border-sand">
+              {quantity}
+            </span>
+            <button
+              onClick={() => onQuantityChange(Math.min(99, quantity + 1))}
+              disabled={quantity >= 99}
+              className="w-10 h-10 flex items-center justify-center text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Increase quantity"
+            >
+              <Plus size={14} />
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </>
   );
 }
