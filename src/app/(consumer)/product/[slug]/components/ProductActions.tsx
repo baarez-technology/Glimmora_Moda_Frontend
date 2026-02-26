@@ -8,10 +8,12 @@ interface ProductActionsProps {
   sizeVariants: ProductVariant[];
   selectedSize: string | null;
   inConsiderations: boolean;
+  inCart: boolean;
   inWardrobe: boolean;
   watchingRestock: boolean;
   onAddToConsiderations: () => void;
   onRemoveFromConsiderations: () => void;
+  onAddToCart: () => void;
   onAddToWardrobe: () => void;
   onRemoveFromWardrobe: () => void;
   onShare: () => void;
@@ -28,10 +30,12 @@ export default function ProductActions({
   sizeVariants,
   selectedSize,
   inConsiderations,
+  inCart,
   inWardrobe,
   watchingRestock,
   onAddToConsiderations,
   onRemoveFromConsiderations,
+  onAddToCart,
   onAddToWardrobe,
   onRemoveFromWardrobe,
   onShare,
@@ -103,28 +107,51 @@ export default function ProductActions({
 
       {/* Main Actions */}
       <div className="space-y-4">
-        {inConsiderations ? (
-          <button
-            onClick={onRemoveFromConsiderations}
-            className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-warm"
-          >
-            <Check size={18} />
-            <span className="text-sm tracking-[0.15em] uppercase">In Your Considerations</span>
-          </button>
-        ) : (
-          <button
-            onClick={onAddToConsiderations}
-            disabled={sizeVariants.length > 0 && !selectedSize}
-            className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-warm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-charcoal-deep"
-            title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
-          >
-            <span className="text-sm tracking-[0.15em] uppercase">Add to Considerations</span>
-            <Heart size={18} />
-          </button>
-        )}
+        {/* Add to Considerations + Add to Cart — side by side */}
+        <div className="flex gap-3">
+          {inConsiderations ? (
+            <button
+              onClick={onRemoveFromConsiderations}
+              className="group flex-1 py-4 px-4 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-warm"
+            >
+              <Check size={16} />
+              <span className="text-sm tracking-[0.1em] uppercase">In Your Considerations</span>
+            </button>
+          ) : (
+            <button
+              onClick={onAddToConsiderations}
+              disabled={sizeVariants.length > 0 && !selectedSize}
+              className="group flex-1 py-4 px-4 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-warm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-charcoal-deep"
+              title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
+            >
+              <Heart size={16} />
+              <span className="text-sm tracking-[0.1em] uppercase">Add to Considerations</span>
+            </button>
+          )}
+
+          {inCart ? (
+            <button
+              disabled
+              className="group flex-1 py-4 px-4 bg-gold-muted/10 border border-gold-muted/30 text-gold-deep flex items-center justify-center gap-2"
+            >
+              <Check size={16} />
+              <span className="text-sm tracking-[0.1em] uppercase">In Cart</span>
+            </button>
+          ) : (
+            <button
+              onClick={onAddToCart}
+              disabled={sizeVariants.length > 0 && !selectedSize}
+              className="group flex-1 py-4 px-4 border-2 border-charcoal-deep text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-deep hover:text-ivory-cream disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-charcoal-deep"
+              title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
+            >
+              <ShoppingBag size={16} />
+              <span className="text-sm tracking-[0.1em] uppercase">Add to Cart</span>
+            </button>
+          )}
+        </div>
 
         {/* Helper text when size is required */}
-        {sizeVariants.length > 0 && !selectedSize && !inConsiderations && (
+        {sizeVariants.length > 0 && !selectedSize && !inConsiderations && !inCart && (
           <p className="text-xs text-center text-stone">
             Please select a size to continue
           </p>

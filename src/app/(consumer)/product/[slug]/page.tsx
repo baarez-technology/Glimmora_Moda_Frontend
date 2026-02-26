@@ -82,12 +82,14 @@ function ProductPageContent({ product }: { product: Product }) {
               sizeVariants={state.sizeVariants}
               selectedSize={state.selectedSize}
               inConsiderations={state.inConsiderations}
+              inCart={state.inCart}
               inWardrobe={state.inWardrobe}
               watchingRestock={state.watchingRestock}
               showIntelligence={state.showIntelligence}
               onShowIntelligence={() => state.setShowIntelligence(!state.showIntelligence)}
               onAddToConsiderations={state.handleAddToConsiderations}
               onRemoveFromConsiderations={state.handleRemoveFromConsiderations}
+              onAddToCart={state.handleAddToCart}
               onAddToWardrobe={state.handleAddToWardrobe}
               onRemoveFromWardrobe={state.handleRemoveFromWardrobe}
               onShare={state.handleShare}

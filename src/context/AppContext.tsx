@@ -17,11 +17,13 @@ import {
   useOrders,
   useUHNIFeatures,
   useFashionIdentity,
+  useCart,
   type Toast,
   type SavedOutfit,
   type RestockAlert,
   type OrderRecord
 } from './hooks';
+import type { CartItem, WishlistItem } from '@/services/customer-collection.service';
 
 // Re-export types for backwards compatibility
 export type { Toast, SavedOutfit, RestockAlert, OrderRecord };
@@ -45,7 +47,20 @@ interface AppContextType {
   removeFromWardrobe: (id: string) => void;
   isInWardrobe: (productId: string) => boolean;
 
-  // Wishlist (TODO: Implement full wishlist functionality)
+  // Cart (API-backed, session-cached)
+  cartItems: CartItem[];
+  cartCount: number;
+  addToCart: (payload: { product_id: string; color: string; size: string; quantity?: number }) => Promise<CartItem>;
+  removeFromCart: (cartId: string) => Promise<void>;
+  isInCart: (productId: string) => boolean;
+  refreshCart: () => Promise<void>;
+
+  // Wishlist (API-backed, session-cached)
+  wishlistItems: WishlistItem[];
+  wishlistCount: number;
+  refreshWishlist: () => Promise<void>;
+
+  // Wishlist (legacy local)
   wishlist: WardrobeItem[];
   removeFromWishlist: (id: string) => void;
 
@@ -102,6 +117,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Toast notifications
   const { toasts, showToast, dismissToast } = useToasts();
 
+  // Cart & Wishlist (API-backed, session-cached)
+  const cart = useCart({ showToast });
+
   // Safe localStorage save helper
   const safeLocalStorageSave = useCallback((key: string, value: unknown) => {
     if (!isHydrated) return;
@@ -144,6 +162,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Calendar events loaded from service
   const [baseCalendarEvents, setBaseCalendarEvents] = useState<CalendarEvent[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+
+  // Load cart & wishlist once per session when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      cart.loadCart();
+      cart.loadWishlist();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   useEffect(() => {
     // Only load calendar events when user is authenticated
@@ -329,7 +356,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       removeFromWardrobe,
       isInWardrobe,
 
-      // Wishlist
+      // Cart (API-backed)
+      cartItems: cart.cartItems,
+      cartCount: cart.cartCount,
+      addToCart: cart.addToCart,
+      removeFromCart: cart.removeFromCart,
+      isInCart: cart.isInCart,
+      refreshCart: cart.refreshCart,
+
+      // Wishlist (API-backed)
+      wishlistItems: cart.wishlistItems,
+      wishlistCount: cart.wishlistCount,
+      refreshWishlist: cart.refreshWishlist,
+
+      // Wishlist (legacy local)
       wishlist,
       removeFromWishlist,
 

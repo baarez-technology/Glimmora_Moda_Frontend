@@ -6,6 +6,8 @@ import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
 import * as intelligenceService from '@/services/intelligence.service';
 import * as wardrobeService from '@/services/wardrobe.service';
+import { addToWishlist, removeFromWishlist, getWishlist } from '@/services/customer-collection.service';
+import type { CartItem } from '@/services/customer-collection.service';
 import type {
   Product,
   Brand,
@@ -48,7 +50,11 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     wardrobe,
     addToWardrobe,
     removeFromWardrobe,
-    isInWardrobe
+    isInWardrobe,
+    addToCart,
+    isInCart,
+    refreshWishlist,
+    refreshCart,
   } = useApp();
 
   // UI State
@@ -80,6 +86,10 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const considerationItem = considerations.find(c => c.productId === product.id);
   const watchingRestock = hasRestockAlert(product.id);
   const inWardrobe = isInWardrobe(product.id);
+  const inCart = isInCart(product.id);
+
+  // Track the wishlist_id for the current product (for removal)
+  const [wishlistItemId, setWishlistItemId] = useState<string | null>(null);
 
   // Load service data and user data
   useEffect(() => {
@@ -162,13 +172,55 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
       { size: selectedSize || undefined, color: selectedColor || undefined },
       agiNote
     );
-  }, [sizeVariants.length, selectedSize, selectedColor, product, addToConsiderations, showToast]);
+
+    // Also persist to wishlist API
+    addToWishlist({
+      product_id: product.id,
+      color: selectedColor || '',
+      size: selectedSize || '',
+    })
+      .then((item) => {
+        setWishlistItemId(item.wishlist_id);
+        refreshWishlist();
+      })
+      .catch(() => { /* API unavailable — local state still works */ });
+  }, [sizeVariants.length, selectedSize, selectedColor, product, addToConsiderations, showToast, refreshWishlist]);
 
   const handleRemoveFromConsiderations = useCallback(() => {
     if (considerationItem) {
       removeFromConsiderations(considerationItem.id);
     }
-  }, [considerationItem, removeFromConsiderations]);
+
+    // Also remove from wishlist API
+    if (wishlistItemId) {
+      removeFromWishlist(wishlistItemId)
+        .then(() => {
+          setWishlistItemId(null);
+          refreshWishlist();
+        })
+        .catch(() => { /* API unavailable — local state still works */ });
+    }
+  }, [considerationItem, removeFromConsiderations, wishlistItemId, refreshWishlist]);
+
+  const handleAddToCart = useCallback(async () => {
+    if (sizeVariants.length > 0 && !selectedSize) {
+      setSizeError(true);
+      showToast('Please select a size', 'error');
+      return;
+    }
+    setSizeError(false);
+
+    try {
+      await addToCart({
+        product_id: product.id,
+        color: selectedColor || '',
+        size: selectedSize || '',
+      });
+      refreshCart();
+    } catch {
+      // Toast already shown by the hook
+    }
+  }, [sizeVariants.length, selectedSize, selectedColor, product, addToCart, showToast, refreshCart]);
 
   const handleNotifyRestock = useCallback(() => {
     addRestockAlert(product, selectedSize || undefined, selectedColor || undefined);
@@ -207,6 +259,19 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     }
   }, [product.id, wardrobe, removeFromWardrobe]);
 
+  // Resolve wishlist_id for this product (so removal works)
+  useEffect(() => {
+    let cancelled = false;
+    getWishlist()
+      .then((items) => {
+        if (cancelled) return;
+        const match = items.find((i) => i.product_id === product.id);
+        if (match) setWishlistItemId(match.wishlist_id);
+      })
+      .catch(() => { /* not logged in or API unavailable */ });
+    return () => { cancelled = true; };
+  }, [product.id]);
+
   // Related products
   const relatedProducts = useMemo(() => {
     return allProducts
@@ -234,6 +299,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     colorVariants,
     inConsiderations,
     inWardrobe,
+    inCart,
     watchingRestock,
     relatedProducts,
     allProducts,
@@ -252,6 +318,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     prevImage,
     handleAddToConsiderations,
     handleRemoveFromConsiderations,
+    handleAddToCart,
     handleAddToWardrobe,
     handleRemoveFromWardrobe,
     handleNotifyRestock,
