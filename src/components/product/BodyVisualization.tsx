@@ -4,7 +4,7 @@ import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { uploadImageFile } from '@/services/upload.service';
+import { uploadImageFile, virtualTryOn } from '@/services/upload.service';
 import { Product, BodyVisualizationConfig } from '@/types';
 
 interface BodyVisualizationProps {
@@ -22,7 +22,12 @@ export default function BodyVisualization({
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [tryOnImage, setTryOnImage] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [tryOnError, setTryOnError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const productImage = product.images?.[0]?.url;
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -31,11 +36,16 @@ export default function BodyVisualization({
 
     setUploadedFileName(file.name);
     setIsUploading(true);
+    setTryOnImage(null);
+    setTryOnError(null);
+
+    let modelUrl: string | null = null;
 
     try {
       // Upload to backend API → get public URL
       const publicUrl = await uploadImageFile(file);
       setUploadedImage(publicUrl);
+      modelUrl = publicUrl;
     } catch {
       // API unavailable — fall back to local data URL preview
       const reader = new FileReader();
@@ -46,19 +56,32 @@ export default function BodyVisualization({
     } finally {
       setIsUploading(false);
     }
+
+    // If we got a real public URL and have a product image, run virtual try-on
+    if (modelUrl && productImage) {
+      setIsGenerating(true);
+      try {
+        const result = await virtualTryOn(modelUrl, productImage);
+        setTryOnImage(result.image_url);
+      } catch (err) {
+        setTryOnError(err instanceof Error ? err.message : 'Try-on generation failed');
+      } finally {
+        setIsGenerating(false);
+      }
+    }
   };
 
   const handleReset = () => {
     setUploadedImage(null);
     setUploadedFileName(null);
+    setTryOnImage(null);
+    setTryOnError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
   };
 
   if (!isOpen) return null;
-
-  const productImage = product.images?.[0]?.url;
 
   return (
     <AnimatePresence>
@@ -106,31 +129,91 @@ export default function BodyVisualization({
 
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-            {/* AI Preview Area (Left) — Placeholder for API-generated visualization */}
-            <div className="lg:col-span-2 relative bg-gradient-to-b from-ivory-cream to-stone/10 p-8 flex items-center justify-center min-h-[400px]">
-              <div className="w-full max-w-sm mx-auto aspect-[3/4] rounded-xl overflow-hidden relative bg-stone/5 border border-stone/20">
-                {/* Product image as placeholder until visualization API is integrated */}
-                {productImage ? (
-                  <Image
-                    src={productImage}
-                    alt={`${product.name} — visualization preview`}
-                    fill
-                    className="object-cover opacity-60"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <ImageIcon className="w-16 h-16 text-stone/20" />
+            {/* AI Preview Area (Left) */}
+            <div className="lg:col-span-2 relative bg-gradient-to-b from-ivory-cream to-stone/10 p-8 flex flex-col items-center justify-center min-h-[400px]">
+              {/* Try-On upload button — above the preview */}
+              {!tryOnImage && !isGenerating && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="mb-4 flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream rounded-lg hover:bg-charcoal-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm tracking-wider">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      <span className="text-sm tracking-wider">
+                        {uploadedImage ? 'Try with Another Photo' : 'Upload & Try On'}
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
+
+              {isUploading || isGenerating ? (
+                /* Uploading / Generating loading state */
+                <div className="w-full max-w-sm mx-auto aspect-[3/4] rounded-xl overflow-hidden relative bg-stone/5 border border-stone/20 flex flex-col items-center justify-center gap-4">
+                  <div className="relative">
+                    <div className="w-16 h-16 border-4 border-stone/20 border-t-gold-soft rounded-full animate-spin" />
+                    <Eye className="w-6 h-6 text-gold-soft absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
                   </div>
-                )}
-                {/* Overlay label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-charcoal-deep/30 backdrop-blur-[2px]">
-                  <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
-                    <Eye className="w-7 h-7 text-white" />
+                  <div className="text-center px-6">
+                    <p className="text-sm font-medium text-charcoal-deep mb-1">
+                      {isUploading ? 'Uploading Your Photo' : 'Generating Try-On'}
+                    </p>
+                    <p className="text-xs text-stone/60">
+                      {isUploading
+                        ? 'Preparing your image...'
+                        : 'Our AI is creating your personalized preview — this may take a moment...'}
+                    </p>
                   </div>
-                  <p className="text-sm font-medium text-white tracking-wide">Virtual Try-On</p>
-                  <p className="text-xs text-white/70 mt-1">AI visualization coming soon</p>
                 </div>
-              </div>
+              ) : tryOnImage ? (
+                /* Generated try-on result */
+                <div className="w-full max-w-sm mx-auto aspect-[3/4] rounded-xl overflow-hidden relative">
+                  <Image
+                    src={tryOnImage}
+                    alt="Virtual try-on result"
+                    fill
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+              ) : (
+                /* Placeholder — product image with overlay */
+                <div className="w-full max-w-sm mx-auto aspect-[3/4] rounded-xl overflow-hidden relative bg-stone/5 border border-stone/20">
+                  {productImage ? (
+                    <Image
+                      src={productImage}
+                      alt={`${product.name} — visualization preview`}
+                      fill
+                      className="object-cover opacity-60"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <ImageIcon className="w-16 h-16 text-stone/20" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center bg-charcoal-deep/30 backdrop-blur-[2px]">
+                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                      <Eye className="w-7 h-7 text-white" />
+                    </div>
+                    <p className="text-sm font-medium text-white tracking-wide">Virtual Try-On</p>
+                    <p className="text-xs text-white/70 mt-1">Upload your photo to get started</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Error message */}
+              {tryOnError && !isGenerating && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-50 text-red-700 text-xs px-4 py-2 rounded-lg border border-red-200 max-w-xs text-center">
+                  {tryOnError}
+                </div>
+              )}
             </div>
 
             {/* Controls Panel (Right) */}
@@ -193,13 +276,18 @@ export default function BodyVisualization({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
+                  disabled={isUploading || isGenerating}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-gold-soft/10 text-charcoal-deep border border-gold-soft/30 rounded-lg hover:bg-gold-soft/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUploading ? (
                     <>
                       <Loader2 className="w-4 h-4 text-gold-soft animate-spin" />
                       <span className="text-sm tracking-wider">Uploading...</span>
+                    </>
+                  ) : isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 text-gold-soft animate-spin" />
+                      <span className="text-sm tracking-wider">Generating...</span>
                     </>
                   ) : (
                     <>
