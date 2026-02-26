@@ -86,6 +86,7 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
                           src={item.product.images[0]?.url || ''}
                           alt={item.product.name}
                           fill
+                          sizes="(max-width: 768px) 50vw, 25vw"
                           className="object-cover group-hover:scale-105 transition-transform"
                         />
                         {item.type === 'wardrobe' && (

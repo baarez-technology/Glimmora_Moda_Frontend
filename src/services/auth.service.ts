@@ -6,6 +6,7 @@
 import { apiRequest, generateMockId } from './api-client';
 import type { ApiResponse } from './api-client';
 import type { UserTier } from '@/types';
+import { fetchWithTimeout } from '@/lib/api-cache';
 
 export interface LoginRequest {
   email: string;
@@ -145,7 +146,7 @@ export interface BrandLoginResponse {
 }
 
 export async function brandLogin(credentials: BrandLoginRequest): Promise<BrandLoginResponse> {
-  const res = await fetch(`/api/v1/auth/login`, {
+  const res = await fetchWithTimeout(`/api/v1/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials),
@@ -185,7 +186,7 @@ export async function updateBrandProfile(
   payload: BrandProfileUpdatePayload
 ): Promise<BrandLoginResponse['brand']> {
   const token = localStorage.getItem('moda-brand-token');
-  const res = await fetch(`/api/v1/brand/me`, {
+  const res = await fetchWithTimeout(`/api/v1/brand/me`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -211,7 +212,7 @@ export async function brandChangePassword(payload: {
   confirm_new_password: string;
 }): Promise<{ message: string }> {
   const token = localStorage.getItem('moda-brand-token');
-  const res = await fetch(`/api/v1/brand/me/change-password`, {
+  const res = await fetchWithTimeout(`/api/v1/brand/me/change-password`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -283,7 +284,7 @@ export async function userLogin(credentials: {
   password: string;
   role: 'consumer' | 'uhni';
 }): Promise<UserTokenResponse> {
-  const res = await fetch(`/api/v1/user/auth/login`, {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(credentials),
@@ -300,7 +301,7 @@ export async function userLogin(credentials: {
 export async function userRegister(
   payload: UserRegisterPayload
 ): Promise<UserTokenResponse> {
-  const res = await fetch(`/api/v1/user/auth/register`, {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -318,7 +319,7 @@ export async function setUserContext(
   payload: UserContextPayload
 ): Promise<UserData> {
   const token = localStorage.getItem('moda-user-token');
-  const res = await fetch(`/api/v1/user/auth/set-context`, {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/set-context`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -375,7 +376,7 @@ export async function socialSignIn(
   idToken: string,
   role: 'consumer' | 'uhni'
 ): Promise<UserTokenResponse> {
-  const res = await fetch(`/api/v1/user/auth/${provider}`, {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/${provider}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id_token: idToken, role }),

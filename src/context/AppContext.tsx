@@ -146,28 +146,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    // Only load calendar events when user is authenticated
+    // Run all independent fetches in parallel instead of sequentially
     if (isAuthenticated) {
-      // 1. Load existing events from DB immediately (fast — includes manual events)
-      calendarService.getCalendarEvents(false).then(backendEvents => {
-        const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
-        setBaseCalendarEvents(mapped);
-      }).catch(() => {
-        // Silently fail — user may not have a calendar connected
-      });
+      // Calendar: DB events + Nylas refresh + products all in parallel
+      Promise.all([
+        // 1. Load existing events from DB (fast — includes manual events)
+        calendarService.getCalendarEvents(false)
+          .then(backendEvents => {
+            const mapped = backendEvents.map(calendarService.mapBackendToFrontendEvent);
+            setBaseCalendarEvents(mapped);
+          })
+          .catch(() => { /* Silently fail — user may not have a calendar connected */ }),
 
-      // 2. Auto-sync from Nylas in background (if calendar is connected)
-      //    This ensures events appear after OAuth connect without manual sync
-      calendarService.refreshCalendarEvents().then(refreshedEvents => {
-        const mapped = refreshedEvents.map(calendarService.mapBackendToFrontendEvent);
-        setBaseCalendarEvents(mapped);
-      }).catch(() => {
-        // No calendar connected or refresh failed — that's fine, DB events already loaded
-      });
+        // 2. Auto-sync from Nylas in background (if calendar is connected)
+        calendarService.refreshCalendarEvents()
+          .then(refreshedEvents => {
+            const mapped = refreshedEvents.map(calendarService.mapBackendToFrontendEvent);
+            setBaseCalendarEvents(mapped);
+          })
+          .catch(() => { /* No calendar connected or refresh failed */ }),
+
+        // 3. Load all products (moved inside parallel block)
+        productService.getAllProducts()
+          .then(response => { if (response.success) setAllProducts(response.data); })
+          .catch(console.error),
+      ]);
+    } else {
+      // Not authenticated — still load products (mock data)
+      productService.getAllProducts()
+        .then(response => { if (response.success) setAllProducts(response.data); })
+        .catch(console.error);
     }
-    productService.getAllProducts().then(response => {
-      if (response.success) setAllProducts(response.data);
-    }).catch(console.error);
   }, [isAuthenticated]);
 
   // Generate dynamic calendar events with outfit suggestions based on wardrobe

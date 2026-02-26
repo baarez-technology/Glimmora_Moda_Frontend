@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode, useCallback 
 import type { UserTier } from '@/types';
 import * as authService from '@/services/auth.service';
 import type { UserData } from '@/services/auth.service';
+import { clearCache } from '@/lib/api-cache';
 
 interface AuthContextType {
   userTier: UserTier;
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoggingOut(true);
     setUserTier('standard');
     setUserDataState(null);
+    clearCache(); // Purge all cached API data to prevent user data leaking to next session
     authService.userLogout();
     authService.logout().catch(console.error);
     setTimeout(() => setIsLoggingOut(false), 500);
