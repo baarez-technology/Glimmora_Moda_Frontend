@@ -51,6 +51,8 @@ export async function uploadDocument(file: File): Promise<ApiResponse<UploadResu
 
 // ─── Real API Upload (FormData with auth) ───────────────────────────────────
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 function getUserToken(): string | null {
   try {
     return localStorage.getItem('moda-user-token');
@@ -62,31 +64,75 @@ function getUserToken(): string | null {
 /**
  * Upload an image file to the backend via FormData.
  * Returns the public URL of the uploaded image.
- * Falls back to a client-side data URL if the API is unavailable.
  */
 export async function uploadImageFile(file: File): Promise<string> {
+  // const token = getUserToken();
   const formData = new FormData();
   formData.append('file', file);
 
-  const headers: Record<string, string> = {};
+  const res = await fetch(`${API_BASE}/api/v1/upload`, {
+    method: 'POST',
+    // headers: {
+    //   ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    // },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
+    throw new Error(err.detail || `Upload failed (${res.status})`);
+  }
+
+  const data = await res.json();
+  console.log('[uploadImageFile] response:', data);
+  console.log('[uploadImageFile] public URL:', data.url);
+  return data.url;
+}
+
+// ─── Virtual Try-On API ──────────────────────────────────────────────────────
+
+export interface VirtualTryOnResult {
+  image_url: string;
+  timing_ms: {
+    download_ms: number;
+    gemini_ms: number;
+    upload_ms: number;
+    total_ms: number;
+  };
+}
+
+/**
+ * Call the virtual try-on endpoint.
+ * Sends the model (person) photo URL and garment (product) photo URL,
+ * returns the S3 URL of the AI-generated try-on image.
+ */
+export async function virtualTryOn(
+  modelImageUrl: string,
+  garmentImageUrl: string,
+): Promise<VirtualTryOnResult> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
   const token = getUserToken();
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch('/api/v1/customer/upload/image', {
+  const res = await fetch(`/api/v1/customer/virtual-tryon`, {
     method: 'POST',
     headers,
-    body: formData,
+    body: JSON.stringify({
+      model_image: modelImageUrl,
+      garment_image: garmentImageUrl,
+    }),
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Failed to upload image');
+    throw new Error(err.detail || 'Virtual try-on failed');
   }
 
-  const data = await res.json();
-  return data.url || data.image_url || data.public_url;
+  return res.json();
 }
 
 export async function getUploadUrl(
