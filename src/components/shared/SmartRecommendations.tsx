@@ -147,6 +147,7 @@ export default function SmartRecommendations({
                     src={product.images[0]?.url || ''}
                     alt={product.name}
                     fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />
 

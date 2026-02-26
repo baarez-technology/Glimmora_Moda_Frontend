@@ -19,8 +19,8 @@ function DiscoverContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'products' | 'brands' | 'stories'>('all');
   const [budgetRange, setBudgetRange] = useState<string | null>(null);
-  const [selectedOccasion, setSelectedOccasion] = useState<string | null>(occasionParam);
-  const [selectedMood, setSelectedMood] = useState<string | null>(moodParam);
+  const [selectedOccasions, setSelectedOccasions] = useState<string[]>(occasionParam ? [occasionParam] : []);
+  const [selectedMoods, setSelectedMoods] = useState<string[]>(moodParam ? [moodParam] : []);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -47,7 +47,69 @@ function DiscoverContent() {
   useEffect(() => {
     async function loadData() {
       try {
-        const productParams = brandIdParam ? { filter_brand_id: brandIdParam, page_size: 100 } : { page_size: 100 };
+        // Only show the full-page loader on the very first load
+        setDataLoading(prev => (isLoaded ? prev : true));
+
+        const productParams: Parameters<typeof getRecommendedProducts>[0] = {
+          page_size: 100,
+        };
+
+        if (brandIdParam) {
+          productParams.filter_brand_id = brandIdParam;
+        }
+
+        // Map UI budget buckets to API min/max budget fields
+        if (budgetRange) {
+          const range = budgetRanges[budgetRange];
+          if (range) {
+            productParams.user_min_budget = range.min;
+            productParams.user_max_budget = range.max;
+          }
+        }
+
+        // Map multi-select occasion/aesthetic filters to API user_preferences.
+        // Occasions can be sent through as-is (backend uses same keys).
+        // For aesthetics we expand the simple UI ids into the richer tokens
+        // used by the recommendation engine (e.g. "minimal" → ["minimal", "minimal-structured"]).
+        if (selectedOccasions.length || selectedMoods.length) {
+          productParams.user_preferences = {};
+
+          if (selectedOccasions.length) {
+            productParams.user_preferences.occasions = selectedOccasions;
+          }
+
+          if (selectedMoods.length) {
+            const aestheticsSet = new Set<string>();
+            selectedMoods.forEach((mood) => {
+              switch (mood) {
+                case 'minimal':
+                  aestheticsSet.add('minimal');
+                  aestheticsSet.add('minimal-structured');
+                  break;
+                case 'classic':
+                  aestheticsSet.add('classic');
+                  aestheticsSet.add('classic-timeless');
+                  break;
+                case 'contemporary':
+                case 'bold': // backward-compat if URL/query contains older id
+                  aestheticsSet.add('bold');
+                  aestheticsSet.add('contemporary-statement');
+                  aestheticsSet.add('contemporary');
+                  break;
+                case 'artistic':
+                  aestheticsSet.add('artistic');
+                  aestheticsSet.add('art-cultural');
+                  break;
+                default:
+                  aestheticsSet.add(mood);
+                  break;
+              }
+            });
+
+            productParams.user_preferences.aesthetics = Array.from(aestheticsSet);
+          }
+        }
+
         const [recommendedProducts, recommendedBrands, stories] = await Promise.all([
           getRecommendedProducts(productParams),
           getRecommendedBrands(),
@@ -64,7 +126,7 @@ function DiscoverContent() {
       }
     }
     loadData();
-  }, [brandIdParam]);
+  }, [brandIdParam, budgetRange, selectedOccasions, selectedMoods, isLoaded]);
 
   const budgetRanges: Record<string, { min: number; max: number }> = {
     'under-500': { min: 0, max: 500 },
@@ -75,11 +137,7 @@ function DiscoverContent() {
 
   const filteredProducts = useMemo(() => {
     const filtered = products.filter(p => {
-      if (budgetRange) {
-        const range = budgetRanges[budgetRange];
-        if (p.price < range.min || p.price > range.max) return false;
-      }
-
+      // Text search is still handled client-side over the recommended set
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(query);
@@ -88,28 +146,35 @@ function DiscoverContent() {
         if (!matchesName && !matchesBrand && !matchesTags) return false;
       }
 
-      if (selectedOccasion) {
+      if (selectedOccasions.length) {
         const occasionTags: Record<string, string[]> = {
-          evening: ['evening', 'formal', 'gala', 'party', 'elegant'],
           professional: ['professional', 'business', 'office', 'work'],
+          social: ['social', 'event', 'party', 'gathering', 'dinner'],
           casual: ['casual', 'everyday', 'relaxed', 'weekend'],
-          travel: ['travel', 'versatile', 'comfortable']
+          formal: ['formal', 'black-tie', 'gala', 'evening'],
+          travel: ['travel', 'journey', 'trip', 'versatile', 'comfortable'],
+          art: ['art', 'cultural', 'gallery', 'theatre', 'museum'],
         };
-        const matchTags = occasionTags[selectedOccasion] || [];
-        const hasTag = p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
-        if (!hasTag) return false;
+        const hasOccasionMatch = selectedOccasions.some((occ) => {
+          const matchTags = occasionTags[occ] || [];
+          return p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
+        });
+        if (!hasOccasionMatch) return false;
       }
 
-      if (selectedMood) {
+      if (selectedMoods.length) {
         const moodTags: Record<string, string[]> = {
           minimal: ['minimal', 'clean', 'structured', 'simple'],
           classic: ['classic', 'timeless', 'heritage', 'traditional'],
-          bold: ['bold', 'contemporary', 'statement', 'modern'],
-          artistic: ['artistic', 'expressive', 'creative', 'unique']
+          contemporary: ['bold', 'contemporary', 'statement', 'modern'],
+          bold: ['bold', 'contemporary', 'statement', 'modern'], // backward-compat
+          artistic: ['art', 'artistic', 'expressive', 'creative', 'cultural', 'unique']
         };
-        const matchTags = moodTags[selectedMood] || [];
-        const hasTag = p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
-        if (!hasTag) return false;
+        const hasMoodMatch = selectedMoods.some((mood) => {
+          const matchTags = moodTags[mood] || [];
+          return p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
+        });
+        if (!hasMoodMatch) return false;
       }
 
       return true;
@@ -124,7 +189,7 @@ function DiscoverContent() {
         default: return 0;
       }
     });
-  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, products, sortBy]);
+  }, [searchQuery, selectedOccasions, selectedMoods, products, sortBy]);
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -135,7 +200,7 @@ function DiscoverContent() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, sortBy]);
+  }, [budgetRange, searchQuery, selectedOccasions, selectedMoods, sortBy]);
 
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
@@ -150,28 +215,67 @@ function DiscoverContent() {
   }, [searchQuery, brandStories]);
 
   const clearFilters = () => {
-    setSelectedOccasion(null);
-    setSelectedMood(null);
+    setSelectedOccasions([]);
+    setSelectedMoods([]);
     setSearchQuery('');
     setBudgetRange(null);
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = selectedOccasion || selectedMood || searchQuery || budgetRange;
+  const hasActiveFilters =
+    selectedOccasions.length > 0 ||
+    selectedMoods.length > 0 ||
+    !!searchQuery ||
+    !!budgetRange;
 
-  const occasions = [
-    { id: 'evening', label: 'Evening' },
-    { id: 'professional', label: 'Professional' },
-    { id: 'casual', label: 'Everyday' },
-    { id: 'travel', label: 'Travel' }
-  ];
+  // Derive available occasion and aesthetic options from the products
+  // returned by the real recommendation API, so the refine panel reflects
+  // actual data instead of purely static mocks.
+  const occasionOptions = useMemo(
+    () => [
+      { id: 'professional', label: 'Professional' },
+      { id: 'social', label: 'Social Events' },
+      { id: 'casual', label: 'Casual Daily' },
+      { id: 'formal', label: 'Formal' },
+      { id: 'travel', label: 'Travel' },
+      { id: 'art', label: 'Art & Culture' },
+    ],
+    []
+  );
 
-  const moods = [
-    { id: 'minimal', label: 'Minimal' },
-    { id: 'classic', label: 'Classic' },
-    { id: 'bold', label: 'Bold' },
-    { id: 'artistic', label: 'Artistic' }
-  ];
+  const moodOptions = useMemo(() => {
+    // Keep ids aligned with onboarding ("minimal", "classic", "artistic", "contemporary")
+    const allowedIds = ['minimal', 'classic', 'artistic', 'contemporary'] as const;
+    const labels: Record<string, string> = {
+      minimal: 'Minimal & Structured',
+      classic: 'Classic & Timeless',
+      artistic: 'Artistic & Expressive',
+      contemporary: 'Bold & Contemporary',
+    };
+    const present = new Set<string>();
+
+    products.forEach((p) => {
+      p.tags?.forEach((tag) => {
+        const raw = tag.toLowerCase().replace(/\s+/g, '-');
+
+        // Map richer backend aesthetic tokens to the UI buckets
+        const bucket =
+          raw.includes('minimal') ? 'minimal'
+          : raw.includes('classic') || raw.includes('timeless') ? 'classic'
+          : raw.includes('art') || raw.includes('cultural') || raw.includes('expressive') ? 'artistic'
+          : raw.includes('contemporary') || raw.includes('bold') || raw.includes('statement') || raw.includes('modern') ? 'contemporary'
+          : null;
+
+        if (bucket && allowedIds.includes(bucket)) {
+          present.add(bucket);
+        }
+      });
+    });
+
+    return allowedIds
+      .filter((id) => present.has(id))
+      .map((id) => ({ id, label: labels[id] }));
+  }, [products]);
 
   const budgets = [
     { id: 'under-500', label: 'Under €500' },
@@ -180,7 +284,7 @@ function DiscoverContent() {
     { id: '5000-plus', label: '€5,000+' }
   ];
 
-  if (dataLoading) {
+  if (!isLoaded && dataLoading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
@@ -306,18 +410,38 @@ function DiscoverContent() {
                   <button onClick={() => setSearchQuery('')} className="hover:text-gold-deep transition-colors"><X size={12} /></button>
                 </span>
               )}
-              {selectedOccasion && (
-                <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
-                  {occasions.find(o => o.id === selectedOccasion)?.label}
-                  <button onClick={() => setSelectedOccasion(null)} className="hover:text-gold-deep transition-colors"><X size={12} /></button>
+              {selectedOccasions.map((occ) => (
+                <span
+                  key={occ}
+                  className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]"
+                >
+                  {occasionOptions.find(o => o.id === occ)?.label ?? occ}
+                  <button
+                    onClick={() =>
+                      setSelectedOccasions(prev => prev.filter(id => id !== occ))
+                    }
+                    className="hover:text-gold-deep transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
                 </span>
-              )}
-              {selectedMood && (
-                <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
-                  {moods.find(m => m.id === selectedMood)?.label}
-                  <button onClick={() => setSelectedMood(null)} className="hover:text-gold-deep transition-colors"><X size={12} /></button>
+              ))}
+              {selectedMoods.map((mood) => (
+                <span
+                  key={mood}
+                  className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]"
+                >
+                  {moodOptions.find(m => m.id === mood)?.label ?? mood}
+                  <button
+                    onClick={() =>
+                      setSelectedMoods(prev => prev.filter(id => id !== mood))
+                    }
+                    className="hover:text-gold-deep transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
                 </span>
-              )}
+              ))}
               {budgetRange && (
                 <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
                   {budgets.find(b => b.id === budgetRange)?.label}
@@ -708,18 +832,24 @@ function DiscoverContent() {
             <div>
               <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Occasion</h4>
               <div className="space-y-1">
-                {occasions.map((occ) => (
+                {occasionOptions.map((occ) => (
                   <button
                     key={occ.id}
-                    onClick={() => setSelectedOccasion(selectedOccasion === occ.id ? null : occ.id)}
+                    onClick={() =>
+                      setSelectedOccasions(prev =>
+                        prev.includes(occ.id)
+                          ? prev.filter(id => id !== occ.id)
+                          : [...prev, occ.id]
+                      )
+                    }
                     className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all border-b border-transparent hover:border-sand/50 ${
-                      selectedOccasion === occ.id
+                      selectedOccasions.includes(occ.id)
                         ? 'text-charcoal-deep'
                         : 'text-stone hover:text-charcoal-deep'
                     }`}
                   >
                     <span>{occ.label}</span>
-                    {selectedOccasion === occ.id && (
+                    {selectedOccasions.includes(occ.id) && (
                       <span className="w-2 h-2 bg-gold-muted rounded-full" />
                     )}
                   </button>
@@ -731,18 +861,24 @@ function DiscoverContent() {
             <div>
               <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Aesthetic</h4>
               <div className="space-y-1">
-                {moods.map((mood) => (
+                {moodOptions.map((mood) => (
                   <button
                     key={mood.id}
-                    onClick={() => setSelectedMood(selectedMood === mood.id ? null : mood.id)}
+                    onClick={() =>
+                      setSelectedMoods(prev =>
+                        prev.includes(mood.id)
+                          ? prev.filter(id => id !== mood.id)
+                          : [...prev, mood.id]
+                      )
+                    }
                     className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all border-b border-transparent hover:border-sand/50 ${
-                      selectedMood === mood.id
+                      selectedMoods.includes(mood.id)
                         ? 'text-charcoal-deep'
                         : 'text-stone hover:text-charcoal-deep'
                     }`}
                   >
                     <span>{mood.label}</span>
-                    {selectedMood === mood.id && (
+                    {selectedMoods.includes(mood.id) && (
                       <span className="w-2 h-2 bg-gold-muted rounded-full" />
                     )}
                   </button>
@@ -784,7 +920,10 @@ function DiscoverContent() {
                 Clear All
               </button>
               <button
-                onClick={() => setShowMobileFilters(false)}
+                onClick={() => {
+                  setShowMobileFilters(false);
+                  resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className="flex-1 py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors"
               >
                 View Results

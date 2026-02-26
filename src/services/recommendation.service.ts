@@ -23,6 +23,14 @@ import type {
   RecommendedProduct,
   RecommendedBrand,
 } from '@/types/recommendation';
+import { cachedFetch, invalidateCache, fetchWithTimeout } from '@/lib/api-cache';
+
+// Cache TTLs
+const BRANDS_TTL = 5 * 60 * 1000;       // 5 min — brands rarely change
+const PRODUCTS_TTL = 2 * 60 * 1000;     // 2 min — products may update more often
+const COLLECTIONS_TTL = 5 * 60 * 1000;  // 5 min
+const STORIES_TTL = 3 * 60 * 1000;      // 3 min
+const PRODUCT_DETAIL_TTL = 2 * 60 * 1000; // 2 min
 
 function getToken(): string | null {
   try {
@@ -112,17 +120,19 @@ function mapToProduct(raw: RecommendedProduct): Product {
  * occasions and aesthetics preferences. Throws on failure.
  */
 export async function getRecommendedBrands(): Promise<Brand[]> {
-  const res = await fetch(`/api/v1/brands/recommendations`, {
-    method: 'GET',
-    headers: authHeaders(),
-  });
+  return cachedFetch('brands', async () => {
+    const res = await fetchWithTimeout(`/api/v1/brands/recommendations`, {
+      method: 'GET',
+      headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error(`Brand recommendations failed: ${res.status}`);
-  }
+    if (!res.ok) {
+      throw new Error(`Brand recommendations failed: ${res.status}`);
+    }
 
-  const data: RecommendedBrand[] = await res.json();
-  return data.map(mapToBrand);
+    const data: RecommendedBrand[] = await res.json();
+    return data.map(mapToBrand);
+  }, BRANDS_TTL);
 }
 
 // ============================================
@@ -144,18 +154,23 @@ export async function getRecommendedProducts(
     ...params,
   };
 
-  const res = await fetch(`/api/v1/products/recommendations`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(body),
-  });
+  // Cache key includes params so different queries get separate caches
+  const cacheKey = `products:${JSON.stringify(body)}`;
 
-  if (!res.ok) {
-    throw new Error(`Product recommendations failed: ${res.status}`);
-  }
+  return cachedFetch(cacheKey, async () => {
+    const res = await fetchWithTimeout(`/api/v1/products/recommendations`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(body),
+    });
 
-  const data: ProductRecommendationResponse = await res.json();
-  return data.products_data.map(mapToProduct);
+    if (!res.ok) {
+      throw new Error(`Product recommendations failed: ${res.status}`);
+    }
+
+    const data: ProductRecommendationResponse = await res.json();
+    return data.products_data.map(mapToProduct);
+  }, PRODUCTS_TTL);
 }
 
 // ============================================
@@ -256,16 +271,20 @@ export async function searchStories(params?: StorySearchParams): Promise<BrandSt
   if (params?.story_id) query.set('story_id', params.story_id);
 
   const qs = query.toString();
-  const res = await fetch(`/api/v1/stories/search${qs ? `?${qs}` : ''}`, {
-    headers: authHeaders(),
-  });
+  const cacheKey = `stories:${qs}`;
 
-  if (!res.ok) {
-    throw new Error(`Stories search failed: ${res.status}`);
-  }
+  return cachedFetch(cacheKey, async () => {
+    const res = await fetchWithTimeout(`/api/v1/stories/search${qs ? `?${qs}` : ''}`, {
+      headers: authHeaders(),
+    });
 
-  const data: ApiStorySearchResult[] = await res.json();
-  return data.map(mapSearchStory);
+    if (!res.ok) {
+      throw new Error(`Stories search failed: ${res.status}`);
+    }
+
+    const data: ApiStorySearchResult[] = await res.json();
+    return data.map(mapSearchStory);
+  }, STORIES_TTL);
 }
 
 /**
@@ -274,7 +293,7 @@ export async function searchStories(params?: StorySearchParams): Promise<BrandSt
  * Returns full story detail including content blocks.
  */
 export async function getStoryById(storyId: string): Promise<BrandStory> {
-  const res = await fetch(`/api/v1/stories/${storyId}`, {
+  const res = await fetchWithTimeout(`/api/v1/stories/${storyId}`, {
     headers: authHeaders(),
   });
 
@@ -331,16 +350,20 @@ export async function getCollections(brandId?: string): Promise<Collection[]> {
   if (brandId) query.set('brand_id', brandId);
 
   const qs = query.toString();
-  const res = await fetch(`/api/v1/customer/collections${qs ? `?${qs}` : ''}`, {
-    headers: authHeaders(),
-  });
+  const cacheKey = `collections:${qs}`;
 
-  if (!res.ok) {
-    throw new Error(`Collections fetch failed: ${res.status}`);
-  }
+  return cachedFetch(cacheKey, async () => {
+    const res = await fetchWithTimeout(`/api/v1/customer/collections${qs ? `?${qs}` : ''}`, {
+      headers: authHeaders(),
+    });
 
-  const data: ApiCollection[] = await res.json();
-  return data.map(mapToCollection);
+    if (!res.ok) {
+      throw new Error(`Collections fetch failed: ${res.status}`);
+    }
+
+    const data: ApiCollection[] = await res.json();
+    return data.map(mapToCollection);
+  }, COLLECTIONS_TTL);
 }
 
 // ============================================
@@ -481,16 +504,23 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
  * Optionally pass brandName to include it in the mapped Product.
  */
 export async function getProductDetail(productId: string, brandName?: string): Promise<Product> {
-  const res = await fetch(`/api/v1/customer/products/${productId}`, {
-    headers: authHeaders(),
-  });
+  return cachedFetch(`product-detail:${productId}`, async () => {
+    const res = await fetchWithTimeout(`/api/v1/customer/products/${productId}`, {
+      headers: authHeaders(),
+    });
 
-  if (!res.ok) {
-    throw new Error(`Product detail fetch failed: ${res.status}`);
-  }
+    if (!res.ok) {
+      throw new Error(`Product detail fetch failed: ${res.status}`);
+    }
 
-  const data: ApiProductDetail = await res.json();
-  return mapProductDetail(data, brandName);
+    const data: ApiProductDetail = await res.json();
+    return mapProductDetail(data, brandName);
+  }, PRODUCT_DETAIL_TTL);
+}
+
+/** Invalidate wardrobe cache after mutations (add/remove) */
+export function invalidateWardrobeCache() {
+  invalidateCache('wardrobe');
 }
 
 // ============================================
@@ -527,7 +557,7 @@ export interface AddToWardrobeRequest {
  * Returns all wardrobe items for the authenticated customer.
  */
 export async function getWardrobe(): Promise<ApiWardrobeItem[]> {
-  const res = await fetch(`/api/v1/customer/wardrobe`, {
+  const res = await fetchWithTimeout(`/api/v1/customer/wardrobe`, {
     headers: authHeaders(),
   });
 
@@ -544,7 +574,7 @@ export async function getWardrobe(): Promise<ApiWardrobeItem[]> {
  * Adds a product to the customer's wardrobe.
  */
 export async function addToWardrobe(params: AddToWardrobeRequest): Promise<ApiWardrobeItem> {
-  const res = await fetch(`/api/v1/customer/wardrobe`, {
+  const res = await fetchWithTimeout(`/api/v1/customer/wardrobe`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify(params),

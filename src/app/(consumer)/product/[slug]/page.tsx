@@ -2,14 +2,13 @@
 
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { ArrowRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import * as productService from '@/services/product.service';
 import { getProductDetail, getRecommendedBrands } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
-import ImmersiveVisualization from '@/components/product/ImmersiveVisualization';
 import OutfitSuggestions from '@/components/product/OutfitSuggestions';
-import BodyVisualization from '@/components/product/BodyVisualization';
 import { useProductPageState, useProductIntelligence } from './hooks/useProductPageState';
 import {
   ProductGallery,
@@ -24,6 +23,16 @@ import {
   ProductIntelligencePanel
 } from './components';
 import type { Product } from '@/types';
+
+// Lazy-load heavy modal components (only loaded when user clicks the button)
+const ImmersiveVisualization = dynamic(
+  () => import('@/components/product/ImmersiveVisualization'),
+  { ssr: false }
+);
+const BodyVisualization = dynamic(
+  () => import('@/components/product/BodyVisualization'),
+  { ssr: false }
+);
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -40,7 +49,8 @@ function ProductPageContent({ product }: { product: Product }) {
     fashionIdentity: state.fashionIdentity,
     wardrobe: state.wardrobe,
     brand: state.brand,
-    allProducts: state.allProducts
+    allProducts: state.allProducts,
+    showIntelligence: state.showIntelligence
   });
 
   return (
@@ -207,13 +217,14 @@ export default function ProductPage({ params }: ProductPageProps) {
     async function loadData() {
       try {
         if (productIdParam) {
-          // Real API — fetch product detail, resolve brand name
-          let brandName = '';
+          // Real API — fetch brands + product detail in parallel
           try {
-            const brands = await getRecommendedBrands();
-            const loaded = await getProductDetail(productIdParam);
+            const [brands, loaded] = await Promise.all([
+              getRecommendedBrands(),
+              getProductDetail(productIdParam),
+            ]);
             const matchBrand = brands.find(b => b.id === loaded.brandId);
-            if (matchBrand) brandName = matchBrand.name;
+            const brandName = matchBrand ? matchBrand.name : '';
             setProduct({ ...loaded, brandName });
           } catch {
             // Fall back to mock if real API fails

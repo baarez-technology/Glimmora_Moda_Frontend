@@ -29,6 +29,7 @@ export default function ProductGallery({
           src={product.images[activeImage]?.url || ''}
           alt={product.name}
           fill
+          sizes="(max-width: 1024px) 100vw, 50vw"
           className="object-cover transition-transform duration-700"
           priority
         />
@@ -88,6 +89,7 @@ export default function ProductGallery({
                 src={image.url}
                 alt={image.alt}
                 fill
+                sizes="(max-width: 1024px) 25vw, 12vw"
                 className="object-cover"
               />
             </button>

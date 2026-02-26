@@ -362,66 +362,105 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
 }
 
 // Separate hook for intelligence data — loads from service layer with fallbacks
-export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, brand, allProducts }: {
+export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, brand, allProducts, showIntelligence }: {
   product: Product;
   sizeVariants: Product['variants'];
   fashionIdentity: FashionIdentity | null;
   wardrobe: { product: Product }[];
   brand?: { name: string } | null;
   allProducts: Product[];
+  showIntelligence?: boolean;
 }) {
-  // Service-loaded intelligence data
-  const [serviceData, setServiceData] = useState<{
-    availability: AvailabilityIntelligence | null;
-    fitConfidence: FitConfidence | null;
+  // Eager service data (outfit suggestions + material feel — always visible on page)
+  const [eagerData, setEagerData] = useState<{
     outfitSuggestions: CompleteOutfit[];
-    fabricSimulation: FabricSimulation | null;
-    climateSuitability: ClimateSuitability | null;
-    sustainabilityScore: SustainabilityScore | null;
     materialFeel: MaterialFeel | null;
   }>({
-    availability: null,
-    fitConfidence: null,
     outfitSuggestions: [],
-    fabricSimulation: null,
-    climateSuitability: null,
-    sustainabilityScore: null,
     materialFeel: null,
   });
 
-  // Load intelligence data from services
+  // Lazy panel data (only loaded when user opens Fashion Intelligence panel)
+  const [panelData, setPanelData] = useState<{
+    availability: AvailabilityIntelligence | null;
+    fitConfidence: FitConfidence | null;
+    fabricSimulation: FabricSimulation | null;
+    climateSuitability: ClimateSuitability | null;
+    sustainabilityScore: SustainabilityScore | null;
+  }>({
+    availability: null,
+    fitConfidence: null,
+    fabricSimulation: null,
+    climateSuitability: null,
+    sustainabilityScore: null,
+  });
+
+  const [panelLoaded, setPanelLoaded] = useState(false);
+
+  // Eager load: outfit suggestions + material feel (always visible on page)
   useEffect(() => {
     let cancelled = false;
-    async function loadIntelligenceData() {
+    async function loadEagerData() {
       try {
-        const [availRes, fitRes, outfitRes, fabricRes, climateRes, sustainRes, materialRes] =
-          await Promise.all([
-            intelligenceService.getAvailabilityIntelligence(product.id),
-            wardrobeService.getFitConfidence(product.id),
-            wardrobeService.getOutfitSuggestions(product),
-            intelligenceService.getFabricSimulation(product.id),
-            intelligenceService.getClimateSuitability(product.id),
-            intelligenceService.getSustainabilityScore(product.id),
-            intelligenceService.getMaterialFeel(product.id),
-          ]);
+        const [outfitRes, materialRes] = await Promise.all([
+          wardrobeService.getOutfitSuggestions(product),
+          intelligenceService.getMaterialFeel(product.id),
+        ]);
         if (!cancelled) {
-          setServiceData({
-            availability: availRes.data ?? null,
-            fitConfidence: fitRes.data ?? null,
+          setEagerData({
             outfitSuggestions: outfitRes.data ?? [],
-            fabricSimulation: fabricRes.data ?? null,
-            climateSuitability: climateRes.data ?? null,
-            sustainabilityScore: sustainRes.data ?? null,
             materialFeel: materialRes.data ?? null,
           });
         }
       } catch (error) {
-        console.error('Failed to load product intelligence data:', error);
+        console.error('Failed to load product page data:', error);
       }
     }
-    loadIntelligenceData();
+    loadEagerData();
     return () => { cancelled = true; };
   }, [product]);
+
+  // Lazy load: panel intelligence data (only when user opens panel)
+  useEffect(() => {
+    if (!showIntelligence || panelLoaded) return;
+    let cancelled = false;
+    async function loadPanelData() {
+      try {
+        const [availRes, fitRes, fabricRes, climateRes, sustainRes] = await Promise.all([
+          intelligenceService.getAvailabilityIntelligence(product.id),
+          wardrobeService.getFitConfidence(product.id),
+          intelligenceService.getFabricSimulation(product.id),
+          intelligenceService.getClimateSuitability(product.id),
+          intelligenceService.getSustainabilityScore(product.id),
+        ]);
+        if (!cancelled) {
+          setPanelData({
+            availability: availRes.data ?? null,
+            fitConfidence: fitRes.data ?? null,
+            fabricSimulation: fabricRes.data ?? null,
+            climateSuitability: climateRes.data ?? null,
+            sustainabilityScore: sustainRes.data ?? null,
+          });
+          setPanelLoaded(true);
+        }
+      } catch (error) {
+        console.error('Failed to load intelligence panel data:', error);
+      }
+    }
+    loadPanelData();
+    return () => { cancelled = true; };
+  }, [showIntelligence, panelLoaded, product]);
+
+  // Compat alias so the rest of the hook reads the same
+  const serviceData = useMemo(() => ({
+    availability: panelData.availability,
+    fitConfidence: panelData.fitConfidence,
+    outfitSuggestions: eagerData.outfitSuggestions,
+    fabricSimulation: panelData.fabricSimulation,
+    climateSuitability: panelData.climateSuitability,
+    sustainabilityScore: panelData.sustainabilityScore,
+    materialFeel: eagerData.materialFeel,
+  }), [panelData, eagerData]);
 
   // G-SAIL™ Availability Intelligence — service data with fallback
   const availabilityIntelligence: AvailabilityIntelligence = useMemo(() => {

@@ -59,6 +59,7 @@ export default function ProductMaterials({ product, materialFeel }: ProductMater
               src={product.images[Math.min(2, product.images.length - 1)]?.url || product.images[0]?.url || ''}
               alt={`${product.name} material detail`}
               fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
             />
           </div>

@@ -19,6 +19,7 @@ export default function ProductCraftsmanship({ product }: ProductCraftsmanshipPr
               src={product.images[Math.min(1, product.images.length - 1)]?.url || product.images[0]?.url || ''}
               alt={`${product.name} craftsmanship detail`}
               fill
+              sizes="(max-width: 1024px) 100vw, 50vw"
               className="object-cover"
             />
           </div>
