@@ -3,17 +3,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, X, ShoppingBag, Crown, Shield, RefreshCw } from 'lucide-react';
+import { ArrowRight, X, Minus, Plus, ShoppingBag, Crown, Shield, Trash2, RefreshCw } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as cartService from '@/services/customer-collection.service';
+import { productHref } from '@/services/customer-collection.service';
 import type { CartItem } from '@/services/customer-collection.service';
 
 export default function UHNICartPage() {
-  const { showToast } = useApp();
+  const { showToast, refreshCart: syncHeaderCart } = useApp();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [showClearAll, setShowClearAll] = useState(false);
+  const [updatingQtyId, setUpdatingQtyId] = useState<string | null>(null);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -38,10 +42,38 @@ export default function UHNICartPage() {
       await cartService.removeFromCart(cartId);
       setCartItems((prev) => prev.filter((item) => item.cart_id !== cartId));
       showToast('Item removed from bag', 'info');
+      syncHeaderCart();
     } catch {
       showToast('Failed to remove item', 'error');
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  const handleQuantityChange = async (cartId: string, newQty: number) => {
+    if (newQty < 1) return;
+    const currentItem = cartItems.find((item) => item.cart_id === cartId);
+    if (!currentItem) return;
+    setUpdatingQtyId(cartId);
+    try {
+      const updated = await cartService.updateCartQuantity(cartId, newQty, currentItem);
+      setCartItems((prev) => prev.map((item) => item.cart_id === cartId ? updated : item));
+      syncHeaderCart();
+    } catch {
+      showToast('Failed to update quantity', 'error');
+    } finally {
+      setUpdatingQtyId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await cartService.clearAllCart();
+      setCartItems([]);
+      showToast('Bag cleared', 'info');
+      syncHeaderCart();
+    } catch {
+      showToast('Failed to clear bag', 'error');
     }
   };
 
@@ -75,13 +107,25 @@ export default function UHNICartPage() {
             <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1]">
               Your Private Bag
             </h1>
-            <button
-              onClick={fetchCart}
-              className="flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw size={14} />
-            </button>
+            <div className="flex items-center gap-4">
+              {cartItems.length > 0 && (
+                <button
+                  onClick={() => setShowClearAll(true)}
+                  className="flex items-center gap-2 text-sm text-sand hover:text-red-400 transition-colors"
+                  title="Clear all items"
+                >
+                  <Trash2 size={14} />
+                  <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
+                </button>
+              )}
+              <button
+                onClick={fetchCart}
+                className="flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors"
+                title="Refresh"
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -114,7 +158,7 @@ export default function UHNICartPage() {
                   >
                     {/* Product Image */}
                     <Link
-                      href={`/product/${item.product_id}`}
+                      href={productHref(item.product_id, item.product_name)}
                       className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-charcoal-deep"
                     >
                       {item.image_urls[0] ? (
@@ -135,7 +179,7 @@ export default function UHNICartPage() {
                     <div className="flex-1 py-1">
                       <div className="flex justify-between items-start gap-4">
                         <div>
-                          <Link href={`/product/${item.product_id}`}>
+                          <Link href={productHref(item.product_id, item.product_name)}>
                             <h3 className="font-display text-xl md:text-2xl text-ivory-cream hover:text-gold-soft transition-colors">
                               {item.product_name}
                             </h3>
@@ -170,7 +214,27 @@ export default function UHNICartPage() {
                         <p className="font-display text-xl text-ivory-cream">
                           €{(item.price * item.quantity).toLocaleString()}
                         </p>
-                        <span className="text-sm text-sand">Qty: {item.quantity}</span>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => handleQuantityChange(item.cart_id, item.quantity - 1)}
+                            disabled={item.quantity <= 1 || updatingQtyId === item.cart_id}
+                            className="w-8 h-8 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="text-sm font-medium text-ivory-cream w-6 text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => handleQuantityChange(item.cart_id, item.quantity + 1)}
+                            disabled={updatingQtyId === item.cart_id}
+                            className="w-8 h-8 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            aria-label="Increase quantity"
+                          >
+                            <Plus size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -289,6 +353,16 @@ export default function UHNICartPage() {
           )}
         </div>
       </section>
+
+      <ConfirmModal
+        isOpen={showClearAll}
+        onClose={() => setShowClearAll(false)}
+        onConfirm={handleClearAll}
+        title="Clear Private Bag"
+        message="Are you sure you want to remove all items from your private bag? This action cannot be undone."
+        confirmLabel="Clear All"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

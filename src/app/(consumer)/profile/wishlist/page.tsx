@@ -3,20 +3,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, X, Share2, ArrowLeft, RefreshCw } from 'lucide-react';
+import { Heart, X, Share2, ArrowLeft, ArrowRight, RefreshCw, ShoppingBag, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as wishlistService from '@/services/customer-collection.service';
+import { productHref } from '@/services/customer-collection.service';
 import type { WishlistItem } from '@/services/customer-collection.service';
 
 export default function WishlistPage() {
   const { isAuthenticated, isHydrated } = useAuth();
-  const { showToast } = useApp();
+  const { showToast, refreshWishlist, refreshCart } = useApp();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [showClearAll, setShowClearAll] = useState(false);
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const [activeHover, setActiveHover] = useState<number | null>(null);
 
   const fetchWishlist = useCallback(async () => {
     try {
@@ -45,6 +50,7 @@ export default function WishlistPage() {
       await wishlistService.removeFromWishlist(wishlistId);
       setWishlistItems((prev) => prev.filter((item) => item.wishlist_id !== wishlistId));
       showToast('Removed from wishlist', 'info');
+      refreshWishlist();
     } catch {
       showToast('Failed to remove item', 'error');
     } finally {
@@ -63,6 +69,32 @@ export default function WishlistPage() {
       } catch {
         // Share cancelled
       }
+    }
+  };
+
+  const handleMoveToCart = async (item: WishlistItem) => {
+    setMovingId(item.wishlist_id);
+    try {
+      await wishlistService.moveWishlistToCart(item);
+      setWishlistItems((prev) => prev.filter((w) => w.wishlist_id !== item.wishlist_id));
+      showToast('Moved to cart', 'success');
+      refreshWishlist();
+      refreshCart();
+    } catch {
+      showToast('Failed to move to cart', 'error');
+    } finally {
+      setMovingId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await wishlistService.clearAllWishlist();
+      setWishlistItems([]);
+      showToast('Wishlist cleared', 'info');
+      refreshWishlist();
+    } catch {
+      showToast('Failed to clear wishlist', 'error');
     }
   };
 
@@ -102,6 +134,16 @@ export default function WishlistPage() {
             </div>
 
             <div className="flex items-center gap-4">
+              {wishlistItems.length > 0 && (
+                <button
+                  onClick={() => setShowClearAll(true)}
+                  className="flex items-center gap-2 text-sm text-stone hover:text-red-600 transition-colors"
+                  title="Clear all items"
+                >
+                  <Trash2 size={14} />
+                  <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
+                </button>
+              )}
               <button
                 onClick={fetchWishlist}
                 className="p-2 text-stone hover:text-charcoal-deep transition-colors"
@@ -172,67 +214,78 @@ export default function WishlistPage() {
             </Link>
           </div>
         ) : viewMode === 'grid' ? (
-          /* Grid View */
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {wishlistItems.map((item) => (
+          /* Grid View — styled to match wardrobe cards */
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 md:gap-x-8 gap-y-10 md:gap-y-12">
+            {wishlistItems.map((item, index) => (
               <div
                 key={item.wishlist_id}
                 className={`group ${removingId === item.wishlist_id ? 'opacity-50 pointer-events-none' : ''}`}
               >
-                <Link href={`/product/${item.product_id}`} className="relative aspect-[3/4] bg-sand/20 mb-4 overflow-hidden block">
+                <Link
+                  href={productHref(item.product_id, item.product_name)}
+                  className="relative block aspect-[3/4] overflow-hidden mb-5"
+                  onMouseEnter={() => setActiveHover(index)}
+                  onMouseLeave={() => setActiveHover(null)}
+                >
                   {item.image_urls[0] ? (
                     <Image
                       src={item.image_urls[0]}
                       alt={item.product_name}
                       fill
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
+                      className="object-cover transition-transform duration-700 group-hover:scale-105"
                     />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center">
+                    <div className="w-full h-full bg-sand/20 flex items-center justify-center">
                       <Heart size={24} className="text-taupe" />
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => handleRemove(item.wishlist_id)}
-                      className="w-10 h-10 bg-white/95 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-red-50 transition-colors"
-                      title="Remove from wishlist"
-                    >
-                      <X size={18} className="text-charcoal-deep" />
-                    </button>
-                    <button
-                      onClick={() => handleShare(item.product_name)}
-                      className="w-10 h-10 bg-white/95 backdrop-blur-sm rounded-full flex items-center justify-center shadow-lg hover:bg-ivory-warm transition-colors"
-                      title="Share"
-                    >
-                      <Share2 size={16} className="text-charcoal-deep" />
-                    </button>
+                  {/* Hover Overlay */}
+                  <div className="absolute inset-0 bg-noir/0 group-hover:bg-noir/20 transition-all duration-500 flex items-center justify-center">
+                    <div className={`w-14 h-14 rounded-full bg-ivory-cream flex items-center justify-center transform transition-all duration-500 ${activeHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
+                      <ArrowRight size={18} className="text-charcoal-deep" />
+                    </div>
+                  </div>
+
+                  {/* Remove Button — top right */}
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemove(item.wishlist_id); }}
+                    className="absolute top-4 right-4 w-8 h-8 bg-ivory-cream/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-error hover:text-white"
+                    aria-label="Remove from wishlist"
+                  >
+                    <X size={14} />
+                  </button>
+
+                  {/* Move to Cart — top left */}
+                  <button
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMoveToCart(item); }}
+                    disabled={movingId === item.wishlist_id}
+                    className="absolute top-4 left-4 w-8 h-8 bg-ivory-cream/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-charcoal-deep hover:text-ivory-cream disabled:opacity-50"
+                    aria-label="Move to cart"
+                    title="Move to cart"
+                  >
+                    <ShoppingBag size={14} />
+                  </button>
+
+                  {/* Price Badge — bottom left */}
+                  <div className="absolute bottom-4 left-4">
+                    <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream/90 px-3 py-1.5">
+                      €{item.price.toLocaleString()}
+                    </span>
                   </div>
                 </Link>
 
-                <div className="space-y-2">
-                  <Link href={`/product/${item.product_id}`}>
-                    <h3 className="font-display text-base text-charcoal-deep group-hover:text-gold-muted transition-colors leading-tight line-clamp-2">
-                      {item.product_name}
-                    </h3>
-                  </Link>
-                  <p className="text-sm text-charcoal-warm">
-                    €{item.price.toLocaleString()}
+                {/* Variants line */}
+                {(item.size || item.color) && (
+                  <p className="text-[10px] tracking-[0.25em] uppercase text-taupe mb-1">
+                    {[item.size, item.color].filter(Boolean).join(' · ')}
                   </p>
-
-                  {/* Variants */}
-                  <div className="flex gap-2">
-                    {item.size && (
-                      <span className="text-[10px] tracking-wider uppercase text-stone">{item.size}</span>
-                    )}
-                    {item.size && item.color && <span className="text-stone">·</span>}
-                    {item.color && (
-                      <span className="text-[10px] tracking-wider uppercase text-stone">{item.color}</span>
-                    )}
-                  </div>
-                </div>
+                )}
+                <Link href={productHref(item.product_id, item.product_name)}>
+                  <h3 className="font-display text-lg text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors">
+                    {item.product_name}
+                  </h3>
+                </Link>
               </div>
             ))}
           </div>
@@ -246,7 +299,7 @@ export default function WishlistPage() {
                   removingId === item.wishlist_id ? 'opacity-50 pointer-events-none' : ''
                 }`}
               >
-                <Link href={`/product/${item.product_id}`} className="relative w-32 h-40 bg-sand/20 flex-shrink-0 overflow-hidden">
+                <Link href={productHref(item.product_id, item.product_name)} className="relative w-32 h-40 bg-sand/20 flex-shrink-0 overflow-hidden">
                   {item.image_urls[0] ? (
                     <Image
                       src={item.image_urls[0]}
@@ -263,7 +316,7 @@ export default function WishlistPage() {
 
                 <div className="flex-1 flex flex-col">
                   <div className="flex-1">
-                    <Link href={`/product/${item.product_id}`}>
+                    <Link href={productHref(item.product_id, item.product_name)}>
                       <h3 className="font-display text-xl text-charcoal-deep hover:text-gold-muted transition-colors mb-2">
                         {item.product_name}
                       </h3>
@@ -295,6 +348,15 @@ export default function WishlistPage() {
 
                   <div className="flex items-center gap-3 mt-4">
                     <button
+                      onClick={() => handleMoveToCart(item)}
+                      disabled={movingId === item.wishlist_id}
+                      className="px-4 py-2.5 border border-charcoal-deep text-xs tracking-wider uppercase text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream disabled:opacity-50 transition-colors"
+                    >
+                      <ShoppingBag size={14} className="inline mr-2" />
+                      Move to Cart
+                    </button>
+
+                    <button
                       onClick={() => handleShare(item.product_name)}
                       className="px-4 py-2.5 border border-sand text-xs tracking-wider uppercase text-charcoal-deep hover:border-charcoal-deep transition-colors"
                     >
@@ -316,6 +378,16 @@ export default function WishlistPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={showClearAll}
+        onClose={() => setShowClearAll(false)}
+        onConfirm={handleClearAll}
+        title="Clear Wishlist"
+        message="Are you sure you want to remove all items from your wishlist? This action cannot be undone."
+        confirmLabel="Clear All"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

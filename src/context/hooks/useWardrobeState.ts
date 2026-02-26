@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import type { Product, WardrobeItem } from '@/types';
-import { getWardrobe, addToWardrobe as apiAddToWardrobe, type ApiWardrobeItem } from '@/services/recommendation.service';
+import { getWardrobe, addToWardrobe as apiAddToWardrobe, removeFromWardrobe as apiRemoveFromWardrobe, clearAllWardrobe as apiClearAllWardrobe, type ApiWardrobeItem } from '@/services/recommendation.service';
 
 // Counter to ensure unique IDs even when called multiple times in the same millisecond
 let wardrobeCounter = 0;
@@ -112,7 +112,16 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
     if (item) {
       showToast(`${item.product.name} removed from wardrobe`, 'info');
     }
+    // Also DELETE from API (fire and forget)
+    apiRemoveFromWardrobe(id).catch(() => { /* silently fail — localStorage still updated */ });
   }, [showToast, wardrobe]);
+
+  const clearAllWardrobe = useCallback(() => {
+    setWardrobe([]);
+    showToast('Wardrobe cleared', 'info');
+    // Also clear via API (fire and forget)
+    apiClearAllWardrobe().catch(() => { /* silently fail */ });
+  }, [showToast]);
 
   const isInWardrobe = useCallback((productId: string) => {
     return wardrobe.some(w => w.productId === productId);
@@ -129,6 +138,7 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
     initializeWardrobe,
     addToWardrobe,
     removeFromWardrobe,
+    clearAllWardrobe,
     isInWardrobe,
     persistWardrobe
   };
