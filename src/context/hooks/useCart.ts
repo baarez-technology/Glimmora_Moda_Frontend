@@ -5,7 +5,12 @@ import {
   getCart,
   addToCart as apiAddToCart,
   removeFromCart as apiRemoveFromCart,
+  updateCartQuantity as apiUpdateCartQuantity,
+  clearAllCart as apiClearAllCart,
   getWishlist,
+  removeFromWishlist as apiRemoveFromWishlist,
+  clearAllWishlist as apiClearAllWishlist,
+  moveWishlistToCart as apiMoveWishlistToCart,
   type CartItem,
   type WishlistItem,
 } from '@/services/customer-collection.service';
@@ -111,6 +116,33 @@ export function useCart({ showToast }: UseCartProps) {
     }
   }, []);
 
+  const updateCartQuantity = useCallback(async (cartId: string, quantity: number) => {
+    try {
+      const currentItem = cartItems.find(i => i.cart_id === cartId);
+      if (!currentItem) throw new Error('Item not found');
+      const updated = await apiUpdateCartQuantity(cartId, quantity, currentItem);
+      setCartItems(prev => {
+        const next = prev.map(i => i.cart_id === cartId ? updated : i);
+        writeSessionCache(CART_CACHE_KEY, next);
+        return next;
+      });
+      return updated;
+    } catch {
+      showToast('Failed to update quantity', 'error');
+    }
+  }, [showToast, cartItems]);
+
+  const clearAllCart = useCallback(async () => {
+    try {
+      await apiClearAllCart();
+      setCartItems([]);
+      writeSessionCache(CART_CACHE_KEY, []);
+      showToast('Cart cleared', 'info');
+    } catch {
+      showToast('Failed to clear cart', 'error');
+    }
+  }, [showToast]);
+
   const isInCart = useCallback((productId: string) => {
     return cartItems.some(i => i.product_id === productId);
   }, [cartItems]);
@@ -142,6 +174,51 @@ export function useCart({ showToast }: UseCartProps) {
     }
   }, []);
 
+  const removeFromWishlist = useCallback(async (wishlistId: string) => {
+    try {
+      await apiRemoveFromWishlist(wishlistId);
+      setWishlistItems(prev => {
+        const updated = prev.filter(i => i.wishlist_id !== wishlistId);
+        writeSessionCache(WISHLIST_CACHE_KEY, updated);
+        return updated;
+      });
+      showToast('Removed from wishlist', 'info');
+    } catch {
+      showToast('Failed to remove from wishlist', 'error');
+    }
+  }, [showToast]);
+
+  const clearAllWishlist = useCallback(async () => {
+    try {
+      await apiClearAllWishlist();
+      setWishlistItems([]);
+      writeSessionCache(WISHLIST_CACHE_KEY, []);
+      showToast('Wishlist cleared', 'info');
+    } catch {
+      showToast('Failed to clear wishlist', 'error');
+    }
+  }, [showToast]);
+
+  const moveWishlistToCart = useCallback(async (wishlistItem: WishlistItem) => {
+    try {
+      const cartItem = await apiMoveWishlistToCart(wishlistItem);
+      setWishlistItems(prev => {
+        const updated = prev.filter(i => i.wishlist_id !== wishlistItem.wishlist_id);
+        writeSessionCache(WISHLIST_CACHE_KEY, updated);
+        return updated;
+      });
+      setCartItems(prev => {
+        const updated = [...prev, cartItem];
+        writeSessionCache(CART_CACHE_KEY, updated);
+        return updated;
+      });
+      showToast('Moved to cart', 'success');
+      return cartItem;
+    } catch {
+      showToast('Failed to move to cart', 'error');
+    }
+  }, [showToast]);
+
   /** Invalidate both caches (call on logout) */
   const clearCartCache = useCallback(() => {
     clearSessionCache(CART_CACHE_KEY);
@@ -158,6 +235,8 @@ export function useCart({ showToast }: UseCartProps) {
     cartCount: cartItems.length,
     addToCart,
     removeFromCart,
+    updateCartQuantity,
+    clearAllCart,
     isInCart,
     loadCart,
     refreshCart,
@@ -165,6 +244,9 @@ export function useCart({ showToast }: UseCartProps) {
     // Wishlist
     wishlistItems,
     wishlistCount: wishlistItems.length,
+    removeFromWishlist,
+    clearAllWishlist,
+    moveWishlistToCart,
     loadWishlist,
     refreshWishlist,
 

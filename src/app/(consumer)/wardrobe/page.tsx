@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import type { ProductCategory } from '@/types';
 
 export default function WardrobePage() {
@@ -13,7 +14,8 @@ export default function WardrobePage() {
   const [activeHover, setActiveHover] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'recent' | 'brand' | 'worn'>('recent');
-  const { wardrobe, removeFromWardrobe } = useApp();
+  const { wardrobe, removeFromWardrobe, clearAllWardrobe } = useApp();
+  const [showClearAll, setShowClearAll] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -192,6 +194,17 @@ export default function WardrobePage() {
                   <LayoutList size={18} />
                 </button>
               </div>
+
+              {wardrobe.length > 0 && (
+                <button
+                  onClick={() => setShowClearAll(true)}
+                  className="flex items-center gap-2 text-sm text-ivory-cream/40 hover:text-red-400 transition-colors"
+                  title="Clear all items"
+                >
+                  <Trash2 size={14} />
+                  <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
+                </button>
+              )}
 
               <Link
                 href="/discover"
@@ -502,6 +515,16 @@ export default function WardrobePage() {
           </div>
         </section>
       )}
+
+      <ConfirmModal
+        isOpen={showClearAll}
+        onClose={() => setShowClearAll(false)}
+        onConfirm={clearAllWardrobe}
+        title="Clear Wardrobe"
+        message="Are you sure you want to remove all items from your wardrobe? This action cannot be undone."
+        confirmLabel="Clear All"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

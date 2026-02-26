@@ -6,16 +6,20 @@ import Image from 'next/image';
 import { ArrowRight, X, Minus, Plus, ShoppingBag, MapPin, Check, User, Trash2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as cartService from '@/services/customer-collection.service';
+import { productHref } from '@/services/customer-collection.service';
 import type { CartItem } from '@/services/customer-collection.service';
 
 export default function CartPage() {
   const { isAuthenticated, isHydrated } = useAuth();
-  const { showToast } = useApp();
+  const { showToast, refreshCart: syncHeaderCart } = useApp();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [showClearAll, setShowClearAll] = useState(false);
+  const [updatingQtyId, setUpdatingQtyId] = useState<string | null>(null);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -44,10 +48,38 @@ export default function CartPage() {
       await cartService.removeFromCart(cartId);
       setCartItems((prev) => prev.filter((item) => item.cart_id !== cartId));
       showToast('Item removed from cart', 'info');
+      syncHeaderCart();
     } catch {
       showToast('Failed to remove item', 'error');
     } finally {
       setRemovingId(null);
+    }
+  };
+
+  const handleQuantityChange = async (cartId: string, newQty: number) => {
+    if (newQty < 1) return;
+    const currentItem = cartItems.find((item) => item.cart_id === cartId);
+    if (!currentItem) return;
+    setUpdatingQtyId(cartId);
+    try {
+      const updated = await cartService.updateCartQuantity(cartId, newQty, currentItem);
+      setCartItems((prev) => prev.map((item) => item.cart_id === cartId ? updated : item));
+      syncHeaderCart();
+    } catch {
+      showToast('Failed to update quantity', 'error');
+    } finally {
+      setUpdatingQtyId(null);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await cartService.clearAllCart();
+      setCartItems([]);
+      showToast('Cart cleared', 'info');
+      syncHeaderCart();
+    } catch {
+      showToast('Failed to clear cart', 'error');
     }
   };
 
@@ -79,6 +111,16 @@ export default function CartPage() {
               Shopping Bag
             </h1>
             <div className="flex items-center gap-4">
+              {cartItems.length > 0 && (
+                <button
+                  onClick={() => setShowClearAll(true)}
+                  className="flex items-center gap-2 text-sm text-stone hover:text-red-600 transition-colors"
+                  title="Clear all items"
+                >
+                  <Trash2 size={14} />
+                  <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
+                </button>
+              )}
               <button
                 onClick={fetchCart}
                 className="flex items-center gap-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
@@ -119,7 +161,7 @@ export default function CartPage() {
                   >
                     {/* Product Image */}
                     <Link
-                      href={`/product/${item.product_id}`}
+                      href={productHref(item.product_id, item.product_name)}
                       className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-sand/20"
                     >
                       {item.image_urls[0] ? (
@@ -140,7 +182,7 @@ export default function CartPage() {
                     <div className="flex-1 py-1">
                       <div className="flex justify-between items-start gap-4">
                         <div>
-                          <Link href={`/product/${item.product_id}`}>
+                          <Link href={productHref(item.product_id, item.product_name)}>
                             <h3 className="font-display text-xl md:text-2xl text-charcoal-deep hover:text-charcoal-warm transition-colors">
                               {item.product_name}
                             </h3>
@@ -176,7 +218,25 @@ export default function CartPage() {
                           €{(item.price * item.quantity).toLocaleString()}
                         </p>
                         <div className="flex items-center gap-3">
-                          <span className="text-sm text-stone">Qty: {item.quantity}</span>
+                          <button
+                            onClick={() => handleQuantityChange(item.cart_id, item.quantity - 1)}
+                            disabled={item.quantity <= 1 || updatingQtyId === item.cart_id}
+                            className="w-8 h-8 flex items-center justify-center border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            aria-label="Decrease quantity"
+                          >
+                            <Minus size={14} />
+                          </button>
+                          <span className="text-sm font-medium text-charcoal-deep w-6 text-center">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => handleQuantityChange(item.cart_id, item.quantity + 1)}
+                            disabled={updatingQtyId === item.cart_id}
+                            className="w-8 h-8 flex items-center justify-center border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            aria-label="Increase quantity"
+                          >
+                            <Plus size={14} />
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -301,6 +361,16 @@ export default function CartPage() {
           )}
         </div>
       </section>
+
+      <ConfirmModal
+        isOpen={showClearAll}
+        onClose={() => setShowClearAll(false)}
+        onConfirm={handleClearAll}
+        title="Clear Shopping Bag"
+        message="Are you sure you want to remove all items from your shopping bag? This action cannot be undone."
+        confirmLabel="Clear All"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

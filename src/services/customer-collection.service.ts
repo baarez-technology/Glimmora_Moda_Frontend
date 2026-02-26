@@ -6,6 +6,21 @@
  * the customer from the Bearer token automatically.
  */
 
+// ─── Slug Helper ────────────────────────────────────────────────────────────
+
+/** Generate a URL-safe slug from a product name, e.g. "Puma Galaxis Pro" → "puma-galaxis-pro" */
+export function toProductSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/** Build the canonical product href used by the [slug] page: /product/<slug>?productId=<id> */
+export function productHref(productId: string, productName: string): string {
+  return `/product/${toProductSlug(productName)}?productId=${productId}`;
+}
+
 // ─── Auth Helper ────────────────────────────────────────────────────────────
 
 function getUserToken(): string | null {
@@ -163,20 +178,48 @@ export async function removeFromWishlist(wishlistId: string): Promise<void> {
 }
 
 // ─── Cart Quantity Update ──────────────────────────────────────────────────
+// Backend has no PATCH endpoint, so we delete the old item and re-add with
+// the new quantity to achieve an "update".
 
-export async function updateCartQuantity(cartId: string, quantity: number): Promise<CartItem> {
-  const res = await fetch(`/api/v1/customer/cart/${cartId}`, {
-    method: 'PATCH',
+export async function updateCartQuantity(cartId: string, quantity: number, currentItem: CartItem): Promise<CartItem> {
+  // Remove old entry
+  await removeFromCart(cartId);
+
+  // Re-add with updated quantity
+  return addToCart({
+    product_id: currentItem.product_id,
+    color: currentItem.color,
+    size: currentItem.size,
+    quantity,
+  });
+}
+
+// ─── Clear All Cart ────────────────────────────────────────────────────────
+
+export async function clearAllCart(): Promise<void> {
+  const res = await fetch('/api/v1/customer/cart', {
+    method: 'DELETE',
     headers: authHeaders(),
-    body: JSON.stringify({ quantity }),
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: 'Failed to update quantity' }));
-    throw new Error(err.detail || `Failed to update quantity (${res.status})`);
+    const err = await res.json().catch(() => ({ detail: 'Failed to clear cart' }));
+    throw new Error(err.detail || `Failed to clear cart (${res.status})`);
   }
+}
 
-  return res.json();
+// ─── Clear All Wishlist ────────────────────────────────────────────────────
+
+export async function clearAllWishlist(): Promise<void> {
+  const res = await fetch('/api/v1/customer/wishlist', {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to clear wishlist' }));
+    throw new Error(err.detail || `Failed to clear wishlist (${res.status})`);
+  }
 }
 
 // ─── Move Wishlist Item to Cart ────────────────────────────────────────────

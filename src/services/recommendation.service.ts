@@ -556,3 +556,35 @@ export async function addToWardrobe(params: AddToWardrobeRequest): Promise<ApiWa
 
   return res.json();
 }
+
+/**
+ * DELETE /api/v1/customer/wardrobe/{wardrobe_id}
+ *
+ * Removes a single item from the customer's wardrobe.
+ */
+export async function removeFromWardrobe(wardrobeId: string): Promise<void> {
+  const res = await fetch(`/api/v1/customer/wardrobe/${wardrobeId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Remove from wardrobe failed: ${res.status}`);
+  }
+}
+
+/**
+ * DELETE /api/v1/customer/wardrobe/all
+ *
+ * Removes all items from the customer's wardrobe.
+ */
+export async function clearAllWardrobe(): Promise<void> {
+  const res = await fetch(`/api/v1/customer/wardrobe/all`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Clear wardrobe failed: ${res.status}`);
+  }
+}

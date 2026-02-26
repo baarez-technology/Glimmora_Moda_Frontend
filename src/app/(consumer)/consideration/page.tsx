@@ -3,15 +3,17 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, X, MapPin, Check, User, Minus, Plus } from 'lucide-react';
+import { ArrowRight, X, MapPin, Check, User, Minus, Plus, Trash2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import ConfirmModal from '@/components/shared/ConfirmModal';
 
 export default function ConsiderationPage() {
-  const { considerations, removeFromConsiderations, updateQuantity } = useApp();
+  const { considerations, removeFromConsiderations, updateQuantity, clearConsiderations } = useApp();
   const { isAuthenticated, isHydrated } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
+  const [showClearAll, setShowClearAll] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -34,9 +36,21 @@ export default function ConsiderationPage() {
             <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-4">
               {considerations.length} piece{considerations.length !== 1 ? 's' : ''} selected
             </span>
-            <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
-              Considerations
-            </h1>
+            <div className="flex items-center justify-between">
+              <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
+                Considerations
+              </h1>
+              {considerations.length > 0 && (
+                <button
+                  onClick={() => setShowClearAll(true)}
+                  className="flex items-center gap-2 text-sm text-ivory-cream/40 hover:text-red-400 transition-colors"
+                  title="Clear all items"
+                >
+                  <Trash2 size={14} />
+                  <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
+                </button>
+              )}
+            </div>
             <p className="text-taupe max-w-lg">
               Take your time with these exceptional pieces. There's no rush — thoughtful decisions lead to lasting satisfaction.
             </p>
@@ -316,6 +330,16 @@ export default function ConsiderationPage() {
           </div>
         </section>
       )}
+
+      <ConfirmModal
+        isOpen={showClearAll}
+        onClose={() => setShowClearAll(false)}
+        onConfirm={clearConsiderations}
+        title="Clear Considerations"
+        message="Are you sure you want to remove all items from your considerations? This action cannot be undone."
+        confirmLabel="Clear All"
+        confirmVariant="danger"
+      />
     </div>
   );
 }

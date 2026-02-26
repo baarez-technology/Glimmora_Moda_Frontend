@@ -45,6 +45,7 @@ interface AppContextType {
   wardrobe: WardrobeItem[];
   addToWardrobe: (product: Product, options?: { color?: string; size?: string; quantity?: number }) => void;
   removeFromWardrobe: (id: string) => void;
+  clearAllWardrobe: () => void;
   isInWardrobe: (productId: string) => boolean;
 
   // Cart (API-backed, session-cached)
@@ -52,12 +53,17 @@ interface AppContextType {
   cartCount: number;
   addToCart: (payload: { product_id: string; color: string; size: string; quantity?: number }) => Promise<CartItem>;
   removeFromCart: (cartId: string) => Promise<void>;
+  updateCartQuantity: (cartId: string, quantity: number) => Promise<CartItem | undefined>;
+  clearAllCart: () => Promise<void>;
   isInCart: (productId: string) => boolean;
   refreshCart: () => Promise<void>;
 
   // Wishlist (API-backed, session-cached)
   wishlistItems: WishlistItem[];
   wishlistCount: number;
+  removeFromWishlistApi: (wishlistId: string) => Promise<void>;
+  clearAllWishlist: () => Promise<void>;
+  moveWishlistToCart: (wishlistItem: WishlistItem) => Promise<CartItem | undefined>;
   refreshWishlist: () => Promise<void>;
 
   // Wishlist (legacy local)
@@ -155,6 +161,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     initializeWardrobe,
     addToWardrobe,
     removeFromWardrobe,
+    clearAllWardrobe,
     isInWardrobe,
     persistWardrobe
   } = useWardrobeState({ showToast, safeLocalStorageSave });
@@ -354,6 +361,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       wardrobe,
       addToWardrobe,
       removeFromWardrobe,
+      clearAllWardrobe,
       isInWardrobe,
 
       // Cart (API-backed)
@@ -361,12 +369,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       cartCount: cart.cartCount,
       addToCart: cart.addToCart,
       removeFromCart: cart.removeFromCart,
+      updateCartQuantity: cart.updateCartQuantity,
+      clearAllCart: cart.clearAllCart,
       isInCart: cart.isInCart,
       refreshCart: cart.refreshCart,
 
       // Wishlist (API-backed)
       wishlistItems: cart.wishlistItems,
       wishlistCount: cart.wishlistCount,
+      removeFromWishlistApi: cart.removeFromWishlist,
+      clearAllWishlist: cart.clearAllWishlist,
+      moveWishlistToCart: cart.moveWishlistToCart,
       refreshWishlist: cart.refreshWishlist,
 
       // Wishlist (legacy local)

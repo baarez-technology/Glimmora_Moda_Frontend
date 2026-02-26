@@ -191,7 +191,7 @@ export default function Header() {
               aria-label="Wishlist"
             >
               <Heart size={20} />
-              {wishlistCount > 0 && (
+              {isHydrated && wishlistCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
                   {wishlistCount}
                 </span>
@@ -205,7 +205,7 @@ export default function Header() {
               aria-label="Shopping Bag"
             >
               <ShoppingBag size={20} />
-              {cartCount > 0 && (
+              {isHydrated && cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
                   {cartCount}
                 </span>
