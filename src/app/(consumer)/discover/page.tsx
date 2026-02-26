@@ -19,8 +19,8 @@ function DiscoverContent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'all' | 'products' | 'brands' | 'stories'>('all');
   const [budgetRange, setBudgetRange] = useState<string | null>(null);
-  const [selectedOccasion, setSelectedOccasion] = useState<string | null>(occasionParam);
-  const [selectedMood, setSelectedMood] = useState<string | null>(moodParam);
+  const [selectedOccasions, setSelectedOccasions] = useState<string[]>(occasionParam ? [occasionParam] : []);
+  const [selectedMoods, setSelectedMoods] = useState<string[]>(moodParam ? [moodParam] : []);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -47,7 +47,37 @@ function DiscoverContent() {
   useEffect(() => {
     async function loadData() {
       try {
-        const productParams = brandIdParam ? { filter_brand_id: brandIdParam, page_size: 100 } : { page_size: 100 };
+        // Only show the full-page loader on the very first load
+        setDataLoading(prev => (isLoaded ? prev : true));
+
+        const productParams: Parameters<typeof getRecommendedProducts>[0] = {
+          page_size: 100,
+        };
+
+        if (brandIdParam) {
+          productParams.filter_brand_id = brandIdParam;
+        }
+
+        // Map UI budget buckets to API min/max budget fields
+        if (budgetRange) {
+          const range = budgetRanges[budgetRange];
+          if (range) {
+            productParams.user_min_budget = range.min;
+            productParams.user_max_budget = range.max;
+          }
+        }
+
+        // Map multi-select occasion/aesthetic filters to API user_preferences
+        if (selectedOccasions.length || selectedMoods.length) {
+          productParams.user_preferences = {};
+          if (selectedOccasions.length) {
+            productParams.user_preferences.occasions = selectedOccasions;
+          }
+          if (selectedMoods.length) {
+            productParams.user_preferences.aesthetics = selectedMoods;
+          }
+        }
+
         const [recommendedProducts, recommendedBrands, stories] = await Promise.all([
           getRecommendedProducts(productParams),
           getRecommendedBrands(),
@@ -64,7 +94,7 @@ function DiscoverContent() {
       }
     }
     loadData();
-  }, [brandIdParam]);
+  }, [brandIdParam, budgetRange, selectedOccasions, selectedMoods, isLoaded]);
 
   const budgetRanges: Record<string, { min: number; max: number }> = {
     'under-500': { min: 0, max: 500 },
@@ -75,11 +105,7 @@ function DiscoverContent() {
 
   const filteredProducts = useMemo(() => {
     const filtered = products.filter(p => {
-      if (budgetRange) {
-        const range = budgetRanges[budgetRange];
-        if (p.price < range.min || p.price > range.max) return false;
-      }
-
+      // Text search is still handled client-side over the recommended set
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(query);
@@ -88,28 +114,32 @@ function DiscoverContent() {
         if (!matchesName && !matchesBrand && !matchesTags) return false;
       }
 
-      if (selectedOccasion) {
+      if (selectedOccasions.length) {
         const occasionTags: Record<string, string[]> = {
           evening: ['evening', 'formal', 'gala', 'party', 'elegant'],
           professional: ['professional', 'business', 'office', 'work'],
           casual: ['casual', 'everyday', 'relaxed', 'weekend'],
           travel: ['travel', 'versatile', 'comfortable']
         };
-        const matchTags = occasionTags[selectedOccasion] || [];
-        const hasTag = p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
-        if (!hasTag) return false;
+        const hasOccasionMatch = selectedOccasions.some((occ) => {
+          const matchTags = occasionTags[occ] || [];
+          return p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
+        });
+        if (!hasOccasionMatch) return false;
       }
 
-      if (selectedMood) {
+      if (selectedMoods.length) {
         const moodTags: Record<string, string[]> = {
           minimal: ['minimal', 'clean', 'structured', 'simple'],
           classic: ['classic', 'timeless', 'heritage', 'traditional'],
           bold: ['bold', 'contemporary', 'statement', 'modern'],
           artistic: ['artistic', 'expressive', 'creative', 'unique']
         };
-        const matchTags = moodTags[selectedMood] || [];
-        const hasTag = p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
-        if (!hasTag) return false;
+        const hasMoodMatch = selectedMoods.some((mood) => {
+          const matchTags = moodTags[mood] || [];
+          return p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
+        });
+        if (!hasMoodMatch) return false;
       }
 
       return true;
@@ -124,7 +154,7 @@ function DiscoverContent() {
         default: return 0;
       }
     });
-  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, products, sortBy]);
+  }, [searchQuery, selectedOccasions, selectedMoods, products, sortBy]);
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -135,7 +165,7 @@ function DiscoverContent() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [budgetRange, searchQuery, selectedOccasion, selectedMood, sortBy]);
+  }, [budgetRange, searchQuery, selectedOccasions, selectedMoods, sortBy]);
 
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
@@ -150,14 +180,18 @@ function DiscoverContent() {
   }, [searchQuery, brandStories]);
 
   const clearFilters = () => {
-    setSelectedOccasion(null);
-    setSelectedMood(null);
+    setSelectedOccasions([]);
+    setSelectedMoods([]);
     setSearchQuery('');
     setBudgetRange(null);
     setCurrentPage(1);
   };
 
-  const hasActiveFilters = selectedOccasion || selectedMood || searchQuery || budgetRange;
+  const hasActiveFilters =
+    selectedOccasions.length > 0 ||
+    selectedMoods.length > 0 ||
+    !!searchQuery ||
+    !!budgetRange;
 
   const occasions = [
     { id: 'evening', label: 'Evening' },
@@ -180,7 +214,7 @@ function DiscoverContent() {
     { id: '5000-plus', label: '€5,000+' }
   ];
 
-  if (dataLoading) {
+  if (!isLoaded && dataLoading) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
@@ -306,18 +340,38 @@ function DiscoverContent() {
                   <button onClick={() => setSearchQuery('')} className="hover:text-gold-deep transition-colors"><X size={12} /></button>
                 </span>
               )}
-              {selectedOccasion && (
-                <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
-                  {occasions.find(o => o.id === selectedOccasion)?.label}
-                  <button onClick={() => setSelectedOccasion(null)} className="hover:text-gold-deep transition-colors"><X size={12} /></button>
+              {selectedOccasions.map((occ) => (
+                <span
+                  key={occ}
+                  className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]"
+                >
+                  {occasions.find(o => o.id === occ)?.label}
+                  <button
+                    onClick={() =>
+                      setSelectedOccasions(prev => prev.filter(id => id !== occ))
+                    }
+                    className="hover:text-gold-deep transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
                 </span>
-              )}
-              {selectedMood && (
-                <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
-                  {moods.find(m => m.id === selectedMood)?.label}
-                  <button onClick={() => setSelectedMood(null)} className="hover:text-gold-deep transition-colors"><X size={12} /></button>
+              ))}
+              {selectedMoods.map((mood) => (
+                <span
+                  key={mood}
+                  className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]"
+                >
+                  {moods.find(m => m.id === mood)?.label}
+                  <button
+                    onClick={() =>
+                      setSelectedMoods(prev => prev.filter(id => id !== mood))
+                    }
+                    className="hover:text-gold-deep transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
                 </span>
-              )}
+              ))}
               {budgetRange && (
                 <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
                   {budgets.find(b => b.id === budgetRange)?.label}
@@ -711,15 +765,21 @@ function DiscoverContent() {
                 {occasions.map((occ) => (
                   <button
                     key={occ.id}
-                    onClick={() => setSelectedOccasion(selectedOccasion === occ.id ? null : occ.id)}
+                    onClick={() =>
+                      setSelectedOccasions(prev =>
+                        prev.includes(occ.id)
+                          ? prev.filter(id => id !== occ.id)
+                          : [...prev, occ.id]
+                      )
+                    }
                     className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all border-b border-transparent hover:border-sand/50 ${
-                      selectedOccasion === occ.id
+                      selectedOccasions.includes(occ.id)
                         ? 'text-charcoal-deep'
                         : 'text-stone hover:text-charcoal-deep'
                     }`}
                   >
                     <span>{occ.label}</span>
-                    {selectedOccasion === occ.id && (
+                    {selectedOccasions.includes(occ.id) && (
                       <span className="w-2 h-2 bg-gold-muted rounded-full" />
                     )}
                   </button>
@@ -734,15 +794,21 @@ function DiscoverContent() {
                 {moods.map((mood) => (
                   <button
                     key={mood.id}
-                    onClick={() => setSelectedMood(selectedMood === mood.id ? null : mood.id)}
+                    onClick={() =>
+                      setSelectedMoods(prev =>
+                        prev.includes(mood.id)
+                          ? prev.filter(id => id !== mood.id)
+                          : [...prev, mood.id]
+                      )
+                    }
                     className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all border-b border-transparent hover:border-sand/50 ${
-                      selectedMood === mood.id
+                      selectedMoods.includes(mood.id)
                         ? 'text-charcoal-deep'
                         : 'text-stone hover:text-charcoal-deep'
                     }`}
                   >
                     <span>{mood.label}</span>
-                    {selectedMood === mood.id && (
+                    {selectedMoods.includes(mood.id) && (
                       <span className="w-2 h-2 bg-gold-muted rounded-full" />
                     )}
                   </button>
@@ -784,7 +850,10 @@ function DiscoverContent() {
                 Clear All
               </button>
               <button
-                onClick={() => setShowMobileFilters(false)}
+                onClick={() => {
+                  setShowMobileFilters(false);
+                  resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className="flex-1 py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors"
               >
                 View Results
