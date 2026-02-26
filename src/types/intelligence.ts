@@ -58,14 +58,24 @@ export interface CompleteOutfit {
 export interface FitConfidence {
   overallScore: number;
   suggestedSize: string;
+  availableSizes: string[];
   breakdown: {
     sizeMatch: number;
     styleMatch: number;
     proportionMatch: number;
   };
+  measurementAnalysis: {
+    chestDifferenceCm: number | null;
+    waistDifferenceCm: number | null;
+    shoulderAlignment: string | null;
+    sleeveLengthEstimate: string | null;
+  };
   sizeNotes: string[];
   returnRisk: 'low' | 'medium' | 'high';
+  returnRiskScore: number;
   recommendation: string;
+  bodyTwinUsed: boolean;
+  fitEngineVersion: string;
 }
 
 // ============================================

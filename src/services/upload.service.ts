@@ -118,7 +118,7 @@ export async function virtualTryOn(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`/api/v1/customer/virtual-tryon`, {
+  const res = await fetch(`${API_BASE}/api/v1/customer/virtual-tryon`, {
     method: 'POST',
     headers,
     body: JSON.stringify({

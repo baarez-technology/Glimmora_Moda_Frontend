@@ -6,6 +6,7 @@ import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
 import * as intelligenceService from '@/services/intelligence.service';
 import * as wardrobeService from '@/services/wardrobe.service';
+import { getFitConfidenceFromAPI } from '@/services/fit-confidence.service';
 import { addToWishlist, removeFromWishlist, getWishlist } from '@/services/customer-collection.service';
 import type { CartItem } from '@/services/customer-collection.service';
 import type {
@@ -426,21 +427,20 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     let cancelled = false;
     async function loadPanelData() {
       try {
-        const [availRes, fitRes, fabricRes, climateRes, sustainRes] = await Promise.all([
+        const [availRes, fabricRes, climateRes, sustainRes] = await Promise.all([
           intelligenceService.getAvailabilityIntelligence(product.id),
-          wardrobeService.getFitConfidence(product.id),
           intelligenceService.getFabricSimulation(product.id),
           intelligenceService.getClimateSuitability(product.id),
           intelligenceService.getSustainabilityScore(product.id),
         ]);
         if (!cancelled) {
-          setPanelData({
+          setPanelData((prev) => ({
+            ...prev,
             availability: availRes.data ?? null,
-            fitConfidence: fitRes.data ?? null,
             fabricSimulation: fabricRes.data ?? null,
             climateSuitability: climateRes.data ?? null,
             sustainabilityScore: sustainRes.data ?? null,
-          });
+          }));
           setPanelLoaded(true);
         }
       } catch (error) {
@@ -450,6 +450,23 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     loadPanelData();
     return () => { cancelled = true; };
   }, [showIntelligence, panelLoaded, product]);
+
+  // Load real fit confidence from backend API (overrides mock data when logged in)
+  useEffect(() => {
+    let cancelled = false;
+    const sizes = sizeVariants.filter(v => v.available).map(v => v.value);
+    if (!product.id || sizes.length === 0) return;
+
+    getFitConfidenceFromAPI(product.id, sizes).then((result) => {
+      if (!cancelled && result) {
+        setPanelData((prev) => ({ ...prev, fitConfidence: result }));
+      }
+    }).catch((err) => {
+      console.error('[fit-confidence] Failed to load:', err);
+    });
+
+    return () => { cancelled = true; };
+  }, [product.id, sizeVariants]);
 
   // Compat alias so the rest of the hook reads the same
   const serviceData = useMemo(() => ({
@@ -495,14 +512,24 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     return {
       overallScore: 87,
       suggestedSize,
+      availableSizes: sizeVariants.filter(v => v.available).map(v => v.value),
       breakdown: { sizeMatch: 92, styleMatch: 85, proportionMatch: 84 },
+      measurementAnalysis: {
+        chestDifferenceCm: null,
+        waistDifferenceCm: null,
+        shoulderAlignment: null,
+        sleeveLengthEstimate: null,
+      },
       sizeNotes: [
         'Runs true to size based on brand standards',
         'Structured fit that defines the silhouette',
         product.category === 'clothing' ? 'Consider sizing up for layering' : 'Standard dimensions for this style'
       ],
       returnRisk: 'low',
-      recommendation: `Based on the ${product.brandName} fit profile, ${suggestedSize} will provide the intended silhouette. The ${product.materials[0]?.name || 'fabric'} has minimal stretch, so accurate sizing ensures optimal drape and comfort.`
+      returnRiskScore: 20,
+      recommendation: `Based on the ${product.brandName} fit profile, ${suggestedSize} will provide the intended silhouette. The ${product.materials[0]?.name || 'fabric'} has minimal stretch, so accurate sizing ensures optimal drape and comfort.`,
+      bodyTwinUsed: false,
+      fitEngineVersion: '',
     };
   }, [serviceData.fitConfidence, product, sizeVariants]);
 
