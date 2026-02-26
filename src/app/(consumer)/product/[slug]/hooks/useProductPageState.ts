@@ -63,6 +63,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [sizeError, setSizeError] = useState(false);
+  const [colorError, setColorError] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
   // Modal State
@@ -159,12 +160,18 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
 
   // Actions
   const handleAddToConsiderations = useCallback(() => {
-    if (sizeVariants.length > 0 && !selectedSize) {
-      setSizeError(true);
-      showToast('Please select a size', 'error');
+    const needsSize = sizeVariants.length > 0 && !selectedSize;
+    const needsColor = colorVariants.length > 0 && !selectedColor;
+
+    if (needsSize || needsColor) {
+      setSizeError(needsSize);
+      setColorError(needsColor);
+      const missing = needsSize && needsColor ? 'size and color' : needsSize ? 'a size' : 'a color';
+      showToast(`Please select ${missing}`, 'error');
       return;
     }
     setSizeError(false);
+    setColorError(false);
 
     const agiNote = "This piece pairs beautifully with structured tailoring. Based on your style preferences, it would complement your existing wardrobe.";
 
@@ -185,7 +192,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
         refreshWishlist();
       })
       .catch(() => { /* API unavailable — local state still works */ });
-  }, [sizeVariants.length, selectedSize, selectedColor, product, addToConsiderations, showToast, refreshWishlist]);
+  }, [sizeVariants.length, colorVariants.length, selectedSize, selectedColor, product, addToConsiderations, showToast, refreshWishlist]);
 
   const handleRemoveFromConsiderations = useCallback(() => {
     if (considerationItem) {
@@ -204,24 +211,31 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   }, [considerationItem, removeFromConsiderations, wishlistItemId, refreshWishlist]);
 
   const handleAddToCart = useCallback(async () => {
-    if (sizeVariants.length > 0 && !selectedSize) {
-      setSizeError(true);
-      showToast('Please select a size', 'error');
+    const needsSize = sizeVariants.length > 0 && !selectedSize;
+    const needsColor = colorVariants.length > 0 && !selectedColor;
+
+    if (needsSize || needsColor) {
+      setSizeError(needsSize);
+      setColorError(needsColor);
+      const missing = needsSize && needsColor ? 'size and color' : needsSize ? 'a size' : 'a color';
+      showToast(`Please select ${missing}`, 'error');
       return;
     }
     setSizeError(false);
+    setColorError(false);
 
     try {
       await addToCart({
         product_id: product.id,
         color: selectedColor || '',
         size: selectedSize || '',
+        quantity,
       });
       refreshCart();
     } catch {
       // Toast already shown by the hook
     }
-  }, [sizeVariants.length, selectedSize, selectedColor, product, addToCart, showToast, refreshCart]);
+  }, [sizeVariants.length, colorVariants.length, selectedSize, selectedColor, product, addToCart, showToast, refreshCart, quantity]);
 
   const handleNotifyRestock = useCallback(() => {
     addRestockAlert(product, selectedSize || undefined, selectedColor || undefined);
@@ -247,6 +261,11 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const handleSizeSelect = useCallback((size: string) => {
     setSelectedSize(size);
     setSizeError(false);
+  }, []);
+
+  const handleColorSelect = useCallback((color: string) => {
+    setSelectedColor(color);
+    setColorError(false);
   }, []);
 
   const handleAddToWardrobe = useCallback(() => {
@@ -297,6 +316,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     selectedColor,
     activeImage,
     sizeError,
+    colorError,
     quantity,
     showIV,
     showIntelligence,
@@ -318,7 +338,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
 
     // Setters
     setSelectedSize: handleSizeSelect,
-    setSelectedColor,
+    setSelectedColor: handleColorSelect,
     setActiveImage,
     setQuantity,
     setShowIV,

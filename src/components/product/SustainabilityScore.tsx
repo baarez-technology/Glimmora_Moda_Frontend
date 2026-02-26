@@ -120,7 +120,7 @@ export default function SustainabilityScore({
   score,
   className = ''
 }: SustainabilityScoreProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   const getGrade = () => {
     if (score.overallScore >= 90) return { grade: 'A+', label: 'Exceptional', color: 'emerald' };
@@ -133,126 +133,134 @@ export default function SustainabilityScore({
   const gradeInfo = getGrade();
 
   return (
-    <div className={`bg-white rounded-xl border border-stone/20 overflow-hidden ${className}`}>
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-stone/10 bg-gradient-to-r from-emerald-50 to-white">
-        <div className="flex items-center gap-4">
-          <ScoreRing score={score.overallScore} size="md" />
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium text-charcoal-deep">Sustainability Score</h3>
-              <span className={`px-2 py-0.5 rounded text-xs font-medium bg-${gradeInfo.color}-100 text-${gradeInfo.color}-700`}
-                style={{
-                  backgroundColor: gradeInfo.color === 'emerald' ? '#d1fae5' : gradeInfo.color === 'amber' ? '#fef3c7' : '#fee2e2',
-                  color: gradeInfo.color === 'emerald' ? '#047857' : gradeInfo.color === 'amber' ? '#b45309' : '#b91c1c'
-                }}
-              >
-                Grade {gradeInfo.grade}
-              </span>
-            </div>
-            <p className="text-sm text-stone/70 mt-1">{gradeInfo.label} environmental performance</p>
+    <div className={`bg-white rounded-xl shadow-sm overflow-hidden ${className}`}>
+      {/* Header — clickable toggle */}
+      <button
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        className="w-full p-4 flex items-center justify-between hover:bg-parchment/50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
+            <Leaf className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div className="text-left">
+            <p className="font-medium text-charcoal-deep">Sustainability Score</p>
+            <p className="text-sm text-stone">{gradeInfo.label} environmental performance</p>
           </div>
         </div>
-      </div>
+        <div className="flex items-center gap-3">
+          <span className={`px-3 py-1 rounded-full text-sm font-medium`}
+            style={{
+              backgroundColor: gradeInfo.color === 'emerald' || gradeInfo.color === 'green' ? '#d1fae5' : gradeInfo.color === 'amber' ? '#fef3c7' : '#fee2e2',
+              color: gradeInfo.color === 'emerald' || gradeInfo.color === 'green' ? '#047857' : gradeInfo.color === 'amber' ? '#b45309' : '#b91c1c'
+            }}
+          >
+            {score.overallScore}/100
+          </span>
+          <ChevronDown
+            size={20}
+            className={`text-greige transition-transform ${expanded ? 'rotate-180' : ''}`}
+          />
+        </div>
+      </button>
 
-      {/* Quick Stats */}
-      <div className="px-5 py-4 grid grid-cols-3 gap-4 border-b border-stone/10">
-        <div className="text-center">
-          <Leaf className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
-          <p className="text-lg font-display text-charcoal-deep">{score.carbonFootprint}</p>
-          <p className="text-[10px] text-stone/50 uppercase tracking-wider">kg CO₂</p>
-        </div>
-        <div className="text-center">
-          <Droplets className="w-5 h-5 text-sky-500 mx-auto mb-1" />
-          <p className="text-lg font-display text-charcoal-deep">{score.waterUsage}</p>
-          <p className="text-[10px] text-stone/50 uppercase tracking-wider">L Water</p>
-        </div>
-        <div className="text-center">
-          <Recycle className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-          <p className="text-lg font-display text-charcoal-deep">{score.recyclability}%</p>
-          <p className="text-[10px] text-stone/50 uppercase tracking-wider">Recyclable</p>
-        </div>
-      </div>
+      {/* Expanded Content */}
+      {expanded && (
+        <div className="border-t border-sand">
+          {/* Score Ring + Grade */}
+          <div className="px-5 py-4 border-b border-stone/10 bg-gradient-to-r from-emerald-50 to-white">
+            <div className="flex items-center gap-4">
+              <ScoreRing score={score.overallScore} size="md" />
+              <div className="flex-1">
+                <span className={`px-2 py-0.5 rounded text-xs font-medium`}
+                  style={{
+                    backgroundColor: gradeInfo.color === 'emerald' || gradeInfo.color === 'green' ? '#d1fae5' : gradeInfo.color === 'amber' ? '#fef3c7' : '#fee2e2',
+                    color: gradeInfo.color === 'emerald' || gradeInfo.color === 'green' ? '#047857' : gradeInfo.color === 'amber' ? '#b45309' : '#b91c1c'
+                  }}
+                >
+                  Grade {gradeInfo.grade}
+                </span>
+              </div>
+            </div>
+          </div>
 
-      {/* Certifications */}
-      {score.certifications && score.certifications.length > 0 && (
-        <div className="px-5 py-4 border-b border-stone/10">
-          <h4 className="text-xs tracking-wider uppercase text-stone/50 mb-3 flex items-center gap-2">
-            <Award className="w-4 h-4" />
-            Certifications
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {score.certifications.map((cert, i) => (
-              <span
-                key={i}
-                className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium"
-              >
-                {cert}
-              </span>
-            ))}
+          {/* Quick Stats */}
+          <div className="px-5 py-4 grid grid-cols-3 gap-4 border-b border-stone/10">
+            <div className="text-center">
+              <Leaf className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+              <p className="text-lg font-display text-charcoal-deep">{score.carbonFootprint}</p>
+              <p className="text-[10px] text-stone/50 uppercase tracking-wider">kg CO₂</p>
+            </div>
+            <div className="text-center">
+              <Droplets className="w-5 h-5 text-sky-500 mx-auto mb-1" />
+              <p className="text-lg font-display text-charcoal-deep">{score.waterUsage}</p>
+              <p className="text-[10px] text-stone/50 uppercase tracking-wider">L Water</p>
+            </div>
+            <div className="text-center">
+              <Recycle className="w-5 h-5 text-amber-500 mx-auto mb-1" />
+              <p className="text-lg font-display text-charcoal-deep">{score.recyclability}%</p>
+              <p className="text-[10px] text-stone/50 uppercase tracking-wider">Recyclable</p>
+            </div>
+          </div>
+
+          {/* Certifications */}
+          {score.certifications && score.certifications.length > 0 && (
+            <div className="px-5 py-4 border-b border-stone/10">
+              <h4 className="text-xs tracking-wider uppercase text-stone/50 mb-3 flex items-center gap-2">
+                <Award className="w-4 h-4" />
+                Certifications
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {score.certifications.map((cert, i) => (
+                  <span
+                    key={i}
+                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full text-xs font-medium"
+                  >
+                    {cert}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Breakdown */}
+          <div className="px-5 py-4 space-y-3">
+            <h4 className="text-xs tracking-wider uppercase text-stone/50">Detailed Breakdown</h4>
+            <CategoryScore
+              category="materials"
+              score={score.breakdown.materials}
+              description="Sustainable and ethically sourced materials"
+            />
+            <CategoryScore
+              category="production"
+              score={score.breakdown.production}
+              description="Ethical manufacturing practices"
+            />
+            <CategoryScore
+              category="packaging"
+              score={score.breakdown.packaging}
+              description="Eco-friendly packaging materials"
+            />
+            <CategoryScore
+              category="transport"
+              score={score.breakdown.transport}
+              description="Carbon-efficient logistics"
+            />
+          </div>
+
+          {/* Source Link */}
+          <div className="px-5 pb-5">
+            <a
+              href="#"
+              className="flex items-center gap-2 text-xs text-gold-soft hover:underline"
+            >
+              <span>View full sustainability report</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
           </div>
         </div>
       )}
-
-      {/* Expandable Details */}
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-5 py-3 flex items-center justify-between text-sm text-stone/70 hover:bg-stone/5 transition-colors"
-      >
-        <span>Detailed Breakdown</span>
-        <motion.div
-          animate={{ rotate: isExpanded ? 180 : 0 }}
-          transition={{ duration: 0.2 }}
-        >
-          <ChevronDown className="w-4 h-4" />
-        </motion.div>
-      </button>
-
-      <AnimatePresence>
-        {isExpanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-          >
-            <div className="px-5 pb-5 space-y-3">
-              <CategoryScore
-                category="materials"
-                score={score.breakdown.materials}
-                description="Sustainable and ethically sourced materials"
-              />
-              <CategoryScore
-                category="production"
-                score={score.breakdown.production}
-                description="Ethical manufacturing practices"
-              />
-              <CategoryScore
-                category="packaging"
-                score={score.breakdown.packaging}
-                description="Eco-friendly packaging materials"
-              />
-              <CategoryScore
-                category="transport"
-                score={score.breakdown.transport}
-                description="Carbon-efficient logistics"
-              />
-            </div>
-
-            {/* Source Link */}
-            <div className="px-5 pb-5">
-              <a
-                href="#"
-                className="flex items-center gap-2 text-xs text-gold-soft hover:underline"
-              >
-                <span>View full sustainability report</span>
-                <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

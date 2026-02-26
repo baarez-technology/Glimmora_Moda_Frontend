@@ -73,8 +73,11 @@ function ProductPageContent({ product }: { product: Product }) {
               selectedSize={state.selectedSize}
               selectedColor={state.selectedColor}
               sizeError={state.sizeError}
+              colorError={state.colorError}
+              quantity={state.quantity}
               onSizeSelect={state.setSelectedSize}
               onColorSelect={state.setSelectedColor}
+              onQuantityChange={state.setQuantity}
             />
 
             <ProductActions
@@ -83,7 +86,6 @@ function ProductPageContent({ product }: { product: Product }) {
               colorVariants={state.colorVariants}
               selectedSize={state.selectedSize}
               selectedColor={state.selectedColor}
-              quantity={state.quantity}
               inConsiderations={state.inConsiderations}
               inCart={state.inCart}
               inWardrobe={state.inWardrobe}
@@ -100,7 +102,6 @@ function ProductPageContent({ product }: { product: Product }) {
               onShowConcierge={() => state.setShowConcierge(true)}
               onShowIV={() => state.setShowIV(true)}
               onShowViewOnMe={() => state.setShowViewOnMe(true)}
-              onQuantityChange={state.setQuantity}
             />
 
             <ProductIntelligencePanel

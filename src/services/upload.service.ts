@@ -49,6 +49,46 @@ export async function uploadDocument(file: File): Promise<ApiResponse<UploadResu
   });
 }
 
+// ─── Real API Upload (FormData with auth) ───────────────────────────────────
+
+function getUserToken(): string | null {
+  try {
+    return localStorage.getItem('moda-user-token');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Upload an image file to the backend via FormData.
+ * Returns the public URL of the uploaded image.
+ * Falls back to a client-side data URL if the API is unavailable.
+ */
+export async function uploadImageFile(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const headers: Record<string, string> = {};
+  const token = getUserToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const res = await fetch('/api/v1/customer/upload/image', {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to upload image');
+  }
+
+  const data = await res.json();
+  return data.url || data.image_url || data.public_url;
+}
+
 export async function getUploadUrl(
   filename: string,
   contentType: string

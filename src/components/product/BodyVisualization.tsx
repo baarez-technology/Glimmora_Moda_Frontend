@@ -2,8 +2,9 @@
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon } from 'lucide-react';
+import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { uploadImageFile } from '@/services/upload.service';
 import { Product, BodyVisualizationConfig } from '@/types';
 
 interface BodyVisualizationProps {
@@ -20,20 +21,31 @@ export default function BodyVisualization({
 }: BodyVisualizationProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith('image/')) return;
 
     setUploadedFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setUploadedImage(ev.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsUploading(true);
+
+    try {
+      // Upload to backend API → get public URL
+      const publicUrl = await uploadImageFile(file);
+      setUploadedImage(publicUrl);
+    } catch {
+      // API unavailable — fall back to local data URL preview
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setUploadedImage(ev.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleReset = () => {
@@ -94,15 +106,29 @@ export default function BodyVisualization({
 
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
-            {/* AI Preview Area (Left) — fixed placeholder, will show backend result */}
+            {/* AI Preview Area (Left) — Placeholder for API-generated visualization */}
             <div className="lg:col-span-2 relative bg-gradient-to-b from-ivory-cream to-stone/10 p-8 flex items-center justify-center min-h-[400px]">
-              <div className="w-full max-w-sm mx-auto aspect-[3/4] border-2 border-dashed border-stone/30 rounded-xl flex flex-col items-center justify-center gap-4 bg-white/50">
-                <div className="w-16 h-16 bg-stone/10 rounded-full flex items-center justify-center">
-                  <ImageIcon className="w-8 h-8 text-stone/40" />
-                </div>
-                <div className="text-center px-6">
-                  <p className="text-sm font-medium text-charcoal-deep mb-1">Virtual Try-On Preview</p>
-                  <p className="text-xs text-stone/60">Your AI-generated preview will appear here</p>
+              <div className="w-full max-w-sm mx-auto aspect-[3/4] rounded-xl overflow-hidden relative bg-stone/5 border border-stone/20">
+                {/* Product image as placeholder until visualization API is integrated */}
+                {productImage ? (
+                  <Image
+                    src={productImage}
+                    alt={`${product.name} — visualization preview`}
+                    fill
+                    className="object-cover opacity-60"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <ImageIcon className="w-16 h-16 text-stone/20" />
+                  </div>
+                )}
+                {/* Overlay label */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-charcoal-deep/30 backdrop-blur-[2px]">
+                  <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mb-3">
+                    <Eye className="w-7 h-7 text-white" />
+                  </div>
+                  <p className="text-sm font-medium text-white tracking-wide">Virtual Try-On</p>
+                  <p className="text-xs text-white/70 mt-1">AI visualization coming soon</p>
                 </div>
               </div>
             </div>
@@ -167,12 +193,22 @@ export default function BodyVisualization({
                 />
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gold-soft/10 text-charcoal-deep border border-gold-soft/30 rounded-lg hover:bg-gold-soft/20 transition-colors"
+                  disabled={isUploading}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-gold-soft/10 text-charcoal-deep border border-gold-soft/30 rounded-lg hover:bg-gold-soft/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <Upload className="w-4 h-4 text-gold-soft" />
-                  <span className="text-sm tracking-wider">
-                    {uploadedImage ? 'Change Photo' : 'Upload Your Image'}
-                  </span>
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 text-gold-soft animate-spin" />
+                      <span className="text-sm tracking-wider">Uploading...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4 text-gold-soft" />
+                      <span className="text-sm tracking-wider">
+                        {uploadedImage ? 'Change Photo' : 'Upload Your Image'}
+                      </span>
+                    </>
+                  )}
                 </button>
 
                 <button

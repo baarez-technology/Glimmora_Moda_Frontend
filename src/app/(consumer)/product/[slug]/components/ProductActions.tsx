@@ -1,6 +1,6 @@
 'use client';
 
-import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, Minus, Plus } from 'lucide-react';
+import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag } from 'lucide-react';
 import type { Product, ProductVariant } from '@/types';
 
 interface ProductActionsProps {
@@ -9,7 +9,6 @@ interface ProductActionsProps {
   colorVariants: ProductVariant[];
   selectedSize: string | null;
   selectedColor: string | null;
-  quantity: number;
   inConsiderations: boolean;
   inCart: boolean;
   inWardrobe: boolean;
@@ -25,7 +24,6 @@ interface ProductActionsProps {
   onShowViewOnMe: () => void;
   onShowIntelligence: () => void;
   onShowConcierge: () => void;
-  onQuantityChange: (qty: number) => void;
   showIntelligence: boolean;
 }
 
@@ -35,7 +33,6 @@ export default function ProductActions({
   colorVariants,
   selectedSize,
   selectedColor,
-  quantity,
   inConsiderations,
   inCart,
   inWardrobe,
@@ -51,7 +48,6 @@ export default function ProductActions({
   onShowViewOnMe,
   onShowIntelligence,
   onShowConcierge,
-  onQuantityChange,
   showIntelligence
 }: ProductActionsProps) {
   const needsSize = sizeVariants.length > 0 && !selectedSize;
@@ -78,32 +74,6 @@ export default function ProductActions({
           <User size={18} className="text-sapphire-subtle" />
           <span className="text-sm tracking-[0.15em] uppercase">View on Me</span>
         </button>
-      </div>
-
-      {/* Quantity Selector */}
-      <div className="mb-6">
-        <p className="text-[11px] tracking-[0.3em] uppercase text-taupe mb-3">Quantity</p>
-        <div className="inline-flex items-center border border-sand">
-          <button
-            onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
-            disabled={quantity <= 1}
-            className="w-10 h-10 flex items-center justify-center text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Decrease quantity"
-          >
-            <Minus size={14} />
-          </button>
-          <span className="w-12 h-10 flex items-center justify-center text-sm font-medium text-charcoal-deep border-x border-sand">
-            {quantity}
-          </span>
-          <button
-            onClick={() => onQuantityChange(Math.min(99, quantity + 1))}
-            disabled={quantity >= 99}
-            className="w-10 h-10 flex items-center justify-center text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Increase quantity"
-          >
-            <Plus size={14} />
-          </button>
-        </div>
       </div>
 
       {/* Intelligence Panel Toggle */}
@@ -156,9 +126,9 @@ export default function ProductActions({
           ) : (
             <button
               onClick={onAddToConsiderations}
-              disabled={sizeVariants.length > 0 && !selectedSize}
+              disabled={selectionIncomplete}
               className="group flex-1 py-4 px-4 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-warm disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-charcoal-deep"
-              title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
+              title={selectionIncomplete ? 'Please select size and color first' : ''}
             >
               <Heart size={16} />
               <span className="text-sm tracking-[0.1em] uppercase">Add to Considerations</span>
@@ -176,9 +146,9 @@ export default function ProductActions({
           ) : (
             <button
               onClick={onAddToCart}
-              disabled={sizeVariants.length > 0 && !selectedSize}
+              disabled={selectionIncomplete}
               className="group flex-1 py-4 px-4 border-2 border-charcoal-deep text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-deep hover:text-ivory-cream disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-charcoal-deep"
-              title={sizeVariants.length > 0 && !selectedSize ? 'Please select a size first' : ''}
+              title={selectionIncomplete ? 'Please select size and color first' : ''}
             >
               <ShoppingBag size={16} />
               <span className="text-sm tracking-[0.1em] uppercase">Add to Cart</span>
@@ -186,10 +156,10 @@ export default function ProductActions({
           )}
         </div>
 
-        {/* Helper text when size is required */}
-        {sizeVariants.length > 0 && !selectedSize && !inConsiderations && !inCart && (
+        {/* Helper text when selection is incomplete */}
+        {selectionIncomplete && !inConsiderations && !inCart && (
           <p className="text-xs text-center text-stone">
-            Please select a size to continue
+            Please select {needsSize && needsColor ? 'size and color' : needsSize ? 'a size' : 'a color'} to continue
           </p>
         )}
 
