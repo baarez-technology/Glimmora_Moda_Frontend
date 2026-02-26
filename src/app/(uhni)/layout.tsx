@@ -49,7 +49,7 @@ export default function UHNILayout({
     { href: '/uhni/sourcing', label: 'Sourcing' },
     { href: '/uhni/bespoke', label: 'Bespoke' },
     { href: '/uhni/autonomous', label: 'Autonomous' },
-    { href: '/uhni/cart', label: 'Cart' },
+    { href: '/cart', label: 'Cart' },
     { href: '/profile/wishlist', label: 'Wishlist' },
     { href: '/', label: 'Main Site' },
   ];

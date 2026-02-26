@@ -161,3 +161,35 @@ export async function removeFromWishlist(wishlistId: string): Promise<void> {
     throw new Error(err.detail || `Failed to remove from wishlist (${res.status})`);
   }
 }
+
+// ─── Cart Quantity Update ──────────────────────────────────────────────────
+
+export async function updateCartQuantity(cartId: string, quantity: number): Promise<CartItem> {
+  const res = await fetch(`/api/v1/customer/cart/${cartId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ quantity }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update quantity' }));
+    throw new Error(err.detail || `Failed to update quantity (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ─── Move Wishlist Item to Cart ────────────────────────────────────────────
+
+export async function moveWishlistToCart(wishlistItem: WishlistItem, quantity = 1): Promise<CartItem> {
+  const cartItem = await addToCart({
+    product_id: wishlistItem.product_id,
+    color: wishlistItem.color,
+    size: wishlistItem.size,
+    quantity,
+  });
+
+  await removeFromWishlist(wishlistItem.wishlist_id);
+
+  return cartItem;
+}

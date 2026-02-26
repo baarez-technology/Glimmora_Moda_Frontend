@@ -12,7 +12,7 @@ import type { Brand } from '@/types';
 
 export default function Header() {
   const router = useRouter();
-  const { considerations, userTier, isUHNI, showToast } = useApp();
+  const { considerations, userTier, isUHNI, showToast, cartCount, wishlistCount } = useApp();
   const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
@@ -191,6 +191,11 @@ export default function Header() {
               aria-label="Wishlist"
             >
               <Heart size={20} />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
+                  {wishlistCount}
+                </span>
+              )}
             </Link>
 
             {/* Cart */}
@@ -200,9 +205,9 @@ export default function Header() {
               aria-label="Shopping Bag"
             >
               <ShoppingBag size={20} />
-              {considerations.length > 0 && (
+              {cartCount > 0 && (
                 <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-gold-muted text-noir text-[10px] rounded-full flex items-center justify-center">
-                  {considerations.length}
+                  {cartCount}
                 </span>
               )}
             </Link>

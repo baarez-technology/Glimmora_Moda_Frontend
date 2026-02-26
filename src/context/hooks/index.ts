@@ -6,3 +6,4 @@ export { useRestockAlerts, type RestockAlert } from './useRestockAlerts';
 export { useOrders, type OrderRecord } from './useOrders';
 export { useUHNIFeatures } from './useUHNIFeatures';
 export { useFashionIdentity } from './useFashionIdentity';
+export { useCart } from './useCart';

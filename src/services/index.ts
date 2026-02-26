@@ -49,3 +49,4 @@ export * as brandPortalService from './brand-portal.service';
 export * as brandIntelligenceService from './brand-intelligence.service';
 export * as uploadService from './upload.service';
 export * as recommendationService from './recommendation.service';
+export * as customerCollectionService from './customer-collection.service';

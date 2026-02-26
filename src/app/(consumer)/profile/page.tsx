@@ -110,6 +110,12 @@ export default function ProfilePage() {
       title: 'Style Calendar',
       subtitle: `${calendarEvents.length} events`,
     },
+    {
+      href: '/profile/body-twin',
+      icon: UserIcon,
+      title: 'Digital Body Twin',
+      subtitle: 'Fit profile & measurements',
+    },
   ];
 
   // UHNI-exclusive nav items

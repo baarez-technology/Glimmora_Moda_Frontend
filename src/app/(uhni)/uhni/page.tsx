@@ -12,6 +12,7 @@ import {
   MessageCircle,
   Globe,
   Lock,
+  User,
   ArrowRight,
   DollarSign,
   Sparkles,
@@ -58,7 +59,8 @@ export default function UHNIDashboardPage() {
     { href: '/uhni/zero-ui', icon: Layers, label: 'Zero-UI Commerce', description: 'Invisible shopping' },
     { href: '/uhni/invisible-commerce', icon: EyeOff, label: 'Invisible Commerce', description: 'Discreet transactions' },
     { href: '/uhni/concierge-tasks', icon: ClipboardList, label: 'Concierge Tasks', description: 'Task management' },
-    { href: '/uhni/silent-commerce', icon: Radio, label: 'Silent Commerce', description: 'Ambient awareness' }
+    { href: '/uhni/silent-commerce', icon: Radio, label: 'Silent Commerce', description: 'Ambient awareness' },
+    { href: '/profile/body-twin', icon: User, label: 'Body Twin', description: 'Fit profile & measurements' }
   ];
 
   return (
