@@ -75,7 +75,7 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
     });
   }, []);
 
-  const addToWardrobe = useCallback((product: Product) => {
+  const addToWardrobe = useCallback((product: Product, options?: { color?: string; size?: string; quantity?: number }) => {
     // Check if already in wardrobe before updating state
     const alreadyInWardrobe = wardrobe.some(w => w.productId === product.id);
 
@@ -94,15 +94,16 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
       outfitCompatibility: []
     };
 
-    setWardrobe(prev => [...prev, newItem]);
+    // Prepend so newest items appear first
+    setWardrobe(prev => [newItem, ...prev]);
     showToast(`${product.name} added to wardrobe`, 'success');
 
     // Also POST to real API (fire and forget)
     apiAddToWardrobe({
       product_id: product.id,
-      color: '',
-      size: '',
-      how_many_buyed_count: 1,
+      color: options?.color || '',
+      size: options?.size || '',
+      how_many_buyed_count: options?.quantity || 1,
     }).catch(() => { /* silently fail — localStorage still has it */ });
   }, [showToast, wardrobe]);
 

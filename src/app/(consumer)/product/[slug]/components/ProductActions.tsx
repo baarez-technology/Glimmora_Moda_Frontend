@@ -1,12 +1,15 @@
 'use client';
 
-import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag } from 'lucide-react';
+import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, Minus, Plus } from 'lucide-react';
 import type { Product, ProductVariant } from '@/types';
 
 interface ProductActionsProps {
   product: Product;
   sizeVariants: ProductVariant[];
+  colorVariants: ProductVariant[];
   selectedSize: string | null;
+  selectedColor: string | null;
+  quantity: number;
   inConsiderations: boolean;
   inCart: boolean;
   inWardrobe: boolean;
@@ -22,13 +25,17 @@ interface ProductActionsProps {
   onShowViewOnMe: () => void;
   onShowIntelligence: () => void;
   onShowConcierge: () => void;
+  onQuantityChange: (qty: number) => void;
   showIntelligence: boolean;
 }
 
 export default function ProductActions({
   product,
   sizeVariants,
+  colorVariants,
   selectedSize,
+  selectedColor,
+  quantity,
   inConsiderations,
   inCart,
   inWardrobe,
@@ -44,31 +51,60 @@ export default function ProductActions({
   onShowViewOnMe,
   onShowIntelligence,
   onShowConcierge,
+  onQuantityChange,
   showIntelligence
 }: ProductActionsProps) {
+  const needsSize = sizeVariants.length > 0 && !selectedSize;
+  const needsColor = colorVariants.length > 0 && !selectedColor;
+  const selectionIncomplete = needsSize || needsColor;
+
   return (
     <>
       {/* IV™ Button - See How It Looks */}
-      {product.ivEnabled && (
-        <div className="flex gap-3 mb-6">
+      <div className="flex gap-3 mb-6">
+        <button
+          onClick={onShowIV}
+          className="flex-1 py-4 px-6 border border-gold-muted text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 group"
+          title="Immersive Visualization™ - Visualize this piece on your Digital Body Twin with AI-powered styling"
+        >
+          <Eye size={18} className="text-gold-muted" />
+          <span className="text-sm tracking-[0.15em] uppercase">IV™</span>
+        </button>
+        <button
+          onClick={onShowViewOnMe}
+          className="flex-1 py-4 px-6 border border-sapphire-subtle text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-sapphire-subtle/10 group"
+          title="View on Me - See how this piece looks on your body type"
+        >
+          <User size={18} className="text-sapphire-subtle" />
+          <span className="text-sm tracking-[0.15em] uppercase">View on Me</span>
+        </button>
+      </div>
+
+      {/* Quantity Selector */}
+      <div className="mb-6">
+        <p className="text-[11px] tracking-[0.3em] uppercase text-taupe mb-3">Quantity</p>
+        <div className="inline-flex items-center border border-sand">
           <button
-            onClick={onShowIV}
-            className="flex-1 py-4 px-6 border border-gold-muted text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 group"
-            title="Immersive Visualization™ - Visualize this piece on your Digital Body Twin with AI-powered styling"
+            onClick={() => onQuantityChange(Math.max(1, quantity - 1))}
+            disabled={quantity <= 1}
+            className="w-10 h-10 flex items-center justify-center text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Decrease quantity"
           >
-            <Eye size={18} className="text-gold-muted" />
-            <span className="text-sm tracking-[0.15em] uppercase">IV™</span>
+            <Minus size={14} />
           </button>
+          <span className="w-12 h-10 flex items-center justify-center text-sm font-medium text-charcoal-deep border-x border-sand">
+            {quantity}
+          </span>
           <button
-            onClick={onShowViewOnMe}
-            className="flex-1 py-4 px-6 border border-sapphire-subtle text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-sapphire-subtle/10 group"
-            title="View on Me - See how this piece looks on your body type"
+            onClick={() => onQuantityChange(Math.min(99, quantity + 1))}
+            disabled={quantity >= 99}
+            className="w-10 h-10 flex items-center justify-center text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Increase quantity"
           >
-            <User size={18} className="text-sapphire-subtle" />
-            <span className="text-sm tracking-[0.15em] uppercase">View on Me</span>
+            <Plus size={14} />
           </button>
         </div>
-      )}
+      </div>
 
       {/* Intelligence Panel Toggle */}
       <button
@@ -169,12 +205,20 @@ export default function ProductActions({
         ) : (
           <button
             onClick={onAddToWardrobe}
-            className="group w-full py-3 px-6 border border-gold-muted/50 text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 hover:border-gold-muted"
-            title="Add this piece to your Digital Wardrobe"
+            disabled={selectionIncomplete}
+            className="group w-full py-3 px-6 border border-gold-muted/50 text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 hover:border-gold-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gold-muted/50"
+            title={selectionIncomplete ? 'Please select size and color first' : 'Add this piece to your Digital Wardrobe'}
           >
             <ShoppingBag size={16} className="text-gold-muted" />
-            <span className="text-sm tracking-[0.15em] uppercase">I Own This</span>
+            <span className="text-sm tracking-[0.15em] uppercase">Add to Wardrobe</span>
           </button>
+        )}
+
+        {/* Helper text when selection is incomplete */}
+        {selectionIncomplete && !inWardrobe && (
+          <p className="text-xs text-center text-stone">
+            Please select {needsSize && needsColor ? 'size and color' : needsSize ? 'a size' : 'a color'} to add to wardrobe
+          </p>
         )}
 
         <div className="flex gap-3">

@@ -63,6 +63,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [activeImage, setActiveImage] = useState(0);
   const [sizeError, setSizeError] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   // Modal State
   const [showIV, setShowIV] = useState(false);
@@ -249,8 +250,18 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   }, []);
 
   const handleAddToWardrobe = useCallback(() => {
-    addToWardrobe(product);
-  }, [product, addToWardrobe]);
+    const sizeVars = product.variants.filter(v => v.type === 'size');
+    const colorVars = product.variants.filter(v => v.type === 'color');
+    if (sizeVars.length > 0 && !selectedSize) {
+      showToast('Please select a size', 'error');
+      return;
+    }
+    if (colorVars.length > 0 && !selectedColor) {
+      showToast('Please select a color', 'error');
+      return;
+    }
+    addToWardrobe(product, { color: selectedColor || undefined, size: selectedSize || undefined, quantity });
+  }, [product, addToWardrobe, selectedSize, selectedColor, quantity, showToast]);
 
   const handleRemoveFromWardrobe = useCallback(() => {
     const wardrobeItem = wardrobe.find(w => w.product.id === product.id);
@@ -286,6 +297,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     selectedColor,
     activeImage,
     sizeError,
+    quantity,
     showIV,
     showIntelligence,
     showConcierge,
@@ -308,6 +320,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     setSelectedSize: handleSizeSelect,
     setSelectedColor,
     setActiveImage,
+    setQuantity,
     setShowIV,
     setShowIntelligence,
     setShowConcierge,
