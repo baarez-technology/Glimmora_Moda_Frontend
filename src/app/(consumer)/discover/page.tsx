@@ -67,14 +67,46 @@ function DiscoverContent() {
           }
         }
 
-        // Map multi-select occasion/aesthetic filters to API user_preferences
+        // Map multi-select occasion/aesthetic filters to API user_preferences.
+        // Occasions can be sent through as-is (backend uses same keys).
+        // For aesthetics we expand the simple UI ids into the richer tokens
+        // used by the recommendation engine (e.g. "minimal" → ["minimal", "minimal-structured"]).
         if (selectedOccasions.length || selectedMoods.length) {
           productParams.user_preferences = {};
+
           if (selectedOccasions.length) {
             productParams.user_preferences.occasions = selectedOccasions;
           }
+
           if (selectedMoods.length) {
-            productParams.user_preferences.aesthetics = selectedMoods;
+            const aestheticsSet = new Set<string>();
+            selectedMoods.forEach((mood) => {
+              switch (mood) {
+                case 'minimal':
+                  aestheticsSet.add('minimal');
+                  aestheticsSet.add('minimal-structured');
+                  break;
+                case 'classic':
+                  aestheticsSet.add('classic');
+                  aestheticsSet.add('classic-timeless');
+                  break;
+                case 'contemporary':
+                case 'bold': // backward-compat if URL/query contains older id
+                  aestheticsSet.add('bold');
+                  aestheticsSet.add('contemporary-statement');
+                  aestheticsSet.add('contemporary');
+                  break;
+                case 'artistic':
+                  aestheticsSet.add('artistic');
+                  aestheticsSet.add('art-cultural');
+                  break;
+                default:
+                  aestheticsSet.add(mood);
+                  break;
+              }
+            });
+
+            productParams.user_preferences.aesthetics = Array.from(aestheticsSet);
           }
         }
 
@@ -116,10 +148,12 @@ function DiscoverContent() {
 
       if (selectedOccasions.length) {
         const occasionTags: Record<string, string[]> = {
-          evening: ['evening', 'formal', 'gala', 'party', 'elegant'],
           professional: ['professional', 'business', 'office', 'work'],
+          social: ['social', 'event', 'party', 'gathering', 'dinner'],
           casual: ['casual', 'everyday', 'relaxed', 'weekend'],
-          travel: ['travel', 'versatile', 'comfortable']
+          formal: ['formal', 'black-tie', 'gala', 'evening'],
+          travel: ['travel', 'journey', 'trip', 'versatile', 'comfortable'],
+          art: ['art', 'cultural', 'gallery', 'theatre', 'museum'],
         };
         const hasOccasionMatch = selectedOccasions.some((occ) => {
           const matchTags = occasionTags[occ] || [];
@@ -132,8 +166,9 @@ function DiscoverContent() {
         const moodTags: Record<string, string[]> = {
           minimal: ['minimal', 'clean', 'structured', 'simple'],
           classic: ['classic', 'timeless', 'heritage', 'traditional'],
-          bold: ['bold', 'contemporary', 'statement', 'modern'],
-          artistic: ['artistic', 'expressive', 'creative', 'unique']
+          contemporary: ['bold', 'contemporary', 'statement', 'modern'],
+          bold: ['bold', 'contemporary', 'statement', 'modern'], // backward-compat
+          artistic: ['art', 'artistic', 'expressive', 'creative', 'cultural', 'unique']
         };
         const hasMoodMatch = selectedMoods.some((mood) => {
           const matchTags = moodTags[mood] || [];
@@ -193,19 +228,54 @@ function DiscoverContent() {
     !!searchQuery ||
     !!budgetRange;
 
-  const occasions = [
-    { id: 'evening', label: 'Evening' },
-    { id: 'professional', label: 'Professional' },
-    { id: 'casual', label: 'Everyday' },
-    { id: 'travel', label: 'Travel' }
-  ];
+  // Derive available occasion and aesthetic options from the products
+  // returned by the real recommendation API, so the refine panel reflects
+  // actual data instead of purely static mocks.
+  const occasionOptions = useMemo(
+    () => [
+      { id: 'professional', label: 'Professional' },
+      { id: 'social', label: 'Social Events' },
+      { id: 'casual', label: 'Casual Daily' },
+      { id: 'formal', label: 'Formal' },
+      { id: 'travel', label: 'Travel' },
+      { id: 'art', label: 'Art & Culture' },
+    ],
+    []
+  );
 
-  const moods = [
-    { id: 'minimal', label: 'Minimal' },
-    { id: 'classic', label: 'Classic' },
-    { id: 'bold', label: 'Bold' },
-    { id: 'artistic', label: 'Artistic' }
-  ];
+  const moodOptions = useMemo(() => {
+    // Keep ids aligned with onboarding ("minimal", "classic", "artistic", "contemporary")
+    const allowedIds = ['minimal', 'classic', 'artistic', 'contemporary'] as const;
+    const labels: Record<string, string> = {
+      minimal: 'Minimal & Structured',
+      classic: 'Classic & Timeless',
+      artistic: 'Artistic & Expressive',
+      contemporary: 'Bold & Contemporary',
+    };
+    const present = new Set<string>();
+
+    products.forEach((p) => {
+      p.tags?.forEach((tag) => {
+        const raw = tag.toLowerCase().replace(/\s+/g, '-');
+
+        // Map richer backend aesthetic tokens to the UI buckets
+        const bucket =
+          raw.includes('minimal') ? 'minimal'
+          : raw.includes('classic') || raw.includes('timeless') ? 'classic'
+          : raw.includes('art') || raw.includes('cultural') || raw.includes('expressive') ? 'artistic'
+          : raw.includes('contemporary') || raw.includes('bold') || raw.includes('statement') || raw.includes('modern') ? 'contemporary'
+          : null;
+
+        if (bucket && allowedIds.includes(bucket)) {
+          present.add(bucket);
+        }
+      });
+    });
+
+    return allowedIds
+      .filter((id) => present.has(id))
+      .map((id) => ({ id, label: labels[id] }));
+  }, [products]);
 
   const budgets = [
     { id: 'under-500', label: 'Under €500' },
@@ -345,7 +415,7 @@ function DiscoverContent() {
                   key={occ}
                   className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]"
                 >
-                  {occasions.find(o => o.id === occ)?.label}
+                  {occasionOptions.find(o => o.id === occ)?.label ?? occ}
                   <button
                     onClick={() =>
                       setSelectedOccasions(prev => prev.filter(id => id !== occ))
@@ -361,7 +431,7 @@ function DiscoverContent() {
                   key={mood}
                   className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]"
                 >
-                  {moods.find(m => m.id === mood)?.label}
+                  {moodOptions.find(m => m.id === mood)?.label ?? mood}
                   <button
                     onClick={() =>
                       setSelectedMoods(prev => prev.filter(id => id !== mood))
@@ -762,7 +832,7 @@ function DiscoverContent() {
             <div>
               <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Occasion</h4>
               <div className="space-y-1">
-                {occasions.map((occ) => (
+                {occasionOptions.map((occ) => (
                   <button
                     key={occ.id}
                     onClick={() =>
@@ -791,7 +861,7 @@ function DiscoverContent() {
             <div>
               <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Aesthetic</h4>
               <div className="space-y-1">
-                {moods.map((mood) => (
+                {moodOptions.map((mood) => (
                   <button
                     key={mood.id}
                     onClick={() =>
