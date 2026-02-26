@@ -246,6 +246,7 @@ export interface UserData {
   last_name: string;
   email: string;
   role: string;
+  profile_picture: string | null;
   occasions: string[];
   aesthetics: string[];
   minimum_budget: number | null;
@@ -365,6 +366,31 @@ export function userLogout(): void {
   localStorage.removeItem('moda-user-token');
   localStorage.removeItem('moda-user-refresh-token');
   localStorage.removeItem('moda-user-data');
+}
+
+// ============================================
+// Get User by ID
+// ============================================
+
+export async function getUserById(userId: string): Promise<UserData> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to fetch user' }));
+    throw new Error(err.detail || `Failed to fetch user (${res.status})`);
+  }
+
+  const user: UserData = await res.json();
+  // Keep local storage in sync with latest data
+  localStorage.setItem('moda-user-data', JSON.stringify(user));
+  return user;
 }
 
 // ============================================

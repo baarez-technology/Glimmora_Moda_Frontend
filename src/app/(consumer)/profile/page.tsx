@@ -6,17 +6,19 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers, Sparkles, Archive, DollarSign, Globe } from 'lucide-react';
 import * as userService from '@/services/user.service';
+import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import type { User } from '@/types';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { isAuthenticated, isHydrated, isLoggingOut, userData: authUserData } = useAuth();
+  const { isAuthenticated, isHydrated, isLoggingOut, userData: authUserData, setUserData } = useAuth();
   const { considerations, wardrobe, calendarEvents, orders, isUHNI, concierge, sourcingRequests, bespokeOrders, autonomousSettings, fashionIdentity } = useApp();
   const [mockUserData, setMockUserData] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   // Build a unified user object: real backend data takes priority, fallback to mock
   const user = (() => {
@@ -28,6 +30,7 @@ export default function ProfilePage() {
         firstName: authUserData.first_name,
         lastName: authUserData.last_name,
         role: authUserData.role,
+        profile_picture: authUserData.profile_picture,
         memberSince: authUserData.created_at,
         fashionIdentity: authUserData.context_set ? {
           occasions: authUserData.occasions,
@@ -45,7 +48,7 @@ export default function ProfilePage() {
       };
     }
     if (mockUserData) {
-      return { ...mockUserData, fashionIdentity, role: 'consumer', memberSince: '', firstName: '', lastName: '' };
+      return { ...mockUserData, fashionIdentity, role: 'consumer', memberSince: '', firstName: '', lastName: '', profile_picture: null };
     }
     return null;
   })();
@@ -67,9 +70,26 @@ export default function ProfilePage() {
       };
       loadUser();
     } else if (isHydrated && isAuthenticated && authUserData) {
-      setIsLoaded(true);
+      // Fetch fresh user data from backend using GET /api/v1/user/auth/{user_id}
+      const refreshUser = async () => {
+        try {
+          const freshUserData = await authService.getUserById(authUserData.user_id);
+          setUserData(freshUserData);
+          if (freshUserData.profile_picture) {
+            setProfilePicture(freshUserData.profile_picture);
+          }
+        } catch {
+          // Non-blocking: fall back to cached authUserData
+          if (authUserData.profile_picture) {
+            setProfilePicture(authUserData.profile_picture);
+          }
+        } finally {
+          setIsLoaded(true);
+        }
+      };
+      refreshUser();
     }
-  }, [isHydrated, isAuthenticated, authUserData]);
+  }, [isHydrated, isAuthenticated, authUserData, setUserData]);
 
   // Show loading while checking auth or loading user data
   if (!isHydrated || !isAuthenticated || !user) {
@@ -200,8 +220,18 @@ export default function ProfilePage() {
         <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24 relative">
           <div className={`flex flex-col md:flex-row items-center md:items-end gap-8 md:gap-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Avatar */}
-            <div className="w-28 h-28 bg-charcoal-warm flex items-center justify-center border border-gold-soft/20">
-              <UserIcon size={48} className="text-gold-soft/60" />
+            <div className="w-28 h-28 bg-charcoal-warm flex items-center justify-center border border-gold-soft/20 overflow-hidden">
+              {profilePicture ? (
+                <Image
+                  src={profilePicture}
+                  alt={user.name}
+                  width={112}
+                  height={112}
+                  className="object-cover w-full h-full"
+                />
+              ) : (
+                <UserIcon size={48} className="text-gold-soft/60" />
+              )}
             </div>
 
             {/* Info */}
