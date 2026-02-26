@@ -389,6 +389,42 @@ interface ApiProductDetail {
 
 function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   const slug = raw.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  // Build variants from backend data with fallback defaults
+  const variants: Product['variants'] = [];
+
+  // Color variant from ai_metadata
+  if (raw.ai_metadata?.color) {
+    const colorName = raw.ai_metadata.color;
+    const colorMap: Record<string, string> = {
+      black: '#000000', white: '#FFFFFF', red: '#C41E3A', blue: '#1E3A5F',
+      navy: '#1B2A4A', brown: '#6B4226', beige: '#C8B89A', cream: '#FFFDD0',
+      grey: '#808080', gray: '#808080', green: '#2D5A27', pink: '#E8A0BF',
+      gold: '#C9A962', silver: '#C0C0C0', tan: '#D2B48C', ivory: '#FFFFF0',
+      burgundy: '#800020', olive: '#556B2F', camel: '#C19A6B', charcoal: '#36454F',
+    };
+    const colorValue = colorMap[colorName.toLowerCase()] || '#8B8680';
+    variants.push({
+      id: `color-${colorName.toLowerCase()}`,
+      type: 'color',
+      name: colorName.charAt(0).toUpperCase() + colorName.slice(1),
+      value: colorValue,
+      available: true,
+    });
+  }
+
+  // Default size variants (backend doesn't provide sizes yet)
+  const defaultSizes = ['XS', 'S', 'M', 'L', 'XL'];
+  defaultSizes.forEach((size) => {
+    variants.push({
+      id: `size-${size.toLowerCase()}`,
+      type: 'size',
+      name: size,
+      value: size,
+      available: true,
+    });
+  });
+
   return {
     id: raw.product_id,
     brandId: raw.brand_id,
@@ -406,7 +442,7 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
       alt: raw.product_name,
       type: i === 0 ? 'hero' as const : 'detail' as const,
     })),
-    variants: [],
+    variants,
     materials: raw.ai_metadata?.fabrics
       ? [{ name: raw.ai_metadata.fabrics, composition: '100%', origin: '' }]
       : [],

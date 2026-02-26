@@ -41,7 +41,7 @@ interface AppContextType {
 
   // Wardrobe
   wardrobe: WardrobeItem[];
-  addToWardrobe: (product: Product) => void;
+  addToWardrobe: (product: Product, options?: { color?: string; size?: string; quantity?: number }) => void;
   removeFromWardrobe: (id: string) => void;
   isInWardrobe: (productId: string) => boolean;
 

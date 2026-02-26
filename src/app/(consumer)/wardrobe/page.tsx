@@ -251,7 +251,7 @@ export default function WardrobePage() {
                     {filteredWardrobe.map((item, index) => (
                       <div key={item.id} className="group">
                         <Link
-                          href={`/product/${item.product.slug}`}
+                          href={`/product/${item.product.slug}?productId=${item.productId}`}
                           className="relative block aspect-[3/4] overflow-hidden mb-5"
                           onMouseEnter={() => setActiveHover(index)}
                           onMouseLeave={() => setActiveHover(null)}
@@ -295,7 +295,7 @@ export default function WardrobePage() {
                         <p className="text-[10px] tracking-[0.25em] uppercase text-taupe mb-1">
                           {item.product.brandName}
                         </p>
-                        <Link href={`/product/${item.product.slug}`}>
+                        <Link href={`/product/${item.product.slug}?productId=${item.productId}`}>
                           <h3 className="font-display text-lg text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors">
                             {item.product.name}
                           </h3>
@@ -311,7 +311,7 @@ export default function WardrobePage() {
                         className="flex gap-6 md:gap-8 pb-6 border-b border-sand/50 last:border-0"
                       >
                         <Link
-                          href={`/product/${item.product.slug}`}
+                          href={`/product/${item.product.slug}?productId=${item.productId}`}
                           className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0"
                           onMouseEnter={() => setActiveHover(index)}
                           onMouseLeave={() => setActiveHover(null)}
@@ -335,7 +335,7 @@ export default function WardrobePage() {
                               <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-2">
                                 {item.product.brandName}
                               </p>
-                              <Link href={`/product/${item.product.slug}`}>
+                              <Link href={`/product/${item.product.slug}?productId=${item.productId}`}>
                                 <h3 className="font-display text-xl md:text-2xl text-charcoal-deep hover:text-charcoal-warm transition-colors">
                                   {item.product.name}
                                 </h3>

@@ -422,7 +422,7 @@ export default function ProfilePage() {
                     {wardrobe.slice(0, 3).map((item, index) => (
                       <Link
                         key={item.id}
-                        href={`/product/${item.product.slug}`}
+                        href={`/product/${item.product.slug}?productId=${item.productId}`}
                         className="group relative aspect-[3/4] overflow-hidden"
                         onMouseEnter={() => setActiveHover(index)}
                         onMouseLeave={() => setActiveHover(null)}

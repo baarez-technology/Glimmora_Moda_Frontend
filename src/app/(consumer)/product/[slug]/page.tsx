@@ -80,7 +80,10 @@ function ProductPageContent({ product }: { product: Product }) {
             <ProductActions
               product={product}
               sizeVariants={state.sizeVariants}
+              colorVariants={state.colorVariants}
               selectedSize={state.selectedSize}
+              selectedColor={state.selectedColor}
+              quantity={state.quantity}
               inConsiderations={state.inConsiderations}
               inWardrobe={state.inWardrobe}
               watchingRestock={state.watchingRestock}
@@ -95,6 +98,7 @@ function ProductPageContent({ product }: { product: Product }) {
               onShowConcierge={() => state.setShowConcierge(true)}
               onShowIV={() => state.setShowIV(true)}
               onShowViewOnMe={() => state.setShowViewOnMe(true)}
+              onQuantityChange={state.setQuantity}
             />
 
             <ProductIntelligencePanel
