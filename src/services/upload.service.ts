@@ -51,8 +51,6 @@ export async function uploadDocument(file: File): Promise<ApiResponse<UploadResu
 
 // ─── Real API Upload (FormData with auth) ───────────────────────────────────
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 function getUserToken(): string | null {
   try {
     return localStorage.getItem('moda-user-token');
@@ -70,7 +68,7 @@ export async function uploadImageFile(file: File): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
 
-  const res = await fetch(`${API_BASE}/api/v1/upload`, {
+  const res = await fetch(`/api/v1/upload`, {
     method: 'POST',
     // headers: {
     //   ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -118,7 +116,7 @@ export async function virtualTryOn(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}/api/v1/customer/virtual-tryon`, {
+  const res = await fetch(`/api/v1/customer/virtual-tryon`, {
     method: 'POST',
     headers,
     body: JSON.stringify({

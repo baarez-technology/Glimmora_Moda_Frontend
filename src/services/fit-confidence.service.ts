@@ -7,8 +7,7 @@
  */
 
 import type { FitConfidence } from '@/types';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { fetchWithTimeout } from '@/lib/api-cache';
 
 function getUserToken(): string | null {
   try {
@@ -94,22 +93,26 @@ export async function getFitConfidenceFromAPI(
   const token = getUserToken();
   if (!token) return null;
 
-  const res = await fetch(`${API_BASE}/api/v1/customer/fit-confidence`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify({
-      product_id: productId,
-      product_sizes: productSizes,
-    }),
-  });
+  try {
+    const res = await fetchWithTimeout(`/api/v1/customer/fit-confidence`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        product_id: productId,
+        product_sizes: productSizes,
+      }),
+    });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    console.log('[fit-confidence] API error:', res.status, err);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.log('[fit-confidence] API error:', res.status, err);
+      return null;
+    }
+
+    const data: FitConfidenceApiResponse = await res.json();
+    return mapToFitConfidence(data);
+  } catch (err) {
+    console.log('[fit-confidence] Network error (backend may be offline):', err);
     return null;
   }
-
-  const data: FitConfidenceApiResponse = await res.json();
-  console.log('[fit-confidence] response:', data);
-  return mapToFitConfidence(data);
 }
