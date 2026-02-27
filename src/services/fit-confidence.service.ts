@@ -94,7 +94,7 @@ export async function getFitConfidenceFromAPI(
   const token = getUserToken();
   if (!token) return null;
 
-  const res = await fetch(`/api/v1/customer/fit-confidence`, {
+  const res = await fetch(`${API_BASE}/api/v1/customer/fit-confidence`, {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({
@@ -105,7 +105,7 @@ export async function getFitConfidenceFromAPI(
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    console.error('[fit-confidence] API error:', res.status, err);
+    console.log('[fit-confidence] API error:', res.status, err);
     return null;
   }
 
