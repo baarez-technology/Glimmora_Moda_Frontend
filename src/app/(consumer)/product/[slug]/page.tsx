@@ -24,14 +24,23 @@ import {
 } from './components';
 import type { Product } from '@/types';
 
+// Loading overlay shown while modal chunks download
+function ModalLoader() {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal-deep/60 backdrop-blur-sm">
+      <div className="w-8 h-8 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
 // Lazy-load heavy modal components (only loaded when user clicks the button)
 const ImmersiveVisualization = dynamic(
   () => import('@/components/product/ImmersiveVisualization'),
-  { ssr: false }
+  { ssr: false, loading: () => <ModalLoader /> }
 );
 const BodyVisualization = dynamic(
   () => import('@/components/product/BodyVisualization'),
-  { ssr: false }
+  { ssr: false, loading: () => <ModalLoader /> }
 );
 
 interface ProductPageProps {

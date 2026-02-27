@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon, Loader2 } from 'lucide-react';
+import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon, ZoomIn, ZoomOut, Move, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { uploadImageFile, virtualTryOn } from '@/services/upload.service';
 import { Product, BodyVisualizationConfig } from '@/types';
@@ -21,20 +21,28 @@ export default function BodyVisualization({
 }: BodyVisualizationProps) {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [productScale, setProductScale] = useState(0.55);
+  const [productPosition, setProductPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [tryOnImage, setTryOnImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [tryOnError, setTryOnError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
-  const productImage = product.images?.[0]?.url;
 
+const productImage = product.images?.[0]?.url;
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
 
     setUploadedFileName(file.name);
+    // Show brief generating animation
+    setIsGenerating(true);
     setIsUploading(true);
     setTryOnImage(null);
     setTryOnError(null);
@@ -51,6 +59,8 @@ export default function BodyVisualization({
       const reader = new FileReader();
       reader.onload = (ev) => {
         setUploadedImage(ev.target?.result as string);
+      // Simulate AI processing delay
+      setTimeout(() => setIsGenerating(false), 800);
       };
       reader.readAsDataURL(file);
     } finally {
@@ -74,6 +84,8 @@ export default function BodyVisualization({
   const handleReset = () => {
     setUploadedImage(null);
     setUploadedFileName(null);
+    setProductScale(0.55);
+    setProductPosition({ x: 0, y: 0 });
     setTryOnImage(null);
     setTryOnError(null);
     if (fileInputRef.current) {
@@ -81,10 +93,24 @@ export default function BodyVisualization({
     }
   };
 
-  if (!isOpen) return null;
+  const handleZoomIn = () => setProductScale(prev => Math.min(prev + 0.1, 1.2));
+  const handleZoomOut = () => setProductScale(prev => Math.max(prev - 0.1, 0.2));
+
+  // Drag handlers for repositioning the product overlay
+  const handlePointerDown = (e: React.PointerEvent) => {
+    setIsDragging(true);
+    setDragStart({ x: e.clientX - productPosition.x, y: e.clientY - productPosition.y });
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging) return;
+    setProductPosition({ x: e.clientX - dragStart.x, y: e.clientY - dragStart.y });
+  };
+  const handlePointerUp = () => setIsDragging(false);
 
   return (
     <AnimatePresence>
+      {isOpen && (
       <motion.div
         className="fixed inset-0 z-50 flex items-center justify-center"
         initial={{ opacity: 0 }}
@@ -212,7 +238,7 @@ export default function BodyVisualization({
               {tryOnError && !isGenerating && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-red-50 text-red-700 text-xs px-4 py-2 rounded-lg border border-red-200 max-w-xs text-center">
                   {tryOnError}
-                </div>
+                )}
               )}
             </div>
 
@@ -223,7 +249,7 @@ export default function BodyVisualization({
                 <h3 className="font-medium text-charcoal-deep">{product.name}</h3>
                 <p className="text-sm text-stone/70">{product.brandName}</p>
                 <p className="text-lg font-display text-gold-soft mt-1">
-                  ${product.price.toLocaleString()}
+                  {product.currency === 'INR' ? '₹' : product.currency === 'EUR' ? '€' : product.currency === 'GBP' ? '£' : '$'}{product.price.toLocaleString()}
                 </p>
               </div>
 
@@ -241,21 +267,11 @@ export default function BodyVisualization({
                 </div>
               )}
 
-              {/* Uploaded Image Preview */}
+              {/* Upload status */}
               {uploadedImage && (
-                <div>
-                  <label className="text-xs tracking-wider uppercase text-stone/70 mb-2 block">
-                    Your Photo
-                  </label>
-                  <div className="relative aspect-[3/4] w-full rounded-lg overflow-hidden border border-stone/20">
-                    <Image
-                      src={uploadedImage}
-                      alt="Your uploaded photo"
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                  <p className="text-[10px] text-stone/50 mt-1.5 truncate">{uploadedFileName}</p>
+                <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-lg">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                  <p className="text-xs text-emerald-700 flex-1 truncate">{uploadedFileName || 'Photo uploaded'}</p>
                 </div>
               )}
 
@@ -315,9 +331,13 @@ export default function BodyVisualization({
                     <Sparkles className="w-4 h-4 text-gold-soft" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-charcoal-deep mb-1">Personalized Fit</p>
+                    <p className="text-xs font-medium text-charcoal-deep mb-1">
+                      {uploadedImage ? 'Adjust the Fit' : 'Personalized Fit'}
+                    </p>
                     <p className="text-xs text-stone/70 leading-relaxed">
-                      Upload your photo and our AI will show you how this piece looks on you.
+                      {uploadedImage
+                        ? 'Drag the product to reposition it. Use zoom controls to resize for a better fit.'
+                        : 'Upload your photo and see how this piece looks on you. You can drag and resize the product overlay.'}
                     </p>
                   </div>
                 </div>
@@ -326,6 +346,7 @@ export default function BodyVisualization({
           </div>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }
