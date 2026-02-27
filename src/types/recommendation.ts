@@ -60,5 +60,5 @@ export interface RecommendedProduct {
 export interface RecommendedBrand {
   brand_id: string;
   brand_name: string;
-  profile_picture: string;
+  brand_logo: string;
 }
