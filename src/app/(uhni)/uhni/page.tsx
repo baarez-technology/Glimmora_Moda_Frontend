@@ -60,7 +60,12 @@ export default function UHNIDashboardPage() {
     { href: '/uhni/invisible-commerce', icon: EyeOff, label: 'Invisible Commerce', description: 'Discreet transactions' },
     { href: '/uhni/concierge-tasks', icon: ClipboardList, label: 'Concierge Tasks', description: 'Task management' },
     { href: '/uhni/silent-commerce', icon: Radio, label: 'Silent Commerce', description: 'Ambient awareness' },
-    { href: '/profile/body-twin', icon: User, label: 'Body Twin', description: 'Fit profile & measurements' }
+    { href: '/uhni/body-twin', icon: User, label: 'Body Twin', description: 'Fit profile & measurements' },
+    { href: '/uhni/wardrobe', icon: ShoppingBag, label: 'Wardrobe', description: 'Your private collection' },
+    { href: '/uhni/calendar', icon: Calendar, label: 'Style Calendar', description: 'Event outfit planning' },
+    { href: '/uhni/discover', icon: Search, label: 'Discover', description: 'Browse & recommendations' },
+    { href: '/uhni/collections', icon: Layers, label: 'Collections', description: 'Curated selections' },
+    { href: '/uhni/stories', icon: Crown, label: 'Stories', description: 'Heritage & craft narratives' }
   ];
 
   return (
