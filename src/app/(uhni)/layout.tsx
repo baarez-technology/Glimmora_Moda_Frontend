@@ -45,12 +45,14 @@ export default function UHNILayout({
   }
 
   const navLinks = [
+    { href: '/uhni/discover', label: 'Discover' },
     { href: '/uhni/concierge', label: 'Concierge' },
     { href: '/uhni/sourcing', label: 'Sourcing' },
     { href: '/uhni/bespoke', label: 'Bespoke' },
-    { href: '/uhni/autonomous', label: 'Autonomous' },
-    { href: '/cart', label: 'Cart' },
-    { href: '/profile/wishlist', label: 'Wishlist' },
+    { href: '/uhni/wardrobe', label: 'Wardrobe' },
+    { href: '/uhni/calendar', label: 'Calendar' },
+    { href: '/uhni/cart', label: 'Cart' },
+    { href: '/uhni/wishlist', label: 'Wishlist' },
     { href: '/', label: 'Main Site' },
   ];
 
