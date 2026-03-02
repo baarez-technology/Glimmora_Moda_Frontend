@@ -6,6 +6,7 @@ import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palet
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { setUserContext, getStoredUserToken } from '@/services/auth.service';
+import { invalidateRecommendationsCache } from '@/services/recommendation.service';
 
 type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
 
@@ -33,9 +34,15 @@ export default function OnboardingPage() {
       // Check if user has meaningful existing preferences
       const hasPrefs = fashionIdentity.occasions?.length > 0 || fashionIdentity.aesthetics?.length > 0 || fashionIdentity.confidenceLevel;
       if (hasPrefs) {
+        // Filter out stale/invalid IDs that don't match current option sets
+        const validOccasionIds = ['professional', 'social', 'casual', 'formal', 'travel', 'art'];
+        const validAestheticIds = ['minimal', 'classic', 'artistic', 'contemporary'];
+        const filteredOccasions = (fashionIdentity.occasions || []).filter(id => validOccasionIds.includes(id));
+        const filteredAesthetics = (fashionIdentity.aesthetics || []).filter(id => validAestheticIds.includes(id));
+
         setSelections({
-          occasions: fashionIdentity.occasions || [],
-          aesthetics: fashionIdentity.aesthetics || [],
+          occasions: filteredOccasions,
+          aesthetics: filteredAesthetics,
           confidenceLevel: (fashionIdentity.confidenceLevel || '') as 'decisive' | 'guided' | 'advisory' | '',
           budgetRange: fashionIdentity.budgetRange
         });
@@ -123,6 +130,9 @@ export default function OnboardingPage() {
 
             // Update auth context with the fresh user data
             setUserData(updatedUser);
+
+            // Clear cached recommendations so discover page gets fresh personalised results
+            invalidateRecommendationsCache();
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to save preferences';
             showToast(message, 'error');

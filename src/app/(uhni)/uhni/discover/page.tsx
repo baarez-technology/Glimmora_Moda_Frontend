@@ -59,28 +59,27 @@ function DiscoverContent() {
           productParams.user_preferences = {};
           if (selectedOccasions.length) productParams.user_preferences.occasions = selectedOccasions;
           if (selectedMoods.length) {
-            const aestheticsSet = new Set<string>();
-            selectedMoods.forEach((mood) => {
-              switch (mood) {
-                case 'minimal': aestheticsSet.add('minimal'); aestheticsSet.add('minimal-structured'); break;
-                case 'classic': aestheticsSet.add('classic'); aestheticsSet.add('classic-timeless'); break;
-                case 'contemporary': case 'bold': aestheticsSet.add('bold'); aestheticsSet.add('contemporary-statement'); aestheticsSet.add('contemporary'); break;
-                case 'artistic': aestheticsSet.add('artistic'); aestheticsSet.add('art-cultural'); break;
-                default: aestheticsSet.add(mood); break;
-              }
-            });
-            productParams.user_preferences.aesthetics = Array.from(aestheticsSet);
+            // Send aesthetic IDs directly — backend uses the same keys
+            productParams.user_preferences.aesthetics = selectedMoods;
           }
         }
 
-        const [recommendedProducts, recommendedBrands, stories] = await Promise.all([
+        const [productsResult, brandsResult, storiesResult] = await Promise.allSettled([
           getRecommendedProducts(productParams),
           getRecommendedBrands(),
           searchStories(),
         ]);
-        setProducts(recommendedProducts);
-        setBrands(recommendedBrands);
-        setBrandStories(stories);
+
+        if (productsResult.status === 'fulfilled') {
+          setProducts(productsResult.value);
+        } else {
+          console.error('[uhni-discover] Products API failed:', productsResult.reason);
+          setError(productsResult.reason?.message || 'Failed to load products');
+          setProducts([]);
+        }
+
+        setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
+        setBrandStories(storiesResult.status === 'fulfilled' ? storiesResult.value : []);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load data';
         console.error('Failed to load discover page data:', err);
@@ -414,20 +413,18 @@ function DiscoverContent() {
                 {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}`}
+                    href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden mb-4 bg-charcoal-deep">
-                      {product.images[0]?.url && (
-                        <Image
-                          src={product.images[0].url}
-                          alt={product.name}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-105"
-                        />
-                      )}
+                      <Image
+                        src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
                       <div className="absolute inset-0 bg-noir/0 group-hover:bg-noir/20 transition-all duration-500 flex items-center justify-center">
                         <div className={`w-12 h-12 rounded-full bg-gold-soft/20 backdrop-blur-sm flex items-center justify-center transform transition-all duration-500 ${activeProductHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
                           <ArrowRight size={16} className="text-ivory-cream" />

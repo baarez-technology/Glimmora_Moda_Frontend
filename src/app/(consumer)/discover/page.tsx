@@ -27,6 +27,7 @@ function DiscoverContent() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('relevance');
   const [currentPage, setCurrentPage] = useState(1);
   const PRODUCTS_PER_PAGE = 20;
@@ -68,9 +69,6 @@ function DiscoverContent() {
         }
 
         // Map multi-select occasion/aesthetic filters to API user_preferences.
-        // Occasions can be sent through as-is (backend uses same keys).
-        // For aesthetics we expand the simple UI ids into the richer tokens
-        // used by the recommendation engine (e.g. "minimal" → ["minimal", "minimal-structured"]).
         if (selectedOccasions.length || selectedMoods.length) {
           productParams.user_preferences = {};
 
@@ -79,47 +77,37 @@ function DiscoverContent() {
           }
 
           if (selectedMoods.length) {
-            const aestheticsSet = new Set<string>();
-            selectedMoods.forEach((mood) => {
-              switch (mood) {
-                case 'minimal':
-                  aestheticsSet.add('minimal');
-                  aestheticsSet.add('minimal-structured');
-                  break;
-                case 'classic':
-                  aestheticsSet.add('classic');
-                  aestheticsSet.add('classic-timeless');
-                  break;
-                case 'contemporary':
-                case 'bold': // backward-compat if URL/query contains older id
-                  aestheticsSet.add('bold');
-                  aestheticsSet.add('contemporary-statement');
-                  aestheticsSet.add('contemporary');
-                  break;
-                case 'artistic':
-                  aestheticsSet.add('artistic');
-                  aestheticsSet.add('art-cultural');
-                  break;
-                default:
-                  aestheticsSet.add(mood);
-                  break;
-              }
-            });
-
-            productParams.user_preferences.aesthetics = Array.from(aestheticsSet);
+            // Send aesthetic IDs directly — backend uses the same keys
+            productParams.user_preferences.aesthetics = selectedMoods;
           }
         }
 
-        const [recommendedProducts, recommendedBrands, stories] = await Promise.all([
+        setLoadError(null);
+
+        // Fetch products, brands, and stories in parallel.
+        // Use allSettled so a products error doesn't block brands/stories.
+        const [productsResult, brandsResult, storiesResult] = await Promise.allSettled([
           getRecommendedProducts(productParams),
           getRecommendedBrands(),
           searchStories(),
         ]);
-        setProducts(recommendedProducts);
-        setBrands(recommendedBrands);
-        setBrandStories(stories);
+
+        if (productsResult.status === 'fulfilled') {
+          setProducts(productsResult.value);
+          if (productsResult.value.length === 0) {
+            console.warn('[discover] API returned 0 products — check browser console for [products] logs');
+          }
+        } else {
+          console.error('[discover] Products API failed:', productsResult.reason);
+          setLoadError(productsResult.reason?.message || 'Failed to load products');
+          setProducts([]);
+        }
+
+        setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
+        setBrandStories(storiesResult.status === 'fulfilled' ? storiesResult.value : []);
       } catch (error) {
         console.error('Failed to load discover page data:', error);
+        setLoadError(error instanceof Error ? error.message : 'Failed to load products');
       } finally {
         setDataLoading(false);
         setIsLoaded(true);
@@ -136,8 +124,10 @@ function DiscoverContent() {
   };
 
   const filteredProducts = useMemo(() => {
+    // Occasion and mood filters are already sent to the API (server-side filtering).
+    // Only apply text search client-side so we don't double-filter and remove
+    // products that the recommendation engine returned.
     const filtered = products.filter(p => {
-      // Text search is still handled client-side over the recommended set
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const matchesName = p.name.toLowerCase().includes(query);
@@ -145,38 +135,6 @@ function DiscoverContent() {
         const matchesTags = p.tags?.some(tag => tag.toLowerCase().includes(query));
         if (!matchesName && !matchesBrand && !matchesTags) return false;
       }
-
-      if (selectedOccasions.length) {
-        const occasionTags: Record<string, string[]> = {
-          professional: ['professional', 'business', 'office', 'work'],
-          social: ['social', 'event', 'party', 'gathering', 'dinner'],
-          casual: ['casual', 'everyday', 'relaxed', 'weekend'],
-          formal: ['formal', 'black-tie', 'gala', 'evening'],
-          travel: ['travel', 'journey', 'trip', 'versatile', 'comfortable'],
-          art: ['art', 'cultural', 'gallery', 'theatre', 'museum'],
-        };
-        const hasOccasionMatch = selectedOccasions.some((occ) => {
-          const matchTags = occasionTags[occ] || [];
-          return p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
-        });
-        if (!hasOccasionMatch) return false;
-      }
-
-      if (selectedMoods.length) {
-        const moodTags: Record<string, string[]> = {
-          minimal: ['minimal', 'clean', 'structured', 'simple'],
-          classic: ['classic', 'timeless', 'heritage', 'traditional'],
-          contemporary: ['bold', 'contemporary', 'statement', 'modern'],
-          bold: ['bold', 'contemporary', 'statement', 'modern'], // backward-compat
-          artistic: ['art', 'artistic', 'expressive', 'creative', 'cultural', 'unique']
-        };
-        const hasMoodMatch = selectedMoods.some((mood) => {
-          const matchTags = moodTags[mood] || [];
-          return p.tags?.some(tag => matchTags.some(t => tag.toLowerCase().includes(t)));
-        });
-        if (!hasMoodMatch) return false;
-      }
-
       return true;
     });
 
@@ -189,7 +147,7 @@ function DiscoverContent() {
         default: return 0;
       }
     });
-  }, [searchQuery, selectedOccasions, selectedMoods, products, sortBy]);
+  }, [searchQuery, products, sortBy]);
 
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
   const paginatedProducts = useMemo(() => {
@@ -486,14 +444,14 @@ function DiscoverContent() {
                 {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}`}
+                    href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-6">
                       <Image
-                        src={product.images[0]?.url || ''}
+                        src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                         alt={product.name}
                         fill
                         className="object-cover transition-all duration-700 group-hover:scale-105"
@@ -533,16 +491,23 @@ function DiscoverContent() {
               </div>
             ) : (
               <div className="text-center py-32 bg-ivory-cream rounded-sm">
-                <p className="font-display text-2xl text-charcoal-deep mb-4">No pieces found</p>
-                <p className="text-stone mb-8 max-w-md mx-auto">
-                  We couldn't find pieces matching your criteria. Try adjusting your filters to explore more.
+                <p className="font-display text-2xl text-charcoal-deep mb-4">
+                  {loadError ? 'Unable to load products' : 'No pieces found'}
                 </p>
+                <p className="text-stone mb-8 max-w-md mx-auto">
+                  {loadError
+                    ? 'There was a problem connecting to the server. Please check your connection and try again.'
+                    : 'We couldn\'t find pieces matching your criteria. Try adjusting your filters to explore more.'}
+                </p>
+                {loadError && (
+                  <p className="text-xs text-stone/60 mb-6 font-mono">{loadError}</p>
+                )}
                 <button
-                  onClick={clearFilters}
+                  onClick={loadError ? () => window.location.reload() : clearFilters}
                   className="group inline-flex items-center gap-4"
                 >
                   <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep group-hover:text-gold-deep transition-colors">
-                    View All Pieces
+                    {loadError ? 'Retry' : 'View All Pieces'}
                   </span>
                   <span className="w-12 h-12 rounded-full border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
                     <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />

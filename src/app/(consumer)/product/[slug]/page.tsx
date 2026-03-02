@@ -210,6 +210,7 @@ export default function ProductPage({ params }: ProductPageProps) {
   const { slug } = use(params);
   const searchParams = useSearchParams();
   const productIdParam = searchParams.get('productId');
+  const imageParam = searchParams.get('img');
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -225,6 +226,17 @@ export default function ProductPage({ params }: ProductPageProps) {
             ]);
             const matchBrand = brands.find(b => b.id === loaded.brandId);
             const brandName = matchBrand ? matchBrand.name : '';
+            // If API returned no images, use the image from the recommendation card
+            const hasImages = loaded.images.length > 0 &&
+              !loaded.images[0].url.includes('placehold.co');
+            if (!hasImages && imageParam) {
+              loaded.images = [{
+                id: '1',
+                url: decodeURIComponent(imageParam),
+                alt: loaded.name,
+                type: 'hero',
+              }];
+            }
             setProduct({ ...loaded, brandName });
           } catch {
             // Fall back to mock if real API fails

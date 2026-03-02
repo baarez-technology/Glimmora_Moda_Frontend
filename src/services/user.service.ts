@@ -35,8 +35,31 @@ export async function getFashionIdentity(): Promise<ApiResponse<FashionIdentity 
   return apiRequest<FashionIdentity | null>('/api/users/me/fashion-identity', {
     mockHandler: () => {
       try {
+        // 1. Check localStorage (most up-to-date local state)
         const stored = localStorage.getItem('moda-fashion-identity');
-        return stored ? JSON.parse(stored) : mockUser.fashionIdentity ?? null;
+        if (stored) return JSON.parse(stored);
+
+        // 2. Build from backend UserData if available (has real selections)
+        const userData = localStorage.getItem('moda-user-data');
+        if (userData) {
+          const parsed = JSON.parse(userData);
+          if (parsed.occasions?.length || parsed.aesthetics?.length) {
+            return {
+              occasions: parsed.occasions || [],
+              aesthetics: parsed.aesthetics || [],
+              confidenceLevel: 'guided' as const,
+              budgetRange: {
+                min: parsed.minimum_budget ?? 0,
+                max: parsed.maximum_budget ?? 0,
+              },
+              primaryLocation: '',
+              travelDestinations: [],
+            };
+          }
+        }
+
+        // 3. Fall back to mock data (first-time users only)
+        return mockUser.fashionIdentity ?? null;
       } catch { return mockUser.fashionIdentity ?? null; }
     },
   });

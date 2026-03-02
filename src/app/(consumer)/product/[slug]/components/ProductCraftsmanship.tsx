@@ -16,7 +16,7 @@ export default function ProductCraftsmanship({ product }: ProductCraftsmanshipPr
           {/* Image Side */}
           <div className="relative aspect-square lg:aspect-auto">
             <Image
-              src={product.images[Math.min(1, product.images.length - 1)]?.url || product.images[0]?.url || ''}
+              src={product.images[Math.min(1, product.images.length - 1)]?.url || product.images[0]?.url || 'https://placehold.co/800x800/F5F0EB/8B8680?text=No+Image'}
               alt={`${product.name} craftsmanship detail`}
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"

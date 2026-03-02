@@ -56,7 +56,7 @@ export default function ProductMaterials({ product, materialFeel }: ProductMater
           {/* Image Side */}
           <div className="relative aspect-square lg:aspect-auto order-1 lg:order-2">
             <Image
-              src={product.images[Math.min(2, product.images.length - 1)]?.url || product.images[0]?.url || ''}
+              src={product.images[Math.min(2, product.images.length - 1)]?.url || product.images[0]?.url || 'https://placehold.co/800x800/F5F0EB/8B8680?text=No+Image'}
               alt={`${product.name} material detail`}
               fill
               sizes="(max-width: 1024px) 100vw, 50vw"

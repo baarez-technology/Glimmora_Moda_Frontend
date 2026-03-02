@@ -87,6 +87,7 @@ export interface Product {
   description: string;
   narrative: string;
   price: number;
+  originalPrice?: number;
   currency: string;
   images: ProductImage[];
   variants: ProductVariant[];

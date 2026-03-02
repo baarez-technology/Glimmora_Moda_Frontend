@@ -8,10 +8,17 @@ import { products } from './products';
 export const mockFitConfidence: FitConfidence = {
   overallScore: 87,
   suggestedSize: 'FR 38',
+  availableSizes: ['XS', 'S', 'M', 'L', 'XL'],
   breakdown: {
     sizeMatch: 92,
     styleMatch: 85,
     proportionMatch: 84
+  },
+  measurementAnalysis: {
+    chestDifferenceCm: -1.2,
+    waistDifferenceCm: 0.5,
+    shoulderAlignment: 'optimal',
+    sleeveLengthEstimate: 'ideal',
   },
   sizeNotes: [
     'Based on your measurements, size FR 38 should fit comfortably through the shoulders',
@@ -19,7 +26,10 @@ export const mockFitConfidence: FitConfidence = {
     'Sleeve length is optimal for your proportions'
   ],
   returnRisk: 'low',
-  recommendation: 'Based on your Body Twin profile and previous purchases, this piece should fit beautifully. The structured silhouette complements your style preferences for classic tailoring.'
+  returnRiskScore: 8,
+  recommendation: 'Based on your Body Twin profile and previous purchases, this piece should fit beautifully. The structured silhouette complements your style preferences for classic tailoring.',
+  bodyTwinUsed: true,
+  fitEngineVersion: 'mock-v1',
 };
 
 // ============================================

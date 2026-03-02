@@ -10,8 +10,8 @@ export const mockUser: User = {
   email: 'sophia@example.com',
   name: 'Sophia Chen',
   fashionIdentity: {
-    occasions: ['professional', 'social-events', 'art-cultural'],
-    aesthetics: ['classic-timeless', 'minimal-structured'],
+    occasions: ['professional', 'social', 'art'],
+    aesthetics: ['classic', 'minimal'],
     confidenceLevel: 'guided',
     budgetRange: { min: 500, max: 5000 },
     primaryLocation: 'Paris',

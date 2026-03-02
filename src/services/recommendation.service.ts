@@ -23,7 +23,7 @@ import type {
   RecommendedProduct,
   RecommendedBrand,
 } from '@/types/recommendation';
-import { cachedFetch, invalidateCache, fetchWithTimeout } from '@/lib/api-cache';
+import { cachedFetch, invalidateCache, invalidateCacheByPrefix, fetchWithTimeout } from '@/lib/api-cache';
 
 // Cache TTLs
 const BRANDS_TTL = 5 * 60 * 1000;       // 5 min — brands rarely change
@@ -31,6 +31,24 @@ const PRODUCTS_TTL = 2 * 60 * 1000;     // 2 min — products may update more of
 const COLLECTIONS_TTL = 5 * 60 * 1000;  // 5 min
 const STORIES_TTL = 3 * 60 * 1000;      // 3 min
 const PRODUCT_DETAIL_TTL = 2 * 60 * 1000; // 2 min
+
+const PLACEHOLDER_IMAGE = 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image';
+
+/**
+ * Clear all recommendation caches (products, brands, collections, stories).
+ * Call this after the user updates their style preferences so the next
+ * page load fetches fresh personalised results from the backend.
+ */
+export function invalidateRecommendationsCache() {
+  invalidateCacheByPrefix('products');
+  invalidateCache('brands');
+  invalidateCacheByPrefix('collections');
+  invalidateCacheByPrefix('stories');
+}
+
+// In-memory map: productId → image URL from recommendations.
+// Populated when recommendation lists load, used as fallback for product detail.
+const productImageCache = new Map<string, string>();
 
 function getToken(): string | null {
   try {
@@ -74,6 +92,18 @@ function mapToBrand(raw: RecommendedBrand): Brand {
 
 /** Map API product → frontend Product type */
 function mapToProduct(raw: RecommendedProduct): Product {
+  // Flexible image extraction: try image_url, then fallback fields the backend might use
+  const rawAny = raw as unknown as Record<string, unknown>;
+  const imageUrl =
+    raw.image_url ||
+    (rawAny['product_image'] as string) ||
+    (Array.isArray(rawAny['product_images']) && (rawAny['product_images'] as string[])[0]) ||
+    '';
+
+  // Cache the image URL so product detail page can use it as fallback
+  if (imageUrl) {
+    productImageCache.set(raw.product_id, imageUrl);
+  }
   const slug = raw.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   return {
     id: raw.product_id,
@@ -86,9 +116,9 @@ function mapToProduct(raw: RecommendedProduct): Product {
     narrative: '',
     price: raw.price,
     currency: 'INR',
-    images: raw.image_url
-      ? [{ id: '1', url: raw.image_url, alt: raw.product_name, type: 'hero' as const }]
-      : [],
+    images: imageUrl
+      ? [{ id: '1', url: imageUrl, alt: raw.product_name, type: 'hero' as const }]
+      : [{ id: '1', url: PLACEHOLDER_IMAGE, alt: raw.product_name, type: 'hero' as const }],
     variants: [],
     materials: [],
     craftsmanship: [],
@@ -99,7 +129,7 @@ function mapToProduct(raw: RecommendedProduct): Product {
     },
     collection: raw.collection_name,
     category: (raw.product_category as Product['category']) || 'clothing',
-    tags: [...raw.occasions, ...raw.aesthetics],
+    tags: [...(Array.isArray(raw.occasions) ? raw.occasions : []), ...(Array.isArray(raw.aesthetics) ? raw.aesthetics : [])],
     visibility: 'public',
     experienceMode: 'standard',
     pricingVisibility: 'visible',
@@ -120,19 +150,26 @@ function mapToProduct(raw: RecommendedProduct): Product {
  * occasions and aesthetics preferences. Throws on failure.
  */
 export async function getRecommendedBrands(): Promise<Brand[]> {
-  return cachedFetch('brands', async () => {
-    const res = await fetchWithTimeout(`/api/v1/brands/recommendations`, {
-      method: 'GET',
-      headers: authHeaders(),
-    });
+  try {
+    return await cachedFetch('brands', async () => {
+      const res = await fetchWithTimeout(`/api/v1/brands/recommendations`, {
+        method: 'GET',
+        headers: authHeaders(),
+      });
 
-    if (!res.ok) {
-      throw new Error(`Brand recommendations failed: ${res.status}`);
-    }
+      if (!res.ok) {
+        console.log(`[brands] API error: ${res.status}`);
+        throw new Error(`Brands API ${res.status}`);
+      }
 
-    const data: RecommendedBrand[] = await res.json();
-    return data.map(mapToBrand);
-  }, BRANDS_TTL);
+      const data: RecommendedBrand[] = await res.json();
+      console.log(`[brands] Loaded ${data.length} brands`);
+      return data.map(mapToBrand);
+    }, BRANDS_TTL);
+  } catch (err) {
+    console.log('[brands] Error (will not cache):', err);
+    return [];
+  }
 }
 
 // ============================================
@@ -157,6 +194,8 @@ export async function getRecommendedProducts(
   // Cache key includes params so different queries get separate caches
   const cacheKey = `products:${JSON.stringify(body)}`;
 
+  console.log('[products] Request body:', body);
+
   return cachedFetch(cacheKey, async () => {
     const res = await fetchWithTimeout(`/api/v1/products/recommendations`, {
       method: 'POST',
@@ -165,10 +204,31 @@ export async function getRecommendedProducts(
     });
 
     if (!res.ok) {
-      throw new Error(`Product recommendations failed: ${res.status}`);
+      const errBody = await res.text().catch(() => '');
+      console.error(`[products] API error ${res.status}:`, errBody);
+      throw new Error(`Products API error (${res.status})`);
     }
 
     const data: ProductRecommendationResponse = await res.json();
+    if (!data.products_data) {
+      console.warn('[products] API returned no products_data field. Response keys:', Object.keys(data));
+      return [];
+    }
+    if (data.products_data.length > 0) {
+      const sample = data.products_data[0] as unknown as Record<string, unknown>;
+      console.log('[products] Raw API sample:', {
+        product_id: sample.product_id,
+        product_name: sample.product_name,
+        image_url: sample.image_url,
+        product_image: sample.product_image,
+        product_images: sample.product_images,
+        all_keys: Object.keys(sample),
+      });
+      const withImages = data.products_data.filter(p => !!p.image_url).length;
+      console.log(`[products] ${withImages}/${data.products_data.length} have image_url`);
+    } else {
+      console.warn('[products] API returned 0 products for request:', body);
+    }
     return data.products_data.map(mapToProduct);
   }, PRODUCTS_TTL);
 }
@@ -273,18 +333,24 @@ export async function searchStories(params?: StorySearchParams): Promise<BrandSt
   const qs = query.toString();
   const cacheKey = `stories:${qs}`;
 
-  return cachedFetch(cacheKey, async () => {
-    const res = await fetchWithTimeout(`/api/v1/stories/search${qs ? `?${qs}` : ''}`, {
-      headers: authHeaders(),
-    });
+  try {
+    return await cachedFetch(cacheKey, async () => {
+      const res = await fetchWithTimeout(`/api/v1/stories/search${qs ? `?${qs}` : ''}`, {
+        headers: authHeaders(),
+      });
 
-    if (!res.ok) {
-      throw new Error(`Stories search failed: ${res.status}`);
-    }
+      if (!res.ok) {
+        console.log(`[stories] API error: ${res.status}`);
+        return [];
+      }
 
-    const data: ApiStorySearchResult[] = await res.json();
-    return data.map(mapSearchStory);
-  }, STORIES_TTL);
+      const data: ApiStorySearchResult[] = await res.json();
+      return data.map(mapSearchStory);
+    }, STORIES_TTL);
+  } catch (err) {
+    console.log('[stories] Network error:', err);
+    return [];
+  }
 }
 
 /**
@@ -352,18 +418,24 @@ export async function getCollections(brandId?: string): Promise<Collection[]> {
   const qs = query.toString();
   const cacheKey = `collections:${qs}`;
 
-  return cachedFetch(cacheKey, async () => {
-    const res = await fetchWithTimeout(`/api/v1/customer/collections${qs ? `?${qs}` : ''}`, {
-      headers: authHeaders(),
-    });
+  try {
+    return await cachedFetch(cacheKey, async () => {
+      const res = await fetchWithTimeout(`/api/v1/customer/collections${qs ? `?${qs}` : ''}`, {
+        headers: authHeaders(),
+      });
 
-    if (!res.ok) {
-      throw new Error(`Collections fetch failed: ${res.status}`);
-    }
+      if (!res.ok) {
+        console.log(`[collections] API error: ${res.status}`);
+        return [];
+      }
 
-    const data: ApiCollection[] = await res.json();
-    return data.map(mapToCollection);
-  }, COLLECTIONS_TTL);
+      const data: ApiCollection[] = await res.json();
+      return data.map(mapToCollection);
+    }, COLLECTIONS_TTL);
+  } catch (err) {
+    console.log('[collections] Network error:', err);
+    return [];
+  }
 }
 
 // ============================================
@@ -376,12 +448,16 @@ interface ApiProductDetail {
   product_name: string;
   sku: string;
   price: number;
+  offer_price?: number | null;
+  discount_percentage?: number | null;
   collection_name: string;
   status: string;
   tagline: string;
   product_description: string;
   product_images: string[];
-  product_image: string;
+  product_image: string | null;
+  sizes?: string[];
+  color_based_images_mapping?: { color: string; hex: string; images: string[] }[];
   regional_stocks: {
     stock_id: string;
     city: string;
@@ -397,27 +473,37 @@ interface ApiProductDetail {
     conversion_rate: number;
   };
   ai_metadata: {
-    product_category: string;
-    color: string;
-    pattern: string;
-    fabrics: string;
+    product_category?: string;
+    color?: string;
+    pattern?: string;
+    fabrics?: string;
   };
   occasions: string[];
   aesthetics: string[];
   is_low_stock: boolean;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at: string | { $date: string };
+  updated_at: string | { $date: string };
 }
 
 function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   const slug = raw.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-  // Build variants from backend data with fallback defaults
+  // Build variants from backend data
   const variants: Product['variants'] = [];
 
-  // Color variant from ai_metadata
-  if (raw.ai_metadata?.color) {
+  // Colors from color_based_images_mapping (real API data) or fallback to ai_metadata
+  if (raw.color_based_images_mapping && raw.color_based_images_mapping.length > 0) {
+    raw.color_based_images_mapping.forEach((cm) => {
+      variants.push({
+        id: `color-${cm.color.toLowerCase().replace(/\s+/g, '-')}`,
+        type: 'color',
+        name: cm.color,
+        value: cm.hex || '#8B8680',
+        available: true,
+      });
+    });
+  } else if (raw.ai_metadata?.color) {
     const colorName = raw.ai_metadata.color;
     const colorMap: Record<string, string> = {
       black: '#000000', white: '#FFFFFF', red: '#C41E3A', blue: '#1E3A5F',
@@ -426,7 +512,7 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
       gold: '#C9A962', silver: '#C0C0C0', tan: '#D2B48C', ivory: '#FFFFF0',
       burgundy: '#800020', olive: '#556B2F', camel: '#C19A6B', charcoal: '#36454F',
     };
-    const colorValue = colorMap[colorName.toLowerCase()] || '#8B8680';
+    const colorValue = colorMap[colorName.toLowerCase()] || colorName;
     variants.push({
       id: `color-${colorName.toLowerCase()}`,
       type: 'color',
@@ -436,11 +522,13 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     });
   }
 
-  // Default size variants (backend doesn't provide sizes yet)
-  const defaultSizes = ['XS', 'S', 'M', 'L', 'XL'];
-  defaultSizes.forEach((size) => {
+  // Sizes from real API data or fallback defaults
+  const sizes = raw.sizes && raw.sizes.length > 0
+    ? raw.sizes
+    : ['XS', 'S', 'M', 'L', 'XL'];
+  sizes.forEach((size) => {
     variants.push({
-      id: `size-${size.toLowerCase()}`,
+      id: `size-${size.toLowerCase().replace(/\s+/g, '-')}`,
       type: 'size',
       name: size,
       value: size,
@@ -448,18 +536,36 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     });
   });
 
+  // Build images list: product_images > color images > product_image > recommendation cache > placeholder
+  let imageUrls = raw.product_images?.filter(Boolean) || [];
+  if (imageUrls.length === 0 && raw.color_based_images_mapping) {
+    imageUrls = raw.color_based_images_mapping.flatMap(cm => cm.images || []).filter(Boolean);
+  }
+  if (imageUrls.length === 0 && raw.product_image) {
+    imageUrls = [raw.product_image];
+  }
+  if (imageUrls.length === 0) {
+    const cachedImg = productImageCache.get(raw.product_id);
+    if (cachedImg) {
+      imageUrls = [cachedImg];
+    } else {
+      imageUrls = [PLACEHOLDER_IMAGE];
+    }
+  }
+
   return {
     id: raw.product_id,
     brandId: raw.brand_id,
     brandName: brandName || '',
     name: raw.product_name,
     slug,
-    tagline: raw.tagline,
-    description: raw.product_description,
+    tagline: raw.tagline || '',
+    description: raw.product_description || '',
     narrative: '',
-    price: raw.price,
+    price: raw.offer_price || raw.price,
+    originalPrice: raw.offer_price ? raw.price : undefined,
     currency: 'INR',
-    images: raw.product_images.map((url, i) => ({
+    images: imageUrls.map((url, i) => ({
       id: String(i + 1),
       url,
       alt: raw.product_name,
@@ -483,7 +589,7 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     },
     collection: raw.collection_name,
     category: (raw.ai_metadata?.product_category as Product['category']) || 'clothing',
-    tags: [...raw.occasions, ...raw.aesthetics],
+    tags: [...(Array.isArray(raw.occasions) ? raw.occasions : []), ...(Array.isArray(raw.aesthetics) ? raw.aesthetics : [])],
     visibility: 'public',
     experienceMode: 'standard',
     pricingVisibility: 'visible',
@@ -514,6 +620,14 @@ export async function getProductDetail(productId: string, brandName?: string): P
     }
 
     const data: ApiProductDetail = await res.json();
+    console.log('[product-detail] Raw API:', {
+      product_id: data.product_id,
+      product_images: data.product_images,
+      product_image: data.product_image,
+      sizes: data.sizes,
+      color_based_images_mapping: data.color_based_images_mapping?.map(c => ({ color: c.color, imageCount: c.images?.length })),
+      offer_price: data.offer_price,
+    });
     return mapProductDetail(data, brandName);
   }, PRODUCT_DETAIL_TTL);
 }

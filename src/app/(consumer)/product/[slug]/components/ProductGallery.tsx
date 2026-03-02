@@ -4,6 +4,8 @@ import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Product } from '@/types';
 
+const PLACEHOLDER_IMAGE = 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image';
+
 interface ProductGalleryProps {
   product: Product;
   activeImage: number;
@@ -26,7 +28,7 @@ export default function ProductGallery({
       {/* Main Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-parchment group">
         <Image
-          src={product.images[activeImage]?.url || ''}
+          src={product.images[activeImage]?.url || PLACEHOLDER_IMAGE}
           alt={product.name}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
@@ -86,7 +88,7 @@ export default function ProductGallery({
               aria-label={`View image ${index + 1}`}
             >
               <Image
-                src={image.url}
+                src={image.url || PLACEHOLDER_IMAGE}
                 alt={image.alt}
                 fill
                 sizes="(max-width: 1024px) 25vw, 12vw"

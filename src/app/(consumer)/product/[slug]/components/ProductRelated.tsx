@@ -50,7 +50,7 @@ export default function ProductRelated({ products, brand }: ProductRelatedProps)
             >
               <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream/10 mb-5">
                 <Image
-                  src={item.images[0]?.url || ''}
+                  src={item.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                   alt={item.name}
                   fill
                   sizes="(max-width: 768px) 50vw, 25vw"

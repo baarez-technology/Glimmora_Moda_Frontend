@@ -270,7 +270,7 @@ export default function WardrobePage() {
                           onMouseLeave={() => setActiveHover(null)}
                         >
                           <Image
-                            src={item.product.images[0]?.url || ''}
+                            src={item.product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                             alt={item.product.name}
                             fill
                             className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -330,7 +330,7 @@ export default function WardrobePage() {
                           onMouseLeave={() => setActiveHover(null)}
                         >
                           <Image
-                            src={item.product.images[0]?.url || ''}
+                            src={item.product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                             alt={item.product.name}
                             fill
                             className="object-cover transition-transform duration-700 group-hover:scale-105"

@@ -255,14 +255,14 @@ export default function BrandPage({ params }: BrandPageProps) {
                 {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}`}
+                    href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden bg-parchment mb-3">
                       <Image
-                        src={product.images[0]?.url}
+                        src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                         alt={product.name}
                         fill
                         sizes="(max-width: 768px) 50vw, 25vw"
@@ -343,7 +343,7 @@ export default function BrandPage({ params }: BrandPageProps) {
                 >
                   <div className="relative aspect-[16/10] overflow-hidden bg-parchment mb-4">
                     <Image
-                      src={collection.heroImage}
+                      src={collection.heroImage || 'https://placehold.co/800x500/F5F0EB/8B8680?text=Collection'}
                       alt={collection.name}
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
@@ -385,7 +385,7 @@ export default function BrandPage({ params }: BrandPageProps) {
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
                     <Image
-                      src={story.heroImage}
+                      src={story.heroImage || 'https://placehold.co/800x500/F5F0EB/8B8680?text=Story'}
                       alt={story.title}
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"

@@ -250,12 +250,12 @@ export default function HomePage() {
             {/* Left - Large Featured Product */}
             {featuredProducts[0] && (
               <Link
-                href={`/product/${featuredProducts[0].slug}?productId=${featuredProducts[0].id}`}
+                href={`/product/${featuredProducts[0].slug}?productId=${featuredProducts[0].id}&img=${encodeURIComponent(featuredProducts[0].images[0]?.url || '')}`}
                 className="group"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-5">
                   <Image
-                    src={featuredProducts[0].images[0]?.url || ''}
+                    src={featuredProducts[0].images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                     alt={featuredProducts[0].name}
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
@@ -283,12 +283,12 @@ export default function HomePage() {
               {featuredProducts.slice(1, 5).map((product) => (
                 <Link
                   key={product.id}
-                  href={`/product/${product.slug}?productId=${product.id}`}
+                  href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
                   className="group"
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-3">
                     <Image
-                      src={product.images[0]?.url || ''}
+                      src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
                       alt={product.name}
                       fill
                       sizes="(max-width: 768px) 50vw, 25vw"

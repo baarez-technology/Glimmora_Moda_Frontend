@@ -60,19 +60,26 @@ export function useWardrobeState({ showToast, safeLocalStorageSave }: UseWardrob
   const [wardrobe, setWardrobe] = useState<WardrobeItem[]>([]);
 
   const initializeWardrobe = useCallback((_storedWardrobe: string | null) => {
-    // Try real API first, fall back to localStorage
-    getWardrobe().then(apiItems => {
-      if (apiItems.length > 0) {
-        setWardrobe(apiItems.map(mapApiWardrobeItem));
-      } else if (_storedWardrobe) {
-        setWardrobe(JSON.parse(_storedWardrobe));
-      }
-    }).catch(() => {
-      // API failed — use localStorage
-      if (_storedWardrobe) {
-        setWardrobe(JSON.parse(_storedWardrobe));
-      }
-    });
+    // Only call the consumer wardrobe API if there's a consumer token.
+    // On the brand portal there's no consumer token, so skip the API call.
+    const hasConsumerToken = !!localStorage.getItem('moda-user-token');
+
+    if (hasConsumerToken) {
+      getWardrobe().then(apiItems => {
+        if (apiItems.length > 0) {
+          setWardrobe(apiItems.map(mapApiWardrobeItem));
+        } else if (_storedWardrobe) {
+          setWardrobe(JSON.parse(_storedWardrobe));
+        }
+      }).catch(() => {
+        // API failed — use localStorage
+        if (_storedWardrobe) {
+          setWardrobe(JSON.parse(_storedWardrobe));
+        }
+      });
+    } else if (_storedWardrobe) {
+      setWardrobe(JSON.parse(_storedWardrobe));
+    }
   }, []);
 
   const addToWardrobe = useCallback((product: Product, options?: { color?: string; size?: string; quantity?: number }) => {

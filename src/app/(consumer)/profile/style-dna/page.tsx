@@ -3,19 +3,28 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Palette, Sparkles, Target, MapPin, Compass, Pencil, Save, X } from 'lucide-react';
+import { ArrowLeft, Palette, Sparkles, Target, MapPin, Compass, Pencil, Save, X, Briefcase, Users, Sun, Star, Plane } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { setUserContext, getStoredUserToken } from '@/services/auth.service';
+import { invalidateRecommendationsCache } from '@/services/recommendation.service';
 import type { FashionIdentity } from '@/types';
 
+// Must match the onboarding IDs and backend API expectations
 const ALL_OCCASIONS = [
-  'everyday', 'work', 'formal', 'casual', 'evening',
-  'weekend', 'travel', 'sport', 'date', 'wedding'
+  { id: 'professional', label: 'Professional', icon: Briefcase },
+  { id: 'social', label: 'Social Events', icon: Users },
+  { id: 'casual', label: 'Casual Daily', icon: Sun },
+  { id: 'formal', label: 'Formal', icon: Star },
+  { id: 'travel', label: 'Travel', icon: Plane },
+  { id: 'art', label: 'Art & Culture', icon: Palette },
 ];
 
 const ALL_AESTHETICS = [
-  'minimalist', 'classic', 'bohemian', 'streetwear', 'romantic',
-  'edgy', 'preppy', 'avant-garde', 'vintage', 'athleisure'
+  { id: 'minimal', label: 'Minimal & Structured' },
+  { id: 'classic', label: 'Classic & Timeless' },
+  { id: 'artistic', label: 'Artistic & Expressive' },
+  { id: 'contemporary', label: 'Bold & Contemporary' },
 ];
 
 const CONFIDENCE_OPTIONS: { value: FashionIdentity['confidenceLevel']; label: string; description: string }[] = [
@@ -58,10 +67,11 @@ export default function StyleDNAPage() {
     if (!fashionIdentity) return;
     switch (section) {
       case 'occasions':
-        setDraftOccasions([...fashionIdentity.occasions]);
+        // Filter to only valid IDs to prevent ghost entries
+        setDraftOccasions(fashionIdentity.occasions.filter(id => ALL_OCCASIONS.some(o => o.id === id)));
         break;
       case 'aesthetics':
-        setDraftAesthetics([...fashionIdentity.aesthetics]);
+        setDraftAesthetics(fashionIdentity.aesthetics.filter(id => ALL_AESTHETICS.some(a => a.id === id)));
         break;
       case 'confidence':
         setDraftConfidence(fashionIdentity.confidenceLevel);
@@ -92,7 +102,7 @@ export default function StyleDNAPage() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [editingSection]);
 
-  const saveSection = useCallback((section: EditingSection) => {
+  const saveSection = useCallback(async (section: EditingSection) => {
     if (!fashionIdentity || !section) return;
 
     let updated: FashionIdentity;
@@ -144,8 +154,26 @@ export default function StyleDNAPage() {
         return;
     }
 
+    // Update local state + localStorage
     updateFashionIdentity(updated);
     setEditingSection(null);
+
+    // Sync occasions/aesthetics/budget to the backend so recommendations update
+    const token = getStoredUserToken();
+    if (token) {
+      try {
+        await setUserContext({
+          occasions: updated.occasions,
+          aesthetics: updated.aesthetics,
+          minimum_budget: updated.budgetRange?.min ?? 0,
+          maximum_budget: updated.budgetRange?.max ?? 0,
+        });
+        // Clear cached recommendations so next page visit gets fresh results
+        invalidateRecommendationsCache();
+      } catch (err) {
+        console.log('[style-dna] Failed to sync preferences to backend:', err);
+      }
+    }
   }, [fashionIdentity, draftOccasions, draftAesthetics, draftConfidence, draftBudgetMin, draftBudgetMax, draftPrimaryLocation, draftTravelDestinations, updateFashionIdentity, showToast]);
 
   const toggleOccasion = (occasion: string) => {
@@ -275,17 +303,17 @@ export default function StyleDNAPage() {
               {editingSection === 'occasions' ? (
                 <div>
                   <div className="flex flex-wrap gap-3">
-                    {ALL_OCCASIONS.map(occasion => (
+                    {ALL_OCCASIONS.map(option => (
                       <button
-                        key={occasion}
-                        onClick={() => toggleOccasion(occasion)}
-                        className={`px-4 py-2 text-sm tracking-[0.05em] capitalize transition-colors border ${
-                          draftOccasions.includes(occasion)
+                        key={option.id}
+                        onClick={() => toggleOccasion(option.id)}
+                        className={`px-4 py-2 text-sm tracking-[0.05em] transition-colors border ${
+                          draftOccasions.includes(option.id)
                             ? 'bg-charcoal-deep text-ivory-cream border-charcoal-deep'
                             : 'bg-parchment text-stone border-sand hover:border-charcoal-deep hover:text-charcoal-deep'
                         }`}
                       >
-                        {occasion}
+                        {option.label}
                       </button>
                     ))}
                   </div>
@@ -298,7 +326,7 @@ export default function StyleDNAPage() {
                       key={occasion}
                       className="px-4 py-2 bg-parchment text-charcoal-deep text-sm tracking-[0.05em] capitalize"
                     >
-                      {occasion}
+                      {ALL_OCCASIONS.find(o => o.id === occasion)?.label || occasion}
                     </span>
                   ))}
                 </div>
@@ -323,17 +351,17 @@ export default function StyleDNAPage() {
               {editingSection === 'aesthetics' ? (
                 <div>
                   <div className="flex flex-wrap gap-3">
-                    {ALL_AESTHETICS.map(aesthetic => (
+                    {ALL_AESTHETICS.map(option => (
                       <button
-                        key={aesthetic}
-                        onClick={() => toggleAesthetic(aesthetic)}
-                        className={`px-4 py-2 text-sm tracking-[0.05em] capitalize transition-colors border ${
-                          draftAesthetics.includes(aesthetic)
+                        key={option.id}
+                        onClick={() => toggleAesthetic(option.id)}
+                        className={`px-4 py-2 text-sm tracking-[0.05em] transition-colors border ${
+                          draftAesthetics.includes(option.id)
                             ? 'bg-charcoal-deep text-ivory-cream border-charcoal-deep'
                             : 'bg-gold-soft/10 text-stone border-gold-soft/30 hover:border-charcoal-deep hover:text-charcoal-deep'
                         }`}
                       >
-                        {aesthetic}
+                        {option.label}
                       </button>
                     ))}
                   </div>
@@ -346,7 +374,7 @@ export default function StyleDNAPage() {
                       key={aesthetic}
                       className="px-4 py-2 bg-gold-soft/10 text-gold-deep text-sm tracking-[0.05em] capitalize"
                     >
-                      {aesthetic}
+                      {ALL_AESTHETICS.find(a => a.id === aesthetic)?.label || aesthetic}
                     </span>
                   ))}
                 </div>
