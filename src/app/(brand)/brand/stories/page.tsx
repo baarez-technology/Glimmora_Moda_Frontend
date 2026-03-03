@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, BookOpen, Clock, CheckCircle, FileText, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { Plus, BookOpen, Clock, CheckCircle, FileText, Trash2, Pencil, Loader2, Upload, Download, ChevronDown, FileJson, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import { fetchStories, softDeleteStory } from '@/services/brand-story.service';
+import { fetchStories, softDeleteStory, exportStoriesFromBackend } from '@/services/brand-story.service';
 import type { StoryResponse } from '@/services/brand-story.service';
+import BulkUploadModal from '@/components/brand/BulkUploadModal';
 
 type StoryType = 'heritage' | 'craftsmanship' | 'collection' | 'artisan';
 type FilterTab = 'all' | 'deleted' | StoryType;
@@ -18,6 +19,11 @@ export default function BrandStoriesPage() {
   const [filter, setFilter] = useState<FilterTab>('all');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | 'excel' | null>(null);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadStories();
@@ -114,17 +120,83 @@ export default function BrandStoriesPage() {
     { value: 'deleted', label: 'Deleted' }
   ];
 
+  const handleExport = async (format: 'json' | 'csv' | 'excel') => {
+    setShowExportMenu(false);
+    setExportingFormat(format);
+    setError(null);
+    try {
+      await exportStoriesFromBackend(format);
+      setExportToast(`Export complete — downloading as ${format.toUpperCase()}`);
+      setTimeout(() => setExportToast(null), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      {/* Export dropdown */}
+      <div className="relative" ref={exportMenuRef}>
+        <button
+          onClick={() => !exportingFormat && setShowExportMenu(v => !v)}
+          disabled={!!exportingFormat}
+          className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {exportingFormat
+            ? <Loader2 size={15} className="animate-spin" />
+            : <Download size={15} />}
+          {exportingFormat ? 'Exporting…' : 'Export'}
+          {!exportingFormat && <ChevronDown size={13} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />}
+        </button>
+        {showExportMenu && (
+          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-30">
+            <div className="px-4 py-2 border-b border-sand/40">
+              <p className="text-[10px] tracking-[0.1em] uppercase text-taupe">Via backend · S3</p>
+            </div>
+            <button
+              onClick={() => handleExport('json')}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left"
+            >
+              <FileJson size={14} className="text-gold-muted" /> Export as JSON
+            </button>
+            <button
+              onClick={() => handleExport('csv')}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left"
+            >
+              <FileText size={14} className="text-info" /> Export as CSV
+            </button>
+            <button
+              onClick={() => handleExport('excel')}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left"
+            >
+              <FileSpreadsheet size={14} className="text-success" /> Export as Excel
+            </button>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => setShowUploadModal(true)}
+        className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide"
+      >
+        <Upload size={15} />
+        Import Stories
+      </button>
+      <PrimaryButton href="/brand/stories/new" icon={Plus}>
+        Create Story
+      </PrimaryButton>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div>
         <BrandPageHeader
           title="Brand Stories"
           subtitle="Loading..."
-          actions={
-            <PrimaryButton href="/brand/stories/new" icon={Plus}>
-              Create Story
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-taupe" />
@@ -139,11 +211,7 @@ export default function BrandStoriesPage() {
         <BrandPageHeader
           title="Brand Stories"
           subtitle="Error"
-          actions={
-            <PrimaryButton href="/brand/stories/new" icon={Plus}>
-              Create Story
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="p-8 text-center">
           <p className="text-error mb-4">{error}</p>
@@ -163,14 +231,21 @@ export default function BrandStoriesPage() {
       <BrandPageHeader
         title="Brand Stories"
         subtitle={`${filteredStories.length} stor${filteredStories.length !== 1 ? 'ies' : 'y'}`}
-        actions={
-          <PrimaryButton href="/brand/stories/new" icon={Plus}>
-            Create Story
-          </PrimaryButton>
-        }
+        actions={headerActions}
       />
 
       <div className="p-8 space-y-6">
+        {/* Export success toast */}
+        {exportToast && (
+          <div className="flex items-center justify-between gap-4 px-4 py-3 bg-success/8 border border-success/25 text-success text-sm">
+            <div className="flex items-center gap-2">
+              <Download size={15} className="shrink-0" />
+              <span>{exportToast}</span>
+            </div>
+            <button onClick={() => setExportToast(null)} className="text-success/60 hover:text-success transition-colors text-lg leading-none">×</button>
+          </div>
+        )}
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
           {filterTabs.map(tab => (
@@ -325,6 +400,17 @@ export default function BrandStoriesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showUploadModal && (
+        <BulkUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => {
+            setShowUploadModal(false);
+            loadStories();
+          }}
+        />
       )}
     </div>
   );

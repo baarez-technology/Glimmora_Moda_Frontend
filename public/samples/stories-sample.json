@@ -1,0 +1,85 @@
+[
+  {
+    "title": "From Herzogenaurach to the World",
+    "story_type": "heritage",
+    "story_type_subtype": "",
+    "excerpt": "How PUMA evolved from a small German sports brand into a global icon of sport and street culture.",
+    "image_url": "https://cdn.shopify.com/s/files/1/1439/9726/files/Ecom-Organza-Flower-Red-Front.jpg?v=1768410566",
+    "content": [
+      {
+        "id": "section-1772010882617",
+        "type": "text",
+        "content": "PUMA was founded in Herzogenaurach, Germany, and grew from a small athletic footwear company into one of the most recognized sports brands worldwide. Over decades, it built credibility in football, motorsport, and athletics while shaping street culture."
+      },
+      {
+        "id": "section-1772010891532",
+        "type": "quote",
+        "content": "\"Forever Faster is not just a slogan — it is a mindset embedded in our DNA.\"",
+        "caption": "John Smith"
+      },
+      {
+        "id": "section-1772010912082",
+        "type": "timeline",
+        "content": "1948 – PUMA founded in Germany\n1968 – Olympic gold moments elevate brand visibility\n1998 – Motorsport expansion accelerates\n2020+ – Global performance & lifestyle dominance"
+      }
+    ],
+    "product_list": [
+      "69a16f0e4f84a9586300ae1e",
+      "2004737573",
+      "975995650"
+    ],
+    "status": "published",
+    "sections": 3,
+    "read_time": 1
+  },
+  {
+    "title": "The Art of Handcrafted Leather",
+    "story_type": "craftsmanship",
+    "story_type_subtype": "leather-goods",
+    "excerpt": "A journey into the meticulous craft of hand-stitched leather goods passed down through three generations of artisans.",
+    "image_url": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800",
+    "content": [
+      {
+        "id": "section-1001",
+        "type": "text",
+        "content": "Every piece begins with the careful selection of full-grain leather, sourced from tanneries that have served master craftsmen for over a century."
+      },
+      {
+        "id": "section-1002",
+        "type": "quote",
+        "content": "\"A bag crafted by hand carries the soul of its maker.\"",
+        "caption": "Maria Conti, Master Artisan"
+      }
+    ],
+    "product_list": [
+      "69a16f0e4f84a9586300ae1f",
+      "1234567890"
+    ],
+    "status": "draft",
+    "sections": 2,
+    "read_time": 1
+  },
+  {
+    "title": "Summer 2025 Collection Launch",
+    "story_type": "collection",
+    "story_type_subtype": "",
+    "excerpt": "Discover the inspiration behind our most vibrant collection yet — a celebration of Mediterranean light and colour.",
+    "image_url": "https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=800",
+    "content": [
+      {
+        "id": "section-2001",
+        "type": "text",
+        "content": "Inspired by the golden hour along the Amalfi Coast, our Summer 2025 collection blends flowing silhouettes with bold, sun-kissed hues."
+      },
+      {
+        "id": "section-2002",
+        "type": "timeline",
+        "content": "January – Concept sketches finalized\nMarch – Fabric sourcing complete\nMay – Final collection revealed\nJune – Global launch"
+      }
+    ],
+    "product_list": [],
+    "status": "draft",
+    "sections": 2,
+    "read_time": 1
+  }
+]
