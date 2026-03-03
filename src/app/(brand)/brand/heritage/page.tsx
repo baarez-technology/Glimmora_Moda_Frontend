@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2, Pencil, Loader2 } from 'lucide-react';
+import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2, Pencil, Loader2, Upload, Download, ChevronDown, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import { fetchHeritageEvents, softDeleteHeritageEvent } from '@/services/brand-heritage.service';
+import { fetchHeritageEvents, softDeleteHeritageEvent, exportHeritageEvents } from '@/services/brand-heritage.service';
 import type { HeritageEventResponse } from '@/services/brand-heritage.service';
+import HeritageUploadModal from '@/components/brand/HeritageUploadModal';
 
 type SignificanceType = 'milestone' | 'collection' | 'innovation' | 'cultural' | 'collaboration' | 'award';
 type FilterTab = 'all' | 'deleted' | SignificanceType;
@@ -17,6 +18,11 @@ export default function HeritagePage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | 'excel' | null>(null);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadEvents();
@@ -58,6 +64,21 @@ export default function HeritagePage() {
       loadEvents();
     } catch (err) {
       console.error('Failed to delete:', err);
+    }
+  };
+
+  const handleExport = async (format: 'json' | 'csv' | 'excel') => {
+    setShowExportMenu(false);
+    setExportingFormat(format);
+    setError(null);
+    try {
+      const result = await exportHeritageEvents(format);
+      setExportToast(`Exported ${result.total_records} event${result.total_records !== 1 ? 's' : ''} as ${format.toUpperCase()}`);
+      setTimeout(() => setExportToast(null), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -119,17 +140,68 @@ export default function HeritagePage() {
     { value: 'deleted', label: 'Deleted' }
   ];
 
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      {/* Export dropdown */}
+      <div className="relative" ref={exportMenuRef}>
+        <button
+          onClick={() => !exportingFormat && setShowExportMenu(v => !v)}
+          disabled={!!exportingFormat}
+          className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {exportingFormat
+            ? <Loader2 size={15} className="animate-spin" />
+            : <Download size={15} />}
+          {exportingFormat ? 'Exporting…' : 'Export'}
+          {!exportingFormat && <ChevronDown size={13} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />}
+        </button>
+        {showExportMenu && (
+          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-30">
+            <div className="px-4 py-2 border-b border-sand/40">
+              <p className="text-[10px] tracking-[0.1em] uppercase text-taupe">Via backend · S3</p>
+            </div>
+            <button
+              onClick={() => handleExport('json')}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left"
+            >
+              <FileJson size={14} className="text-gold-muted" /> Export as JSON
+            </button>
+            <button
+              onClick={() => handleExport('csv')}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left"
+            >
+              <FileText size={14} className="text-info" /> Export as CSV
+            </button>
+            <button
+              onClick={() => handleExport('excel')}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left"
+            >
+              <FileSpreadsheet size={14} className="text-success" /> Export as Excel
+            </button>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => setShowUploadModal(true)}
+        className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide"
+      >
+        <Upload size={15} />
+        Upload Events
+      </button>
+      <PrimaryButton href="/brand/heritage/new" icon={Plus}>
+        Add Event
+      </PrimaryButton>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div>
         <BrandPageHeader
           title="Brand Heritage"
           subtitle="Loading..."
-          actions={
-            <PrimaryButton href="/brand/heritage/new" icon={Plus}>
-              Add Event
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-taupe" />
@@ -144,11 +216,7 @@ export default function HeritagePage() {
         <BrandPageHeader
           title="Brand Heritage"
           subtitle="Error"
-          actions={
-            <PrimaryButton href="/brand/heritage/new" icon={Plus}>
-              Add Event
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="p-8 text-center">
           <p className="text-error mb-4">{error}</p>
@@ -168,11 +236,7 @@ export default function HeritagePage() {
       <BrandPageHeader
         title="Brand Heritage"
         subtitle={`${sortedEvents.length} heritage event${sortedEvents.length !== 1 ? 's' : ''}`}
-        actions={
-          <PrimaryButton href="/brand/heritage/new" icon={Plus}>
-            Add Event
-          </PrimaryButton>
-        }
+        actions={headerActions}
       />
 
       <div className="p-8 space-y-6">
@@ -293,6 +357,18 @@ export default function HeritagePage() {
       </div>
 
       {/* Delete Confirmation Modal */}
+      {/* Export success toast */}
+      {exportToast && (
+        <div className="mx-8 mb-2 flex items-center justify-between gap-4 px-4 py-3 bg-success/8 border border-success/25 text-success text-sm">
+          <div className="flex items-center gap-2">
+            <Download size={15} className="shrink-0" />
+            <span>{exportToast}</span>
+          </div>
+          <button onClick={() => setExportToast(null)} className="text-success/60 hover:text-success transition-colors text-lg leading-none">×</button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-noir/40">
           <div className="bg-white p-8 max-w-md w-full mx-4 border border-sand">
@@ -319,6 +395,14 @@ export default function HeritagePage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showUploadModal && (
+        <HeritageUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => { setShowUploadModal(false); loadEvents(); }}
+        />
       )}
     </div>
   );
