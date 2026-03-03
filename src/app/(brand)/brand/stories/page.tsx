@@ -125,8 +125,8 @@ export default function BrandStoriesPage() {
     setExportingFormat(format);
     setError(null);
     try {
-      await exportStoriesFromBackend(format);
-      setExportToast(`Export complete — downloading as ${format.toUpperCase()}`);
+      const result = await exportStoriesFromBackend(format);
+      setExportToast(`Exported ${result.total_records} stor${result.total_records !== 1 ? 'ies' : 'y'} as ${format.toUpperCase()}`);
       setTimeout(() => setExportToast(null), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Export failed');

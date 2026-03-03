@@ -5,10 +5,10 @@ import {
   X, Upload, FileJson, FileSpreadsheet, FileText,
   Download, CheckCircle, AlertCircle, Loader2, CloudUpload,
 } from 'lucide-react';
-import { uploadMultipleStories, downloadStorySample } from '@/services/brand-story.service';
-import type { MultiStoryUploadResult } from '@/services/brand-story.service';
+import { importHeritageEvents, downloadHeritageSample } from '@/services/brand-heritage.service';
+import type { HeritageImportResult } from '@/services/brand-heritage.service';
 
-interface BulkUploadModalProps {
+interface HeritageUploadModalProps {
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -16,13 +16,20 @@ interface BulkUploadModalProps {
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 type SampleFormat = 'json' | 'csv' | 'excel';
 
+function detectFileType(file: File): 'json' | 'csv' | 'excel' {
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'json') return 'json';
+  if (ext === 'csv') return 'csv';
+  return 'excel';
+}
+
 const ACCEPTED_EXTENSIONS = '.json,.csv,.xlsx,.xls';
 
-export default function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalProps) {
+export default function HeritageUploadModal({ onClose, onSuccess }: HeritageUploadModalProps) {
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>('idle');
-  const [result, setResult] = useState<MultiStoryUploadResult | null>(null);
+  const [result, setResult] = useState<HeritageImportResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [downloadingFormat, setDownloadingFormat] = useState<SampleFormat | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,7 +70,8 @@ export default function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalP
     setUploadState('uploading');
     setErrorMessage(null);
     try {
-      const res = await uploadMultipleStories(selectedFile);
+      const fileType = detectFileType(selectedFile);
+      const res = await importHeritageEvents(selectedFile, fileType);
       setResult(res);
       setUploadState('success');
       onSuccess();
@@ -76,9 +84,9 @@ export default function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalP
   const handleDownloadSample = async (format: SampleFormat) => {
     setDownloadingFormat(format);
     try {
-      await downloadStorySample(format);
+      await downloadHeritageSample(format);
     } catch {
-      // silently ignore — S3 URL fetch failed
+      // silently ignore
     } finally {
       setDownloadingFormat(null);
     }
@@ -103,8 +111,8 @@ export default function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalP
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-sand/50">
           <div>
-            <h2 className="font-display text-base text-charcoal-deep tracking-wide">Bulk Upload Stories</h2>
-            <p className="text-xs text-stone mt-0.5">Upload multiple stories at once via JSON, CSV, or Excel</p>
+            <h2 className="font-display text-base text-charcoal-deep tracking-wide">Bulk Upload Heritage Events</h2>
+            <p className="text-xs text-stone mt-0.5">Upload multiple events at once via JSON, CSV, or Excel</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-taupe hover:text-charcoal-deep transition-colors">
             <X size={18} />
@@ -179,17 +187,16 @@ export default function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalP
             <div className="p-4 bg-success/5 border border-success/20 space-y-2">
               <div className="flex items-start gap-2 text-success">
                 <CheckCircle size={15} className="mt-0.5 shrink-0" />
-                <p className="text-sm font-medium">{result.message}</p>
+                <p className="text-sm font-medium">
+                  {result.imported} event{result.imported !== 1 ? 's' : ''} imported successfully
+                </p>
               </div>
               <div className="pl-6 space-y-1">
                 <p className="text-xs text-stone">
-                  <span className="font-medium text-charcoal-deep">{result.inserted_count}</span> stor{result.inserted_count !== 1 ? 'ies' : 'y'} created
+                  <span className="font-medium text-charcoal-deep">{result.imported}</span> imported ·{' '}
+                  <span className="font-medium text-charcoal-deep">{result.skipped}</span> skipped ·{' '}
+                  <span className="font-medium text-charcoal-deep">{result.total_in_file}</span> total in file
                 </p>
-                {result.story_ids.length > 0 && (
-                  <p className="text-[11px] text-taupe font-mono break-all">
-                    IDs: {result.story_ids.slice(0, 3).join(', ')}{result.story_ids.length > 3 ? ` +${result.story_ids.length - 3} more` : ''}
-                  </p>
-                )}
               </div>
             </div>
           )}
@@ -243,13 +250,11 @@ export default function BulkUploadModal({ onClose, onSuccess }: BulkUploadModalP
           </div>
 
           <p className="text-[11px] text-taupe leading-relaxed">
-            Each row (or object in JSON) represents one story. Required:{' '}
-            <span className="font-medium text-stone">title</span>,{' '}
-            <span className="font-medium text-stone">story_type</span>,{' '}
-            <span className="font-medium text-stone">excerpt</span>.{' '}
-            <span className="font-medium text-stone">content</span> must be a JSON array of sections.{' '}
-            <span className="font-medium text-stone">product_list</span> is an optional JSON array of product IDs.
-            Samples are served from the server — <span className="font-medium text-stone">sections</span> and <span className="font-medium text-stone">read_time</span> are auto-computed on import.
+            Required fields:{' '}
+            <span className="font-medium text-stone">year</span>,{' '}
+            <span className="font-medium text-stone">title</span>.{' '}
+            Rows missing either are skipped.{' '}
+            <span className="font-medium text-stone">product_list</span> is a plain comma-separated string in CSV/Excel (e.g. <span className="font-mono">id1, id2</span>).
           </p>
         </div>
       </div>
