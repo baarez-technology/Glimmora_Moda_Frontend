@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Zap, Search, Gem, Phone, Mail, MessageCircle, Layers, Sparkles, Archive, DollarSign, Globe } from 'lucide-react';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Phone, Mail, MessageCircle, Layers } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
@@ -14,7 +14,7 @@ import type { User } from '@/types';
 export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated, isLoggingOut, userData: authUserData, setUserData } = useAuth();
-  const { considerations, wardrobe, calendarEvents, orders, isUHNI, concierge, sourcingRequests, bespokeOrders, autonomousSettings, fashionIdentity } = useApp();
+  const { wardrobe, calendarEvents, orders, isUHNI, concierge, fashionIdentity } = useApp();
   const [mockUserData, setMockUserData] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
@@ -53,6 +53,13 @@ export default function ProfilePage() {
     return null;
   })();
 
+  // UHNI users get their own dashboard — redirect away from consumer profile
+  useEffect(() => {
+    if (isHydrated && isAuthenticated && isUHNI) {
+      router.replace('/uhni');
+    }
+  }, [isUHNI, isHydrated, isAuthenticated, router]);
+
   // Redirect to login if not authenticated (but not during logout - let Header handle navigation)
   useEffect(() => {
     if (isHydrated && !isAuthenticated && !isLoggingOut) {
@@ -90,6 +97,9 @@ export default function ProfilePage() {
       refreshUser();
     }
   }, [isHydrated, isAuthenticated, authUserData, setUserData]);
+
+  // UHNI users are being redirected — prevent flash of consumer content
+  if (isUHNI) return null;
 
   // Show loading while checking auth or loading user data
   if (!isHydrated || !isAuthenticated || !user) {
@@ -138,66 +148,6 @@ export default function ProfilePage() {
     },
   ];
 
-  // UHNI-exclusive nav items
-  const uhniNavItems = isUHNI ? [
-    {
-      href: '/uhni/concierge',
-      icon: Crown,
-      title: 'Personal Concierge',
-      subtitle: concierge?.name || 'Your dedicated advisor',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/autonomous',
-      icon: Zap,
-      title: 'Autonomous Shopping',
-      subtitle: autonomousSettings?.enabled ? 'Active' : 'Configure',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/sourcing',
-      icon: Search,
-      title: 'Private Sourcing',
-      subtitle: sourcingRequests.length > 0 ? `${sourcingRequests.length} active` : 'Request items',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/bespoke',
-      icon: Gem,
-      title: 'Bespoke Orders',
-      subtitle: bespokeOrders.length > 0 ? `${bespokeOrders.length} in progress` : 'Commission pieces',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/private-collections',
-      icon: Sparkles,
-      title: 'Private Collections',
-      subtitle: '4 collections available',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/heritage-archive',
-      icon: Archive,
-      title: 'Heritage Archive',
-      subtitle: '5 brands',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/pricing',
-      icon: DollarSign,
-      title: 'Private Pricing',
-      subtitle: '3 offers available',
-      isUHNI: true,
-    },
-    {
-      href: '/uhni/global-sourcing',
-      icon: Globe,
-      title: 'Global Sourcing',
-      subtitle: '3 active searches',
-      isUHNI: true,
-    },
-  ] : [];
-
   // Settings at the end
   const settingsItem = {
     href: '/profile/settings',
@@ -206,13 +156,7 @@ export default function ProfilePage() {
     subtitle: 'Account & preferences',
   };
 
-  const navItems: Array<{
-    href: string;
-    icon: typeof ShoppingBag;
-    title: string;
-    subtitle: string;
-    isUHNI?: boolean;
-  }> = [...baseNavItems, ...uhniNavItems, settingsItem];
+  const navItems = [...baseNavItems, settingsItem];
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -290,9 +234,26 @@ export default function ProfilePage() {
           <div className="grid lg:grid-cols-3 gap-12 lg:gap-16">
             {/* Left Column - Navigation */}
             <div className="lg:col-span-1">
+              <div className="lg:sticky lg:top-[108px] lg:max-h-[calc(100vh-124px)] lg:overflow-y-auto lg:pr-2 scrollbar-thin">
               <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
                 Quick Access
               </span>
+
+              {/* UHNI access banner */}
+              {isUHNI && (
+                <div className="mb-6 p-5 bg-charcoal-deep flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <Crown size={14} className="text-gold-soft flex-shrink-0" />
+                    <p className="text-xs tracking-wider text-ivory-cream">You have UHNI access</p>
+                  </div>
+                  <Link
+                    href="/uhni"
+                    className="text-xs tracking-[0.15em] uppercase text-gold-soft hover:text-ivory-cream transition-colors flex-shrink-0"
+                  >
+                    Go to UHNI Dashboard →
+                  </Link>
+                </div>
+              )}
 
               <nav className="space-y-1">
                 {navItems.map((item) => (
@@ -349,6 +310,7 @@ export default function ProfilePage() {
                   </Link>
                 </div>
               )}
+              </div>
             </div>
 
             {/* Right Column */}

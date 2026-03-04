@@ -7,6 +7,14 @@ export function middleware(request: NextRequest) {
   // Get user tier from cookie or header (for now, we'll use a workaround with localStorage check on client)
   // In a real app, this would check an HTTP-only cookie with session token
 
+  // Legacy profile routes → redirect to UHNI equivalents
+  if (pathname === '/profile/silent-cart') {
+    return NextResponse.redirect(new URL('/uhni/zero-ui', request.url));
+  }
+  if (pathname === '/profile/vip-access') {
+    return NextResponse.redirect(new URL('/uhni/private-collections', request.url));
+  }
+
   // UHNI portal routes (/uhni/*) are tier-gated:
   // - Client-side: (uhni)/layout.tsx reads userTier from AuthContext and redirects non-UHNI users
   // - Server-side (future): Replace this with JWT/session cookie check for userTier === 'uhni'
@@ -20,6 +28,8 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/uhni/:path*'
+    '/uhni/:path*',
+    '/profile/silent-cart',
+    '/profile/vip-access',
   ]
 };

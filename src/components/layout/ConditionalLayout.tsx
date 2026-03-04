@@ -10,6 +10,7 @@ export default function ConditionalLayout({ children }: { children: React.ReactN
 
   // Hide header/footer on auth, onboarding, and brand portal pages
   // These pages have their own internal navigation/layout
+  // UHNI portal keeps the consumer Header/Footer for consistent UI
   const isAuthPage = pathname?.startsWith('/auth');
   const isOnboardingPage = pathname?.startsWith('/onboarding');
   const isBrandPortal = pathname?.startsWith('/brand');

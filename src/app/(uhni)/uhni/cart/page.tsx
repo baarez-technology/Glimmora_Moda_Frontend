@@ -80,38 +80,43 @@ export default function UHNICartPage() {
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const itemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-noir flex items-center justify-center">
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-gold-soft border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sand text-sm">Loading your private bag...</p>
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-taupe text-sm">Loading your private bag...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-noir">
-      {/* Header */}
-      <section className="border-b border-gold-soft/10">
-        <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 py-10">
-          <div className="flex items-center gap-2 mb-3">
-            <Crown size={14} className="text-gold-soft" />
-            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft">
-              {itemCount} {itemCount === 1 ? 'piece' : 'pieces'} curated
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1]">
-              Your Private Bag
-            </h1>
+    <div className="min-h-screen bg-ivory-cream">
+      {/* Hero Header */}
+      <section className="bg-charcoal-deep py-16 lg:py-20">
+        <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
+          <Link href="/uhni" className="inline-flex items-center gap-2 text-xs tracking-wider text-sand/50 hover:text-sand transition-colors mb-8">
+            ← Back to Dashboard
+          </Link>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Crown size={13} className="text-gold-soft" />
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/60">
+                  {itemCount} {itemCount === 1 ? 'piece' : 'pieces'} ready to acquire
+                </span>
+              </div>
+              <h1 className="font-display text-[clamp(2rem,4vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-2">
+                Your Private Bag
+              </h1>
+              <p className="text-taupe text-sm">Review your selections before proceeding to checkout.</p>
+            </div>
             <div className="flex items-center gap-4">
               {cartItems.length > 0 && (
                 <button
                   onClick={() => setShowClearAll(true)}
-                  className="flex items-center gap-2 text-sm text-sand hover:text-red-400 transition-colors"
+                  className="flex items-center gap-2 text-sand/50 hover:text-red-400 transition-colors"
                   title="Clear all items"
                 >
                   <Trash2 size={14} />
@@ -120,7 +125,7 @@ export default function UHNICartPage() {
               )}
               <button
                 onClick={fetchCart}
-                className="flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors"
+                className="flex items-center gap-2 text-sand/50 hover:text-sand transition-colors"
                 title="Refresh"
               >
                 <RefreshCw size={14} />
@@ -133,9 +138,9 @@ export default function UHNICartPage() {
       {/* Error Banner */}
       {error && (
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 pt-6">
-          <div className="p-4 bg-red-900/20 border border-red-500/30 text-red-300 text-sm flex items-center justify-between">
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={fetchCart} className="text-red-200 underline text-xs uppercase tracking-wider">
+            <button onClick={fetchCart} className="text-red-600 underline text-xs uppercase tracking-wider">
               Retry
             </button>
           </div>
@@ -153,13 +158,13 @@ export default function UHNICartPage() {
                   <div
                     key={item.cart_id}
                     className={`flex gap-6 md:gap-8 py-8 ${
-                      index !== cartItems.length - 1 ? 'border-b border-gold-soft/10' : ''
+                      index !== cartItems.length - 1 ? 'border-b border-sand/50' : ''
                     } ${removingId === item.cart_id ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     {/* Product Image */}
                     <Link
                       href={productHref(item.product_id, item.product_name)}
-                      className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-charcoal-deep"
+                      className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-parchment"
                     >
                       {item.image_urls[0] ? (
                         <Image
@@ -170,7 +175,7 @@ export default function UHNICartPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <ShoppingBag size={24} className="text-gold-soft/40" />
+                          <ShoppingBag size={24} className="text-stone" />
                         </div>
                       )}
                     </Link>
@@ -180,7 +185,7 @@ export default function UHNICartPage() {
                       <div className="flex justify-between items-start gap-4">
                         <div>
                           <Link href={productHref(item.product_id, item.product_name)}>
-                            <h3 className="font-display text-xl md:text-2xl text-ivory-cream hover:text-gold-soft transition-colors">
+                            <h3 className="font-display text-xl md:text-2xl text-charcoal-deep hover:text-stone transition-colors">
                               {item.product_name}
                             </h3>
                           </Link>
@@ -188,7 +193,7 @@ export default function UHNICartPage() {
                         <button
                           onClick={() => handleRemove(item.cart_id)}
                           disabled={removingId === item.cart_id}
-                          className="w-10 h-10 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream transition-all flex-shrink-0"
+                          className="w-10 h-10 flex items-center justify-center border border-sand/50 text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-all flex-shrink-0"
                           aria-label="Remove item"
                         >
                           <X size={16} />
@@ -198,12 +203,12 @@ export default function UHNICartPage() {
                       {/* Variants */}
                       <div className="flex gap-3 mt-4">
                         {item.size && (
-                          <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
+                          <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-sand/50 text-stone">
                             Size: {item.size}
                           </span>
                         )}
                         {item.color && (
-                          <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
+                          <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-sand/50 text-stone">
                             Color: {item.color}
                           </span>
                         )}
@@ -211,25 +216,25 @@ export default function UHNICartPage() {
 
                       {/* Price & Quantity */}
                       <div className="flex items-center justify-between mt-6">
-                        <p className="font-display text-xl text-ivory-cream">
+                        <p className="font-display text-xl text-charcoal-deep">
                           €{(item.price * item.quantity).toLocaleString()}
                         </p>
                         <div className="flex items-center gap-3">
                           <button
                             onClick={() => handleQuantityChange(item.cart_id, item.quantity - 1)}
                             disabled={item.quantity <= 1 || updatingQtyId === item.cart_id}
-                            className="w-8 h-8 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="w-8 h-8 flex items-center justify-center border border-sand/50 text-stone hover:border-charcoal-deep hover:text-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                             aria-label="Decrease quantity"
                           >
                             <Minus size={14} />
                           </button>
-                          <span className="text-sm font-medium text-ivory-cream w-6 text-center">
+                          <span className="text-sm font-medium text-charcoal-deep w-6 text-center">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() => handleQuantityChange(item.cart_id, item.quantity + 1)}
                             disabled={updatingQtyId === item.cart_id}
-                            className="w-8 h-8 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                            className="w-8 h-8 flex items-center justify-center border border-sand/50 text-stone hover:border-charcoal-deep hover:text-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                             aria-label="Increase quantity"
                           >
                             <Plus size={14} />
@@ -243,22 +248,22 @@ export default function UHNICartPage() {
 
               {/* Summary Sidebar */}
               <div className="lg:col-span-1">
-                <div className="sticky top-32 bg-charcoal-deep border border-gold-soft/10 p-8">
+                <div className="sticky top-[108px] bg-white border border-sand/50 p-8">
                   <div className="flex items-center gap-2 mb-6">
-                    <Crown size={14} className="text-gold-soft" />
-                    <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50">
+                    <Crown size={12} className="text-gold-soft" />
+                    <span className="text-[10px] tracking-[0.4em] uppercase text-stone">
                       Private Summary
                     </span>
                   </div>
 
                   {/* Items */}
-                  <div className="space-y-3 border-b border-gold-soft/10 pb-6 mb-6">
+                  <div className="space-y-3 border-b border-sand/50 pb-6 mb-6">
                     {cartItems.map((item) => (
                       <div key={item.cart_id} className="flex justify-between text-sm">
-                        <span className="text-sand truncate pr-4">
+                        <span className="text-taupe truncate pr-4">
                           {item.product_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
                         </span>
-                        <span className="text-ivory-cream flex-shrink-0">
+                        <span className="text-charcoal-deep flex-shrink-0">
                           €{(item.price * item.quantity).toLocaleString()}
                         </span>
                       </div>
@@ -266,45 +271,45 @@ export default function UHNICartPage() {
                   </div>
 
                   {/* Subtotals */}
-                  <div className="space-y-3 border-b border-gold-soft/10 pb-6 mb-6">
+                  <div className="space-y-3 border-b border-sand/50 pb-6 mb-6">
                     <div className="flex justify-between text-sm">
-                      <span className="text-sand">Subtotal</span>
-                      <span className="text-ivory-cream">€{total.toLocaleString()}</span>
+                      <span className="text-taupe">Subtotal</span>
+                      <span className="text-charcoal-deep">€{total.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-sand">White-Glove Delivery</span>
-                      <span className="text-gold-soft">Complimentary</span>
+                      <span className="text-taupe">White-Glove Delivery</span>
+                      <span className="text-gold-soft text-xs tracking-wide uppercase">Complimentary</span>
                     </div>
                   </div>
 
                   {/* Total */}
-                  <div className="flex justify-between items-end mb-10">
-                    <span className="text-[10px] tracking-[0.3em] uppercase text-sand">Total</span>
-                    <span className="font-display text-3xl text-ivory-cream">
+                  <div className="flex justify-between items-end mb-8">
+                    <span className="text-[10px] tracking-[0.3em] uppercase text-stone">Total</span>
+                    <span className="font-display text-3xl text-charcoal-deep">
                       €{total.toLocaleString()}
                     </span>
                   </div>
 
                   {/* Actions */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <Link
                       href="/checkout"
-                      className="group w-full py-4 px-6 bg-gold-soft text-noir flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-deep"
+                      className="group w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-charcoal-deep/80"
                     >
-                      <span className="text-sm tracking-[0.15em] uppercase font-medium">Proceed to Checkout</span>
+                      <span className="text-sm tracking-[0.15em] uppercase">Proceed to Checkout</span>
                       <ArrowRight size={16} />
                     </Link>
 
                     <Link
                       href="/uhni/private-shopping"
-                      className="group w-full py-4 px-6 border border-gold-soft/30 text-gold-soft flex items-center justify-center gap-3 transition-all duration-300 hover:border-gold-soft hover:bg-gold-soft/10"
+                      className="group w-full py-4 px-6 border border-sand/50 text-stone flex items-center justify-center gap-3 transition-all duration-300 hover:border-charcoal-deep hover:text-charcoal-deep"
                     >
                       <span className="text-sm tracking-[0.15em] uppercase">Private Shopping</span>
                     </Link>
                   </div>
 
-                  {/* Premium Trust Indicators */}
-                  <div className="mt-8 pt-8 border-t border-gold-soft/10">
+                  {/* Trust Indicators */}
+                  <div className="mt-8 pt-8 border-t border-sand/50">
                     <div className="space-y-3">
                       {[
                         'White-glove delivery & presentation',
@@ -312,8 +317,8 @@ export default function UHNICartPage() {
                         'Personal concierge support',
                         'Discreet, secure transaction',
                       ].map((text) => (
-                        <div key={text} className="flex items-center gap-2 text-xs text-sand/60">
-                          <Shield size={12} className="text-gold-soft/40" />
+                        <div key={text} className="flex items-center gap-2 text-xs text-stone">
+                          <Shield size={12} className="text-stone flex-shrink-0" />
                           <span>{text}</span>
                         </div>
                       ))}
@@ -325,26 +330,26 @@ export default function UHNICartPage() {
           ) : (
             /* Empty State */
             <div className="max-w-xl mx-auto text-center py-20">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gold-soft/10 rounded-full mb-6">
-                <ShoppingBag size={32} className="text-gold-soft/60" />
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-parchment mb-6">
+                <ShoppingBag size={32} className="text-stone" />
               </div>
-              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-ivory-cream leading-[1.1] mb-4">
+              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1.1] mb-4">
                 Your Private Bag is Empty
               </h2>
-              <p className="text-sand mb-12 max-w-md mx-auto">
+              <p className="text-taupe mb-10 max-w-md mx-auto">
                 Your concierge can curate selections for you, or explore private collections to find extraordinary pieces.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/uhni/concierge"
-                  className="inline-flex items-center gap-3 px-8 py-4 bg-gold-soft text-noir hover:bg-gold-deep transition-colors"
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-charcoal-deep/80 transition-colors"
                 >
-                  <Crown size={16} />
-                  <span className="text-sm tracking-[0.15em] uppercase font-medium">Ask Concierge</span>
+                  <Crown size={14} className="text-gold-soft" />
+                  <span className="text-sm tracking-[0.15em] uppercase">Ask Concierge</span>
                 </Link>
                 <Link
                   href="/uhni/private-collections"
-                  className="inline-flex items-center gap-3 px-8 py-4 border border-gold-soft/30 text-gold-soft hover:border-gold-soft transition-colors"
+                  className="inline-flex items-center gap-3 px-8 py-4 border border-sand/50 text-charcoal-deep hover:border-charcoal-deep transition-colors"
                 >
                   <span className="text-sm tracking-[0.15em] uppercase">Private Collections</span>
                 </Link>

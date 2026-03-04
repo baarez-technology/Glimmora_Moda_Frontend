@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Heart, X, Share2, ArrowLeft, ArrowRight, RefreshCw, ShoppingBag, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -13,7 +14,8 @@ import type { WishlistItem } from '@/services/customer-collection.service';
 
 export default function WishlistPage() {
   const { isAuthenticated, isHydrated } = useAuth();
-  const { showToast, refreshWishlist, refreshCart } = useApp();
+  const { showToast, refreshWishlist, refreshCart, isUHNI } = useApp();
+  const router = useRouter();
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -37,12 +39,13 @@ export default function WishlistPage() {
   }, []);
 
   useEffect(() => {
+    if (isUHNI) { router.replace('/uhni/wishlist'); return; }
     if (isHydrated && isAuthenticated) {
       fetchWishlist();
     } else if (isHydrated) {
       setLoading(false);
     }
-  }, [isHydrated, isAuthenticated, fetchWishlist]);
+  }, [isUHNI, router, isHydrated, isAuthenticated, fetchWishlist]);
 
   const handleRemove = async (wishlistId: string) => {
     setRemovingId(wishlistId);
@@ -109,6 +112,8 @@ export default function WishlistPage() {
       </div>
     );
   }
+
+  if (isUHNI) return null;
 
   return (
     <div className="min-h-screen bg-parchment">
