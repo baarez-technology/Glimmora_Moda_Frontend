@@ -13,22 +13,92 @@ import {
   Package,
   CheckCircle,
   Star,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Trash2,
+  Plus,
+  Check,
+  Send
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import type { SourcingRequestStatus, SourcingRequestType } from '@/types/uhni';
 
+function MessageInput({ onSend }: { onSend: (msg: string) => void }) {
+  const [value, setValue] = useState('');
+  return (
+    <div className="flex gap-2">
+      <input
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter' && value.trim()) {
+            onSend(value.trim());
+            setValue('');
+          }
+        }}
+        placeholder="Message the client..."
+        className="flex-1 border border-sand px-3 py-2 text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+      />
+      <button
+        onClick={() => {
+          if (value.trim()) {
+            onSend(value.trim());
+            setValue('');
+          }
+        }}
+        className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
+      >
+        <Send size={14} />
+      </button>
+    </div>
+  );
+}
+
+const statusFlow: Record<string, string[]> = {
+  pending: ['sourcing'],
+  sourcing: ['options_found'],
+  options_found: ['awaiting_approval'],
+  awaiting_approval: ['acquired'],
+  acquired: ['delivered'],
+  delivered: [],
+  cancelled: [],
+};
+
 export default function SourcingRequestDetailPage() {
   const params = useParams();
-  const { getSourcingRequestById, submitSourcingOption } = useBrand();
+  const {
+    getSourcingRequestById,
+    submitSourcingOption,
+    updateSourcingStatus,
+    addSourcingOption,
+    removeSourcingOption,
+    sendSourcingMessage,
+  } = useBrand();
+
   const [showSubmitForm, setShowSubmitForm] = useState(false);
-  const [formData, setFormData] = useState({
+  const [showAddOptionForm, setShowAddOptionForm] = useState(false);
+  const [statusNote, setStatusNote] = useState('');
+
+  // Legacy submit form
+  const [legacyForm, setLegacyForm] = useState({
     description: '',
     price: '',
     condition: 'new' as 'new' | 'like_new' | 'excellent' | 'good',
     source: '',
     recommendation: ''
+  });
+
+  // New option form
+  const [optionForm, setOptionForm] = useState({
+    title: '',
+    brandName: '',
+    description: '',
+    price: '',
+    sourceLocation: '',
+    estimatedDelivery: '',
+    imageUrl: '',
+    notes: '',
   });
 
   const requestId = params.id as string;
@@ -48,47 +118,33 @@ export default function SourcingRequestDetailPage() {
     );
   }
 
-  const formatCurrency = (value: number) => {
-    return `€${value.toLocaleString()}`;
-  };
+  const formatCurrency = (value: number) => `€${value.toLocaleString()}`;
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+      year: 'numeric', month: 'long', day: 'numeric'
     });
   };
 
   const getDaysUntilDeadline = (deadline?: string) => {
     if (!deadline) return null;
-    const deadlineDate = new Date(deadline);
-    const now = new Date();
-    const days = Math.ceil((deadlineDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
     return days;
   };
 
   const getStatusBadge = (status: SourcingRequestStatus) => {
     switch (status) {
-      case 'pending':
-        return 'bg-warning/10 text-warning';
-      case 'sourcing':
-        return 'bg-info/10 text-info';
-      case 'options_found':
-        return 'bg-gold-soft/20 text-gold-deep';
-      case 'awaiting_approval':
-        return 'bg-champagne/30 text-gold-muted';
-      case 'acquired':
-      case 'delivered':
-        return 'bg-success/10 text-success';
-      case 'cancelled':
-        return 'bg-error/10 text-error';
-      default:
-        return 'bg-taupe/20 text-stone';
+      case 'pending': return 'bg-warning/10 text-warning';
+      case 'sourcing': return 'bg-info/10 text-info';
+      case 'options_found': return 'bg-gold-soft/20 text-gold-deep';
+      case 'awaiting_approval': return 'bg-champagne/30 text-gold-muted';
+      case 'acquired': case 'delivered': return 'bg-success/10 text-success';
+      case 'cancelled': return 'bg-error/10 text-error';
+      default: return 'bg-taupe/20 text-stone';
     }
   };
 
-  const getStatusLabel = (status: SourcingRequestStatus) => {
+  const getStatusLabel = (status: string) => {
     return status.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
@@ -96,44 +152,52 @@ export default function SourcingRequestDetailPage() {
     return type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   };
 
-  const getConditionBadge = (condition: string) => {
-    switch (condition) {
-      case 'new':
-        return 'bg-success/10 text-success';
-      case 'like_new':
-        return 'bg-info/10 text-info';
-      case 'excellent':
-        return 'bg-gold-soft/20 text-gold-deep';
-      case 'good':
-        return 'bg-warning/10 text-warning';
-      default:
-        return 'bg-taupe/20 text-stone';
+  const getPriorityBadge = (priority?: string) => {
+    switch (priority) {
+      case 'urgent': return 'bg-error/10 text-error';
+      case 'when_available': return 'bg-parchment text-stone';
+      default: return 'bg-info/10 text-info';
     }
   };
 
   const daysUntilDeadline = getDaysUntilDeadline(request.deadline);
-  const canSubmit = request.status === 'pending' || request.status === 'sourcing';
+  const canSubmitLegacy = request.status === 'pending' || request.status === 'sourcing';
+  const canAddOptions = request.status === 'sourcing' || request.status === 'options_found';
+  const nextStatuses = statusFlow[request.status] || [];
+  const selectedOption = request.foundOptions.find(o => o.id === request.selectedOptionId);
 
-  const handleSubmitOption = () => {
-    if (!formData.description || !formData.price) return;
-
+  const handleLegacySubmit = () => {
+    if (!legacyForm.description || !legacyForm.price) return;
     submitSourcingOption(requestId, {
-      customDescription: formData.description,
-      price: parseFloat(formData.price),
-      condition: formData.condition,
-      source: formData.source || undefined,
-      conciergeRecommendation: formData.recommendation || undefined
+      customDescription: legacyForm.description,
+      price: parseFloat(legacyForm.price),
+      condition: legacyForm.condition,
+      source: legacyForm.source || undefined,
+      conciergeRecommendation: legacyForm.recommendation || undefined
     });
-
-    // Reset form and hide it
-    setFormData({
-      description: '',
-      price: '',
-      condition: 'new',
-      source: '',
-      recommendation: ''
-    });
+    setLegacyForm({ description: '', price: '', condition: 'new', source: '', recommendation: '' });
     setShowSubmitForm(false);
+  };
+
+  const handleAddOption = () => {
+    if (!optionForm.title || !optionForm.price) return;
+    addSourcingOption(requestId, {
+      title: optionForm.title,
+      brandName: optionForm.brandName || undefined,
+      description: optionForm.description || undefined,
+      price: parseFloat(optionForm.price),
+      sourceLocation: optionForm.sourceLocation || undefined,
+      estimatedDelivery: optionForm.estimatedDelivery || undefined,
+      imageUrl: optionForm.imageUrl || undefined,
+      notes: optionForm.notes || undefined,
+    });
+    setOptionForm({ title: '', brandName: '', description: '', price: '', sourceLocation: '', estimatedDelivery: '', imageUrl: '', notes: '' });
+    setShowAddOptionForm(false);
+  };
+
+  const handleStatusUpdate = (newStatus: string) => {
+    updateSourcingStatus(requestId, newStatus as SourcingRequestStatus, statusNote || `Status updated to ${getStatusLabel(newStatus)}`);
+    setStatusNote('');
   };
 
   return (
@@ -161,20 +225,27 @@ export default function SourcingRequestDetailPage() {
               <p className="text-xs opacity-80">Status: {getStatusLabel(request.status)}</p>
             </div>
           </div>
-          {request.deadline && daysUntilDeadline !== null && (
-            <div className="flex items-center gap-2">
-              <Clock size={16} />
-              <span className="text-sm">
-                {daysUntilDeadline > 0 ? `${daysUntilDeadline} days until deadline` : 'Deadline passed'}
+          <div className="flex items-center gap-3">
+            {request.priority && (
+              <span className={`px-2.5 py-1 text-[10px] tracking-[0.1em] uppercase ${getPriorityBadge(request.priority)}`}>
+                {request.priority === 'when_available' ? 'When Available' : request.priority}
               </span>
-            </div>
-          )}
+            )}
+            {request.deadline && daysUntilDeadline !== null && (
+              <div className="flex items-center gap-2">
+                <Clock size={16} />
+                <span className="text-sm">
+                  {daysUntilDeadline > 0 ? `${daysUntilDeadline} days until deadline` : 'Deadline passed'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Request Details */}
+            {/* SECTION A: Request Details */}
             <div className="bg-white border border-sand/50">
               <div className="px-6 py-4 border-b border-sand/50">
                 <h2 className="font-medium text-charcoal-deep">Request Details</h2>
@@ -185,6 +256,20 @@ export default function SourcingRequestDetailPage() {
                   <p className="text-sm text-charcoal-deep leading-relaxed">{request.description}</p>
                 </div>
 
+                {request.category && (
+                  <div className="pt-4 border-t border-sand/30">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Category</p>
+                    <p className="text-sm text-charcoal-deep">{request.category}</p>
+                  </div>
+                )}
+
+                {request.specifications && (
+                  <div className="pt-4 border-t border-sand/30">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Specifications</p>
+                    <p className="text-sm text-charcoal-deep">{request.specifications}</p>
+                  </div>
+                )}
+
                 {request.occasion && (
                   <div className="pt-4 border-t border-sand/30">
                     <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Occasion</p>
@@ -192,51 +277,199 @@ export default function SourcingRequestDetailPage() {
                   </div>
                 )}
 
-                {request.referenceImages && request.referenceImages.length > 0 && (
-                  <div className="pt-4 border-t border-sand/30">
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Reference Images</p>
-                    <div className="flex gap-3">
-                      {request.referenceImages.map((img, index) => (
-                        <div key={index} className="w-24 h-24 bg-parchment">
-                          <img src={img} alt={`Reference ${index + 1}`} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                    </div>
+                <div className="pt-4 border-t border-sand/30 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Client</p>
+                    <p className="text-sm text-charcoal-deep">UHNI Client</p>
                   </div>
-                )}
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Submitted</p>
+                    <p className="text-sm text-charcoal-deep">{formatDate(request.createdAt)}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Found Options */}
-            <div className="bg-white border border-sand/50">
-              <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
-                <h2 className="font-medium text-charcoal-deep">Found Options</h2>
-                <span className="text-sm text-taupe">{request.foundOptions.length} option{request.foundOptions.length !== 1 ? 's' : ''}</span>
-              </div>
-              {request.foundOptions.length === 0 ? (
-                <div className="p-12 text-center">
-                  <Package size={48} className="mx-auto text-taupe/40 mb-4" />
-                  <p className="text-stone">No options submitted yet</p>
-                  {canSubmit && (
-                    <button
-                      onClick={() => setShowSubmitForm(true)}
-                      className="mt-4 text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
-                    >
-                      Submit your first option
-                    </button>
-                  )}
+            {/* SECTION B: Status Update Panel */}
+            {nextStatuses.length > 0 && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50">
+                  <h2 className="font-medium text-charcoal-deep">Update Status</h2>
                 </div>
-              ) : (
-                <div className="divide-y divide-sand/30">
-                  {request.foundOptions.map(option => (
-                    <div key={option.id} className="p-6">
-                      <div className="flex gap-4">
-                        {option.images && option.images.length > 0 ? (
-                          <div className="w-24 h-24 bg-parchment flex-shrink-0">
-                            <img src={option.images[0]} alt="Option" className="w-full h-full object-cover" />
+                <div className="p-6 space-y-4">
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Status Note (Optional)</p>
+                    <input
+                      type="text"
+                      value={statusNote}
+                      onChange={e => setStatusNote(e.target.value)}
+                      placeholder="Add a note about this status change..."
+                      className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    {nextStatuses.map(status => (
+                      <button
+                        key={status}
+                        onClick={() => handleStatusUpdate(status)}
+                        className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors"
+                      >
+                        Move to {getStatusLabel(status)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* SECTION C: Add Options Panel */}
+            {canAddOptions && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
+                  <h2 className="font-medium text-charcoal-deep">Add Found Options</h2>
+                  <button
+                    onClick={() => setShowAddOptionForm(!showAddOptionForm)}
+                    className="flex items-center gap-1.5 text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:text-gold-muted transition-colors"
+                  >
+                    <Plus size={14} />
+                    {showAddOptionForm ? 'Cancel' : 'Add Option'}
+                  </button>
+                </div>
+
+                {showAddOptionForm && (
+                  <div className="p-6 space-y-4 border-b border-sand/50">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                          Option Title *
+                        </label>
+                        <input
+                          type="text"
+                          value={optionForm.title}
+                          onChange={e => setOptionForm(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="e.g., Hermès Birkin 25 Gold Togo"
+                          className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                          Brand / Source Name
+                        </label>
+                        <input
+                          type="text"
+                          value={optionForm.brandName}
+                          onChange={e => setOptionForm(prev => ({ ...prev, brandName: e.target.value }))}
+                          placeholder="e.g., Hermès"
+                          className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                        Description
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={optionForm.description}
+                        onChange={e => setOptionForm(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Describe the item..."
+                        className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                          Price *
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                          <input
+                            type="number"
+                            value={optionForm.price}
+                            onChange={e => setOptionForm(prev => ({ ...prev, price: e.target.value }))}
+                            placeholder="0"
+                            className="w-full pl-8 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                          Source Location
+                        </label>
+                        <input
+                          type="text"
+                          value={optionForm.sourceLocation}
+                          onChange={e => setOptionForm(prev => ({ ...prev, sourceLocation: e.target.value }))}
+                          placeholder="e.g., Milan Boutique"
+                          className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                          Estimated Delivery
+                        </label>
+                        <input
+                          type="text"
+                          value={optionForm.estimatedDelivery}
+                          onChange={e => setOptionForm(prev => ({ ...prev, estimatedDelivery: e.target.value }))}
+                          placeholder="e.g., 2-3 weeks"
+                          className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                          Image URL (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={optionForm.imageUrl}
+                          onChange={e => setOptionForm(prev => ({ ...prev, imageUrl: e.target.value }))}
+                          placeholder="https://..."
+                          className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                        Notes (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={optionForm.notes}
+                        onChange={e => setOptionForm(prev => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Additional notes..."
+                        className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <button
+                        onClick={handleAddOption}
+                        disabled={!optionForm.title || !optionForm.price}
+                        className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Add Option
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Existing options */}
+                {request.foundOptions.length > 0 && (
+                  <div className="divide-y divide-sand/30">
+                    {request.foundOptions.map(option => (
+                      <div key={option.id} className="p-6 flex items-start gap-4">
+                        {(option.imageUrl || (option.images && option.images.length > 0)) ? (
+                          <div className="w-20 h-20 bg-parchment flex-shrink-0">
+                            <img
+                              src={option.imageUrl || option.images[0]}
+                              alt={option.title || option.customDescription || 'Option'}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
                         ) : (
-                          <div className="w-24 h-24 bg-parchment flex-shrink-0 flex items-center justify-center">
+                          <div className="w-20 h-20 bg-parchment flex-shrink-0 flex items-center justify-center">
                             <ImageIcon size={24} className="text-taupe/40" />
                           </div>
                         )}
@@ -244,87 +477,127 @@ export default function SourcingRequestDetailPage() {
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="text-sm font-medium text-charcoal-deep">
-                                {option.product?.name || option.customDescription}
+                                {option.title || option.customDescription || option.product?.name}
                               </p>
-                              <p className="text-xs text-taupe">{option.source}</p>
+                              {option.brandName && (
+                                <p className="text-xs text-gold-muted tracking-[0.1em] uppercase">{option.brandName}</p>
+                              )}
+                              {(option.description || option.conciergeRecommendation) && (
+                                <p className="text-xs text-stone mt-1">{option.description || option.conciergeRecommendation}</p>
+                              )}
                             </div>
-                            <span className={`px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getConditionBadge(option.condition)}`}>
-                              {option.condition.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <div className="mt-2 flex items-center gap-4">
-                            <p className="text-lg font-medium text-charcoal-deep">{formatCurrency(option.price)}</p>
-                            {option.originalPrice && option.originalPrice !== option.price && (
-                              <p className="text-sm text-taupe line-through">{formatCurrency(option.originalPrice)}</p>
+                            {request.selectedOptionId === option.id ? (
+                              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-success/10 text-success text-[10px] tracking-[0.1em] uppercase">
+                                <Check size={12} />
+                                Client Selected
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => removeSourcingOption(requestId, option.id)}
+                                className="text-taupe hover:text-error transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             )}
                           </div>
-                          {option.conciergeRecommendation && (
-                            <div className="mt-3 p-3 bg-gold-soft/10 flex items-start gap-2">
-                              <Star size={14} className="text-gold-deep flex-shrink-0 mt-0.5" />
-                              <p className="text-xs text-gold-deep">{option.conciergeRecommendation}</p>
-                            </div>
-                          )}
-                          {option.availableUntil && (
-                            <p className="text-xs text-taupe mt-2">
-                              Available until {formatDate(option.availableUntil)}
-                            </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <p className="text-lg font-medium text-charcoal-deep">{formatCurrency(option.price)}</p>
+                            <span className="text-xs text-stone">{option.sourceLocation || option.source}</span>
+                            {option.estimatedDelivery && (
+                              <span className="text-xs text-stone">Est: {option.estimatedDelivery}</span>
+                            )}
+                          </div>
+                          {option.notes && (
+                            <p className="text-xs text-stone italic mt-1">{option.notes}</p>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
 
-            {/* Submit Option Form */}
-            {canSubmit && showSubmitForm && (
+                {request.foundOptions.length === 0 && !showAddOptionForm && (
+                  <div className="p-8 text-center">
+                    <Package size={32} className="mx-auto text-taupe/40 mb-3" />
+                    <p className="text-sm text-stone">No options added yet</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* SECTION D: Client Options Review Status */}
+            {request.selectedOptionId && selectedOption && (
+              <div className="bg-white border border-success/30">
+                <div className="px-6 py-4 border-b border-success/20 flex items-center gap-3">
+                  <CheckCircle size={18} className="text-success" />
+                  <h2 className="font-medium text-charcoal-deep">Client Has Selected an Option</h2>
+                </div>
+                <div className="p-6">
+                  <div className="flex items-start gap-4 mb-4">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-charcoal-deep">
+                        {selectedOption.title || selectedOption.customDescription || 'Selected Option'}
+                      </p>
+                      {selectedOption.brandName && (
+                        <p className="text-xs text-gold-muted tracking-[0.1em] uppercase mt-0.5">{selectedOption.brandName}</p>
+                      )}
+                      <p className="font-display text-xl text-charcoal-deep mt-2">
+                        {formatCurrency(selectedOption.price)}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1.5 bg-success/10 text-success text-xs tracking-[0.1em] uppercase">
+                      Selected
+                    </span>
+                  </div>
+                  {request.status === 'awaiting_approval' && (
+                    <button
+                      onClick={() => updateSourcingStatus(requestId, 'acquired', 'Item acquired and being prepared for delivery')}
+                      className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors"
+                    >
+                      Confirm Acquisition
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Legacy Submit Option Form */}
+            {canSubmitLegacy && showSubmitForm && (
               <div className="bg-white border border-sand/50">
                 <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
-                  <h2 className="font-medium text-charcoal-deep">Submit Option</h2>
-                  <button
-                    onClick={() => setShowSubmitForm(false)}
-                    className="text-xs text-taupe hover:text-charcoal-deep"
-                  >
-                    Cancel
-                  </button>
+                  <h2 className="font-medium text-charcoal-deep">Submit Option (Legacy)</h2>
+                  <button onClick={() => setShowSubmitForm(false)} className="text-xs text-taupe hover:text-charcoal-deep">Cancel</button>
                 </div>
                 <div className="p-6 space-y-4">
                   <div>
-                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                      Description *
-                    </label>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Description *</label>
                     <textarea
                       rows={3}
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      value={legacyForm.description}
+                      onChange={e => setLegacyForm(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Describe the item you can source..."
                       className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                        Price *
-                      </label>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Price *</label>
                       <div className="relative">
                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
                         <input
                           type="number"
-                          value={formData.price}
-                          onChange={(e) => setFormData(prev => ({ ...prev, price: e.target.value }))}
+                          value={legacyForm.price}
+                          onChange={e => setLegacyForm(prev => ({ ...prev, price: e.target.value }))}
                           placeholder="0"
                           className="w-full pl-8 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                        Condition *
-                      </label>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Condition *</label>
                       <select
-                        value={formData.condition}
-                        onChange={(e) => setFormData(prev => ({ ...prev, condition: e.target.value as typeof formData.condition }))}
+                        value={legacyForm.condition}
+                        onChange={e => setLegacyForm(prev => ({ ...prev, condition: e.target.value as typeof legacyForm.condition }))}
                         className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                       >
                         <option value="new">New</option>
@@ -335,33 +608,19 @@ export default function SourcingRequestDetailPage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                      Source Location
-                    </label>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Source Location</label>
                     <input
                       type="text"
-                      value={formData.source}
-                      onChange={(e) => setFormData(prev => ({ ...prev, source: e.target.value }))}
+                      value={legacyForm.source}
+                      onChange={e => setLegacyForm(prev => ({ ...prev, source: e.target.value }))}
                       placeholder="e.g., Paris Flagship Boutique"
                       className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                      Recommendation Notes
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={formData.recommendation}
-                      onChange={(e) => setFormData(prev => ({ ...prev, recommendation: e.target.value }))}
-                      placeholder="Why is this option a good match?"
-                      className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
-                    />
-                  </div>
                   <div className="flex justify-end">
                     <button
-                      onClick={handleSubmitOption}
-                      disabled={!formData.description || !formData.price}
+                      onClick={handleLegacySubmit}
+                      disabled={!legacyForm.description || !legacyForm.price}
                       className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Submit Option
@@ -371,7 +630,7 @@ export default function SourcingRequestDetailPage() {
               </div>
             )}
 
-            {canSubmit && !showSubmitForm && (
+            {canSubmitLegacy && !showSubmitForm && !canAddOptions && (
               <button
                 onClick={() => setShowSubmitForm(true)}
                 className="w-full py-4 border-2 border-dashed border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep transition-colors"
@@ -380,29 +639,99 @@ export default function SourcingRequestDetailPage() {
               </button>
             )}
 
-            {/* Concierge Notes */}
-            {request.conciergeNotes.length > 0 && (
+            {/* SECTION E: Messaging Panel */}
+            <div className="bg-white border border-sand/50">
+              <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
+                <MessageSquare size={18} className="text-stone" />
+                <h2 className="font-medium text-charcoal-deep">Messages</h2>
+              </div>
+              <div className="p-6 space-y-4">
+                {(!request.messages || request.messages.length === 0) && request.conciergeNotes.length === 0 ? (
+                  <p className="text-sm text-stone italic">No messages yet.</p>
+                ) : (
+                  <>
+                    {/* Legacy concierge notes */}
+                    {request.conciergeNotes.length > 0 && (
+                      <div className="space-y-3 mb-4">
+                        {request.conciergeNotes.map(note => (
+                          <div key={note.id} className="flex gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                              note.author === 'concierge' ? 'bg-gold-soft/20 text-gold-deep' : 'bg-parchment text-stone'
+                            }`}>
+                              {note.author === 'concierge' ? 'C' : 'U'}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-xs text-taupe mb-1">
+                                {note.author === 'concierge' ? 'Concierge' : 'Client'} · {formatDate(note.timestamp)}
+                              </p>
+                              <p className="text-sm text-charcoal-deep">{note.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* New messages */}
+                    {request.messages && request.messages.length > 0 && (
+                      <div className="space-y-3 max-h-64 overflow-y-auto mb-3">
+                        {request.messages.map(msg => (
+                          <div
+                            key={msg.id}
+                            className={`p-3 max-w-sm text-sm ${
+                              msg.senderRole === 'brand'
+                                ? 'ml-auto bg-charcoal-deep text-ivory-cream'
+                                : 'bg-parchment text-charcoal-deep'
+                            }`}
+                          >
+                            <p className="text-xs font-medium mb-1 opacity-60">{msg.senderName}</p>
+                            <p>{msg.content}</p>
+                            <p className="text-xs opacity-40 mt-1">
+                              {new Date(msg.createdAt).toLocaleTimeString('en-US', {
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                <MessageInput onSend={(content) => sendSourcingMessage(requestId, content)} />
+              </div>
+            </div>
+
+            {/* SECTION F: Timeline */}
+            {request.timeline && request.timeline.length > 0 && (
               <div className="bg-white border border-sand/50">
-                <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
-                  <MessageSquare size={18} className="text-stone" />
-                  <h2 className="font-medium text-charcoal-deep">Concierge Notes</h2>
+                <div className="px-6 py-4 border-b border-sand/50">
+                  <h2 className="font-medium text-charcoal-deep">Timeline</h2>
                 </div>
-                <div className="p-6 space-y-4">
-                  {request.conciergeNotes.map(note => (
-                    <div key={note.id} className="flex gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        note.author === 'concierge' ? 'bg-gold-soft/20 text-gold-deep' : 'bg-parchment text-stone'
-                      }`}>
-                        {note.author === 'concierge' ? 'C' : 'U'}
+                <div className="p-6">
+                  <div className="space-y-0">
+                    {request.timeline.map((event, index) => (
+                      <div key={event.id} className="flex gap-4">
+                        <div className="flex flex-col items-center">
+                          <div className="w-3 h-3 rounded-full bg-gold-soft flex-shrink-0" />
+                          {index < request.timeline!.length - 1 && (
+                            <div className="w-px h-full bg-sand min-h-[40px]" />
+                          )}
+                        </div>
+                        <div className="pb-6">
+                          <p className="text-sm font-medium text-charcoal-deep">
+                            {getStatusLabel(event.status)}
+                          </p>
+                          <p className="text-xs text-stone mt-0.5">{event.note}</p>
+                          <p className="text-xs text-taupe mt-1">
+                            {new Date(event.createdAt).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric',
+                              hour: '2-digit', minute: '2-digit'
+                            })}
+                            <span className="ml-2 text-taupe/60">by {event.updatedBy}</span>
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <p className="text-xs text-taupe mb-1">
-                          {note.author === 'concierge' ? 'Concierge' : 'Client'} · {formatDate(note.timestamp)}
-                        </p>
-                        <p className="text-sm text-charcoal-deep">{note.content}</p>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -420,7 +749,10 @@ export default function SourcingRequestDetailPage() {
                 <div className="p-6 space-y-4">
                   <div className="text-center">
                     <p className="text-2xl font-display text-charcoal-deep">
-                      {formatCurrency(request.budget.min)} - {formatCurrency(request.budget.max)}
+                      {request.budget.min > 0
+                        ? `${formatCurrency(request.budget.min)} - ${formatCurrency(request.budget.max)}`
+                        : formatCurrency(request.budget.max)
+                      }
                     </p>
                     {request.budget.flexible && (
                       <p className="text-xs text-gold-muted mt-1">Budget is flexible</p>
@@ -475,6 +807,18 @@ export default function SourcingRequestDetailPage() {
                     {getStatusLabel(request.status)}
                   </span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-taupe uppercase tracking-wider">Options</span>
+                  <span className="text-sm text-charcoal-deep">{request.foundOptions.length}</span>
+                </div>
+                {request.selectedOptionId && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-taupe uppercase tracking-wider">Client Selection</span>
+                    <span className="px-2 py-0.5 bg-success/10 text-success text-[10px] tracking-[0.1em] uppercase">
+                      Option Selected
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

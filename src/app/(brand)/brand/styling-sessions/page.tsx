@@ -1,17 +1,17 @@
 'use client';
 
 import { useState } from 'react';
-import { Calendar, Clock, User, Video, Store, Home, CheckCircle, XCircle, RotateCcw, MapPin, Mail, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, User, Video, Store, Home, CheckCircle, XCircle, RotateCcw, MapPin, Mail, AlertTriangle, Sparkles, Plus, X, Package } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
-import type { StylingSession, StylingSessionType, StylingSessionStatus } from '@/types/brand-portal';
+import type { StylingSession, StylingSessionType, StylingSessionStatus, StylingRecommendation } from '@/types/brand-portal';
 
 type FilterTab = 'all' | 'upcoming' | 'past';
 type ViewMode = 'list' | 'calendar';
 
 export default function StylingSessionsPage() {
-  const { stylingSessions, updateStylingSessionStatus } = useBrand();
+  const { stylingSessions, updateStylingSessionStatus, products } = useBrand();
   const [filter, setFilter] = useState<FilterTab>('upcoming');
   const [viewMode, setViewMode] = useState<ViewMode>('list');
 
@@ -54,73 +54,56 @@ export default function StylingSessionsPage() {
 
   const getTypeIcon = (type: StylingSessionType) => {
     switch (type) {
-      case 'virtual':
-        return Video;
-      case 'in_store':
-        return Store;
-      case 'home':
-        return Home;
-      default:
-        return Calendar;
+      case 'virtual': return Video;
+      case 'in_store': return Store;
+      case 'home': return Home;
+      default: return Calendar;
     }
   };
 
   const getTypeBadge = (type: StylingSessionType) => {
     switch (type) {
-      case 'virtual':
-        return 'bg-info/10 text-info';
-      case 'in_store':
-        return 'bg-gold-soft/20 text-gold-deep';
-      case 'home':
-        return 'bg-champagne/30 text-gold-muted';
-      default:
-        return 'bg-taupe/20 text-stone';
+      case 'virtual': return 'bg-info/10 text-info';
+      case 'in_store': return 'bg-gold-soft/20 text-gold-deep';
+      case 'home': return 'bg-champagne/30 text-gold-muted';
+      default: return 'bg-taupe/20 text-stone';
     }
   };
 
   const getStatusBadge = (status: StylingSessionStatus) => {
     switch (status) {
-      case 'scheduled':
-        return 'bg-info/10 text-info';
-      case 'completed':
-        return 'bg-success/10 text-success';
-      case 'cancelled':
-        return 'bg-error/10 text-error';
-      case 'rescheduled':
-        return 'bg-warning/10 text-warning';
-      default:
-        return 'bg-taupe/20 text-stone';
+      case 'pending': return 'bg-gold-soft/20 text-gold-deep';
+      case 'confirmed': return 'bg-info/10 text-info';
+      case 'scheduled': return 'bg-info/10 text-info';
+      case 'completed': return 'bg-success/10 text-success';
+      case 'cancelled': return 'bg-error/10 text-error';
+      case 'rescheduled': return 'bg-warning/10 text-warning';
+      default: return 'bg-taupe/20 text-stone';
     }
   };
 
   const getStatusIcon = (status: StylingSessionStatus) => {
     switch (status) {
-      case 'scheduled':
-        return Clock;
-      case 'completed':
-        return CheckCircle;
-      case 'cancelled':
-        return XCircle;
-      case 'rescheduled':
-        return RotateCcw;
-      default:
-        return Clock;
+      case 'pending': return Clock;
+      case 'confirmed': return CheckCircle;
+      case 'scheduled': return Clock;
+      case 'completed': return CheckCircle;
+      case 'cancelled': return XCircle;
+      case 'rescheduled': return RotateCcw;
+      default: return Clock;
     }
   };
 
   const getTierBadge = (tier: StylingSession['customerTier']) => {
     switch (tier) {
-      case 'uhni':
-        return 'bg-gold-soft/20 text-gold-deep';
-      case 'preferred':
-        return 'bg-champagne/30 text-gold-muted';
-      case 'standard':
-        return 'bg-parchment text-charcoal-deep';
-      default:
-        return 'bg-taupe/20 text-stone';
+      case 'uhni': return 'bg-gold-soft/20 text-gold-deep';
+      case 'preferred': return 'bg-champagne/30 text-gold-muted';
+      case 'standard': return 'bg-parchment text-charcoal-deep';
+      default: return 'bg-taupe/20 text-stone';
     }
   };
 
+  // Confirm status update dialog
   const [confirmAction, setConfirmAction] = useState<{ sessionId: string; status: StylingSessionStatus; customerName: string } | null>(null);
 
   const confirmModalRef = useModalAccessibility(
@@ -139,8 +122,53 @@ export default function StylingSessionsPage() {
     }
   };
 
-  const handleStatusUpdate = (sessionId: string, newStatus: StylingSessionStatus) => {
-    updateStylingSessionStatus(sessionId, newStatus);
+  // Recommendations modal
+  const [recsSession, setRecsSession] = useState<StylingSession | null>(null);
+  const [recForm, setRecForm] = useState({ productId: '', stylistNote: '' });
+  const [pendingRecs, setPendingRecs] = useState<StylingRecommendation[]>([]);
+
+  const recsModalRef = useModalAccessibility(
+    !!recsSession,
+    () => { setRecsSession(null); setPendingRecs([]); setRecForm({ productId: '', stylistNote: '' }); }
+  );
+
+  const handleOpenRecommendations = (session: StylingSession) => {
+    setRecsSession(session);
+    setPendingRecs(session.outfitRecommendations || []);
+  };
+
+  const handleAddRecommendation = () => {
+    if (!recForm.productId) return;
+    const product = products.find(p => p.id === recForm.productId);
+    if (!product) return;
+
+    const newRec: StylingRecommendation = {
+      id: `rec-${Date.now()}`,
+      productId: product.id,
+      productName: product.name,
+      productSlug: product.slug,
+      productImage: product.images?.[0]?.url || '',
+      brandName: product.brandName || '',
+      price: product.price,
+      stylistNote: recForm.stylistNote || undefined,
+    };
+
+    setPendingRecs(prev => [...prev, newRec]);
+    setRecForm({ productId: '', stylistNote: '' });
+  };
+
+  const handleRemoveRecommendation = (recId: string) => {
+    setPendingRecs(prev => prev.filter(r => r.id !== recId));
+  };
+
+  const handleSaveRecommendations = () => {
+    if (recsSession) {
+      updateStylingSessionStatus(recsSession.id, recsSession.status, {
+        outfitRecommendations: pendingRecs,
+      });
+      setRecsSession(null);
+      setPendingRecs([]);
+    }
   };
 
   const filterCounts = {
@@ -190,9 +218,7 @@ export default function StylingSessionsPage() {
             <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-1.5 text-xs tracking-[0.1em] uppercase transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-white text-charcoal-deep'
-                  : 'text-stone hover:text-charcoal-deep'
+                viewMode === 'list' ? 'bg-white text-charcoal-deep' : 'text-stone hover:text-charcoal-deep'
               }`}
             >
               List
@@ -200,9 +226,7 @@ export default function StylingSessionsPage() {
             <button
               onClick={() => setViewMode('calendar')}
               className={`px-3 py-1.5 text-xs tracking-[0.1em] uppercase transition-colors ${
-                viewMode === 'calendar'
-                  ? 'bg-white text-charcoal-deep'
-                  : 'text-stone hover:text-charcoal-deep'
+                viewMode === 'calendar' ? 'bg-white text-charcoal-deep' : 'text-stone hover:text-charcoal-deep'
               }`}
             >
               Calendar
@@ -210,14 +234,12 @@ export default function StylingSessionsPage() {
           </div>
         </div>
 
-        {/* Sessions List */}
+        {/* Sessions */}
         {sortedSessions.length === 0 ? (
           <div className="bg-white border border-sand/50 p-12 text-center">
             <Calendar size={48} className="mx-auto text-taupe/40 mb-4" />
             <p className="text-stone">No styling sessions found</p>
-            <p className="text-sm text-taupe mt-2">
-              Sessions booked by UHNI clients will appear here
-            </p>
+            <p className="text-sm text-taupe mt-2">Sessions booked by clients will appear here</p>
           </div>
         ) : viewMode === 'list' ? (
           <div className="bg-white border border-sand/50">
@@ -225,24 +247,12 @@ export default function StylingSessionsPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-sand/50 bg-parchment/30">
-                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">
-                      Date & Time
-                    </th>
-                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">
-                      Customer
-                    </th>
-                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">
-                      Type
-                    </th>
-                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">
-                      Status
-                    </th>
-                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">
-                      Location
-                    </th>
-                    <th className="px-6 py-4 text-right text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">
-                      Actions
-                    </th>
+                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">Date & Time</th>
+                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">Customer</th>
+                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">Type</th>
+                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">Status</th>
+                    <th className="px-6 py-4 text-left text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">Context</th>
+                    <th className="px-6 py-4 text-right text-[10px] tracking-[0.2em] uppercase text-taupe font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -250,11 +260,12 @@ export default function StylingSessionsPage() {
                     const TypeIcon = getTypeIcon(session.type);
                     const StatusIcon = getStatusIcon(session.status);
                     const isUpcoming = getSessionTiming(session) === 'upcoming';
-                    const canManage = isUpcoming && session.status === 'scheduled';
+                    const canManage = isUpcoming && (session.status === 'scheduled' || session.status === 'pending' || session.status === 'confirmed');
+                    const isPending = session.status === 'pending';
+                    const isCompleted = session.status === 'completed';
 
                     return (
                       <tr key={session.id} className="border-b border-sand/30 hover:bg-parchment/20">
-                        {/* Date & Time */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-parchment flex items-center justify-center">
@@ -267,7 +278,6 @@ export default function StylingSessionsPage() {
                           </div>
                         </td>
 
-                        {/* Customer */}
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-parchment rounded-full flex items-center justify-center">
@@ -288,7 +298,6 @@ export default function StylingSessionsPage() {
                           </div>
                         </td>
 
-                        {/* Type */}
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${getTypeBadge(session.type)}`}>
                             <TypeIcon size={10} />
@@ -296,7 +305,6 @@ export default function StylingSessionsPage() {
                           </span>
                         </td>
 
-                        {/* Status */}
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center gap-1.5 px-2 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(session.status)}`}>
                             <StatusIcon size={10} />
@@ -304,22 +312,31 @@ export default function StylingSessionsPage() {
                           </span>
                         </td>
 
-                        {/* Location */}
                         <td className="px-6 py-4">
-                          {session.location ? (
-                            <div className="flex items-center gap-1 text-sm text-stone">
-                              <MapPin size={12} className="text-taupe" />
-                              <span className="truncate max-w-[150px]">{session.location}</span>
-                            </div>
+                          {session.contextInfo ? (
+                            <p className="text-xs text-stone max-w-[150px] truncate" title={session.contextInfo}>
+                              {session.contextInfo}
+                            </p>
+                          ) : session.notes ? (
+                            <p className="text-xs text-taupe italic max-w-[150px] truncate" title={session.notes}>
+                              {session.notes}
+                            </p>
                           ) : (
                             <span className="text-xs text-taupe">-</span>
                           )}
                         </td>
 
-                        {/* Actions */}
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-end gap-2">
-                            {canManage ? (
+                            {isPending && (
+                              <button
+                                onClick={() => updateStylingSessionStatus(session.id, 'confirmed')}
+                                className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-info/10 text-info hover:bg-info/20 transition-colors"
+                              >
+                                Confirm
+                              </button>
+                            )}
+                            {canManage && (
                               <>
                                 <button
                                   onClick={() => requestStatusUpdate(session.id, 'completed', session.customerName)}
@@ -334,7 +351,20 @@ export default function StylingSessionsPage() {
                                   Cancel
                                 </button>
                               </>
-                            ) : (
+                            )}
+                            {isCompleted && (
+                              <button
+                                onClick={() => handleOpenRecommendations(session)}
+                                className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-gold-soft/20 text-gold-deep hover:bg-gold-soft/30 transition-colors flex items-center gap-1"
+                              >
+                                <Sparkles size={10} />
+                                Recommendations
+                                {session.outfitRecommendations && session.outfitRecommendations.length > 0 && (
+                                  <span className="ml-1 text-[9px]">({session.outfitRecommendations.length})</span>
+                                )}
+                              </button>
+                            )}
+                            {!canManage && !isPending && !isCompleted && (
                               <span className="text-xs text-taupe">-</span>
                             )}
                           </div>
@@ -354,7 +384,9 @@ export default function StylingSessionsPage() {
                 const TypeIcon = getTypeIcon(session.type);
                 const StatusIcon = getStatusIcon(session.status);
                 const isUpcoming = getSessionTiming(session) === 'upcoming';
-                const canManage = isUpcoming && session.status === 'scheduled';
+                const canManage = isUpcoming && (session.status === 'scheduled' || session.status === 'pending' || session.status === 'confirmed');
+                const isPending = session.status === 'pending';
+                const isCompleted = session.status === 'completed';
 
                 return (
                   <div
@@ -363,7 +395,6 @@ export default function StylingSessionsPage() {
                       isUpcoming ? 'border-gold-soft/50 bg-gold-soft/5' : 'border-sand/50'
                     }`}
                   >
-                    {/* Header */}
                     <div className="flex items-center justify-between mb-3">
                       <span className={`px-2 py-0.5 text-[9px] tracking-[0.1em] uppercase ${getStatusBadge(session.status)}`}>
                         <StatusIcon size={10} className="inline mr-1" />
@@ -375,13 +406,11 @@ export default function StylingSessionsPage() {
                       </span>
                     </div>
 
-                    {/* Date & Time */}
                     <div className="mb-3">
                       <p className="font-medium text-charcoal-deep">{formatDate(session.scheduledAt)}</p>
                       <p className="text-sm text-taupe">{formatTime(session.scheduledAt)} - {session.duration} minutes</p>
                     </div>
 
-                    {/* Customer */}
                     <div className="flex items-center gap-2 mb-3 pb-3 border-b border-sand/30">
                       <div className="w-8 h-8 bg-parchment rounded-full flex items-center justify-center">
                         <User size={14} className="text-stone" />
@@ -396,36 +425,49 @@ export default function StylingSessionsPage() {
                       </div>
                     </div>
 
-                    {/* Location */}
-                    {session.location && (
-                      <div className="flex items-center gap-1 text-xs text-stone mb-3">
-                        <MapPin size={12} className="text-taupe flex-shrink-0" />
-                        <span className="truncate">{session.location}</span>
-                      </div>
+                    {session.contextInfo && (
+                      <p className="text-xs text-stone mb-3 line-clamp-2">{session.contextInfo}</p>
                     )}
 
-                    {/* Notes */}
                     {session.notes && (
                       <p className="text-xs text-taupe italic mb-3 line-clamp-2">{session.notes}</p>
                     )}
 
-                    {/* Actions */}
-                    {canManage && (
-                      <div className="flex items-center gap-2 pt-3 border-t border-sand/30">
+                    <div className="flex items-center gap-2 pt-3 border-t border-sand/30">
+                      {isPending && (
                         <button
-                          onClick={() => requestStatusUpdate(session.id, 'completed', session.customerName)}
-                          className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success hover:bg-success/20 transition-colors"
+                          onClick={() => updateStylingSessionStatus(session.id, 'confirmed')}
+                          className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-info/10 text-info hover:bg-info/20 transition-colors"
                         >
-                          Complete
+                          Confirm
                         </button>
+                      )}
+                      {canManage && (
+                        <>
+                          <button
+                            onClick={() => requestStatusUpdate(session.id, 'completed', session.customerName)}
+                            className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success hover:bg-success/20 transition-colors"
+                          >
+                            Complete
+                          </button>
+                          <button
+                            onClick={() => requestStatusUpdate(session.id, 'cancelled', session.customerName)}
+                            className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-error/10 text-error hover:bg-error/20 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </>
+                      )}
+                      {isCompleted && (
                         <button
-                          onClick={() => requestStatusUpdate(session.id, 'cancelled', session.customerName)}
-                          className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-error/10 text-error hover:bg-error/20 transition-colors"
+                          onClick={() => handleOpenRecommendations(session)}
+                          className="flex-1 px-3 py-2 text-[10px] tracking-[0.1em] uppercase bg-gold-soft/20 text-gold-deep hover:bg-gold-soft/30 transition-colors flex items-center justify-center gap-1"
                         >
-                          Cancel
+                          <Sparkles size={10} />
+                          Recommendations
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -478,6 +520,120 @@ export default function StylingSessionsPage() {
               >
                 {confirmAction.status === 'cancelled' ? 'Cancel Session' : 'Mark Complete'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations Modal */}
+      {recsSession && (
+        <div className="fixed inset-0 bg-noir/40 z-50 flex items-center justify-center p-4">
+          <div
+            ref={recsModalRef}
+            role="dialog"
+            aria-modal="true"
+            className="bg-white border border-sand/50 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+          >
+            <div className="sticky top-0 bg-white border-b border-sand/50 px-6 py-4 flex items-center justify-between z-10">
+              <div>
+                <h3 className="font-medium text-charcoal-deep">Post-Session Recommendations</h3>
+                <p className="text-xs text-taupe mt-1">
+                  {recsSession.customerName} — {formatDate(recsSession.scheduledAt)}
+                </p>
+              </div>
+              <button
+                onClick={() => { setRecsSession(null); setPendingRecs([]); setRecForm({ productId: '', stylistNote: '' }); }}
+                className="p-2 hover:bg-sand/20 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Current recommendations */}
+              {pendingRecs.length > 0 && (
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                    Recommended Items ({pendingRecs.length})
+                  </p>
+                  <div className="space-y-3">
+                    {pendingRecs.map(rec => (
+                      <div key={rec.id} className="flex items-center gap-4 p-3 border border-sand/50">
+                        <div className="w-12 h-12 bg-parchment flex items-center justify-center flex-shrink-0">
+                          {rec.productImage ? (
+                            <img src={rec.productImage} alt={rec.productName} className="w-full h-full object-cover" />
+                          ) : (
+                            <Package size={16} className="text-stone" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-charcoal-deep truncate">{rec.productName}</p>
+                          <p className="text-xs text-taupe">€{rec.price.toLocaleString()}</p>
+                          {rec.stylistNote && (
+                            <p className="text-xs text-stone italic mt-1">{rec.stylistNote}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleRemoveRecommendation(rec.id)}
+                          className="p-1 text-error/60 hover:text-error transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add new recommendation */}
+              <div className="border-t border-sand/30 pt-6">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Add Recommendation</p>
+                <div className="space-y-3">
+                  <select
+                    value={recForm.productId}
+                    onChange={(e) => setRecForm(prev => ({ ...prev, productId: e.target.value }))}
+                    className="w-full px-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors text-sm"
+                  >
+                    <option value="">Select a product...</option>
+                    {products.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} — €{p.price.toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={recForm.stylistNote}
+                    onChange={(e) => setRecForm(prev => ({ ...prev, stylistNote: e.target.value }))}
+                    placeholder="Stylist note (optional)"
+                    className="w-full px-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors text-sm placeholder:text-taupe"
+                  />
+                  <button
+                    onClick={handleAddRecommendation}
+                    disabled={!recForm.productId}
+                    className="flex items-center gap-2 px-4 py-2 text-[10px] tracking-[0.1em] uppercase bg-parchment text-charcoal-deep hover:bg-sand/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Plus size={12} />
+                    Add Product
+                  </button>
+                </div>
+              </div>
+
+              {/* Save */}
+              <div className="flex gap-3 pt-4 border-t border-sand/30">
+                <button
+                  onClick={() => { setRecsSession(null); setPendingRecs([]); setRecForm({ productId: '', stylistNote: '' }); }}
+                  className="flex-1 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveRecommendations}
+                  className="flex-1 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Save Recommendations
+                </button>
+              </div>
             </div>
           </div>
         </div>

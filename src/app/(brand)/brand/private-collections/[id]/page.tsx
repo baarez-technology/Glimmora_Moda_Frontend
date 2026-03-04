@@ -1,15 +1,80 @@
 'use client';
 
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Lock, Sparkles, Users, Calendar, Package, Edit } from 'lucide-react';
+import { ArrowLeft, Lock, Sparkles, Users, Calendar, Package, Edit, Send, Check, Crown, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import type { PrivateCollectionAccess } from '@/types/uhni';
+import type { PrivateCollectionAccess, CollectionAccessRequest } from '@/types/uhni';
+
+const mockUHNIClients = [
+  { id: 'uhni-001', name: 'Arabella Montclair', tier: 'uhni', email: 'arabella@example.com' },
+  { id: 'uhni-002', name: 'Viktor Harrington', tier: 'uhni', email: 'viktor@example.com' },
+  { id: 'uhni-003', name: 'Celestine DuPont', tier: 'uhni', email: 'celestine@example.com' },
+  { id: 'uhni-004', name: 'Magnus Beaumont', tier: 'uhni', email: 'magnus@example.com' },
+  { id: 'uhni-005', name: 'Isadora Chen-Whitfield', tier: 'preferred', email: 'isadora@example.com' },
+];
+
+function AccessRequestActions({ request, onApprove, onDeny }: {
+  request: CollectionAccessRequest;
+  onApprove: (requestId: string, note?: string) => void;
+  onDeny: (requestId: string, note?: string) => void;
+}) {
+  const [note, setNote] = useState('');
+
+  if (request.status !== 'pending') {
+    return (
+      <span className={`text-xs px-2 py-0.5 tracking-[0.1em] uppercase ${
+        request.status === 'approved' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+      }`}>
+        {request.status === 'approved' ? 'Approved' : 'Denied'}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        type="text"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Optional note..."
+        className="w-full text-xs border border-sand/50 px-2 py-1.5 focus:outline-none focus:border-charcoal-deep/30"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={() => onApprove(request.id, note || undefined)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-success/10 text-success text-xs tracking-[0.1em] uppercase hover:bg-success/20 transition-colors"
+        >
+          <CheckCircle size={12} />
+          Approve
+        </button>
+        <button
+          onClick={() => onDeny(request.id, note || undefined)}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-error/10 text-error text-xs tracking-[0.1em] uppercase hover:bg-error/20 transition-colors"
+        >
+          <XCircle size={12} />
+          Deny
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function PrivateCollectionDetailPage() {
   const params = useParams();
-  const { getPrivateCollectionById, products } = useBrand();
+  const {
+    getPrivateCollectionById,
+    products,
+    sendCollectionInvitation,
+    approveAccessRequest,
+    denyAccessRequest
+  } = useBrand();
+
+  const [showInvitePanel, setShowInvitePanel] = useState(false);
+  const [inviteMessage, setInviteMessage] = useState('');
+  const [selectedClients, setSelectedClients] = useState<string[]>([]);
 
   const collectionId = params.id as string;
   const collection = getPrivateCollectionById(collectionId);
@@ -62,6 +127,31 @@ export default function PrivateCollectionDetailPage() {
   const status = getStatus();
   const accessBadge = getAccessBadge(collection.accessLevel);
   const AccessIcon = accessBadge.icon;
+
+  const pendingRequests = (collection.accessRequests || []).filter(r => r.status === 'pending');
+  const resolvedRequests = (collection.accessRequests || []).filter(r => r.status !== 'pending');
+
+  const handleToggleClient = (clientId: string) => {
+    setSelectedClients(prev =>
+      prev.includes(clientId) ? prev.filter(id => id !== clientId) : [...prev, clientId]
+    );
+  };
+
+  const handleSendInvitations = () => {
+    if (selectedClients.length === 0) return;
+    sendCollectionInvitation(collection.id, selectedClients, inviteMessage || undefined);
+    setSelectedClients([]);
+    setInviteMessage('');
+    setShowInvitePanel(false);
+  };
+
+  const handleApproveRequest = (requestId: string, note?: string) => {
+    approveAccessRequest(collection.id, requestId, note);
+  };
+
+  const handleDenyRequest = (requestId: string, note?: string) => {
+    denyAccessRequest(collection.id, requestId, note);
+  };
 
   return (
     <div>
@@ -147,6 +237,186 @@ export default function PrivateCollectionDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Section A: Send Invitations */}
+            {(collection.accessLevel === 'invitation' || collection.accessLevel === 'uhni_only') && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Send size={18} className="text-stone" />
+                    <h2 className="font-medium text-charcoal-deep">Send Invitations</h2>
+                  </div>
+                  <button
+                    onClick={() => setShowInvitePanel(!showInvitePanel)}
+                    className="text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:text-gold-muted transition-colors"
+                  >
+                    {showInvitePanel ? 'Cancel' : 'Invite Clients'}
+                  </button>
+                </div>
+
+                {showInvitePanel && (
+                  <div className="p-6 space-y-4">
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Select Clients</p>
+                      <div className="space-y-2">
+                        {mockUHNIClients.map(client => {
+                          const alreadyInvited = (collection.invitedClients || []).includes(client.id);
+                          return (
+                            <label
+                              key={client.id}
+                              className={`flex items-center gap-3 p-3 border transition-colors cursor-pointer ${
+                                alreadyInvited
+                                  ? 'border-sand/30 bg-parchment/50 opacity-60 cursor-not-allowed'
+                                  : selectedClients.includes(client.id)
+                                    ? 'border-charcoal-deep bg-parchment'
+                                    : 'border-sand/50 hover:border-charcoal-deep/30'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedClients.includes(client.id)}
+                                onChange={() => !alreadyInvited && handleToggleClient(client.id)}
+                                disabled={alreadyInvited}
+                                className="accent-charcoal-deep"
+                              />
+                              <div className="flex items-center gap-2 flex-1">
+                                <Crown size={14} className={client.tier === 'uhni' ? 'text-gold-soft' : 'text-taupe'} />
+                                <span className="text-sm text-charcoal-deep">{client.name}</span>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe ml-auto">
+                                  {alreadyInvited ? 'Already Invited' : client.tier}
+                                </span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Message (Optional)</p>
+                      <textarea
+                        value={inviteMessage}
+                        onChange={(e) => setInviteMessage(e.target.value)}
+                        rows={3}
+                        placeholder="Add a personal invitation message..."
+                        className="w-full border border-sand/50 px-3 py-2 text-sm focus:outline-none focus:border-charcoal-deep/30 resize-none"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleSendInvitations}
+                      disabled={selectedClients.length === 0}
+                      className="flex items-center gap-2 px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <Send size={14} />
+                      Send {selectedClients.length > 0 ? `${selectedClients.length} Invitation${selectedClients.length > 1 ? 's' : ''}` : 'Invitations'}
+                    </button>
+                  </div>
+                )}
+
+                {/* Invited Clients Summary (when panel closed) */}
+                {!showInvitePanel && (collection.invitedClients || []).length > 0 && (
+                  <div className="p-6">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                      Invited Clients ({(collection.invitedClients || []).length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(collection.invitedClients || []).map(clientId => {
+                        const client = mockUHNIClients.find(c => c.id === clientId);
+                        return (
+                          <span key={clientId} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-parchment text-xs text-charcoal-deep">
+                            <Check size={12} className="text-success" />
+                            {client?.name || clientId}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Section B: Access Requests */}
+            {(collection.accessLevel === 'request' || (collection.accessRequests || []).length > 0) && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Users size={18} className="text-stone" />
+                    <h2 className="font-medium text-charcoal-deep">Access Requests</h2>
+                  </div>
+                  {pendingRequests.length > 0 && (
+                    <span className="px-2.5 py-1 bg-warning/10 text-warning text-xs tracking-[0.1em] uppercase">
+                      {pendingRequests.length} Pending
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-6 space-y-4">
+                  {/* Pending Requests */}
+                  {pendingRequests.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Pending Requests</p>
+                      {pendingRequests.map(request => (
+                        <div key={request.id} className="flex items-start gap-4 p-4 border border-warning/20 bg-warning/5">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Crown size={14} className={request.clientTier === 'uhni' ? 'text-gold-soft' : 'text-taupe'} />
+                              <span className="text-sm font-medium text-charcoal-deep">{request.clientName}</span>
+                              <span className="text-[10px] tracking-[0.1em] uppercase text-taupe">{request.clientTier}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <Clock size={12} className="text-taupe" />
+                              <span className="text-xs text-taupe">
+                                Requested {formatDate(request.requestedAt)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="w-48">
+                            <AccessRequestActions
+                              request={request}
+                              onApprove={handleApproveRequest}
+                              onDeny={handleDenyRequest}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Resolved Requests */}
+                  {resolvedRequests.length > 0 && (
+                    <div className="space-y-3">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mt-4">Resolved</p>
+                      {resolvedRequests.map(request => (
+                        <div key={request.id} className="flex items-center gap-4 p-4 border border-sand/30 bg-parchment/30">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-charcoal-deep">{request.clientName}</span>
+                              <span className="text-[10px] tracking-[0.1em] uppercase text-taupe">{request.clientTier}</span>
+                            </div>
+                            {request.reviewNote && (
+                              <p className="text-xs text-taupe mt-1 italic">"{request.reviewNote}"</p>
+                            )}
+                          </div>
+                          <AccessRequestActions
+                            request={request}
+                            onApprove={handleApproveRequest}
+                            onDeny={handleDenyRequest}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(collection.accessRequests || []).length === 0 && (
+                    <div className="py-8 text-center">
+                      <Users size={32} className="mx-auto text-taupe/40 mb-3" />
+                      <p className="text-sm text-stone">No access requests yet</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -193,6 +463,14 @@ export default function PrivateCollectionDetailPage() {
                   <span className="text-sm text-charcoal-deep">
                     {collection.invitationRequired ? 'Yes' : 'No'}
                   </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-taupe uppercase tracking-wider">Invited</span>
+                  <span className="text-sm text-charcoal-deep">{(collection.invitedClients || []).length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-taupe uppercase tracking-wider">Access Requests</span>
+                  <span className="text-sm text-charcoal-deep">{(collection.accessRequests || []).length}</span>
                 </div>
               </div>
             </div>

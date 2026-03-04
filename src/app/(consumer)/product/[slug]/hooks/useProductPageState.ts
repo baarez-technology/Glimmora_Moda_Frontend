@@ -56,6 +56,8 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     isInCart,
     refreshWishlist,
     refreshCart,
+    isUHNI,
+    createNegotiation,
   } = useApp();
 
   // UI State
@@ -259,6 +261,19 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     }
   }, [product, showToast]);
 
+  const handleNegotiatePrice = useCallback((proposedPrice: number, message: string) => {
+    createNegotiation({
+      productId: product.id,
+      productName: product.name,
+      productImage: product.images[0]?.url || '',
+      productSlug: product.slug,
+      brandName: product.brandName,
+      originalPrice: product.price,
+      proposedPrice,
+      clientMessage: message,
+    });
+  }, [product, createNegotiation]);
+
   const handleSizeSelect = useCallback((size: string) => {
     setSelectedSize(size);
     setSizeError(false);
@@ -357,8 +372,10 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     handleRemoveFromWardrobe,
     handleNotifyRestock,
     handleShare,
+    handleNegotiatePrice,
     showToast,
-    wardrobe
+    wardrobe,
+    isUHNI,
   };
 }
 

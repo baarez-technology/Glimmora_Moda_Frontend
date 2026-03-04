@@ -29,7 +29,7 @@ import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/componen
 
 export default function OrderDetailPage() {
   const params = useParams();
-  const { getOrderById, getProductById, updateOrderStatus, partner } = useBrand();
+  const { getOrderById, getProductById, updateOrderStatus, partner, commerceSettings } = useBrand();
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
@@ -399,29 +399,42 @@ export default function OrderDetailPage() {
                 <X size={18} />
               </button>
             </div>
-            <InvoiceDocument
-              invoiceNumber={generateInvoiceNumber(order.id, order.createdAt)}
-              invoiceDate={order.createdAt}
-              orderType="standard"
-              brandName={partner?.brandName || 'ModaGlimmora'}
-              buyerName={order.customer.name}
-              buyerEmail={order.customer.email}
-              buyerAddress={`${order.shippingInfo.address}\n${order.shippingInfo.city}, ${order.shippingInfo.postalCode}\n${order.shippingInfo.country}`}
-              items={order.items.map(item => ({
-                description: item.productName,
-                detail: item.variant || '',
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                currency: 'EUR',
-              }))}
-              subtotal={order.subtotal}
-              shippingAmount={order.shipping}
-              taxRate={0.20}
-              taxAmount={order.tax}
-              total={order.total}
-              currency="EUR"
-              paymentStatus={order.paymentStatus === 'paid' ? 'paid' : 'pending'}
-            />
+            {(() => {
+              const activeTaxRule = commerceSettings.taxRules.find(r => r.isEnabled);
+              const taxRate = activeTaxRule ? activeTaxRule.taxRate / 100 : 0.20;
+              const taxAmount = Math.round(order.total * taxRate / (1 + taxRate));
+              const activeShipping = commerceSettings.shippingMethods
+                .filter(m => m.isEnabled)
+                .sort((a, b) => a.baseRate - b.baseRate)[0];
+              const shippingAmount = order.total >= commerceSettings.freeShippingThreshold
+                ? 0
+                : (activeShipping?.baseRate || 0);
+              return (
+                <InvoiceDocument
+                  invoiceNumber={generateInvoiceNumber(order.id, order.createdAt)}
+                  invoiceDate={order.createdAt}
+                  orderType="standard"
+                  brandName={partner?.brandName || 'ModaGlimmora'}
+                  buyerName={order.customer.name}
+                  buyerEmail={order.customer.email}
+                  buyerAddress={`${order.shippingInfo.address}\n${order.shippingInfo.city}, ${order.shippingInfo.postalCode}\n${order.shippingInfo.country}`}
+                  items={order.items.map(item => ({
+                    description: item.productName,
+                    detail: item.variant || '',
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    currency: 'EUR',
+                  }))}
+                  subtotal={order.subtotal}
+                  shippingAmount={shippingAmount}
+                  taxRate={taxRate}
+                  taxAmount={taxAmount}
+                  total={order.total}
+                  currency="EUR"
+                  paymentStatus={order.paymentStatus === 'paid' ? 'paid' : 'pending'}
+                />
+              );
+            })()}
             <div className="flex gap-3 mt-6">
               <button
                 onClick={printInvoice}

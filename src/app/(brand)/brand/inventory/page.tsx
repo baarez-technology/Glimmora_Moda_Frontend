@@ -17,6 +17,8 @@ import {
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
+import ExportButton from '@/components/brand/ExportButton';
+import { convertToCSV, downloadCSV, buildFilename, getQuarterLabel } from '@/lib/export-utils';
 
 export default function InventoryPage() {
   const { inventory, resolveAlert } = useBrand();
@@ -81,6 +83,36 @@ export default function InventoryPage() {
 
   const activeAlerts = inventory.alerts.filter(a => !a.resolvedAt);
 
+  const exportInventoryCSV = () => {
+    const rows = inventory.regions.flatMap(region =>
+      region.cities.map(city => ({
+        Region: region.region,
+        City: city.city,
+        Units: city.units,
+        Value: city.value,
+        'Change %': city.changePercent,
+      }))
+    );
+    const csv = convertToCSV(rows);
+    downloadCSV(buildFilename('inventory', getQuarterLabel(new Date())), csv);
+  };
+
+  const exportAlertsCSV = () => {
+    const rows = activeAlerts.map(alert => ({
+      Product: alert.productName,
+      Type: alert.type,
+      Priority: alert.priority,
+      Region: alert.region,
+      City: alert.city,
+      'Current Stock': alert.currentStock,
+      Threshold: alert.threshold ?? '',
+      Message: alert.message,
+      'Created At': alert.createdAt,
+    }));
+    const csv = convertToCSV(rows);
+    downloadCSV(buildFilename('inventory-alerts', getQuarterLabel(new Date())), csv);
+  };
+
   // Compute separate change percentages for units vs value from regional data
   const totalRegionUnits = inventory.regions.reduce((sum, r) => sum + r.totalUnits, 0);
   const totalRegionValue = inventory.regions.reduce((sum, r) => sum + r.totalValue, 0);
@@ -97,16 +129,22 @@ export default function InventoryPage() {
         title="Global Inventory"
         subtitle="G-SAIL - Global Stock and Availability Intelligence Layer"
       >
-        <div className="flex items-center gap-4 text-xs text-stone">
-          <div className="flex items-center gap-2">
-            <Globe size={14} />
-            <span>{inventory.regions.length} Regions</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 text-xs text-stone">
+            <div className="flex items-center gap-2">
+              <Globe size={14} />
+              <span>{inventory.regions.length} Regions</span>
+            </div>
+            <span className="text-taupe">·</span>
+            <div className="flex items-center gap-2">
+              <RefreshCw size={14} />
+              <span>Last synced: {formatTime(inventory.lastSyncedAt)}</span>
+            </div>
           </div>
-          <span className="text-taupe">·</span>
-          <div className="flex items-center gap-2">
-            <RefreshCw size={14} />
-            <span>Last synced: {formatTime(inventory.lastSyncedAt)}</span>
-          </div>
+          <ExportButton options={[
+            { label: 'Export Inventory (CSV)', onClick: exportInventoryCSV },
+            { label: 'Export Alerts (CSV)', onClick: exportAlertsCSV },
+          ]} />
         </div>
       </BrandPageHeader>
 

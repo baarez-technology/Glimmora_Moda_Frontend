@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Lock, Sparkles, Calendar, Eye, Crown, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Lock, Sparkles, Calendar, Eye, Crown, MessageCircle, Check, XCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { getPrivateCollections, requestCollectionAccess } from '@/services/uhni.service';
 import type { PrivateCollection } from '@/types';
@@ -11,7 +11,13 @@ import type { PrivateCollection } from '@/types';
 type FilterType = 'all' | 'available' | 'upcoming' | 'invitation';
 
 export default function PrivateCollectionsPage() {
-  const { concierge, showToast } = useApp();
+  const {
+    concierge,
+    showToast,
+    collectionInvitations,
+    respondToInvitation,
+    submitAccessRequest
+  } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [collections, setCollections] = useState<PrivateCollection[]>([]);
@@ -51,6 +57,9 @@ export default function PrivateCollectionsPage() {
     { value: 'invitation', label: 'Invitation Required' },
   ];
 
+  const pendingInvitations = collectionInvitations.filter(inv => inv.status === 'pending');
+  const acceptedInvitations = collectionInvitations.filter(inv => inv.status === 'accepted');
+
   const filteredCollections = collections.filter(collection => {
     if (filter === 'all') return true;
     if (filter === 'available') return collection.hasAccess && new Date(collection.previewDate) <= new Date();
@@ -72,13 +81,8 @@ export default function PrivateCollectionsPage() {
     return { text: 'Preview Available', className: 'bg-gold-muted/10 text-gold-muted' };
   };
 
-  const handleRequestAccess = async (collection: PrivateCollection) => {
-    try {
-      await requestCollectionAccess(collection.id);
-      showToast(`Access request sent for ${collection.name}`, 'success');
-    } catch {
-      showToast('Failed to send access request', 'error');
-    }
+  const handleRequestAccess = (collection: PrivateCollection) => {
+    submitAccessRequest(collection.id, collection.name, collection.brandId);
   };
 
   return (
@@ -117,6 +121,74 @@ export default function PrivateCollectionsPage() {
 
       {/* Main Content */}
       <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+
+        {/* Pending Invitations */}
+        {pendingInvitations.length > 0 && (
+          <div className="mb-8 space-y-3">
+            <h2 className="text-[10px] tracking-[0.3em] uppercase text-gold-soft font-medium">
+              Pending Invitations ({pendingInvitations.length})
+            </h2>
+            {pendingInvitations.map(invitation => (
+              <div key={invitation.id} className="bg-gold-soft/10 border border-gold-soft/20 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Sparkles size={14} className="text-gold-soft" />
+                      <span className="text-sm font-medium text-charcoal-deep">{invitation.collectionName}</span>
+                    </div>
+                    <p className="text-xs text-stone mt-1">
+                      From {invitation.brandName}
+                    </p>
+                    {invitation.message && (
+                      <p className="text-xs text-taupe mt-2 italic">"{invitation.message}"</p>
+                    )}
+                    <p className="text-[10px] text-taupe mt-2">
+                      Expires {new Date(invitation.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => respondToInvitation(invitation.id, 'accept')}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                    >
+                      <Check size={12} />
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => respondToInvitation(invitation.id, 'decline')}
+                      className="flex items-center gap-1.5 px-4 py-2 border border-stone/30 text-stone text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+                    >
+                      <XCircle size={12} />
+                      Decline
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Accepted Invitations */}
+        {acceptedInvitations.length > 0 && (
+          <div className="mb-8 space-y-3">
+            <h2 className="text-[10px] tracking-[0.3em] uppercase text-success font-medium">
+              Accepted Invitations
+            </h2>
+            {acceptedInvitations.map(invitation => (
+              <div key={invitation.id} className="bg-success/5 border border-success/20 p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Check size={16} className="text-success" />
+                  <div>
+                    <span className="text-sm text-charcoal-deep">{invitation.collectionName}</span>
+                    <span className="text-xs text-taupe ml-2">by {invitation.brandName}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] tracking-[0.1em] uppercase text-success">Access Granted</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Filter Tabs */}
         <div className="flex gap-1 bg-parchment p-1 mb-8 overflow-x-auto">
           {filters.map(f => (

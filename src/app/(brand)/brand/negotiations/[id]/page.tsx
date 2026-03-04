@@ -10,7 +10,8 @@ import {
   ArrowRight,
   Clock,
   MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Send
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
@@ -20,6 +21,7 @@ export default function NegotiationDetailPage() {
   const params = useParams();
   const { getNegotiationById, submitCounterOffer, approveNegotiation, declineNegotiation } = useBrand();
   const [counterOfferValue, setCounterOfferValue] = useState('');
+  const [brandMessageText, setBrandMessageText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const negotiationId = params.id as string;
@@ -88,13 +90,15 @@ export default function NegotiationDetailPage() {
 
   const handleApprove = () => {
     setIsSubmitting(true);
-    approveNegotiation(negotiation.id);
+    approveNegotiation(negotiation.id, brandMessageText || undefined);
+    setBrandMessageText('');
     setTimeout(() => setIsSubmitting(false), 500);
   };
 
   const handleDecline = () => {
     setIsSubmitting(true);
-    declineNegotiation(negotiation.id);
+    declineNegotiation(negotiation.id, brandMessageText || undefined);
+    setBrandMessageText('');
     setTimeout(() => setIsSubmitting(false), 500);
   };
 
@@ -103,8 +107,9 @@ export default function NegotiationDetailPage() {
     if (isNaN(amount) || amount <= 0) return;
 
     setIsSubmitting(true);
-    submitCounterOffer(negotiation.id, amount);
+    submitCounterOffer(negotiation.id, amount, brandMessageText || undefined);
     setCounterOfferValue('');
+    setBrandMessageText('');
     setTimeout(() => setIsSubmitting(false), 500);
   };
 
@@ -219,6 +224,19 @@ export default function NegotiationDetailPage() {
               </div>
             </div>
 
+            {/* Client Message */}
+            {negotiation.clientMessage && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
+                  <MessageSquare size={18} className="text-stone" />
+                  <h2 className="font-medium text-charcoal-deep">Client Message</h2>
+                </div>
+                <div className="p-6">
+                  <p className="text-sm text-stone">{negotiation.clientMessage}</p>
+                </div>
+              </div>
+            )}
+
             {/* Response Actions */}
             {canRespond && (
               <div className="bg-white border border-sand/50">
@@ -226,6 +244,20 @@ export default function NegotiationDetailPage() {
                   <h2 className="font-medium text-charcoal-deep">Your Response</h2>
                 </div>
                 <div className="p-6 space-y-6">
+                  {/* Brand Message */}
+                  <div>
+                    <label className="text-[10px] tracking-[0.2em] uppercase text-taupe block mb-2">
+                      Message to Client (Optional)
+                    </label>
+                    <textarea
+                      value={brandMessageText}
+                      onChange={(e) => setBrandMessageText(e.target.value)}
+                      rows={3}
+                      placeholder="Add a message to accompany your response..."
+                      className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none text-sm"
+                    />
+                  </div>
+
                   {/* Quick Actions */}
                   <div className="flex gap-4">
                     <button
@@ -274,6 +306,24 @@ export default function NegotiationDetailPage() {
                       Suggested range: {formatCurrency(negotiation.proposedPrice)} - {formatCurrency(negotiation.originalPrice)}
                     </p>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Brand Response (shown when already responded) */}
+            {negotiation.brandMessage && negotiation.status !== 'pending' && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
+                  <Send size={18} className="text-stone" />
+                  <h2 className="font-medium text-charcoal-deep">Your Response Message</h2>
+                </div>
+                <div className="p-6">
+                  <p className="text-sm text-stone">{negotiation.brandMessage}</p>
+                  {negotiation.respondedAt && (
+                    <p className="text-xs text-taupe mt-2">
+                      Sent {formatDate(negotiation.respondedAt)}
+                    </p>
+                  )}
                 </div>
               </div>
             )}

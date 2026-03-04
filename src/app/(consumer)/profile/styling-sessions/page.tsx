@@ -1,99 +1,84 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Crown, Calendar, Video, Clock, User, Plus, Check, X, ChevronRight, MessageCircle, Sparkles, ArrowRight } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import {
+  ArrowLeft,
+  Calendar,
+  Video,
+  Clock,
+  User,
+  Plus,
+  Check,
+  X,
+  ChevronRight,
+  MessageCircle,
+  Sparkles,
+  Store,
+  Home as HomeIcon,
+  MapPin,
+  ExternalLink,
+  Search,
+} from 'lucide-react';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { useApp } from '@/context/AppContext';
+import type { Brand } from '@/types';
+import type { StylingSessionType, StylingSession } from '@/types/brand-portal';
+import * as brandService from '@/services/brand.service';
 
-interface StylingSession {
-  id: string;
-  type: 'virtual' | 'in-person';
-  duration: 30 | 60 | 90;
-  date: string;
-  time: string;
-  stylist: {
-    name: string;
-    avatar: string;
-    title: string;
-    specialties: string[];
-  };
-  status: 'scheduled' | 'completed' | 'cancelled';
-  focus?: string;
-  notes?: string;
-}
+type TabValue = 'sessions' | 'book';
+type BookingStep = 1 | 2 | 3;
 
 export default function StylingSessionsPage() {
   const router = useRouter();
-  const { isUHNI, isHydrated, concierge, showToast } = useApp();
+  const searchParams = useSearchParams();
+  const { isUHNI, isHydrated, concierge, showToast, stylingSessions, bookStylingSession, cancelStylingSession } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  // TODO: Pull sessions from a styling session service when API is available
-  // Currently showing example session data seeded from concierge context
-  const [sessions, setSessions] = useState<StylingSession[]>([
-    {
-      id: '1',
-      type: 'virtual',
-      duration: 60,
-      date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-      time: '14:00',
-      stylist: {
-        name: concierge?.name || 'Your Stylist',
-        avatar: concierge?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-        title: concierge?.title || 'Style Consultant',
-        specialties: concierge?.specialties?.slice(0, 3) || ['Capsule Wardrobes', 'Event Styling', 'Investment Pieces']
-      },
-      status: 'scheduled',
-      focus: 'Wardrobe Planning Session',
-      notes: 'Discuss upcoming events and wardrobe needs'
-    }
-  ]);
 
-  const [showRescheduleModal, setShowRescheduleModal] = useState<string | null>(null);
-  const [rescheduleDate, setRescheduleDate] = useState('');
-  const [rescheduleTime, setRescheduleTime] = useState('');
+  const tabParam = searchParams.get('tab');
+  const brandParam = searchParams.get('brand');
+  const [activeTab, setActiveTab] = useState<TabValue>(tabParam === 'book' ? 'book' : 'sessions');
   const [cancelSessionId, setCancelSessionId] = useState<string | null>(null);
 
+  // Booking state
+  const [bookingStep, setBookingStep] = useState<BookingStep>(1);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brandSearch, setBrandSearch] = useState('');
   const [bookingForm, setBookingForm] = useState({
-    type: 'virtual' as 'virtual' | 'in-person',
-    duration: 60,
+    brandId: brandParam || '',
+    brandName: '',
+    type: 'virtual' as StylingSessionType,
     date: '',
     time: '',
-    focus: '',
-    notes: ''
+    duration: 60,
+    notes: '',
+    contextInfo: '',
   });
 
   useEffect(() => {
     setIsLoaded(true);
-    // Load saved sessions from localStorage
-    try {
-      const saved = localStorage.getItem('moda-styling-sessions');
-      if (saved) setSessions(JSON.parse(saved));
-    } catch { /* ignore */ }
+    brandService.getAllBrands().then(r => {
+      if (r.success) setBrands(r.data);
+    });
   }, []);
 
-  // Persist sessions to localStorage on change
+  // Handle ?tab=book param
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('moda-styling-sessions', JSON.stringify(sessions));
-    }
-  }, [sessions, isLoaded]);
+    if (tabParam === 'book') setActiveTab('book');
+  }, [tabParam]);
 
-  // ESC key handler for modals
+  // Pre-fill brand if provided
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (showBookingModal) setShowBookingModal(false);
-        if (showRescheduleModal) { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }
+    if (brandParam && brands.length > 0) {
+      const brand = brands.find(b => b.id === brandParam);
+      if (brand) {
+        setBookingForm(prev => ({ ...prev, brandId: brand.id, brandName: brand.name }));
+        setBookingStep(2);
       }
-    };
-    if (showBookingModal || showRescheduleModal) {
-      document.addEventListener('keydown', handleEsc);
-      return () => document.removeEventListener('keydown', handleEsc);
     }
-  }, [showBookingModal, showRescheduleModal]);
+  }, [brandParam, brands]);
 
   // Redirect non-UHNI users
   useEffect(() => {
@@ -113,95 +98,123 @@ export default function StylingSessionsPage() {
     );
   }
 
-  const handleBookSession = () => {
-    const newSession: StylingSession = {
-      id: `session-${Date.now()}`,
-      type: bookingForm.type,
-      duration: bookingForm.duration as 30 | 60 | 90,
-      date: bookingForm.date,
-      time: bookingForm.time,
-      stylist: {
-        name: concierge?.name || 'Your Stylist',
-        avatar: concierge?.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400',
-        title: concierge?.title || 'Style Consultant',
-        specialties: concierge?.specialties?.slice(0, 3) || ['Capsule Wardrobes', 'Event Styling', 'Investment Pieces']
-      },
-      status: 'scheduled',
-      focus: bookingForm.focus,
-      notes: bookingForm.notes
-    };
+  const upcomingSessions = stylingSessions.filter(s =>
+    s.status !== 'cancelled' && s.status !== 'completed' && new Date(s.scheduledAt) > new Date()
+  );
+  const pastSessions = stylingSessions.filter(s =>
+    s.status === 'completed' || s.status === 'cancelled' || new Date(s.scheduledAt) <= new Date()
+  );
 
-    setSessions([newSession, ...sessions]);
-    setShowBookingModal(false);
-    showToast('Styling session booked successfully!', 'success');
+  const filteredBrands = brands.filter(b =>
+    b.name.toLowerCase().includes(brandSearch.toLowerCase())
+  );
 
-    // Reset form
-    setBookingForm({
-      type: 'virtual',
-      duration: 60,
-      date: '',
-      time: '',
-      focus: '',
-      notes: ''
+  const getStatusBadge = (status: StylingSession['status']) => {
+    switch (status) {
+      case 'pending': return 'bg-gold-soft/20 text-gold-deep';
+      case 'confirmed': return 'bg-info/10 text-info';
+      case 'scheduled': return 'bg-info/10 text-info';
+      case 'completed': return 'bg-success/10 text-success';
+      case 'cancelled': return 'bg-error/10 text-error';
+      case 'rescheduled': return 'bg-warning/10 text-warning';
+      default: return 'bg-taupe/20 text-stone';
+    }
+  };
+
+  const getTypeIcon = (type: StylingSessionType) => {
+    switch (type) {
+      case 'virtual': return Video;
+      case 'in_store': return Store;
+      case 'home': return HomeIcon;
+      default: return Calendar;
+    }
+  };
+
+  const getTypeLabel = (type: StylingSessionType) => {
+    switch (type) {
+      case 'virtual': return 'Virtual';
+      case 'in_store': return 'In-Store';
+      case 'home': return 'At Home';
+      default: return type;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
     });
   };
 
-  const handleJoinSession = (session: StylingSession) => {
-    if (session.type === 'virtual') {
-      showToast('Virtual session link will be available 5 minutes before your appointment', 'info');
-    } else {
-      showToast('In-person session — check your email for venue details', 'info');
-    }
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
-  const handleReschedule = (sessionId: string) => {
-    if (!rescheduleDate || !rescheduleTime) {
-      showToast('Please select a new date and time', 'info');
-      return;
-    }
-    setSessions(prev => prev.map(s =>
-      s.id === sessionId
-        ? { ...s, date: rescheduleDate, time: rescheduleTime }
-        : s
-    ));
-    setShowRescheduleModal(null);
-    setRescheduleDate('');
-    setRescheduleTime('');
-    showToast('Session rescheduled successfully', 'success');
+  const handleSelectBrand = (brand: Brand) => {
+    setBookingForm(prev => ({ ...prev, brandId: brand.id, brandName: brand.name }));
+    setBookingStep(2);
+  };
+
+  const handleBookSession = () => {
+    if (!bookingForm.date || !bookingForm.time || !bookingForm.brandId) return;
+
+    const scheduledAt = new Date(`${bookingForm.date}T${bookingForm.time}`).toISOString();
+    bookStylingSession({
+      brandId: bookingForm.brandId,
+      brandName: bookingForm.brandName,
+      type: bookingForm.type,
+      scheduledAt,
+      duration: bookingForm.duration,
+      notes: bookingForm.notes,
+      contextInfo: bookingForm.contextInfo,
+      customerTier: 'uhni',
+    });
+
+    // Reset form
+    setBookingForm({
+      brandId: '',
+      brandName: '',
+      type: 'virtual',
+      date: '',
+      time: '',
+      duration: 60,
+      notes: '',
+      contextInfo: '',
+    });
+    setBookingStep(1);
+    setActiveTab('sessions');
   };
 
   const handleCancelSession = (sessionId: string) => {
-    setSessions(prev => prev.map(s =>
-      s.id === sessionId ? { ...s, status: 'cancelled' as const } : s
-    ));
-    showToast('Session cancelled', 'success');
+    cancelStylingSession(sessionId);
   };
 
-  const sessionTypes = [
-    {
-      type: 'virtual' as const,
-      title: 'Virtual Session',
-      icon: Video,
-      description: 'Video consultation from anywhere',
-      price: 'Complimentary'
-    },
-    {
-      type: 'in-person' as const,
-      title: 'In-Person Session',
-      icon: User,
-      description: 'Personalized boutique experience',
-      price: 'Complimentary'
+  const handleJoinSession = (session: StylingSession) => {
+    if (session.meetingLink) {
+      window.open(session.meetingLink, '_blank');
+    } else if (session.type === 'virtual') {
+      showToast('Virtual session link will be available before your appointment', 'info');
+    } else {
+      showToast('Check your email for venue details', 'info');
     }
+  };
+
+  const sessionTypes: { type: StylingSessionType; title: string; icon: typeof Video; description: string }[] = [
+    { type: 'virtual', title: 'Virtual Session', icon: Video, description: 'Video consultation from anywhere' },
+    { type: 'in_store', title: 'In-Store', icon: Store, description: 'Personalized boutique experience' },
+    { type: 'home', title: 'At Home', icon: HomeIcon, description: 'Private styling at your residence' },
   ];
 
   const durations = [
-    { minutes: 30, label: '30 minutes', focus: 'Quick consultation' },
+    { minutes: 30, label: '30 min', focus: 'Quick consultation' },
     { minutes: 60, label: '1 hour', focus: 'Comprehensive styling' },
-    { minutes: 90, label: '90 minutes', focus: 'Deep wardrobe analysis' }
+    { minutes: 90, label: '90 min', focus: 'Deep wardrobe analysis' },
   ];
-
-  const upcomingSessions = sessions.filter(s => s.status === 'scheduled');
-  const pastSessions = sessions.filter(s => s.status === 'completed' || s.status === 'cancelled');
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -229,297 +242,555 @@ export default function StylingSessionsPage() {
                   </span>
                 </div>
                 <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
-                  Personal Styling Sessions
+                  Styling Sessions
                 </h1>
                 <p className="text-sand mt-2">Expert styling consultations tailored to you</p>
               </div>
             </div>
+          </div>
 
+          {/* Tabs */}
+          <div className="flex items-center gap-1 mt-8">
             <button
-              onClick={() => setShowBookingModal(true)}
-              className="flex items-center gap-2 px-5 py-3 bg-gold-soft/20 text-gold-soft hover:bg-gold-soft/30 transition-colors"
+              onClick={() => setActiveTab('sessions')}
+              className={`px-5 py-2.5 text-xs tracking-[0.15em] uppercase transition-colors ${
+                activeTab === 'sessions'
+                  ? 'bg-gold-soft/20 text-gold-soft'
+                  : 'text-sand/60 hover:text-sand'
+              }`}
             >
-              <Plus size={18} />
-              <span className="text-sm tracking-[0.1em] uppercase">Book Session</span>
+              My Sessions
+              <span className="ml-2 text-[10px]">{stylingSessions.length}</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab('book'); setBookingStep(1); }}
+              className={`px-5 py-2.5 text-xs tracking-[0.15em] uppercase transition-colors flex items-center gap-2 ${
+                activeTab === 'book'
+                  ? 'bg-gold-soft/20 text-gold-soft'
+                  : 'text-sand/60 hover:text-sand'
+              }`}
+            >
+              <Plus size={14} />
+              Book a Session
             </button>
           </div>
         </div>
       </div>
 
       <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Upcoming Sessions */}
-            <div>
-              <h2 className="font-display text-2xl text-charcoal-deep mb-6">Upcoming Sessions</h2>
-              {upcomingSessions.length === 0 ? (
-                <div className="text-center py-16 bg-white">
-                  <Calendar size={48} className="mx-auto text-stone mb-4" />
-                  <p className="text-stone mb-6">No upcoming sessions scheduled</p>
-                  <button
-                    onClick={() => setShowBookingModal(true)}
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors"
-                  >
-                    <Plus size={16} />
-                    <span className="text-sm tracking-[0.15em] uppercase">Book Your First Session</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {upcomingSessions.map((session) => (
-                    <div key={session.id} className="bg-white p-6">
-                      <div className="flex gap-6">
-                        {/* Stylist Avatar */}
-                        <div className="relative w-16 h-16 rounded-full overflow-hidden flex-shrink-0 border-2 border-gold-soft/30">
-                          <Image
-                            src={session.stylist.avatar}
-                            alt={session.stylist.name}
-                            fill
-                            className="object-cover"
-                          />
-                        </div>
 
-                        {/* Session Details */}
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <p className="font-display text-xl text-charcoal-deep">{session.stylist.name}</p>
-                              <p className="text-sm text-taupe">{session.stylist.title}</p>
+        {/* ═══ MY SESSIONS TAB ═══ */}
+        {activeTab === 'sessions' && (
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Main Content */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Upcoming Sessions */}
+              <div>
+                <h2 className="font-display text-2xl text-charcoal-deep mb-6">Upcoming Sessions</h2>
+                {upcomingSessions.length === 0 ? (
+                  <div className="text-center py-16 bg-white">
+                    <Calendar size={48} className="mx-auto text-stone mb-4" />
+                    <p className="text-stone mb-6">No upcoming sessions scheduled</p>
+                    <button
+                      onClick={() => setActiveTab('book')}
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors"
+                    >
+                      <Plus size={16} />
+                      <span className="text-sm tracking-[0.15em] uppercase">Book Your First Session</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {upcomingSessions.map((session) => {
+                      const TypeIcon = getTypeIcon(session.type);
+                      return (
+                        <div key={session.id} className="bg-white p-6">
+                          <div className="flex gap-6">
+                            {/* Brand Icon */}
+                            <div className="w-16 h-16 bg-parchment flex items-center justify-center flex-shrink-0">
+                              <TypeIcon size={24} className="text-stone" />
                             </div>
-                            <div className="flex items-center gap-2 px-3 py-1 bg-gold-soft/10 text-gold-muted text-xs tracking-[0.1em] uppercase">
-                              {session.type === 'virtual' ? <Video size={12} /> : <User size={12} />}
-                              <span>{session.type}</span>
-                            </div>
-                          </div>
 
-                          {session.focus && (
-                            <div className="p-4 bg-parchment mb-3">
-                              <p className="text-sm text-charcoal-deep font-medium">{session.focus}</p>
+                            {/* Session Details */}
+                            <div className="flex-1">
+                              <div className="flex items-start justify-between mb-3">
+                                <div>
+                                  <p className="font-display text-xl text-charcoal-deep">
+                                    {session.brandName || 'Styling Session'}
+                                  </p>
+                                  {session.stylistName && (
+                                    <p className="text-sm text-taupe">with {session.stylistName}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${getStatusBadge(session.status)}`}>
+                                    {session.status}
+                                  </span>
+                                  <span className="px-2 py-1 text-[9px] tracking-[0.1em] uppercase bg-parchment text-stone">
+                                    {getTypeLabel(session.type)}
+                                  </span>
+                                </div>
+                              </div>
+
                               {session.notes && (
-                                <p className="text-xs text-stone mt-2">{session.notes}</p>
+                                <div className="p-4 bg-parchment mb-3">
+                                  <p className="text-sm text-charcoal-deep">{session.notes}</p>
+                                </div>
                               )}
+
+                              <div className="flex items-center gap-6 text-sm text-stone">
+                                <div className="flex items-center gap-2">
+                                  <Calendar size={14} />
+                                  <span>{formatDate(session.scheduledAt)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Clock size={14} />
+                                  <span>{formatTime(session.scheduledAt)} ({session.duration} min)</span>
+                                </div>
+                              </div>
+
+                              {session.meetingLink && session.type === 'virtual' && (
+                                <div className="mt-3 flex items-center gap-2 text-sm text-info">
+                                  <ExternalLink size={14} />
+                                  <span>Meeting link available</span>
+                                </div>
+                              )}
+
+                              {/* Actions */}
+                              <div className="flex gap-3 mt-4">
+                                {session.type === 'virtual' && (
+                                  <button
+                                    onClick={() => handleJoinSession(session)}
+                                    className="flex-1 py-2 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.1em] uppercase"
+                                  >
+                                    Join Session
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setCancelSessionId(session.id)}
+                                  className="px-4 py-2 border border-error/30 text-error hover:border-error transition-colors text-sm tracking-[0.1em] uppercase"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
                             </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Past Sessions */}
+              {pastSessions.length > 0 && (
+                <div>
+                  <h2 className="font-display text-2xl text-charcoal-deep mb-6">Past Sessions</h2>
+                  <div className="space-y-4">
+                    {pastSessions.map((session) => (
+                      <div key={session.id} className="bg-white p-6 opacity-75">
+                        <div className="flex gap-4 items-center">
+                          <div className="w-12 h-12 bg-parchment flex items-center justify-center flex-shrink-0">
+                            {session.status === 'completed' ? (
+                              <Check size={20} className="text-success" />
+                            ) : (
+                              <X size={20} className="text-error" />
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-medium text-charcoal-deep">{session.brandName || 'Styling Session'}</p>
+                            <p className="text-sm text-taupe">
+                              {new Date(session.scheduledAt).toLocaleDateString()} • {getTypeLabel(session.type)} • {session.duration} min
+                            </p>
+                          </div>
+                          <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${getStatusBadge(session.status)}`}>
+                            {session.status}
+                          </span>
+                          {session.outfitRecommendations && session.outfitRecommendations.length > 0 && (
+                            <button
+                              onClick={() => showToast(`${session.outfitRecommendations!.length} recommendations from this session`, 'info')}
+                              className="flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
+                            >
+                              <span className="tracking-[0.1em] uppercase">Recommendations</span>
+                              <ChevronRight size={14} />
+                            </button>
                           )}
-
-                          <div className="flex items-center gap-6 text-sm text-stone">
-                            <div className="flex items-center gap-2">
-                              <Calendar size={14} />
-                              <span>{new Date(session.date).toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                month: 'long',
-                                day: 'numeric'
-                              })}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Clock size={14} />
-                              <span>{session.time} ({session.duration} min)</span>
-                            </div>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex gap-3 mt-4">
-                            <button
-                              onClick={() => handleJoinSession(session)}
-                              className="flex-1 py-2 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.1em] uppercase"
-                            >
-                              Join Session
-                            </button>
-                            <button
-                              onClick={() => {
-                                setShowRescheduleModal(session.id);
-                                setRescheduleDate(session.date.split('T')[0]);
-                                setRescheduleTime(session.time);
-                              }}
-                              className="px-4 py-2 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.1em] uppercase"
-                            >
-                              Reschedule
-                            </button>
-                            <button
-                              onClick={() => setCancelSessionId(session.id)}
-                              className="px-4 py-2 border border-error/30 text-error hover:border-error transition-colors text-sm tracking-[0.1em] uppercase"
-                            >
-                              Cancel
-                            </button>
-                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Past Sessions */}
-            {pastSessions.length > 0 && (
-              <div>
-                <h2 className="font-display text-2xl text-charcoal-deep mb-6">Past Sessions</h2>
-                <div className="space-y-4">
-                  {pastSessions.map((session) => (
-                    <div key={session.id} className="bg-white p-6 opacity-75">
-                      <div className="flex gap-4 items-center">
-                        <div className="w-12 h-12 bg-parchment flex items-center justify-center flex-shrink-0">
-                          <Check size={20} className="text-success" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-charcoal-deep">{session.focus || 'Styling Session'}</p>
-                          <p className="text-sm text-taupe">{new Date(session.date).toLocaleDateString()} • {session.stylist.name}</p>
-                        </div>
-                        <button
-                          onClick={() => showToast(session.notes || 'No session notes available', 'info')}
-                          className="flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
-                        >
-                          <span className="tracking-[0.1em] uppercase">View Notes</span>
-                          <ChevronRight size={14} />
-                        </button>
-                      </div>
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Concierge Card */}
+              {concierge && (
+                <div className="bg-charcoal-deep p-6">
+                  <div className="relative w-20 h-20 rounded-full overflow-hidden mx-auto mb-4 border-2 border-gold-soft/30">
+                    <Image
+                      src={concierge.avatar}
+                      alt={concierge.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                  <h3 className="font-display text-xl text-ivory-cream text-center mb-1">{concierge.name}</h3>
+                  <p className="text-sm text-taupe text-center mb-4">{concierge.title}</p>
+
+                  <div className="p-4 bg-ivory-cream/5 mb-4">
+                    <p className="text-xs text-sand mb-2">Specialties</p>
+                    <div className="flex flex-wrap gap-2">
+                      {concierge.specialties.slice(0, 3).map((specialty) => (
+                        <span key={specialty} className="text-xs px-2 py-1 bg-gold-soft/10 text-gold-soft">
+                          {specialty}
+                        </span>
+                      ))}
                     </div>
+                  </div>
+
+                  <Link
+                    href="/uhni/concierge"
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gold-soft/20 text-gold-soft hover:bg-gold-soft/30 transition-colors"
+                  >
+                    <MessageCircle size={16} />
+                    <span className="text-sm tracking-[0.1em] uppercase">Message</span>
+                  </Link>
+                </div>
+              )}
+
+              {/* Benefits */}
+              <div className="bg-white p-6">
+                <h3 className="font-display text-lg text-charcoal-deep mb-4">Session Benefits</h3>
+                <ul className="space-y-3 text-sm text-stone">
+                  <li className="flex items-start gap-3">
+                    <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
+                    <span>Personalized wardrobe analysis & optimization</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
+                    <span>Expert recommendations for your lifestyle</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
+                    <span>Investment piece guidance & sourcing</span>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
+                    <span>Event-specific styling solutions</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Quick Links */}
+              <div className="bg-white p-6">
+                <h3 className="font-display text-lg text-charcoal-deep mb-4">Quick Links</h3>
+                <div className="space-y-2">
+                  <Link
+                    href="/wardrobe"
+                    className="flex items-center justify-between p-3 border border-sand hover:border-charcoal-deep transition-colors group"
+                  >
+                    <span className="text-sm text-charcoal-deep">View Wardrobe</span>
+                    <ChevronRight size={14} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
+                  </Link>
+                  <Link
+                    href="/uhni/intelligence"
+                    className="flex items-center justify-between p-3 border border-sand hover:border-charcoal-deep transition-colors group"
+                  >
+                    <span className="text-sm text-charcoal-deep">Style Insights</span>
+                    <ChevronRight size={14} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ BOOK A SESSION TAB ═══ */}
+        {activeTab === 'book' && (
+          <div className="max-w-3xl mx-auto">
+            {/* Progress Steps */}
+            <div className="flex items-center justify-center gap-4 mb-10">
+              {[
+                { step: 1 as BookingStep, label: 'Select Brand' },
+                { step: 2 as BookingStep, label: 'Date & Details' },
+                { step: 3 as BookingStep, label: 'Review & Confirm' },
+              ].map(({ step, label }) => (
+                <div key={step} className="flex items-center gap-2">
+                  <div className={`w-8 h-8 flex items-center justify-center text-sm ${
+                    bookingStep >= step
+                      ? 'bg-charcoal-deep text-ivory-cream'
+                      : 'bg-parchment text-stone'
+                  }`}>
+                    {bookingStep > step ? <Check size={16} /> : step}
+                  </div>
+                  <span className={`text-xs tracking-[0.1em] uppercase hidden sm:inline ${
+                    bookingStep >= step ? 'text-charcoal-deep' : 'text-taupe'
+                  }`}>
+                    {label}
+                  </span>
+                  {step < 3 && <div className={`w-12 h-px ${bookingStep > step ? 'bg-charcoal-deep' : 'bg-sand'}`} />}
+                </div>
+              ))}
+            </div>
+
+            {/* Step 1: Brand Selection */}
+            {bookingStep === 1 && (
+              <div>
+                <h2 className="font-display text-2xl text-charcoal-deep mb-2">Select a Brand</h2>
+                <p className="text-sm text-stone mb-6">Choose which maison you&apos;d like to book a styling session with</p>
+
+                <div className="relative mb-6">
+                  <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-taupe" />
+                  <input
+                    type="text"
+                    value={brandSearch}
+                    onChange={(e) => setBrandSearch(e.target.value)}
+                    placeholder="Search brands..."
+                    className="w-full pl-10 pr-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors placeholder:text-taupe"
+                  />
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  {filteredBrands.map(brand => (
+                    <button
+                      key={brand.id}
+                      onClick={() => handleSelectBrand(brand)}
+                      className="p-5 bg-white border border-sand hover:border-charcoal-deep transition-all text-left group"
+                    >
+                      <div className="flex items-center gap-4">
+                        {brand.logoUrl ? (
+                          <div className="relative w-12 h-12 flex-shrink-0">
+                            <Image src={brand.logoUrl} alt={brand.name} fill className="object-contain" />
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 bg-parchment flex items-center justify-center flex-shrink-0">
+                            <span className="font-display text-lg text-stone">{brand.name.charAt(0)}</span>
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-display text-lg text-charcoal-deep group-hover:text-gold-muted transition-colors">
+                            {brand.name}
+                          </p>
+                          {brand.tagline && (
+                            <p className="text-xs text-taupe line-clamp-1">{brand.tagline}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
                   ))}
+                </div>
+
+                {filteredBrands.length === 0 && (
+                  <div className="text-center py-12 bg-white">
+                    <Search size={32} className="mx-auto text-taupe/40 mb-4" />
+                    <p className="text-stone">No brands found</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Step 2: Date, Time & Context */}
+            {bookingStep === 2 && (
+              <div>
+                <h2 className="font-display text-2xl text-charcoal-deep mb-2">Session Details</h2>
+                <p className="text-sm text-stone mb-8">
+                  Booking with <span className="text-charcoal-deep font-medium">{bookingForm.brandName}</span>
+                  <button
+                    onClick={() => { setBookingStep(1); setBookingForm(prev => ({ ...prev, brandId: '', brandName: '' })); }}
+                    className="ml-2 text-gold-muted hover:text-gold-deep"
+                  >
+                    Change
+                  </button>
+                </p>
+
+                <div className="space-y-8">
+                  {/* Session Type */}
+                  <div>
+                    <label className="block text-sm tracking-wider uppercase text-taupe mb-4">Session Type</label>
+                    <div className="grid grid-cols-3 gap-4">
+                      {sessionTypes.map(st => (
+                        <button
+                          key={st.type}
+                          onClick={() => setBookingForm(prev => ({ ...prev, type: st.type }))}
+                          className={`p-5 border text-left transition-all ${
+                            bookingForm.type === st.type
+                              ? 'border-charcoal-deep bg-parchment'
+                              : 'border-sand hover:border-charcoal-deep bg-white'
+                          }`}
+                        >
+                          <st.icon size={24} className="mb-3 text-stone" />
+                          <p className="font-display text-base text-charcoal-deep mb-1">{st.title}</p>
+                          <p className="text-xs text-stone">{st.description}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label className="block text-sm tracking-wider uppercase text-taupe mb-4">Duration</label>
+                    <div className="grid grid-cols-3 gap-3">
+                      {durations.map(dur => (
+                        <button
+                          key={dur.minutes}
+                          onClick={() => setBookingForm(prev => ({ ...prev, duration: dur.minutes }))}
+                          className={`p-4 border text-center transition-all ${
+                            bookingForm.duration === dur.minutes
+                              ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
+                              : 'border-sand hover:border-charcoal-deep text-charcoal-deep bg-white'
+                          }`}
+                        >
+                          <p className="font-display text-lg mb-1">{dur.label}</p>
+                          <p className="text-xs opacity-70">{dur.focus}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Date & Time */}
+                  <div className="grid sm:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm tracking-wider uppercase text-taupe mb-3">Date</label>
+                      <input
+                        type="date"
+                        value={bookingForm.date}
+                        onChange={(e) => setBookingForm(prev => ({ ...prev, date: e.target.value }))}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm tracking-wider uppercase text-taupe mb-3">Time</label>
+                      <input
+                        type="time"
+                        value={bookingForm.time}
+                        onChange={(e) => setBookingForm(prev => ({ ...prev, time: e.target.value }))}
+                        className="w-full px-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Context */}
+                  <div>
+                    <label className="block text-sm tracking-wider uppercase text-taupe mb-3">
+                      What are you looking for? (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={bookingForm.contextInfo}
+                      onChange={(e) => setBookingForm(prev => ({ ...prev, contextInfo: e.target.value }))}
+                      placeholder="e.g., Spring wardrobe refresh, Event styling, Investment pieces"
+                      className="w-full px-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors placeholder:text-taupe"
+                    />
+                  </div>
+
+                  {/* Notes */}
+                  <div>
+                    <label className="block text-sm tracking-wider uppercase text-taupe mb-3">
+                      Additional Notes (Optional)
+                    </label>
+                    <textarea
+                      value={bookingForm.notes}
+                      onChange={(e) => setBookingForm(prev => ({ ...prev, notes: e.target.value }))}
+                      rows={3}
+                      placeholder="Any specific topics or preferences..."
+                      className="w-full px-4 py-3 border border-sand bg-white focus:outline-none focus:border-charcoal-deep transition-colors resize-none placeholder:text-taupe"
+                    />
+                  </div>
+
+                  {/* Navigation */}
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setBookingStep(1)}
+                      className="flex-1 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => setBookingStep(3)}
+                      disabled={!bookingForm.date || !bookingForm.time}
+                      className="flex-1 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-[0.15em] uppercase"
+                    >
+                      Review Booking
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Concierge Card */}
-            {concierge && (
-              <div className="bg-charcoal-deep p-6">
-                <div className="relative w-20 h-20 rounded-full overflow-hidden mx-auto mb-4 border-2 border-gold-soft/30">
-                  <Image
-                    src={concierge.avatar}
-                    alt={concierge.name}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <h3 className="font-display text-xl text-ivory-cream text-center mb-1">{concierge.name}</h3>
-                <p className="text-sm text-taupe text-center mb-4">{concierge.title}</p>
+            {/* Step 3: Review & Confirm */}
+            {bookingStep === 3 && (
+              <div>
+                <h2 className="font-display text-2xl text-charcoal-deep mb-6">Review & Confirm</h2>
 
-                <div className="p-4 bg-ivory-cream/5 mb-4">
-                  <p className="text-xs text-sand mb-2">Specialties</p>
-                  <div className="flex flex-wrap gap-2">
-                    {concierge.specialties.slice(0, 3).map((specialty) => (
-                      <span key={specialty} className="text-xs px-2 py-1 bg-gold-soft/10 text-gold-soft">
-                        {specialty}
-                      </span>
-                    ))}
+                <div className="bg-white p-8 space-y-6">
+                  <div className="grid grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Brand</p>
+                      <p className="font-display text-lg text-charcoal-deep">{bookingForm.brandName}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Session Type</p>
+                      <p className="text-charcoal-deep">{getTypeLabel(bookingForm.type)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Date</p>
+                      <p className="text-charcoal-deep">
+                        {bookingForm.date && new Date(bookingForm.date + 'T00:00:00').toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Time & Duration</p>
+                      <p className="text-charcoal-deep">{bookingForm.time} • {bookingForm.duration} minutes</p>
+                    </div>
+                  </div>
+
+                  {bookingForm.contextInfo && (
+                    <div className="pt-4 border-t border-sand/30">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Context</p>
+                      <p className="text-sm text-charcoal-deep">{bookingForm.contextInfo}</p>
+                    </div>
+                  )}
+
+                  {bookingForm.notes && (
+                    <div className="pt-4 border-t border-sand/30">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Notes</p>
+                      <p className="text-sm text-stone">{bookingForm.notes}</p>
+                    </div>
+                  )}
+
+                  <div className="p-4 bg-gold-soft/10 text-sm text-gold-deep">
+                    <p>Complimentary for UHNI clients. The brand will confirm your session shortly.</p>
                   </div>
                 </div>
 
-                <Link
-                  href="/uhni/concierge"
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gold-soft/20 text-gold-soft hover:bg-gold-soft/30 transition-colors"
-                >
-                  <MessageCircle size={16} />
-                  <span className="text-sm tracking-[0.1em] uppercase">Message</span>
-                </Link>
+                {/* Actions */}
+                <div className="flex gap-4 mt-6">
+                  <button
+                    onClick={() => setBookingStep(2)}
+                    className="flex-1 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleBookSession}
+                    className="flex-1 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+                  >
+                    Confirm Booking
+                  </button>
+                </div>
               </div>
             )}
-
-            {/* Benefits */}
-            <div className="bg-white p-6">
-              <h3 className="font-display text-lg text-charcoal-deep mb-4">Session Benefits</h3>
-              <ul className="space-y-3 text-sm text-stone">
-                <li className="flex items-start gap-3">
-                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                  <span>Personalized wardrobe analysis & optimization</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                  <span>Expert recommendations for your lifestyle</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                  <span>Investment piece guidance & sourcing</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                  <span>Event-specific styling solutions</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check size={16} className="text-success flex-shrink-0 mt-0.5" />
-                  <span>Seasonal wardrobe planning</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Quick Links */}
-            <div className="bg-white p-6">
-              <h3 className="font-display text-lg text-charcoal-deep mb-4">Quick Links</h3>
-              <div className="space-y-2">
-                <Link
-                  href="/wardrobe"
-                  className="flex items-center justify-between p-3 border border-sand hover:border-charcoal-deep transition-colors group"
-                >
-                  <span className="text-sm text-charcoal-deep">View Wardrobe</span>
-                  <ChevronRight size={14} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
-                </Link>
-                <Link
-                  href="/uhni/intelligence"
-                  className="flex items-center justify-between p-3 border border-sand hover:border-charcoal-deep transition-colors group"
-                >
-                  <span className="text-sm text-charcoal-deep">Style Insights</span>
-                  <ChevronRight size={14} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
-                </Link>
-              </div>
-            </div>
           </div>
-        </div>
+        )}
       </div>
-
-      {/* Reschedule Modal */}
-      {showRescheduleModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }}>
-          <div className="bg-white max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <div className="border-b border-sand px-8 py-6 flex items-center justify-between">
-              <h2 className="font-display text-xl text-charcoal-deep">Reschedule Session</h2>
-              <button
-                onClick={() => { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }}
-                className="p-2 hover:bg-sand/20 rounded transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-8 space-y-6">
-              <div>
-                <label className="block text-sm tracking-wider uppercase text-taupe mb-3">New Date</label>
-                <input
-                  type="date"
-                  value={rescheduleDate}
-                  onChange={(e) => setRescheduleDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-sm tracking-wider uppercase text-taupe mb-3">New Time</label>
-                <input
-                  type="time"
-                  value={rescheduleTime}
-                  onChange={(e) => setRescheduleTime(e.target.value)}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
-              </div>
-              <div className="flex gap-4">
-                <button
-                  onClick={() => { setShowRescheduleModal(null); setRescheduleDate(''); setRescheduleTime(''); }}
-                  className="flex-1 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleReschedule(showRescheduleModal)}
-                  disabled={!rescheduleDate || !rescheduleTime}
-                  className="flex-1 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-[0.15em] uppercase"
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Cancel Session Confirmation */}
       <ConfirmModal
@@ -533,134 +804,6 @@ export default function StylingSessionsPage() {
         confirmLabel="Cancel Session"
         confirmVariant="danger"
       />
-
-      {/* Booking Modal */}
-      {showBookingModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-6" onClick={() => setShowBookingModal(false)}>
-          <div className="bg-white max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            {/* Modal Header */}
-            <div className="sticky top-0 bg-white border-b border-sand px-8 py-6 flex items-center justify-between z-10">
-              <h2 className="font-display text-2xl text-charcoal-deep">Book Styling Session</h2>
-              <button
-                onClick={() => setShowBookingModal(false)}
-                className="p-2 hover:bg-sand/20 rounded transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-8 space-y-8">
-              {/* Session Type */}
-              <div>
-                <label className="block text-sm tracking-wider uppercase text-taupe mb-4">Session Type</label>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {sessionTypes.map((type) => (
-                    <button
-                      key={type.type}
-                      onClick={() => setBookingForm({ ...bookingForm, type: type.type })}
-                      className={`p-6 border text-left transition-all ${
-                        bookingForm.type === type.type
-                          ? 'border-charcoal-deep bg-parchment'
-                          : 'border-sand hover:border-charcoal-deep'
-                      }`}
-                    >
-                      <type.icon size={24} className="mb-3 text-stone" />
-                      <p className="font-display text-lg text-charcoal-deep mb-1">{type.title}</p>
-                      <p className="text-sm text-stone mb-2">{type.description}</p>
-                      <p className="text-xs text-gold-muted">{type.price}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Duration */}
-              <div>
-                <label className="block text-sm tracking-wider uppercase text-taupe mb-4">Duration</label>
-                <div className="grid grid-cols-3 gap-3">
-                  {durations.map((dur) => (
-                    <button
-                      key={dur.minutes}
-                      onClick={() => setBookingForm({ ...bookingForm, duration: dur.minutes })}
-                      className={`p-4 border text-center transition-all ${
-                        bookingForm.duration === dur.minutes
-                          ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
-                          : 'border-sand hover:border-charcoal-deep text-charcoal-deep'
-                      }`}
-                    >
-                      <p className="font-display text-lg mb-1">{dur.label}</p>
-                      <p className="text-xs opacity-70">{dur.focus}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Date & Time */}
-              <div className="grid sm:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm tracking-wider uppercase text-taupe mb-3">Date</label>
-                  <input
-                    type="date"
-                    value={bookingForm.date}
-                    onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm tracking-wider uppercase text-taupe mb-3">Time</label>
-                  <input
-                    type="time"
-                    value={bookingForm.time}
-                    onChange={(e) => setBookingForm({ ...bookingForm, time: e.target.value })}
-                    className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Focus */}
-              <div>
-                <label className="block text-sm tracking-wider uppercase text-taupe mb-3">Session Focus (Optional)</label>
-                <input
-                  type="text"
-                  value={bookingForm.focus}
-                  onChange={(e) => setBookingForm({ ...bookingForm, focus: e.target.value })}
-                  placeholder="e.g., Spring wardrobe refresh, Event styling, Investment pieces"
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors placeholder:text-taupe"
-                />
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="block text-sm tracking-wider uppercase text-taupe mb-3">Additional Notes (Optional)</label>
-                <textarea
-                  value={bookingForm.notes}
-                  onChange={(e) => setBookingForm({ ...bookingForm, notes: e.target.value })}
-                  rows={4}
-                  placeholder="Any specific topics or items you'd like to discuss..."
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors resize-none placeholder:text-taupe"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowBookingModal(false)}
-                  className="flex-1 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleBookSession}
-                  disabled={!bookingForm.date || !bookingForm.time}
-                  className="flex-1 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm tracking-[0.15em] uppercase"
-                >
-                  Confirm Booking
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

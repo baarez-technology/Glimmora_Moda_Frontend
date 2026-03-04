@@ -3,30 +3,36 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, DollarSign, Crown, Check, Clock, Bell, Tag, TrendingDown, MessageCircle, ArrowRight, AlertCircle } from 'lucide-react';
+import { ArrowLeft, DollarSign, Crown, Check, Clock, Bell, Tag, TrendingDown, MessageCircle, ArrowRight, AlertCircle, Gift, Package, FolderOpen, Building, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
   getPriceNegotiations,
-  getPriceOffers,
   getPriceAlerts,
   getPricingTiers,
   getPricingSummary,
   acceptNegotiation,
-  claimOffer
 } from '@/services/uhni.service';
-import type { NegotiationStatus, PriceNegotiation, UHNIPriceOffer, UHNIPriceAlert, UHNIPricingTier, UHNIPricingSummary } from '@/types';
+import type { NegotiationStatus, PriceNegotiation, UHNIPriceAlert, UHNIPricingTier, UHNIPricingSummary } from '@/types';
+import type { UHNIPriceOffer } from '@/types/uhni';
 
 export default function PricingPage() {
-  const { concierge, showToast } = useApp();
+  const {
+    concierge, showToast,
+    priceNegotiations: contextNegotiations, respondToCounterOffer,
+    uhniOffers, claimedOffers, claimOffer
+  } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'negotiations' | 'offers' | 'alerts'>('negotiations');
 
   const [negotiations, setNegotiations] = useState<PriceNegotiation[]>([]);
-  const [offers, setOffers] = useState<UHNIPriceOffer[]>([]);
   const [alerts, setAlerts] = useState<UHNIPriceAlert[]>([]);
   const [tiers, setTiers] = useState<UHNIPricingTier[]>([]);
   const [summary, setSummary] = useState<UHNIPricingSummary | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
+
+  // Offer detail modal
+  const [selectedOffer, setSelectedOffer] = useState<UHNIPriceOffer | null>(null);
+  const [showOfferDetail, setShowOfferDetail] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -36,15 +42,17 @@ export default function PricingPage() {
     const loadData = async () => {
       setIsDataLoading(true);
       try {
-        const [negRes, offRes, alertRes, tierRes, sumRes] = await Promise.all([
+        const [negRes, alertRes, tierRes, sumRes] = await Promise.all([
           getPriceNegotiations(),
-          getPriceOffers(),
           getPriceAlerts(),
           getPricingTiers(),
           getPricingSummary(),
         ]);
-        setNegotiations(negRes.data);
-        setOffers(offRes.data);
+        setNegotiations(() => {
+          const serviceIds = new Set(negRes.data.map((n: PriceNegotiation) => n.id));
+          const contextOnly = contextNegotiations.filter(n => !serviceIds.has(n.id));
+          return [...contextOnly, ...negRes.data];
+        });
         setAlerts(alertRes.data);
         setTiers(tierRes.data);
         setSummary(sumRes.data);
@@ -55,6 +63,7 @@ export default function PricingPage() {
       }
     };
     loadData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isDataLoading) {
@@ -96,21 +105,42 @@ export default function PricingPage() {
 
   const handleAcceptOffer = async (id: string) => {
     try {
+      respondToCounterOffer(id, 'accept');
       await acceptNegotiation(id);
       setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status: 'accepted' as NegotiationStatus } : n));
-      showToast('Offer accepted successfully', 'success');
     } catch {
       showToast('Failed to accept offer', 'error');
     }
   };
 
-  const handleClaimOffer = async (id: string, _name: string) => {
-    try {
-      await claimOffer(id);
-      setOffers(prev => prev.map(o => o.id === id ? { ...o, claimed: true } : o));
-      showToast('Offer claimed — your concierge will follow up', 'success');
-    } catch {
-      showToast('Failed to claim offer', 'error');
+  const handleRejectOffer = (id: string) => {
+    respondToCounterOffer(id, 'reject');
+    setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status: 'declined' as NegotiationStatus } : n));
+  };
+
+  // Offer helpers
+  const isOfferClaimed = (offerId: string) => claimedOffers.some(c => c.offerId === offerId);
+
+  const getDiscountDisplay = (offer: UHNIPriceOffer) => {
+    if (offer.discountType === 'percentage') return `${offer.discountValue}% off`;
+    return `€${offer.discountValue.toLocaleString()} off`;
+  };
+
+  const getOfferTypeIcon = (type: UHNIPriceOffer['type']) => {
+    switch (type) {
+      case 'product': return Package;
+      case 'collection': return FolderOpen;
+      case 'brand': return Building;
+      default: return Tag;
+    }
+  };
+
+  const getOfferTypeBadge = (type: UHNIPriceOffer['type']) => {
+    switch (type) {
+      case 'product': return 'bg-gold-soft/20 text-gold-deep';
+      case 'collection': return 'bg-champagne/30 text-gold-muted';
+      case 'brand': return 'bg-parchment text-charcoal-deep';
+      default: return 'bg-parchment text-stone';
     }
   };
 
@@ -164,8 +194,8 @@ export default function PricingPage() {
           </div>
           <div className="bg-white p-6">
             <Tag size={20} className="text-gold-soft mb-3" />
-            <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Pending Offers</p>
-            <p className="font-display text-2xl text-charcoal-deep">{summary?.pendingOffers ?? 0}</p>
+            <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Available Offers</p>
+            <p className="font-display text-2xl text-charcoal-deep">{uhniOffers.length}</p>
           </div>
           <div className="bg-white p-6">
             <Bell size={20} className="text-stone mb-3" />
@@ -221,20 +251,25 @@ export default function PricingPage() {
         {/* Tabs */}
         <div className="flex gap-1 bg-parchment p-1 mb-8">
           {[
-            { value: 'negotiations' as const, label: 'Negotiations', count: negotiations.length },
-            { value: 'offers' as const, label: 'Special Offers', count: offers.filter(o => !o.claimed).length },
-            { value: 'alerts' as const, label: 'Price Alerts', count: alerts.length },
+            { value: 'negotiations' as const, label: 'Negotiations', count: negotiations.length, actionCount: negotiations.filter(n => n.status === 'counter_offered').length },
+            { value: 'offers' as const, label: 'Special Offers', count: uhniOffers.length, actionCount: 0 },
+            { value: 'alerts' as const, label: 'Price Alerts', count: alerts.length, actionCount: 0 },
           ].map(tab => (
             <button
               key={tab.value}
               onClick={() => setActiveTab(tab.value)}
-              className={`flex-1 px-4 py-3 text-xs tracking-[0.1em] uppercase transition-colors ${
+              className={`flex-1 px-4 py-3 text-xs tracking-[0.1em] uppercase transition-colors relative ${
                 activeTab === tab.value
                   ? 'bg-white text-charcoal-deep'
                   : 'text-stone hover:text-charcoal-deep'
               }`}
             >
               {tab.label} ({tab.count})
+              {tab.actionCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center w-5 h-5 bg-gold-soft text-noir text-[10px] font-medium rounded-full">
+                  {tab.actionCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -250,7 +285,6 @@ export default function PricingPage() {
               return (
                 <div key={negotiation.id} className="bg-white p-6">
                   <div className="flex flex-col md:flex-row gap-6">
-                    {/* Product Image */}
                     <div className="relative w-full md:w-32 h-32 flex-shrink-0">
                       <Image
                         src={negotiation.productImage}
@@ -259,8 +293,6 @@ export default function PricingPage() {
                         className="object-cover"
                       />
                     </div>
-
-                    {/* Details */}
                     <div className="flex-1">
                       <div className="flex items-start justify-between gap-4 mb-3">
                         <div>
@@ -272,8 +304,6 @@ export default function PricingPage() {
                           <span className="text-[10px] tracking-[0.1em] uppercase">{status.text}</span>
                         </div>
                       </div>
-
-                      {/* Pricing */}
                       <div className="flex flex-wrap gap-6 mb-4">
                         <div>
                           <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Original Price</span>
@@ -290,8 +320,23 @@ export default function PricingPage() {
                           </div>
                         )}
                       </div>
-
-                      {/* Notes */}
+                      {negotiation.brandMessage && (
+                        <div className="bg-gold-soft/5 border border-gold-soft/20 p-4 mb-4">
+                          <span className="text-[10px] tracking-[0.1em] uppercase text-gold-muted block mb-2">Brand Response</span>
+                          <p className="text-sm text-charcoal-deep">{negotiation.brandMessage}</p>
+                          {negotiation.respondedAt && (
+                            <p className="text-[10px] text-taupe mt-2">
+                              {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {negotiation.clientMessage && (
+                        <div className="bg-parchment p-4 mb-4">
+                          <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block mb-2">Your Message</span>
+                          <p className="text-sm text-stone">{negotiation.clientMessage}</p>
+                        </div>
+                      )}
                       {negotiation.conciergeNotes.length > 0 && (
                         <div className="bg-parchment p-4 mb-4">
                           <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block mb-2">Concierge Notes</span>
@@ -300,13 +345,17 @@ export default function PricingPage() {
                           ))}
                         </div>
                       )}
-
-                      {/* Actions */}
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-taupe">
-                          {daysRemaining > 0 ? `${daysRemaining} days remaining` : 'Expired'}
-                        </span>
-                        {negotiation.status === 'counter_offered' && (
+                        <div className="flex items-center gap-2">
+                          {daysRemaining > 0 ? (
+                            <span className={`text-xs ${daysRemaining <= 2 ? 'text-warning font-medium' : 'text-taupe'}`}>
+                              {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining
+                            </span>
+                          ) : (
+                            <span className="text-xs text-error">Expired</span>
+                          )}
+                        </div>
+                        {negotiation.status === 'counter_offered' && daysRemaining > 0 && (
                           <div className="flex gap-3">
                             <button
                               onClick={() => handleAcceptOffer(negotiation.id)}
@@ -314,12 +363,12 @@ export default function PricingPage() {
                             >
                               Accept Counter
                             </button>
-                            <Link
-                              href="/uhni/concierge"
-                              className="px-4 py-2 border border-sand text-charcoal-deep text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+                            <button
+                              onClick={() => handleRejectOffer(negotiation.id)}
+                              className="px-4 py-2 border border-error/30 text-error text-xs tracking-[0.1em] uppercase hover:bg-error/10 transition-colors"
                             >
-                              Negotiate Further
-                            </Link>
+                              Decline
+                            </button>
                           </div>
                         )}
                       </div>
@@ -346,56 +395,182 @@ export default function PricingPage() {
 
         {/* Offers Tab */}
         {activeTab === 'offers' && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {offers.filter(o => !o.claimed).map((offer) => {
-              const daysRemaining = getDaysRemaining(offer.validUntil);
-
-              return (
-                <div key={offer.id} className="bg-white overflow-hidden">
-                  {offer.targetImage && (
-                    <div className="relative aspect-[16/10]">
-                      <Image
-                        src={offer.targetImage}
-                        alt={offer.targetName}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute top-4 right-4 px-3 py-1.5 bg-gold-soft text-noir text-sm font-medium">
-                        {offer.discountType === 'percentage'
-                          ? `${offer.discountValue}% OFF`
-                          : `${formatCurrency(offer.discountValue)} OFF`
-                        }
+          <div className="space-y-6">
+            {/* Claimed offers wallet */}
+            {claimedOffers.filter(c => c.status === 'active').length > 0 && (
+              <div className="bg-gold-soft/10 border border-gold-soft/30 p-5">
+                <p className="text-[10px] tracking-[0.3em] uppercase text-gold-muted mb-4">
+                  Your Offer Wallet — {claimedOffers.filter(c => c.status === 'active').length} Active
+                </p>
+                <div className="space-y-3">
+                  {claimedOffers.filter(c => c.status === 'active').map(claimed => (
+                    <div
+                      key={claimed.id}
+                      className="bg-white border border-gold-soft/20 p-4 flex items-center justify-between gap-4"
+                    >
+                      <div>
+                        <p className="text-sm font-medium text-charcoal-deep">{claimed.offerTitle}</p>
+                        <p className="text-xs text-stone mt-0.5">
+                          {claimed.brandName}
+                          {claimed.productName && ` · ${claimed.productName}`}
+                        </p>
+                        <p className="text-xs text-taupe mt-0.5">
+                          Expires {new Date(claimed.expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-lg font-display text-gold-deep">{claimed.discountLabel}</p>
+                        {claimed.productSlug && (
+                          <Link
+                            href={`/product/${claimed.productSlug}`}
+                            className="text-xs text-stone hover:text-charcoal-deep transition-colors underline mt-1 block"
+                          >
+                            View Product
+                          </Link>
+                        )}
                       </div>
                     </div>
-                  )}
-                  <div className="p-6">
-                    <span className="text-[10px] tracking-[0.15em] uppercase text-taupe">{offer.type}</span>
-                    <h3 className="font-display text-lg text-charcoal-deep mb-2">{offer.targetName}</h3>
-
-                    {offer.conditions && (
-                      <ul className="mb-4 space-y-1">
-                        {offer.conditions.map((condition, idx) => (
-                          <li key={idx} className="text-xs text-stone">• {condition}</li>
-                        ))}
-                      </ul>
-                    )}
-
-                    <div className="flex items-center justify-between pt-4 border-t border-sand">
-                      <span className="text-xs text-taupe">
-                        {daysRemaining > 0 ? `${daysRemaining} days left` : 'Expired'}
-                      </span>
-                      <button
-                        onClick={() => handleClaimOffer(offer.id, offer.targetName)}
-                        disabled={daysRemaining === 0}
-                        className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Claim Offer
-                      </button>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              );
-            })}
+              </div>
+            )}
+
+            {/* Available offers */}
+            <div>
+              <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">
+                Available Offers — {uhniOffers.length} exclusive
+              </p>
+
+              {uhniOffers.length === 0 ? (
+                <div className="bg-white border border-sand p-12 text-center">
+                  <Gift size={48} className="mx-auto text-taupe/40 mb-4" />
+                  <p className="text-stone text-sm">No offers available right now</p>
+                  <p className="text-taupe text-xs mt-1">Exclusive offers from your preferred brands will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {uhniOffers.map(offer => {
+                    const daysLeft = getDaysRemaining(offer.validUntil);
+                    const claimed = isOfferClaimed(offer.id);
+                    const TypeIcon = getOfferTypeIcon(offer.type);
+                    const claimsRemaining = offer.maxClaims
+                      ? offer.maxClaims - (offer.claimedCount || 0)
+                      : null;
+
+                    return (
+                      <div
+                        key={offer.id}
+                        className={`bg-white border p-6 transition-colors ${
+                          claimed ? 'border-success/30 bg-success/5' : 'border-sand'
+                        }`}
+                      >
+                        <div className="flex items-start gap-5">
+                          {/* Offer image or icon */}
+                          <div className="w-16 h-16 bg-parchment flex items-center justify-center flex-shrink-0">
+                            {offer.productImage ? (
+                              <img src={offer.productImage} alt={offer.targetName} className="w-full h-full object-cover" />
+                            ) : (
+                              <TypeIcon size={24} className="text-stone" />
+                            )}
+                          </div>
+
+                          {/* Offer info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className={`text-[10px] px-2 py-0.5 tracking-[0.1em] uppercase ${getOfferTypeBadge(offer.type)}`}>
+                                {offer.type}
+                              </span>
+                              {offer.isPrivate && (
+                                <span className="text-[10px] px-2 py-0.5 tracking-[0.1em] uppercase bg-gold-soft/30 text-gold-deep">
+                                  Private
+                                </span>
+                              )}
+                              {daysLeft <= 3 && daysLeft > 0 && (
+                                <span className="text-[10px] px-2 py-0.5 tracking-[0.1em] uppercase bg-error/10 text-error">
+                                  Expires soon
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-[10px] tracking-[0.15em] uppercase text-gold-muted">
+                              {offer.brandName}
+                            </p>
+                            <p className="font-medium text-charcoal-deep mt-0.5">{offer.targetName}</p>
+
+                            {/* Discount display */}
+                            <div className="flex items-baseline gap-2 mt-2">
+                              <p className="font-display text-2xl text-charcoal-deep">
+                                {getDiscountDisplay(offer)}
+                              </p>
+                              {offer.type === 'product' && (offer.originalPrice || 0) > 0 && (
+                                <p className="text-sm text-stone">
+                                  on €{(offer.originalPrice || 0).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Conditions */}
+                            {offer.conditions && offer.conditions.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-2">
+                                {offer.conditions.map((cond, i) => (
+                                  <span key={i} className="text-[10px] text-stone bg-parchment px-2 py-0.5">
+                                    {cond}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Expiry and claims info */}
+                            <div className="flex items-center gap-4 mt-3">
+                              <p className={`text-xs ${daysLeft <= 3 ? 'text-error' : 'text-taupe'}`}>
+                                {daysLeft > 0
+                                  ? `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                                  : 'Expired'
+                                }
+                              </p>
+                              {claimsRemaining !== null && (
+                                <p className="text-xs text-taupe">
+                                  {claimsRemaining} of {offer.maxClaims} remaining
+                                </p>
+                              )}
+                              {(offer.claimedCount || 0) > 0 && (
+                                <p className="text-xs text-taupe">{offer.claimedCount} claimed</p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action */}
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            {claimed ? (
+                              <div className="flex items-center gap-2">
+                                <Check size={16} className="text-success" />
+                                <span className="text-sm text-success font-medium">Claimed</span>
+                              </div>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => claimOffer(offer)}
+                                  disabled={daysLeft <= 0 || (claimsRemaining !== null && claimsRemaining <= 0)}
+                                  className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                  Claim Offer
+                                </button>
+                                <button
+                                  onClick={() => { setSelectedOffer(offer); setShowOfferDetail(true); }}
+                                  className="px-5 py-2 border border-sand text-stone text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors whitespace-nowrap"
+                                >
+                                  View Details
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -484,6 +659,103 @@ export default function PricingPage() {
           </div>
         )}
       </div>
+
+      {/* Offer Detail Modal */}
+      {showOfferDetail && selectedOffer && (
+        <div
+          className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowOfferDetail(false)}
+        >
+          <div
+            className="bg-white max-w-lg w-full p-8 max-h-[80vh] overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Offer Details</h3>
+              <button
+                onClick={() => setShowOfferDetail(false)}
+                className="p-2 hover:bg-sand/20 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <div>
+                <p className="text-[10px] tracking-[0.2em] uppercase text-gold-muted mb-1">{selectedOffer.brandName}</p>
+                <p className="font-display text-2xl text-charcoal-deep">{selectedOffer.targetName}</p>
+                <p className="text-3xl font-display text-charcoal-deep mt-3">{getDiscountDisplay(selectedOffer)}</p>
+                {selectedOffer.type === 'product' && (selectedOffer.originalPrice || 0) > 0 && (
+                  <p className="text-sm text-stone mt-1">
+                    Original price: €{(selectedOffer.originalPrice || 0).toLocaleString()}
+                    {' → '}€
+                    {(selectedOffer.discountType === 'percentage'
+                      ? Math.round((selectedOffer.originalPrice || 0) * (1 - selectedOffer.discountValue / 100))
+                      : (selectedOffer.originalPrice || 0) - selectedOffer.discountValue
+                    ).toLocaleString()}
+                  </p>
+                )}
+              </div>
+
+              <div className="border-t border-sand pt-4">
+                <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-2">Validity</p>
+                <p className="text-sm text-charcoal-deep">
+                  {new Date(selectedOffer.validFrom).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                  {' — '}
+                  {new Date(selectedOffer.validUntil).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+              </div>
+
+              {selectedOffer.conditions && selectedOffer.conditions.length > 0 && (
+                <div className="border-t border-sand pt-4">
+                  <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-2">Conditions</p>
+                  <ul className="space-y-1">
+                    {selectedOffer.conditions.map((cond, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-stone">
+                        <span className="w-1 h-1 rounded-full bg-taupe mt-2 flex-shrink-0" />
+                        {cond}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {selectedOffer.maxClaims && selectedOffer.maxClaims > 0 && (
+                <div className="border-t border-sand pt-4">
+                  <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-1">Availability</p>
+                  <p className="text-sm text-charcoal-deep">
+                    {selectedOffer.maxClaims - (selectedOffer.claimedCount || 0)} of {selectedOffer.maxClaims} remaining
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-8 space-y-3">
+              {!isOfferClaimed(selectedOffer.id) ? (
+                <button
+                  onClick={() => { claimOffer(selectedOffer); setShowOfferDetail(false); }}
+                  className="w-full px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Claim This Offer
+                </button>
+              ) : (
+                <div className="flex items-center justify-center gap-2 py-3">
+                  <Check size={18} className="text-success" />
+                  <p className="text-success font-medium">You have claimed this offer</p>
+                </div>
+              )}
+              <button
+                onClick={() => setShowOfferDetail(false)}
+                className="w-full px-6 py-3 border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

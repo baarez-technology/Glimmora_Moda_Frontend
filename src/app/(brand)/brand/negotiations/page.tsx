@@ -108,7 +108,13 @@ export default function NegotiationsPage() {
       <BrandPageHeader
         title="Price Negotiations"
         subtitle={`${filteredNegotiations.length} negotiation${filteredNegotiations.length !== 1 ? 's' : ''}`}
-      />
+      >
+        {priceNegotiations.filter(n => n.status === 'pending').length > 0 && (
+          <span className="px-2 py-0.5 bg-warning/10 text-warning text-xs">
+            {priceNegotiations.filter(n => n.status === 'pending').length} awaiting response
+          </span>
+        )}
+      </BrandPageHeader>
 
       <div className="p-8 space-y-6">
         {/* Filter Tabs */}

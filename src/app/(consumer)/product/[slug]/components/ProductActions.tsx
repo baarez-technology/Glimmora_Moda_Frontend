@@ -1,6 +1,7 @@
 'use client';
 
-import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag } from 'lucide-react';
+import { useState } from 'react';
+import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, DollarSign, X, Crown } from 'lucide-react';
 import type { Product, ProductVariant } from '@/types';
 
 interface ProductActionsProps {
@@ -25,6 +26,8 @@ interface ProductActionsProps {
   onShowIntelligence: () => void;
   onShowConcierge: () => void;
   showIntelligence: boolean;
+  isUHNI?: boolean;
+  onNegotiatePrice?: (proposedPrice: number, message: string) => void;
 }
 
 export default function ProductActions({
@@ -48,8 +51,13 @@ export default function ProductActions({
   onShowViewOnMe,
   onShowIntelligence,
   onShowConcierge,
-  showIntelligence
+  showIntelligence,
+  isUHNI,
+  onNegotiatePrice
 }: ProductActionsProps) {
+  const [showNegotiateModal, setShowNegotiateModal] = useState(false);
+  const [negotiatePrice, setNegotiatePrice] = useState('');
+  const [negotiateMessage, setNegotiateMessage] = useState('');
   const needsSize = sizeVariants.length > 0 && !selectedSize;
   const needsColor = colorVariants.length > 0 && !selectedColor;
   const selectionIncomplete = needsSize || needsColor;
@@ -229,6 +237,104 @@ export default function ProductActions({
         <span className="text-sm tracking-[0.1em]">Questions about this piece?</span>
         <span className="text-[10px] tracking-[0.15em] uppercase text-taupe group-hover:text-charcoal-deep transition-colors">Ask Concierge</span>
       </button>
+
+      {/* UHNI: Negotiate Price */}
+      {isUHNI && onNegotiatePrice && (
+        <>
+          <button
+            onClick={() => setShowNegotiateModal(true)}
+            className="w-full mt-4 py-4 px-6 bg-charcoal-deep/5 border border-gold-muted/40 text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 hover:border-gold-muted"
+          >
+            <Crown size={16} className="text-gold-muted" />
+            <span className="text-sm tracking-[0.15em] uppercase">Negotiate Price</span>
+            <span className="text-[10px] text-taupe ml-1">UHNI Exclusive</span>
+          </button>
+
+          {/* Negotiate Price Modal */}
+          {showNegotiateModal && (
+            <div className="fixed inset-0 bg-noir/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white max-w-md w-full">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-sand/50">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={18} className="text-gold-muted" />
+                    <h3 className="font-display text-lg text-charcoal-deep">Negotiate Price</h3>
+                  </div>
+                  <button onClick={() => setShowNegotiateModal(false)} className="text-taupe hover:text-charcoal-deep">
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-5">
+                  <div>
+                    <p className="text-sm text-charcoal-deep font-medium">{product.name}</p>
+                    <p className="text-xs text-taupe">{product.brandName}</p>
+                    <p className="text-lg font-display text-charcoal-deep mt-1">
+                      €{product.price.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] tracking-[0.15em] uppercase text-taupe block mb-2">
+                      Your Proposed Price
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                      <input
+                        type="number"
+                        value={negotiatePrice}
+                        onChange={(e) => setNegotiatePrice(e.target.value)}
+                        placeholder="Enter your offer"
+                        className="w-full pl-8 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                    {negotiatePrice && parseFloat(negotiatePrice) > 0 && (
+                      <p className="text-xs text-taupe mt-1">
+                        {Math.round(((product.price - parseFloat(negotiatePrice)) / product.price) * 100)}% below retail
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] tracking-[0.15em] uppercase text-taupe block mb-2">
+                      Message to Brand (Optional)
+                    </label>
+                    <textarea
+                      value={negotiateMessage}
+                      onChange={(e) => setNegotiateMessage(e.target.value)}
+                      rows={3}
+                      placeholder="Why this price? Mention loyalty, bulk interest, etc."
+                      className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none text-sm"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => setShowNegotiateModal(false)}
+                      className="flex-1 py-3 px-4 border border-sand text-charcoal-deep text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        const price = parseFloat(negotiatePrice);
+                        if (isNaN(price) || price <= 0) return;
+                        onNegotiatePrice(price, negotiateMessage);
+                        setShowNegotiateModal(false);
+                        setNegotiatePrice('');
+                        setNegotiateMessage('');
+                      }}
+                      disabled={!negotiatePrice || parseFloat(negotiatePrice) <= 0}
+                      className="flex-1 py-3 px-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+                    >
+                      Submit Offer
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Gift, Tag, Percent, Calendar, CheckCircle, Clock, Package, FolderOpen, Building } from 'lucide-react';
+import { Plus, Gift, Tag, Percent, Calendar, CheckCircle, Clock, Package, FolderOpen, Building, Users } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { UHNIPriceOffer } from '@/types/brand-portal';
@@ -196,25 +196,26 @@ export default function UHNIOffersPage() {
                       </div>
                     </div>
 
-                    {/* Claimed status */}
-                    <div className="mt-3 flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-xs">
-                        {offer.claimed ? (
-                          <>
-                            <CheckCircle size={12} className="text-success" />
-                            <span className="text-success">Claimed</span>
-                          </>
-                        ) : (
-                          <>
-                            <Clock size={12} className="text-taupe" />
-                            <span className="text-taupe">Not claimed</span>
-                          </>
+                    {/* Claim count & status */}
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs text-stone">
+                          <Users size={14} />
+                          <span>
+                            {offer.claimedCount || 0} claimed
+                            {offer.maxClaims && offer.maxClaims > 0 ? ` of ${offer.maxClaims}` : ''}
+                          </span>
+                        </div>
+                        {offer.isPrivate && (
+                          <span className="text-[10px] px-2 py-0.5 bg-gold-soft/20 text-gold-deep tracking-[0.1em] uppercase">
+                            Private
+                          </span>
                         )}
                       </div>
                       {offer.conditions && offer.conditions.length > 0 && (
-                        <span className="text-[10px] text-taupe">
+                        <p className="text-[10px] text-taupe">
                           {offer.conditions.length} condition{offer.conditions.length !== 1 ? 's' : ''}
-                        </span>
+                        </p>
                       )}
                     </div>
                   </div>

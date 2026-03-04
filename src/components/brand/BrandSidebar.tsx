@@ -40,6 +40,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
+  phase?: 1 | 2 | 3;
 }
 
 interface NavSection {
@@ -92,17 +93,17 @@ const navigation: NavSection[] = [
     title: 'Intelligence',
     collapsible: true,
     items: [
-      { label: 'Design-to-Demand', href: '/brand/intelligence/design-demand', icon: Brain },
-      { label: 'Intelligence Agent', href: '/brand/intelligence/agent', icon: Activity },
-      { label: 'Brand Concierge', href: '/brand/intelligence/concierge', icon: Bot },
-      { label: 'Memory Imprint', href: '/brand/intelligence/memory', icon: Fingerprint },
-      { label: 'Digital Twin', href: '/brand/intelligence/digital-twin', icon: Network },
-      { label: 'Cultural Authority', href: '/brand/intelligence/cultural-authority', icon: Shield },
-      { label: 'Boutiques', href: '/brand/intelligence/boutiques', icon: Store },
-      { label: 'Counterfeit Detection', href: '/brand/intelligence/counterfeit', icon: AlertTriangle },
-      { label: 'Drop Simulator', href: '/brand/intelligence/drop-simulator', icon: Rocket },
-      { label: 'Heritage DNA', href: '/brand/intelligence/heritage', icon: Gem },
-      { label: 'Client Genome', href: '/brand/intelligence/client-genome', icon: Users }
+      { label: 'Design-to-Demand', href: '/brand/intelligence/design-demand', icon: Brain, phase: 2 },
+      { label: 'Intelligence Agent', href: '/brand/intelligence/agent', icon: Activity, phase: 1 },
+      { label: 'Brand Concierge', href: '/brand/intelligence/concierge', icon: Bot, phase: 1 },
+      { label: 'Memory Imprint', href: '/brand/intelligence/memory', icon: Fingerprint, phase: 3 },
+      { label: 'Digital Twin', href: '/brand/intelligence/digital-twin', icon: Network, phase: 3 },
+      { label: 'Cultural Authority', href: '/brand/intelligence/cultural-authority', icon: Shield, phase: 3 },
+      { label: 'Boutiques', href: '/brand/intelligence/boutiques', icon: Store, phase: 1 },
+      { label: 'Counterfeit Detection', href: '/brand/intelligence/counterfeit', icon: AlertTriangle, phase: 3 },
+      { label: 'Drop Simulator', href: '/brand/intelligence/drop-simulator', icon: Rocket, phase: 2 },
+      { label: 'Heritage DNA', href: '/brand/intelligence/heritage', icon: Gem, phase: 2 },
+      { label: 'Client Genome', href: '/brand/intelligence/client-genome', icon: Users, phase: 1 }
     ]
   },
   {
@@ -228,6 +229,11 @@ export function BrandSidebar() {
                       >
                         <Icon size={18} strokeWidth={1.5} />
                         <span className="flex-1">{item.label}</span>
+                        {item.phase && (
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            item.phase === 1 ? 'bg-success' : item.phase === 2 ? 'bg-info' : 'bg-gold-soft'
+                          }`} />
+                        )}
                         {active && (
                           <ChevronRight size={14} className="text-taupe" />
                         )}

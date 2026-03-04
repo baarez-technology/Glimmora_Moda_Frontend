@@ -354,7 +354,9 @@ export type {
   SourcingOption,
   SourcingNote,
   UHNIPriceOffer,
-  UserTier
+  UserTier,
+  CollectionAccessRequest,
+  CollectionInvitation
 } from './uhni';
 
 // ============================================
@@ -416,16 +418,45 @@ export interface BrandStory {
 // ============================================
 
 export type StylingSessionType = 'virtual' | 'in_store' | 'home';
-export type StylingSessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+export type StylingSessionStatus = 'pending' | 'confirmed' | 'scheduled' | 'completed' | 'cancelled' | 'rescheduled';
+
+export interface StylingRecommendation {
+  id: string;
+  productId: string;
+  productName: string;
+  productSlug: string;
+  productImage: string;
+  brandName: string;
+  price: number;
+  stylistNote?: string;
+}
+
+export interface StylingSessionRequest {
+  brandId: string;
+  brandName: string;
+  type: StylingSessionType;
+  scheduledAt: string;
+  duration: number;
+  notes?: string;
+  contextInfo?: string;
+  customerTier: 'standard' | 'preferred' | 'uhni';
+}
 
 export interface StylingSession {
   id: string;
   brandId: string;
+  brandName?: string;
   scheduledAt: string;
   duration: number;
   type: StylingSessionType;
   status: StylingSessionStatus;
   notes?: string;
+  clientNotes?: string;
+  brandNotes?: string;
+  outfitRecommendations?: StylingRecommendation[];
+  meetingLink?: string;
+  contextInfo?: string;
+  cancelReason?: string;
   customerId: string;
   customerName: string;
   customerEmail: string;
@@ -434,4 +465,38 @@ export interface StylingSession {
   stylistName?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================
+// COMMERCE SETTINGS (Tax, Shipping, Returns)
+// ============================================
+
+export interface TaxRule {
+  id: string;
+  regionName: string;
+  countryCode: string;
+  taxRate: number;
+  taxLabel: string;
+  isEnabled: boolean;
+  includeInPrice: boolean;
+}
+
+export interface ShippingMethod {
+  id: string;
+  name: string;
+  carrier: string;
+  estimatedDays: string;
+  baseRate: number;
+  freeAbove: number;
+  isEnabled: boolean;
+  regions: string[];
+}
+
+export interface CommerceSettings {
+  taxRules: TaxRule[];
+  shippingMethods: ShippingMethod[];
+  freeShippingThreshold: number;
+  returnWindowDays: number;
+  returnPolicy: string;
+  defaultCurrency: string;
 }

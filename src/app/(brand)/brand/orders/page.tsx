@@ -6,6 +6,8 @@ import { ChevronRight, ChevronLeft, Search, Package, Clock, Truck, CheckCircle, 
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import type { OrderStatus } from '@/types/brand-portal';
+import ExportButton from '@/components/brand/ExportButton';
+import { convertToCSV, downloadCSV, buildFilename } from '@/lib/export-utils';
 
 const ORDERS_PER_PAGE = 20;
 
@@ -120,6 +122,25 @@ export default function OrdersPage() {
     }
   };
 
+  const exportOrdersCSV = () => {
+    const rows = filteredAndSortedOrders.map(order => ({
+      'Order #': order.orderNumber,
+      Customer: order.customer.name,
+      Email: order.customer.email,
+      Items: order.items.length,
+      Boutique: order.boutique,
+      Region: order.region,
+      Total: order.total,
+      Currency: order.currency,
+      Payment: order.paymentStatus,
+      Status: order.status,
+      'Shipping Address': order.shippingInfo.address,
+      'Created At': order.createdAt,
+    }));
+    const csv = convertToCSV(rows);
+    downloadCSV(buildFilename('orders', filter === 'all' ? 'all' : filter), csv);
+  };
+
   const statusCounts = {
     all: orders.length,
     pending: orders.filter(o => o.status === 'pending').length,
@@ -135,6 +156,11 @@ export default function OrdersPage() {
       <BrandPageHeader
         title="Orders"
         subtitle={`${filteredAndSortedOrders.length} order${filteredAndSortedOrders.length !== 1 ? 's' : ''}`}
+        actions={
+          <ExportButton options={[
+            { label: 'Export Orders (CSV)', onClick: exportOrdersCSV },
+          ]} />
+        }
       />
 
       <div className="p-8 space-y-6">

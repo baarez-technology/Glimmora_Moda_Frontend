@@ -133,6 +133,13 @@ export default function SourcingRequestsPage() {
       <BrandPageHeader
         title="Sourcing Requests"
         subtitle={`${filteredRequests.length} request${filteredRequests.length !== 1 ? 's' : ''} to participate in`}
+        actions={
+          sourcingRequests.filter(r => r.status === 'awaiting_approval').length > 0 ? (
+            <span className="px-2.5 py-1 bg-gold-soft/20 text-gold-deep text-xs tracking-[0.1em]">
+              {sourcingRequests.filter(r => r.status === 'awaiting_approval').length} awaiting approval
+            </span>
+          ) : undefined
+        }
       />
 
       <div className="p-8 space-y-6">
@@ -251,6 +258,11 @@ export default function SourcingRequestsPage() {
                               <StatusIcon size={12} />
                               {getStatusLabel(request.status)}
                             </span>
+                            {request.status === 'awaiting_approval' && (
+                              <span className="ml-2 px-2 py-0.5 bg-gold-soft/20 text-gold-deep text-[10px] tracking-[0.05em] uppercase">
+                                Action Required
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-center">

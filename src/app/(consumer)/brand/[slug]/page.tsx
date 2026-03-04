@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
 import { getRecommendedProducts, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
@@ -411,6 +411,32 @@ export default function BrandPage({ params }: BrandPageProps) {
           </div>
         </section>
       )}
+
+      {/* ═══ STYLING SESSION CTA ═══ */}
+      <section className="py-16 bg-parchment">
+        <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-16">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8 p-8 bg-white">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gold-soft/20 flex items-center justify-center">
+                <Sparkles size={24} className="text-gold-muted" />
+              </div>
+              <div>
+                <h3 className="font-display text-xl text-charcoal-deep">Book a Styling Session</h3>
+                <p className="text-sm text-stone mt-1">
+                  Get personalized styling advice from {brand.name}&apos;s experts
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/profile/styling-sessions?tab=book&brand=${brand.id}`}
+              className="inline-flex items-center gap-3 px-8 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+            >
+              <Sparkles size={16} />
+              Book Session
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* ═══ CTA ═══ */}
       <section className="py-20 lg:py-28">
