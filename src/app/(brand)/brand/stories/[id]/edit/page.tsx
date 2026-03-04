@@ -7,6 +7,7 @@ import { ArrowLeft, Plus, Image, Type, Quote, Clock, Trash2, Save, Loader2, Book
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchStory, updateStory, fetchProductsList } from '@/services/brand-story.service';
 import type { StoryResponse, ProductListItem } from '@/services/brand-story.service';
+import StoryProductPicker from '@/components/brand/StoryProductPicker';
 
 type StoryType = 'heritage' | 'craftsmanship' | 'collection' | 'artisan';
 
@@ -418,37 +419,12 @@ export default function EditStoryPage() {
             <span className="text-sm text-taupe">{formData.product_list.length} selected</span>
           </div>
           <div className="p-6">
-            {products.length === 0 ? (
-              <p className="text-sm text-taupe text-center py-4">No products available</p>
-            ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-48 overflow-y-auto">
-                {products.map(product => {
-                  const pid = String(product.product_id);
-                  const isSelected = formData.product_list.includes(pid);
-                  return (
-                    <button
-                      key={product.product_id}
-                      type="button"
-                      onClick={() => toggleProduct(pid)}
-                      className={`flex items-center gap-2 p-2 border text-left transition-colors ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-parchment'
-                          : 'border-sand hover:border-charcoal-deep/50'
-                      }`}
-                    >
-                      <div className="w-8 h-8 bg-parchment flex-shrink-0">
-                        {product.image_url && (
-                          <img src={product.image_url} alt="" className="w-full h-full object-cover" />
-                        )}
-                      </div>
-                      <p className={`text-xs truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
-                        {product.product_name}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <StoryProductPicker
+              products={products}
+              selectedIds={formData.product_list}
+              onToggle={toggleProduct}
+              isLoading={false}
+            />
           </div>
         </div>
 
