@@ -3,17 +3,25 @@
 import { useState, useMemo, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getRecommendedBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
+import { useApp } from '@/context/AppContext';
 import type { Product, Brand, BrandStory } from '@/types';
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const { isUHNI } = useApp();
   const occasionParam = searchParams.get('occasion');
   const moodParam = searchParams.get('mood');
   const brandIdParam = searchParams.get('brandId');
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  // UHNI users have their own discover page
+  useEffect(() => {
+    if (isUHNI) router.replace('/uhni/discover');
+  }, [isUHNI, router]);
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -252,6 +260,8 @@ function DiscoverContent() {
       </div>
     );
   }
+
+  if (isUHNI) return null;
 
   return (
     <div className="bg-ivory-cream">

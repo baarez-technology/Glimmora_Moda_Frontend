@@ -17,17 +17,22 @@ import {
   User,
   CreditCard,
   Calendar,
-  ChevronDown
+  ChevronDown,
+  FileText,
+  Printer,
+  X
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import type { OrderStatus } from '@/types/brand-portal';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 
 export default function OrderDetailPage() {
   const params = useParams();
-  const { getOrderById, getProductById, updateOrderStatus } = useBrand();
+  const { getOrderById, getProductById, updateOrderStatus, partner } = useBrand();
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const orderId = params.id as string;
   const order = getOrderById(orderId);
@@ -154,6 +159,13 @@ export default function OrderDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowInvoice(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-sand/50 text-stone text-xs tracking-wide hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+            >
+              <FileText size={14} />
+              Invoice
+            </button>
             <span className={`px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getPaymentStatusBadge(order.paymentStatus)}`}>
               Payment: {order.paymentStatus}
             </span>
@@ -376,6 +388,59 @@ export default function OrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Invoice Modal */}
+      {showInvoice && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setShowInvoice(false)}>
+          <div className="bg-white max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Invoice</h3>
+              <button onClick={() => setShowInvoice(false)} className="p-2 hover:bg-sand/20 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <InvoiceDocument
+              invoiceNumber={generateInvoiceNumber(order.id, order.createdAt)}
+              invoiceDate={order.createdAt}
+              orderType="standard"
+              brandName={partner?.brandName || 'ModaGlimmora'}
+              buyerName={order.customer.name}
+              buyerEmail={order.customer.email}
+              buyerAddress={`${order.shippingInfo.address}\n${order.shippingInfo.city}, ${order.shippingInfo.postalCode}\n${order.shippingInfo.country}`}
+              items={order.items.map(item => ({
+                description: item.productName,
+                detail: item.variant || '',
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                currency: 'EUR',
+              }))}
+              subtotal={order.subtotal}
+              shippingAmount={order.shipping}
+              taxRate={0.20}
+              taxAmount={order.tax}
+              total={order.total}
+              currency="EUR"
+              paymentStatus={order.paymentStatus === 'paid' ? 'paid' : 'pending'}
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={printInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+              >
+                <Printer size={16} />
+                Print Invoice
+              </button>
+              <button
+                onClick={printInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+              >
+                <FileText size={16} />
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -93,35 +93,41 @@ export default function UHNIWishlistPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-noir flex items-center justify-center">
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-gold-soft border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-sand text-sm">Loading your curated selections...</p>
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-taupe text-sm">Loading your curated selections...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-noir">
-      {/* Header */}
-      <section className="border-b border-gold-soft/10">
-        <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 py-10">
-          <div className="flex items-center gap-2 mb-3">
-            <Crown size={14} className="text-gold-soft" />
-            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft">
-              {wishlistItems.length} {wishlistItems.length === 1 ? 'piece' : 'pieces'} curated
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1]">
-              Curated Selections
-            </h1>
+    <div className="min-h-screen bg-ivory-cream">
+      {/* Hero Header */}
+      <section className="bg-charcoal-deep py-16 lg:py-20">
+        <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
+          <Link href="/uhni" className="inline-flex items-center gap-2 text-xs tracking-wider text-sand/50 hover:text-sand transition-colors mb-8">
+            ← Back to Dashboard
+          </Link>
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <Crown size={13} className="text-gold-soft" />
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/60">
+                  {wishlistItems.length} {wishlistItems.length === 1 ? 'piece' : 'pieces'} curated
+                </span>
+              </div>
+              <h1 className="font-display text-[clamp(2rem,4vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-2">
+                Curated Selections
+              </h1>
+              <p className="text-taupe text-sm">Pieces you are watching and considering for acquisition.</p>
+            </div>
             <div className="flex items-center gap-4">
               {wishlistItems.length > 0 && (
                 <button
                   onClick={() => setShowClearAll(true)}
-                  className="flex items-center gap-2 text-sm text-sand hover:text-red-400 transition-colors"
+                  className="flex items-center gap-2 text-sand/50 hover:text-red-400 transition-colors"
                 >
                   <Trash2 size={14} />
                   <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
@@ -129,22 +135,23 @@ export default function UHNIWishlistPage() {
               )}
               <button
                 onClick={fetchWishlist}
-                className="flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors"
+                className="flex items-center gap-2 text-sand/50 hover:text-sand transition-colors"
+                aria-label="Refresh"
               >
                 <RefreshCw size={14} />
               </button>
               {/* View Toggle */}
-              <div className="flex border border-gold-soft/20">
+              <div className="flex border border-sand/30">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-2.5 transition-all ${viewMode === 'grid' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand hover:text-ivory-cream'}`}
+                  className={`p-2.5 transition-all ${viewMode === 'grid' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand/50 hover:text-sand'}`}
                   aria-label="Grid view"
                 >
                   <Grid size={16} />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-2.5 transition-all ${viewMode === 'list' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand hover:text-ivory-cream'}`}
+                  className={`p-2.5 transition-all ${viewMode === 'list' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand/50 hover:text-sand'}`}
                   aria-label="List view"
                 >
                   <LayoutList size={16} />
@@ -158,9 +165,9 @@ export default function UHNIWishlistPage() {
       {/* Error Banner */}
       {error && (
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24 pt-6">
-          <div className="p-4 bg-red-900/20 border border-red-500/30 text-red-300 text-sm flex items-center justify-between">
+          <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center justify-between">
             <span>{error}</span>
-            <button onClick={fetchWishlist} className="text-red-200 underline text-xs uppercase tracking-wider">
+            <button onClick={fetchWishlist} className="text-red-600 underline text-xs uppercase tracking-wider">
               Retry
             </button>
           </div>
@@ -181,7 +188,7 @@ export default function UHNIWishlistPage() {
                   >
                     <Link
                       href={productHref(item.product_id, item.product_name)}
-                      className="relative block aspect-[3/4] overflow-hidden mb-4 bg-charcoal-deep"
+                      className="relative block aspect-[3/4] overflow-hidden mb-4 bg-parchment"
                     >
                       {item.image_urls[0] ? (
                         <Image
@@ -192,17 +199,17 @@ export default function UHNIWishlistPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Heart size={24} className="text-gold-soft/40" />
+                          <Heart size={24} className="text-stone" />
                         </div>
                       )}
 
                       {/* Hover Overlay */}
-                      <div className="absolute inset-0 bg-noir/0 group-hover:bg-noir/30 transition-all duration-500" />
+                      <div className="absolute inset-0 bg-charcoal-deep/0 group-hover:bg-charcoal-deep/20 transition-all duration-500" />
 
                       {/* Remove Button */}
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemove(item.wishlist_id); }}
-                        className="absolute top-3 right-3 w-8 h-8 bg-noir/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-900"
+                        className="absolute top-3 right-3 w-8 h-8 bg-charcoal-deep/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-900"
                         aria-label="Remove"
                       >
                         <X size={14} className="text-ivory-cream" />
@@ -212,7 +219,7 @@ export default function UHNIWishlistPage() {
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleMoveToCart(item); }}
                         disabled={movingId === item.wishlist_id}
-                        className="absolute top-3 left-3 w-8 h-8 bg-noir/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gold-soft hover:text-noir disabled:opacity-50"
+                        className="absolute top-3 left-3 w-8 h-8 bg-charcoal-deep/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gold-soft hover:text-noir disabled:opacity-50"
                         aria-label="Move to bag"
                       >
                         <ShoppingBag size={14} className="text-ivory-cream" />
@@ -220,19 +227,19 @@ export default function UHNIWishlistPage() {
 
                       {/* Price Badge */}
                       <div className="absolute bottom-3 left-3">
-                        <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-noir/80 px-3 py-1.5">
+                        <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-charcoal-deep/80 px-3 py-1.5">
                           €{item.price.toLocaleString()}
                         </span>
                       </div>
                     </Link>
 
                     {(item.size || item.color) && (
-                      <p className="text-[10px] tracking-[0.25em] uppercase text-sand/60 mb-1">
+                      <p className="text-[10px] tracking-[0.25em] uppercase text-stone mb-1">
                         {[item.size, item.color].filter(Boolean).join(' · ')}
                       </p>
                     )}
                     <Link href={productHref(item.product_id, item.product_name)}>
-                      <h3 className="font-display text-lg text-ivory-cream leading-tight group-hover:text-gold-soft transition-colors">
+                      <h3 className="font-display text-base text-charcoal-deep leading-tight group-hover:text-stone transition-colors">
                         {item.product_name}
                       </h3>
                     </Link>
@@ -246,12 +253,12 @@ export default function UHNIWishlistPage() {
                   <div
                     key={item.wishlist_id}
                     className={`flex gap-6 md:gap-8 py-8 ${
-                      index !== wishlistItems.length - 1 ? 'border-b border-gold-soft/10' : ''
+                      index !== wishlistItems.length - 1 ? 'border-b border-sand/50' : ''
                     } ${removingId === item.wishlist_id ? 'opacity-50 pointer-events-none' : ''}`}
                   >
                     <Link
                       href={productHref(item.product_id, item.product_name)}
-                      className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-charcoal-deep"
+                      className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-parchment"
                     >
                       {item.image_urls[0] ? (
                         <Image
@@ -262,7 +269,7 @@ export default function UHNIWishlistPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <Heart size={24} className="text-gold-soft/40" />
+                          <Heart size={24} className="text-stone" />
                         </div>
                       )}
                     </Link>
@@ -271,18 +278,18 @@ export default function UHNIWishlistPage() {
                       <div className="flex justify-between items-start gap-4">
                         <div>
                           <Link href={productHref(item.product_id, item.product_name)}>
-                            <h3 className="font-display text-xl md:text-2xl text-ivory-cream hover:text-gold-soft transition-colors">
+                            <h3 className="font-display text-xl md:text-2xl text-charcoal-deep hover:text-stone transition-colors">
                               {item.product_name}
                             </h3>
                           </Link>
-                          <p className="font-display text-lg text-ivory-cream/80 mt-2">
+                          <p className="font-display text-lg text-charcoal-deep/70 mt-2">
                             €{item.price.toLocaleString()}
                           </p>
                         </div>
                         <button
                           onClick={() => handleRemove(item.wishlist_id)}
                           disabled={removingId === item.wishlist_id}
-                          className="w-10 h-10 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream transition-all flex-shrink-0"
+                          className="w-10 h-10 flex items-center justify-center border border-sand/50 text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-all flex-shrink-0"
                           aria-label="Remove"
                         >
                           <X size={16} />
@@ -292,19 +299,19 @@ export default function UHNIWishlistPage() {
                       {(item.size || item.color) && (
                         <div className="flex gap-3 mt-4">
                           {item.size && (
-                            <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
+                            <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-sand/50 text-stone">
                               Size: {item.size}
                             </span>
                           )}
                           {item.color && (
-                            <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-gold-soft/20 text-sand">
+                            <span className="text-xs tracking-[0.1em] uppercase px-3 py-1.5 border border-sand/50 text-stone">
                               Color: {item.color}
                             </span>
                           )}
                         </div>
                       )}
 
-                      <p className="text-xs text-sand/50 mt-3">
+                      <p className="text-xs text-stone mt-3">
                         Added {new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </p>
 
@@ -312,14 +319,14 @@ export default function UHNIWishlistPage() {
                         <button
                           onClick={() => handleMoveToCart(item)}
                           disabled={movingId === item.wishlist_id}
-                          className="px-5 py-3 bg-gold-soft text-noir text-xs tracking-[0.15em] uppercase hover:bg-gold-deep transition-colors disabled:opacity-50"
+                          className="px-5 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-charcoal-deep/80 transition-colors disabled:opacity-50"
                         >
                           <ShoppingBag size={14} className="inline mr-2" />
                           Move to Bag
                         </button>
                         <button
                           onClick={() => handleShare(item.product_name)}
-                          className="px-5 py-3 border border-gold-soft/30 text-gold-soft text-xs tracking-[0.15em] uppercase hover:border-gold-soft transition-colors"
+                          className="px-5 py-3 border border-sand/50 text-stone text-xs tracking-[0.15em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
                         >
                           <Share2 size={14} className="inline mr-2" />
                           Share
@@ -333,26 +340,26 @@ export default function UHNIWishlistPage() {
           ) : (
             /* Empty State */
             <div className="max-w-xl mx-auto text-center py-20">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gold-soft/10 rounded-full mb-6">
-                <Heart size={32} className="text-gold-soft/60" />
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-parchment mb-6">
+                <Heart size={32} className="text-stone" />
               </div>
-              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-ivory-cream leading-[1.1] mb-4">
+              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1.1] mb-4">
                 No Curated Selections Yet
               </h2>
-              <p className="text-sand mb-12 max-w-md mx-auto">
+              <p className="text-taupe mb-10 max-w-md mx-auto">
                 Your concierge can curate pieces for you, or explore our exclusive collections to discover extraordinary items.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/uhni/concierge"
-                  className="inline-flex items-center gap-3 px-8 py-4 bg-gold-soft text-noir hover:bg-gold-deep transition-colors"
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-charcoal-deep/80 transition-colors"
                 >
-                  <Crown size={16} />
-                  <span className="text-sm tracking-[0.15em] uppercase font-medium">Ask Concierge</span>
+                  <Crown size={14} className="text-gold-soft" />
+                  <span className="text-sm tracking-[0.15em] uppercase">Ask Concierge</span>
                 </Link>
                 <Link
                   href="/uhni/discover"
-                  className="inline-flex items-center gap-3 px-8 py-4 border border-gold-soft/30 text-gold-soft hover:border-gold-soft transition-colors"
+                  className="inline-flex items-center gap-3 px-8 py-4 border border-sand/50 text-charcoal-deep hover:border-charcoal-deep transition-colors"
                 >
                   <span className="text-sm tracking-[0.15em] uppercase">Discover Pieces</span>
                 </Link>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
   Calendar,
@@ -73,7 +74,8 @@ const dressCodeLabels: Record<string, string> = {
 };
 
 export default function CalendarPage() {
-  const { calendarEvents, saveOutfit, addToConsiderations, showToast } = useApp();
+  const { calendarEvents, saveOutfit, addToConsiderations, showToast, isUHNI } = useApp();
+  const router = useRouter();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(
     calendarEvents[0]?.id || null
   );
@@ -88,6 +90,7 @@ export default function CalendarPage() {
     : calendarEvents[0] || null;
 
   useEffect(() => {
+    if (isUHNI) { router.replace('/uhni/calendar'); return; }
     setIsLoaded(true);
     const loadConnections = async () => {
       try {
@@ -112,7 +115,7 @@ export default function CalendarPage() {
       }
     };
     loadConnections();
-  }, []);
+  }, [isUHNI, router]);
 
   const connectedCalendar = calendarConnections.find(c => c.connected);
 
@@ -171,6 +174,8 @@ export default function CalendarPage() {
     if (diff < 14) return 'Next week';
     return `In ${Math.ceil(diff / 7)} weeks`;
   };
+
+  if (isUHNI) return null;
 
   return (
     <div className="min-h-screen bg-ivory-cream">

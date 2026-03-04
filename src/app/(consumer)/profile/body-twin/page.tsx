@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, User, Check, ChevronRight, ChevronLeft, Shield, Save, Pencil, Plus, Ruler, Shirt, Move, Loader2 } from 'lucide-react';
 import { getDigitalBodyTwin, createDigitalBodyTwin, updateDigitalBodyTwin } from '@/services/digital-body-twin.service';
 import { useApp } from '@/context/AppContext';
@@ -167,7 +168,8 @@ function BodyTwinEmpty({ onAdd }: { onAdd: () => void }) {
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function BodyTwinPage() {
-  const { showToast } = useApp();
+  const { showToast, isUHNI } = useApp();
+  const router = useRouter();
   const [bodyTwin, setBodyTwin] = useState<DigitalBodyTwin>(defaultBodyTwin);
   const [savedBodyTwin, setSavedBodyTwin] = useState<DigitalBodyTwin | null>(null);
   const [mode, setMode] = useState<'loading' | 'view' | 'edit' | 'add'>('loading');
@@ -175,6 +177,10 @@ export default function BodyTwinPage() {
   const [saving, setSaving] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [measurementErrors, setMeasurementErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (isUHNI) router.replace('/uhni/body-twin');
+  }, [isUHNI, router]);
 
   // Load existing Body Twin data on mount
   useEffect(() => {
@@ -316,6 +322,8 @@ export default function BodyTwinPage() {
     setActiveStep(0);
     setMeasurementErrors({});
   };
+
+  if (isUHNI) return null;
 
   const isEditMode = mode === 'edit';
 

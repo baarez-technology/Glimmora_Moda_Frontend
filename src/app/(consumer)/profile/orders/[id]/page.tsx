@@ -3,7 +3,8 @@
 import { use, useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Download, RotateCcw, X, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, MessageCircle, FileText } from 'lucide-react';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 import { useApp } from '@/context/AppContext';
 import { notFound, useRouter } from 'next/navigation';
 
@@ -294,8 +295,8 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                   onClick={() => setShowInvoice(true)}
                   className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
                 >
-                  <Download size={20} className="text-stone" />
-                  <span className="text-sm text-charcoal-deep">Download Invoice</span>
+                  <FileText size={20} className="text-stone" />
+                  <span className="text-sm text-charcoal-deep">View Invoice</span>
                 </button>
                 <button
                   onClick={() => {
@@ -422,85 +423,60 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
       {/* Invoice Modal */}
       {showInvoice && order && (
         <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setShowInvoice(false)}>
-          <div className="bg-white max-w-lg w-full p-8 max-h-[80vh] overflow-y-auto" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-6">
               <h3 className="font-display text-xl text-charcoal-deep">Invoice</h3>
               <button onClick={() => setShowInvoice(false)} className="p-2 hover:bg-sand/20 transition-colors">
                 <X size={18} />
               </button>
             </div>
-            <div className="border border-sand p-6 space-y-6">
-              <div className="flex justify-between">
-                <div>
-                  <p className="font-display text-lg text-charcoal-deep">ModaGlimmora</p>
-                  <p className="text-xs text-stone">Invoice #{order.id}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-stone">Date: {formatDisplayDate(order.createdAt)}</p>
-                  <p className="text-xs text-stone">Status: {order.status}</p>
-                </div>
-              </div>
-              <div className="border-t border-sand pt-4">
-                {order.items.map(item => (
-                  <div key={item.id} className="flex justify-between py-2 text-sm">
-                    <span className="text-charcoal-deep">{item.product.name}</span>
-                    <span className="text-charcoal-deep">€{item.product.price.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t border-sand pt-4 flex justify-between">
-                <span className="font-medium text-charcoal-deep">Total</span>
-                <span className="font-display text-xl text-charcoal-deep">€{order.total.toLocaleString()}</span>
-              </div>
-              <p className="text-xs text-stone text-center">Shipping: Complimentary | Tax: Included</p>
+
+            <InvoiceDocument
+              invoiceNumber={generateInvoiceNumber(order.id, order.createdAt)}
+              invoiceDate={order.createdAt}
+              orderType="standard"
+              brandName={order.items[0]?.product.brandName || 'ModaGlimmora'}
+              buyerName={order.customerName || 'Valued Client'}
+              buyerEmail={order.customerEmail || ''}
+              buyerAddress={order.shippingAddress || ''}
+              items={order.items.map(item => ({
+                description: item.product.name,
+                detail: [
+                  item.selectedVariants?.size ? `Size: ${item.selectedVariants.size}` : '',
+                  item.selectedVariants?.color ? `Color: ${item.selectedVariants.color}` : '',
+                ].filter(Boolean).join(' · '),
+                quantity: item.quantity || 1,
+                unitPrice: item.product.price,
+                currency: 'EUR',
+              }))}
+              subtotal={order.total}
+              shippingAmount={0}
+              taxRate={0.20}
+              taxAmount={Math.round(order.total * 0.20 / 1.20)}
+              total={order.total}
+              currency="EUR"
+              paymentStatus="paid"
+            />
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={printInvoice}
+                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-charcoal-deep/80 transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
+              >
+                <Printer size={16} />
+                Print Invoice
+              </button>
+              <button
+                onClick={() => {
+                  printInvoice();
+                  showToast("Use 'Save as PDF' in the print dialog to download", 'info');
+                }}
+                className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
+              >
+                <FileText size={16} />
+                Download PDF
+              </button>
             </div>
-            <button
-              onClick={() => {
-                const lines = [
-                  '================================================',
-                  '              MODAGLIMMORA INVOICE',
-                  '================================================',
-                  '',
-                  `Invoice #: ${order.id}`,
-                  `Date: ${formatDisplayDate(order.createdAt)}`,
-                  `Status: ${order.status.charAt(0).toUpperCase() + order.status.slice(1)}`,
-                  '',
-                  '------------------------------------------------',
-                  'ITEMS',
-                  '------------------------------------------------',
-                  ...order.items.map(item =>
-                    `  ${item.product.name}${item.selectedVariants?.size ? ` (Size: ${item.selectedVariants.size})` : ''}${item.selectedVariants?.color ? ` (Color: ${item.selectedVariants.color})` : ''}\n    Brand: ${item.product.brandName}\n    Price: EUR ${item.product.price.toLocaleString()}`
-                  ),
-                  '',
-                  '------------------------------------------------',
-                  `Subtotal:  EUR ${order.total.toLocaleString()}`,
-                  'Shipping:  Complimentary',
-                  'Tax:       Included',
-                  '------------------------------------------------',
-                  `TOTAL:     EUR ${order.total.toLocaleString()}`,
-                  '================================================',
-                  '',
-                  'Thank you for shopping with ModaGlimmora.',
-                  'For support, visit /concierge or contact us.',
-                  '',
-                ];
-                const text = lines.join('\n');
-                const blob = new Blob([text], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `invoice-${order.id}.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast('Invoice downloaded', 'success');
-              }}
-              className="w-full mt-4 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
-            >
-              <Download size={16} />
-              Download Invoice
-            </button>
           </div>
         </div>
       )}

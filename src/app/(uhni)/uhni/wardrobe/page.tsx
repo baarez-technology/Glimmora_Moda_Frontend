@@ -97,32 +97,45 @@ export default function UHNIWardrobePage() {
   })();
 
   return (
-    <div className="min-h-screen bg-noir">
-      {/* Hero Header */}
-      <section className="border-b border-gold-soft/10 py-16 lg:py-20">
+    <div className="min-h-screen bg-ivory-cream">
+      {/* Hero Header — dark banner matching dashboard hero */}
+      <section className="bg-charcoal-deep py-16 lg:py-20">
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
-          <div className={`flex flex-col lg:flex-row lg:items-end justify-between gap-8 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <Link href="/uhni" className="inline-flex items-center gap-2 text-xs tracking-wider text-sand/50 hover:text-sand transition-colors mb-8">
+            ← Back to Dashboard
+          </Link>
+          <div className={`flex flex-col lg:flex-row lg:items-end justify-between gap-8 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Crown size={14} className="text-gold-soft" />
-                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">Your Collection</span>
+              <div className="flex items-center gap-2 mb-3">
+                <Crown size={13} className="text-gold-soft" />
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/60">Your Collection</span>
               </div>
-              <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
+              <h1 className="font-display text-[clamp(2rem,4vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-2">
                 Private Wardrobe
               </h1>
-              <p className="text-sand max-w-lg">
+              <p className="text-taupe text-sm">
                 {wardrobe.length} piece{wardrobe.length !== 1 ? 's' : ''} carefully curated in your private collection.
               </p>
+              <p className="text-sand/40 text-xs mt-1">
+                Items added from any session appear here — your UHNI wardrobe syncs across all devices.
+              </p>
+              <Link
+                href="/outfit-builder"
+                className="inline-flex items-center gap-2 mt-4 text-xs tracking-[0.15em] uppercase text-gold-soft/70 hover:text-gold-soft transition-colors"
+              >
+                <ArrowRight size={12} />
+                Build an Outfit
+              </Link>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 flex-wrap">
               {/* Filter & Sort */}
               <div className="flex items-center gap-3">
                 <SlidersHorizontal size={16} className="text-sand/40" />
                 <select
                   value={categoryFilter}
                   onChange={e => setCategoryFilter(e.target.value)}
-                  className="bg-transparent border border-gold-soft/20 text-sand text-sm px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-gold-soft/40"
+                  className="bg-transparent border border-sand/30 text-sand text-sm px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-sand/60"
                   aria-label="Filter by category"
                 >
                   <option value="all" className="text-charcoal-deep">All</option>
@@ -134,7 +147,7 @@ export default function UHNIWardrobePage() {
                 <select
                   value={sortBy}
                   onChange={e => setSortBy(e.target.value as 'recent' | 'brand' | 'worn')}
-                  className="bg-transparent border border-gold-soft/20 text-sand text-sm px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-gold-soft/40"
+                  className="bg-transparent border border-sand/30 text-sand text-sm px-3 py-2 appearance-none cursor-pointer focus:outline-none focus:border-sand/60"
                   aria-label="Sort by"
                 >
                   <option value="recent" className="text-charcoal-deep">Recently Added</option>
@@ -144,39 +157,39 @@ export default function UHNIWardrobePage() {
               </div>
 
               {/* View Toggle */}
-              <div className="flex border border-gold-soft/20">
+              <div className="flex border border-sand/30">
                 <button
                   onClick={() => setViewMode('grid')}
-                  className={`p-3 transition-all ${viewMode === 'grid' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand hover:text-ivory-cream'}`}
+                  className={`p-3 transition-all ${viewMode === 'grid' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand/50 hover:text-sand'}`}
                   aria-label="Grid view"
                 >
-                  <Grid size={18} />
+                  <Grid size={16} />
                 </button>
                 <button
                   onClick={() => setViewMode('list')}
-                  className={`p-3 transition-all ${viewMode === 'list' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand hover:text-ivory-cream'}`}
+                  className={`p-3 transition-all ${viewMode === 'list' ? 'bg-gold-soft/20 text-gold-soft' : 'text-sand/50 hover:text-sand'}`}
                   aria-label="List view"
                 >
-                  <LayoutList size={18} />
+                  <LayoutList size={16} />
                 </button>
               </div>
 
               {wardrobe.length > 0 && (
                 <button
                   onClick={() => setShowClearAll(true)}
-                  className="flex items-center gap-2 text-sm text-sand hover:text-red-400 transition-colors"
+                  className="flex items-center gap-2 text-sand/50 hover:text-red-400 transition-colors"
                 >
                   <Trash2 size={14} />
                   <span className="text-xs tracking-[0.1em] uppercase">Clear All</span>
                 </button>
               )}
 
-              <Link href="/uhni/discover" className="group flex items-center gap-4">
-                <span className="text-sm tracking-[0.15em] uppercase text-sand group-hover:text-ivory-cream transition-colors">
+              <Link href="/uhni/discover" className="group flex items-center gap-3">
+                <span className="text-sm tracking-[0.15em] uppercase text-ivory-cream group-hover:text-sand transition-colors">
                   Add Piece
                 </span>
-                <span className="w-12 h-12 border border-gold-soft/30 flex items-center justify-center group-hover:border-gold-soft group-hover:bg-gold-soft/10 transition-all duration-300">
-                  <ArrowRight size={16} className="text-gold-soft" />
+                <span className="w-10 h-10 border border-gold-soft/30 flex items-center justify-center group-hover:border-gold-soft group-hover:bg-gold-soft/10 transition-all duration-300">
+                  <ArrowRight size={14} className="text-gold-soft" />
                 </span>
               </Link>
             </div>
@@ -186,24 +199,24 @@ export default function UHNIWardrobePage() {
 
       {/* Stats Bar */}
       {wardrobe.length > 0 && (
-        <section className="border-b border-gold-soft/10">
+        <section className="border-b border-sand/50 bg-white">
           <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
-            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gold-soft/10">
-              <div className="py-8 pr-8">
-                <p className="font-display text-3xl text-ivory-cream mb-1">{stats.totalPieces}</p>
-                <p className="text-[10px] tracking-[0.3em] uppercase text-sand/50">Pieces</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-sand/50">
+              <div className="py-6 pr-8">
+                <p className="font-display text-2xl text-charcoal-deep mb-1">{stats.totalPieces}</p>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-stone">Pieces</p>
               </div>
-              <div className="py-8 px-8">
-                <p className="font-display text-3xl text-ivory-cream mb-1">{stats.brands}</p>
-                <p className="text-[10px] tracking-[0.3em] uppercase text-sand/50">Maisons</p>
+              <div className="py-6 px-8">
+                <p className="font-display text-2xl text-charcoal-deep mb-1">{stats.brands}</p>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-stone">Maisons</p>
               </div>
-              <div className="py-8 px-8">
-                <p className="font-display text-3xl text-ivory-cream mb-1">{stats.totalWears}</p>
-                <p className="text-[10px] tracking-[0.3em] uppercase text-sand/50">Total Wears</p>
+              <div className="py-6 px-8">
+                <p className="font-display text-2xl text-charcoal-deep mb-1">{stats.totalWears}</p>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-stone">Total Wears</p>
               </div>
-              <div className="py-8 pl-8">
-                <p className="font-display text-3xl text-ivory-cream mb-1">€{stats.totalValue.toLocaleString()}</p>
-                <p className="text-[10px] tracking-[0.3em] uppercase text-sand/50">Collection Value</p>
+              <div className="py-6 pl-8">
+                <p className="font-display text-2xl text-charcoal-deep mb-1">€{stats.totalValue.toLocaleString()}</p>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-stone">Collection Value</p>
               </div>
             </div>
           </div>
@@ -211,7 +224,7 @@ export default function UHNIWardrobePage() {
       )}
 
       {/* Main Content */}
-      <section className="py-16 lg:py-24">
+      <section className="py-14 lg:py-20">
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
           {wardrobe.length > 0 ? (
             <div className="grid lg:grid-cols-4 gap-12 lg:gap-16">
@@ -223,7 +236,7 @@ export default function UHNIWardrobePage() {
                       <div key={item.id} className="group">
                         <Link
                           href={`/product/${item.product.slug}?productId=${item.productId}`}
-                          className="relative block aspect-[3/4] overflow-hidden mb-4 bg-charcoal-deep"
+                          className="relative block aspect-[3/4] overflow-hidden mb-4 bg-parchment"
                           onMouseEnter={() => setActiveHover(index)}
                           onMouseLeave={() => setActiveHover(null)}
                         >
@@ -233,30 +246,30 @@ export default function UHNIWardrobePage() {
                             fill
                             className="object-cover transition-transform duration-700 group-hover:scale-105"
                           />
-                          <div className="absolute inset-0 bg-noir/0 group-hover:bg-noir/30 transition-all duration-500 flex items-center justify-center">
-                            <div className={`w-14 h-14 rounded-full bg-gold-soft/20 backdrop-blur-sm flex items-center justify-center transform transition-all duration-500 ${activeHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
+                          <div className="absolute inset-0 bg-charcoal-deep/0 group-hover:bg-charcoal-deep/20 transition-all duration-500 flex items-center justify-center">
+                            <div className={`w-14 h-14 rounded-full bg-ivory-cream/20 backdrop-blur-sm flex items-center justify-center transform transition-all duration-500 ${activeHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
                               <ArrowRight size={18} className="text-ivory-cream" />
                             </div>
                           </div>
                           <button
                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); removeFromWardrobe(item.id); }}
-                            className="absolute top-3 right-3 w-8 h-8 bg-noir/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-900"
+                            className="absolute top-3 right-3 w-8 h-8 bg-charcoal-deep/80 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-900"
                             aria-label="Remove from wardrobe"
                           >
                             <X size={14} className="text-ivory-cream" />
                           </button>
                           <div className="absolute bottom-3 left-3">
-                            <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-noir/80 px-3 py-1.5 flex items-center gap-1.5">
+                            <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-charcoal-deep/80 px-3 py-1.5 flex items-center gap-1.5">
                               <Calendar size={10} />
                               {item.wearCount} wears
                             </span>
                           </div>
                         </Link>
-                        <p className="text-[10px] tracking-[0.25em] uppercase text-sand/50 mb-1">
+                        <p className="text-[10px] tracking-[0.25em] uppercase text-stone mb-1">
                           {item.product.brandName}
                         </p>
                         <Link href={`/product/${item.product.slug}?productId=${item.productId}`}>
-                          <h3 className="font-display text-lg text-ivory-cream leading-tight group-hover:text-gold-soft transition-colors">
+                          <h3 className="font-display text-lg text-charcoal-deep leading-tight group-hover:text-stone transition-colors">
                             {item.product.name}
                           </h3>
                         </Link>
@@ -268,11 +281,11 @@ export default function UHNIWardrobePage() {
                     {filteredWardrobe.map((item, index) => (
                       <div
                         key={item.id}
-                        className={`flex gap-6 md:gap-8 py-8 ${index !== filteredWardrobe.length - 1 ? 'border-b border-gold-soft/10' : ''}`}
+                        className={`flex gap-6 md:gap-8 py-8 ${index !== filteredWardrobe.length - 1 ? 'border-b border-sand/50' : ''}`}
                       >
                         <Link
                           href={`/product/${item.product.slug}?productId=${item.productId}`}
-                          className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-charcoal-deep"
+                          className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0 bg-parchment"
                           onMouseEnter={() => setActiveHover(index)}
                           onMouseLeave={() => setActiveHover(null)}
                         >
@@ -286,36 +299,36 @@ export default function UHNIWardrobePage() {
                         <div className="flex-1 py-2">
                           <div className="flex justify-between items-start gap-4">
                             <div>
-                              <p className="text-[10px] tracking-[0.3em] uppercase text-sand/50 mb-2">
+                              <p className="text-[10px] tracking-[0.3em] uppercase text-stone mb-2">
                                 {item.product.brandName}
                               </p>
                               <Link href={`/product/${item.product.slug}?productId=${item.productId}`}>
-                                <h3 className="font-display text-xl md:text-2xl text-ivory-cream hover:text-gold-soft transition-colors">
+                                <h3 className="font-display text-xl md:text-2xl text-charcoal-deep hover:text-stone transition-colors">
                                   {item.product.name}
                                 </h3>
                               </Link>
                             </div>
                             <button
                               onClick={() => removeFromWardrobe(item.id)}
-                              className="w-10 h-10 flex items-center justify-center border border-gold-soft/20 text-sand hover:border-gold-soft hover:text-ivory-cream transition-all"
+                              className="w-10 h-10 flex items-center justify-center border border-sand/50 text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-all"
                               aria-label="Remove"
                             >
                               <X size={16} />
                             </button>
                           </div>
-                          <div className="flex items-center gap-4 mt-4 text-sm text-sand">
+                          <div className="flex items-center gap-4 mt-4 text-sm text-taupe">
                             <span className="flex items-center gap-2">
                               <Calendar size={14} />
                               Worn {item.wearCount} times
                             </span>
                             {item.lastWorn && (
-                              <span className="text-sand/50">Last: {item.lastWorn}</span>
+                              <span className="text-stone">Last: {item.lastWorn}</span>
                             )}
                           </div>
                           {item.product.tags.length > 0 && (
                             <div className="flex gap-2 mt-4">
                               {item.product.tags.slice(0, 3).map((tag) => (
-                                <span key={tag} className="px-3 py-1 border border-gold-soft/20 text-xs text-sand">
+                                <span key={tag} className="px-3 py-1 border border-sand/50 text-xs text-stone">
                                   {tag}
                                 </span>
                               ))}
@@ -332,21 +345,21 @@ export default function UHNIWardrobePage() {
               <div className="lg:col-span-1 space-y-8">
                 {/* Outfit Ideas */}
                 <div>
-                  <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-6">
+                  <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-5">
                     Suggested Outfits
                   </span>
                   {suggestedOutfits.length > 0 ? (
                     <div className="space-y-4">
                       {suggestedOutfits.map((outfit, index) => (
-                        <div key={index} className="p-5 bg-charcoal-deep border border-gold-soft/10">
-                          <p className="text-[10px] tracking-[0.2em] uppercase text-gold-soft/60 mb-2">{outfit.occasion}</p>
-                          <h4 className="font-display text-lg text-ivory-cream mb-3">{outfit.name}</h4>
-                          <p className="text-sm text-sand">{outfit.pieces.join(' + ')}</p>
+                        <div key={index} className="p-5 bg-white border border-sand/50">
+                          <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">{outfit.occasion}</p>
+                          <h4 className="font-display text-base text-charcoal-deep mb-2">{outfit.name}</h4>
+                          <p className="text-sm text-taupe">{outfit.pieces.join(' + ')}</p>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-sand leading-relaxed">
+                    <p className="text-sm text-taupe leading-relaxed">
                       Add at least 2 pieces to your wardrobe to see personalized outfit suggestions.
                     </p>
                   )}
@@ -355,17 +368,17 @@ export default function UHNIWardrobePage() {
                 {/* Wardrobe Gaps */}
                 {wardrobeGaps.length > 0 && (
                   <div>
-                    <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-6">
+                    <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-5">
                       Wardrobe Gaps
                     </span>
                     <div className="space-y-3">
                       {wardrobeGaps.map((gap) => (
-                        <div key={gap.key} className="p-4 border border-gold-soft/10 bg-charcoal-deep/50">
-                          <p className="text-sm font-medium text-ivory-cream mb-1">{gap.label}</p>
-                          <p className="text-xs text-sand leading-relaxed">{gap.suggestion}</p>
+                        <div key={gap.key} className="p-4 border border-sand/50 bg-parchment">
+                          <p className="text-sm font-medium text-charcoal-deep mb-1">{gap.label}</p>
+                          <p className="text-xs text-taupe leading-relaxed">{gap.suggestion}</p>
                           <Link
                             href={`/uhni/discover?category=${gap.key}`}
-                            className="inline-flex items-center gap-1.5 mt-2 text-[10px] tracking-[0.1em] uppercase text-gold-soft hover:text-gold-deep transition-colors"
+                            className="inline-flex items-center gap-1.5 mt-2 text-[10px] tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
                           >
                             <span>Browse {gap.label}</span>
                             <ArrowRight size={10} />
@@ -377,12 +390,12 @@ export default function UHNIWardrobePage() {
                 )}
 
                 {/* Style Note */}
-                <div className="p-6 bg-charcoal-deep border border-gold-soft/10">
+                <div className="p-6 bg-white border border-sand/50">
                   <div className="flex items-center gap-2 mb-4">
                     <Crown size={12} className="text-gold-soft" />
-                    <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50">Style Note</p>
+                    <p className="text-[10px] tracking-[0.4em] uppercase text-stone">Style Note</p>
                   </div>
-                  <p className="text-sand text-sm leading-relaxed">
+                  <p className="text-taupe text-sm leading-relaxed">
                     Your collection shows a refined taste for structured silhouettes. Consider adding softer textures for versatility.
                   </p>
                 </div>
@@ -391,28 +404,28 @@ export default function UHNIWardrobePage() {
           ) : (
             /* Empty State */
             <div className="max-w-xl mx-auto text-center py-20">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gold-soft/10 rounded-full mb-6">
-                <Crown size={32} className="text-gold-soft/60" />
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-parchment mb-6">
+                <Crown size={32} className="text-stone" />
               </div>
-              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-ivory-cream leading-[1.1] mb-6">
+              <h2 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1.1] mb-4">
                 Start Your Private Collection
               </h2>
-              <p className="text-sand mb-12">
+              <p className="text-taupe mb-10">
                 Add pieces you own to get personalized outfit suggestions and track your style journey.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
                   href="/uhni/discover"
-                  className="inline-flex items-center gap-3 px-8 py-4 bg-gold-soft text-noir hover:bg-gold-deep transition-colors"
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-charcoal-deep/80 transition-colors"
                 >
-                  <span className="text-sm tracking-[0.15em] uppercase font-medium">Discover Pieces</span>
+                  <span className="text-sm tracking-[0.15em] uppercase">Discover Pieces</span>
                   <ArrowRight size={16} />
                 </Link>
                 <Link
                   href="/uhni/concierge"
-                  className="inline-flex items-center gap-3 px-8 py-4 border border-gold-soft/30 text-gold-soft hover:border-gold-soft transition-colors"
+                  className="inline-flex items-center gap-3 px-8 py-4 border border-sand/50 text-charcoal-deep hover:border-charcoal-deep transition-colors"
                 >
-                  <Crown size={16} />
+                  <Crown size={14} className="text-gold-soft" />
                   <span className="text-sm tracking-[0.15em] uppercase">Ask Concierge</span>
                 </Link>
               </div>

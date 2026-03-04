@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
@@ -9,17 +10,19 @@ import ConfirmModal from '@/components/shared/ConfirmModal';
 import type { ProductCategory } from '@/types';
 
 export default function WardrobePage() {
+  const { wardrobe, removeFromWardrobe, clearAllWardrobe, isUHNI } = useApp();
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'recent' | 'brand' | 'worn'>('recent');
-  const { wardrobe, removeFromWardrobe, clearAllWardrobe } = useApp();
   const [showClearAll, setShowClearAll] = useState(false);
 
   useEffect(() => {
+    if (isUHNI) { router.replace('/uhni/wardrobe'); return; }
     setIsLoaded(true);
-  }, []);
+  }, [isUHNI, router]);
 
   const stats = {
     totalPieces: wardrobe.length,
@@ -119,6 +122,8 @@ export default function WardrobePage() {
     const presentCategories = new Set(wardrobe.map(item => item.product.category));
     return allCategories.filter(cat => !presentCategories.has(cat.key));
   })();
+
+  if (isUHNI) return null;
 
   return (
     <div className="min-h-screen bg-ivory-cream">

@@ -13,19 +13,24 @@ import {
   Scissors,
   Mail,
   Camera,
-  ChevronDown
+  ChevronDown,
+  FileText,
+  Printer,
+  X
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { useApp } from '@/context/AppContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { BespokeOrderStatus, BespokeOrderType } from '@/types/uhni';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 
 export default function BespokeOrderDetailPage() {
   const params = useParams();
-  const { getBespokeOrderById, updateBespokeOrderStatus } = useBrand();
+  const { getBespokeOrderById, updateBespokeOrderStatus, partner } = useBrand();
   const { showToast } = useApp();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const orderId = params.id as string;
   const order = getBespokeOrderById(orderId);
@@ -134,9 +139,18 @@ export default function BespokeOrderDetailPage() {
           { label: order.id.toUpperCase() }
         ]}
         actions={
-          <SecondaryButton href="/brand/bespoke" icon={ArrowLeft}>
-            Back to Orders
-          </SecondaryButton>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowInvoice(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-sand text-stone text-xs tracking-wide hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+            >
+              <FileText size={14} />
+              Generate Invoice
+            </button>
+            <SecondaryButton href="/brand/bespoke" icon={ArrowLeft}>
+              Back to Orders
+            </SecondaryButton>
+          </div>
         }
       />
 
@@ -392,6 +406,61 @@ export default function BespokeOrderDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Invoice Modal */}
+      {showInvoice && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setShowInvoice(false)}>
+          <div className="bg-white max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Bespoke Invoice</h3>
+              <button onClick={() => setShowInvoice(false)} className="p-2 hover:bg-sand/20 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <InvoiceDocument
+              invoiceNumber={generateInvoiceNumber(order.id, order.createdAt)}
+              invoiceDate={order.createdAt}
+              orderType="bespoke"
+              brandName={partner?.brandName || 'ModaGlimmora'}
+              buyerName="Valued Client"
+              buyerEmail=""
+              items={[{
+                description: order.title,
+                detail: order.description,
+                quantity: 1,
+                unitPrice: order.price,
+                currency: 'EUR',
+              }]}
+              subtotal={order.price}
+              shippingAmount={0}
+              taxRate={0.20}
+              taxAmount={Math.round(order.price * 0.20 / 1.20)}
+              total={order.price}
+              currency="EUR"
+              depositPaid={order.depositPaid}
+              balanceDue={order.price - order.depositPaid}
+              paymentStatus={order.status === 'complete' ? 'paid' : 'deposit_paid'}
+              notes={`Estimated completion: ${new Date(order.estimatedCompletion).toLocaleDateString()}`}
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={printInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+              >
+                <Printer size={16} />
+                Print Invoice
+              </button>
+              <button
+                onClick={printInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+              >
+                <FileText size={16} />
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

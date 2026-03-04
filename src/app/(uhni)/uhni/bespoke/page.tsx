@@ -3,14 +3,16 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Crown, Gem, Plus, Clock, CheckCircle, Ruler, Palette, Scissors, Eye, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { ArrowLeft, Crown, Gem, Plus, Clock, CheckCircle, Ruler, Palette, Scissors, Eye, ChevronDown, ChevronUp, Calendar, FileText, Printer, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { BespokeOrderStatus } from '@/types';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 
 export default function BespokeOrdersPage() {
   const { bespokeOrders, concierge } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
@@ -64,6 +66,8 @@ export default function BespokeOrdersPage() {
         return type;
     }
   };
+
+  const activeInvoiceOrder = bespokeOrders.find(o => o.id === invoiceOrderId);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -290,17 +294,79 @@ export default function BespokeOrdersPage() {
                   <div className="text-xs text-taupe">
                     Order #{order.id.toUpperCase()} • Created {new Date(order.createdAt).toLocaleDateString()}
                   </div>
-                  {order.atelierContact && (
-                    <p className="text-xs text-stone">
-                      Atelier: <span className="text-charcoal-deep">{order.atelierContact}</span>
-                    </p>
-                  )}
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setInvoiceOrderId(order.id)}
+                      className="inline-flex items-center gap-2 text-xs text-stone hover:text-charcoal-deep transition-colors"
+                    >
+                      <FileText size={14} />
+                      View Invoice
+                    </button>
+                    {order.atelierContact && (
+                      <p className="text-xs text-stone">
+                        Atelier: <span className="text-charcoal-deep">{order.atelierContact}</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
+      {activeInvoiceOrder && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setInvoiceOrderId(null)}>
+          <div className="bg-white max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Bespoke Invoice</h3>
+              <button onClick={() => setInvoiceOrderId(null)} className="p-2 hover:bg-sand/20 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+            <InvoiceDocument
+              invoiceNumber={generateInvoiceNumber(activeInvoiceOrder.id, activeInvoiceOrder.createdAt)}
+              invoiceDate={activeInvoiceOrder.createdAt}
+              orderType="bespoke"
+              brandName={activeInvoiceOrder.brandName || 'ModaGlimmora Bespoke'}
+              buyerName="Valued Client"
+              buyerEmail=""
+              items={[{
+                description: activeInvoiceOrder.title,
+                detail: activeInvoiceOrder.description,
+                quantity: 1,
+                unitPrice: activeInvoiceOrder.price,
+                currency: 'EUR',
+              }]}
+              subtotal={activeInvoiceOrder.price}
+              shippingAmount={0}
+              taxRate={0.20}
+              taxAmount={Math.round(activeInvoiceOrder.price * 0.20 / 1.20)}
+              total={activeInvoiceOrder.price}
+              currency="EUR"
+              depositPaid={activeInvoiceOrder.depositPaid}
+              balanceDue={activeInvoiceOrder.price - activeInvoiceOrder.depositPaid}
+              paymentStatus={activeInvoiceOrder.status === 'complete' ? 'paid' : 'deposit_paid'}
+              notes={`Estimated completion: ${new Date(activeInvoiceOrder.estimatedCompletion).toLocaleDateString()}`}
+            />
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={printInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+              >
+                <Printer size={16} />
+                Print Invoice
+              </button>
+              <button
+                onClick={printInvoice}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+              >
+                <FileText size={16} />
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -19,9 +19,64 @@ import {
   EyeOff,
   ClipboardList,
   Radio,
-  Layers
+  Layers,
+  Heart,
+  BookOpen,
+  Star,
+  Zap,
+  Package,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+
+// Nav groups — shown in left column, same pattern as consumer profile Quick Access
+const navGroups = [
+  {
+    label: 'Concierge',
+    items: [
+      { href: '/uhni/concierge', icon: MessageCircle, title: 'Personal Concierge', subtitle: 'Direct line to your advisor' },
+      { href: '/uhni/concierge-tasks', icon: ClipboardList, title: 'Concierge Tasks', subtitle: 'Track open requests' },
+    ],
+  },
+  {
+    label: 'Commerce',
+    items: [
+      { href: '/uhni/sourcing', icon: Search, title: 'Sourcing', subtitle: 'Global item search' },
+      { href: '/uhni/bespoke', icon: Scissors, title: 'Bespoke', subtitle: 'Custom commissions' },
+      { href: '/uhni/pricing', icon: DollarSign, title: 'Private Pricing', subtitle: 'Negotiations & offers' },
+      { href: '/uhni/private-collections', icon: Lock, title: 'Private Collections', subtitle: 'Invitation-only access' },
+      { href: '/uhni/private-shopping', icon: ShoppingBag, title: 'Private Shopping', subtitle: 'VIP events' },
+    ],
+  },
+  {
+    label: 'Personal',
+    items: [
+      { href: '/uhni/wardrobe', icon: ShoppingBag, title: 'Wardrobe', subtitle: 'Your private collection' },
+      { href: '/uhni/body-twin', icon: User, title: 'Body Twin', subtitle: 'Fit profile & measurements' },
+      { href: '/uhni/calendar', icon: Calendar, title: 'Style Calendar', subtitle: 'Event outfit planning' },
+      { href: '/uhni/wishlist', icon: Heart, title: 'Wishlist', subtitle: 'Items you are watching' },
+      { href: '/uhni/cart', icon: Package, title: 'Cart', subtitle: 'Ready to acquire' },
+    ],
+  },
+  {
+    label: 'Intelligence',
+    items: [
+      { href: '/uhni/autonomous', icon: Bot, title: 'Autonomous', subtitle: 'AI shopping agent' },
+      { href: '/uhni/intelligence', icon: Sparkles, title: 'Intelligence', subtitle: 'AI insights on your taste' },
+      { href: '/uhni/global-sourcing', icon: Globe, title: 'Global Sourcing', subtitle: 'Worldwide availability' },
+      { href: '/uhni/zero-ui', icon: Zap, title: 'Zero UI', subtitle: 'Automation settings' },
+      { href: '/uhni/invisible-commerce', icon: EyeOff, title: 'Invisible Commerce', subtitle: 'No digital footprint' },
+      { href: '/uhni/silent-commerce', icon: Radio, title: 'Silent Commerce', subtitle: 'Ambient transactions' },
+    ],
+  },
+  {
+    label: 'Heritage',
+    items: [
+      { href: '/uhni/stories', icon: BookOpen, title: 'Stories', subtitle: 'Heritage & craft narratives' },
+      { href: '/uhni/heritage-archive', icon: Crown, title: 'Heritage Archive', subtitle: 'Brand archives' },
+      { href: '/uhni/events', icon: Star, title: 'Events', subtitle: 'Exclusive experiences' },
+    ],
+  },
+];
 
 export default function UHNIDashboardPage() {
   const {
@@ -31,7 +86,6 @@ export default function UHNIDashboardPage() {
     autonomousSettings,
     autonomousActivity,
     wardrobe,
-    showToast
   } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -39,194 +93,184 @@ export default function UHNIDashboardPage() {
     setIsLoaded(true);
   }, []);
 
-  // Compute metrics
   const wardrobeValue = wardrobe.reduce((sum, item) => sum + (item.product?.price || 0), 0);
   const activeSourcing = sourcingRequests.filter(r => r.status !== 'delivered' && r.status !== 'acquired').length;
   const activeBespoke = bespokeOrders.filter(o => o.status !== 'complete').length;
 
-  const quickActions = [
-    { href: '/uhni/concierge', icon: MessageCircle, label: 'Concierge', description: 'Personal luxury advisor' },
-    { href: '/uhni/sourcing', icon: Search, label: 'Sourcing', description: 'Global item search' },
-    { href: '/uhni/bespoke', icon: Scissors, label: 'Bespoke', description: 'Custom orders' },
-    { href: '/uhni/autonomous', icon: Bot, label: 'Autonomous', description: 'AI-powered shopping' },
-    { href: '/uhni/private-collections', icon: Lock, label: 'Private Collections', description: 'Exclusive access' },
-    { href: '/uhni/pricing', icon: DollarSign, label: 'Pricing', description: 'Negotiations & offers' },
-    { href: '/uhni/global-sourcing', icon: Globe, label: 'Global Network', description: 'Worldwide availability' },
-    { href: '/uhni/private-shopping', icon: ShoppingBag, label: 'Private Shopping', description: 'VIP events' },
-    { href: '/uhni/events', icon: Calendar, label: 'Events', description: 'Exclusive experiences' },
-    { href: '/uhni/heritage-archive', icon: Crown, label: 'Heritage', description: 'Brand archives' },
-    { href: '/uhni/intelligence', icon: Sparkles, label: 'Intelligence', description: 'AI insights' },
-    { href: '/uhni/zero-ui', icon: Layers, label: 'Zero-UI Commerce', description: 'Invisible shopping' },
-    { href: '/uhni/invisible-commerce', icon: EyeOff, label: 'Invisible Commerce', description: 'Discreet transactions' },
-    { href: '/uhni/concierge-tasks', icon: ClipboardList, label: 'Concierge Tasks', description: 'Task management' },
-    { href: '/uhni/silent-commerce', icon: Radio, label: 'Silent Commerce', description: 'Ambient awareness' },
-    { href: '/uhni/body-twin', icon: User, label: 'Body Twin', description: 'Fit profile & measurements' },
-    { href: '/uhni/wardrobe', icon: ShoppingBag, label: 'Wardrobe', description: 'Your private collection' },
-    { href: '/uhni/calendar', icon: Calendar, label: 'Style Calendar', description: 'Event outfit planning' },
-    { href: '/uhni/discover', icon: Search, label: 'Discover', description: 'Browse & recommendations' },
-    { href: '/uhni/collections', icon: Layers, label: 'Collections', description: 'Curated selections' },
-    { href: '/uhni/stories', icon: Crown, label: 'Stories', description: 'Heritage & craft narratives' }
-  ];
-
   return (
     <div className="min-h-screen bg-ivory-cream">
-      {/* Hero Header */}
-      <div className="bg-charcoal-deep">
-        <div className="max-w-7xl mx-auto px-8 md:px-16 lg:px-24 py-16">
+      {/* Hero — matches consumer profile hero */}
+      <section className="relative bg-charcoal-deep py-16 lg:py-20 overflow-hidden">
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-gold-soft/5 to-transparent" />
+        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24 relative">
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="flex items-center gap-3 mb-4">
-              <Crown size={20} className="text-gold-soft" />
-              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70">
-                UHNI Command Center
-              </span>
+            <div className="flex items-center gap-2 mb-3">
+              <Crown size={13} className="text-gold-soft" />
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/60">UHNI Command Centre</span>
             </div>
-            <h1 className="font-display text-[clamp(2.5rem,5vw,4rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
+            <h1 className="font-display text-[clamp(2rem,4vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-2">
               Welcome Back
             </h1>
-            <p className="text-sand text-lg max-w-xl">
-              Your personal luxury management dashboard. Every service at your fingertips.
-            </p>
+            <p className="text-taupe text-sm">Your private luxury management dashboard.</p>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className={`max-w-7xl mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        {/* Metric Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-12">
-          <div className="bg-white p-5 text-center">
-            <p className="font-display text-2xl text-charcoal-deep">&euro;{wardrobeValue.toLocaleString()}</p>
-            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Wardrobe Value</p>
-          </div>
-          <div className="bg-white p-5 text-center">
-            <p className="font-display text-2xl text-charcoal-deep">{activeSourcing}</p>
-            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Active Sourcing</p>
-          </div>
-          <div className="bg-white p-5 text-center">
-            <p className="font-display text-2xl text-charcoal-deep">{activeBespoke}</p>
-            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Bespoke Orders</p>
-          </div>
-          <div className="bg-white p-5 text-center">
-            <p className="font-display text-lg text-charcoal-deep truncate">{concierge ? concierge.name.split(' ')[0] : '—'}</p>
-            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Concierge</p>
-          </div>
-          <div className="bg-white p-5 text-center">
-            <p className="font-display text-2xl text-charcoal-deep">
-              &euro;{(autonomousSettings?.monthlyBudget ? (autonomousSettings.monthlyBudget / 1000).toFixed(0) : '0')}K
-            </p>
-            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Auto Budget</p>
-          </div>
-          <div className="bg-white p-5 text-center">
-            <p className="font-display text-2xl text-charcoal-deep">{wardrobe.length}</p>
-            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Wardrobe Items</p>
-          </div>
-        </div>
+      {/* Main content — 3-col grid matching consumer profile */}
+      <section className="py-14 lg:py-20">
+        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24">
+          <div className={`grid lg:grid-cols-3 gap-12 lg:gap-16 transition-all duration-700 delay-100 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
 
-        {/* Quick Actions Grid */}
-        <div className="mb-12">
-          <h2 className="text-[10px] tracking-[0.3em] uppercase text-stone mb-6">Services</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {quickActions.map(action => (
-              <Link
-                key={action.href}
-                href={action.href}
-                className="group bg-white p-6 border border-sand/30 hover:border-charcoal-deep transition-all duration-300"
-              >
-                <action.icon size={24} className="text-charcoal-deep mb-3 group-hover:text-gold-soft transition-colors" />
-                <h3 className="font-display text-lg text-charcoal-deep mb-1">{action.label}</h3>
-                <p className="text-xs text-stone">{action.description}</p>
-                <ArrowRight size={14} className="text-stone mt-3 group-hover:translate-x-1 transition-transform" />
-              </Link>
-            ))}
-          </div>
-        </div>
+            {/* ── Left column: UHNI navigation ── */}
+            <div className="lg:col-span-1">
+              <div className="lg:sticky lg:top-[108px] lg:max-h-[calc(100vh-124px)] lg:overflow-y-auto lg:pr-2 scrollbar-thin">
+              <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
+                Quick Access
+              </span>
 
-        {/* Recent Activity */}
-        <div className="bg-white border border-sand/30">
-          <div className="px-8 py-6 border-b border-sand/30">
-            <h2 className="font-display text-xl text-charcoal-deep">Recent Activity</h2>
-          </div>
-          <div className="divide-y divide-sand/30">
-            {sourcingRequests.slice(0, 2).map(request => (
-              <div key={request.id} className="px-8 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-parchment flex items-center justify-center">
-                    <Search size={18} className="text-stone" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-charcoal-deep">{request.title}</p>
-                    <p className="text-xs text-stone capitalize">{request.status.replace('_', ' ')}</p>
-                  </div>
+              {navGroups.map((group) => (
+                <div key={group.label} className="mb-6">
+                  <p className="text-[9px] tracking-[0.4em] uppercase text-taupe/60 mb-1 pl-5">{group.label}</p>
+                  {group.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className="group flex items-center justify-between p-4 border-b border-sand/50 hover:bg-parchment transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-9 h-9 flex items-center justify-center bg-parchment group-hover:bg-ivory-cream transition-colors flex-shrink-0">
+                          <item.icon size={16} className="text-stone" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-charcoal-deep">{item.title}</p>
+                          <p className="text-xs text-taupe">{item.subtitle}</p>
+                        </div>
+                      </div>
+                      <ArrowRight size={14} className="text-taupe group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all flex-shrink-0" />
+                    </Link>
+                  ))}
                 </div>
-                <Link
-                  href="/uhni/sourcing"
-                  className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase"
-                >
-                  View All
-                </Link>
-              </div>
-            ))}
-            {bespokeOrders.slice(0, 2).map(order => (
-              <div key={order.id} className="px-8 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-parchment flex items-center justify-center">
-                    <Scissors size={18} className="text-stone" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-charcoal-deep">{order.title}</p>
-                    <p className="text-xs text-stone capitalize">{order.status.replace('_', ' ')}</p>
-                  </div>
-                </div>
-                <Link
-                  href="/uhni/bespoke"
-                  className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase"
-                >
-                  View All
-                </Link>
-              </div>
-            ))}
-            {autonomousActivity.slice(0, 2).map(activity => (
-              <div key={activity.id} className="px-8 py-5 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-parchment flex items-center justify-center">
-                    <Bot size={18} className="text-stone" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-charcoal-deep">{activity.product.name}</p>
-                    <p className="text-xs text-stone capitalize">{activity.type.replace(/_/g, ' ')}</p>
-                  </div>
-                </div>
-                <Link
-                  href="/uhni/autonomous"
-                  className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase"
-                >
-                  View All
-                </Link>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Concierge Banner */}
-        {concierge && (
-          <div className="mt-8 bg-charcoal-deep p-8 flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-gold-soft/20 rounded-full flex items-center justify-center">
-                <MessageCircle size={24} className="text-gold-soft" />
-              </div>
-              <div>
-                <p className="text-ivory-cream font-display text-lg">{concierge.name}</p>
-                <p className="text-sand text-sm">{concierge.title} — {concierge.specialties.join(', ')}</p>
+              ))}
               </div>
             </div>
-            <Link
-              href="/uhni/concierge"
-              className="px-6 py-3 bg-gold-soft/20 text-gold-soft hover:bg-gold-soft/30 transition-colors text-sm tracking-wider uppercase"
-            >
-              Contact
-            </Link>
+
+            {/* ── Right column: metrics + activity ── */}
+            <div className="lg:col-span-2 space-y-10">
+
+              {/* Metric cards */}
+              <div>
+                <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-5">Overview</span>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-sand/50 p-5">
+                    <p className="font-display text-2xl text-charcoal-deep">&euro;{wardrobeValue.toLocaleString()}</p>
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Wardrobe Value</p>
+                  </div>
+                  <div className="bg-white border border-sand/50 p-5">
+                    <p className="font-display text-2xl text-charcoal-deep">{activeSourcing}</p>
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Active Sourcing</p>
+                  </div>
+                  <div className="bg-white border border-sand/50 p-5">
+                    <p className="font-display text-2xl text-charcoal-deep">{activeBespoke}</p>
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Bespoke Orders</p>
+                  </div>
+                  <div className="bg-white border border-sand/50 p-5">
+                    <p className="font-display text-lg text-charcoal-deep truncate">{concierge ? concierge.name.split(' ')[0] : '—'}</p>
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Concierge</p>
+                  </div>
+                  <div className="bg-white border border-sand/50 p-5">
+                    <p className="font-display text-2xl text-charcoal-deep">
+                      &euro;{autonomousSettings?.monthlyBudget ? (autonomousSettings.monthlyBudget / 1000).toFixed(0) : '0'}K
+                    </p>
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Auto Budget</p>
+                  </div>
+                  <div className="bg-white border border-sand/50 p-5">
+                    <p className="font-display text-2xl text-charcoal-deep">{wardrobe.length}</p>
+                    <p className="text-[10px] tracking-[0.15em] uppercase text-stone mt-1">Wardrobe Items</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent activity */}
+              {(sourcingRequests.length > 0 || bespokeOrders.length > 0 || autonomousActivity.length > 0) && (
+                <div>
+                  <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-5">Recent Activity</span>
+                  <div className="bg-white border border-sand/50 divide-y divide-sand/50">
+                    {sourcingRequests.slice(0, 2).map(req => (
+                      <div key={req.id} className="flex items-center justify-between px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-9 h-9 bg-parchment flex items-center justify-center flex-shrink-0">
+                            <Search size={14} className="text-stone" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-charcoal-deep">{req.title}</p>
+                            <p className="text-xs text-taupe capitalize">{req.status.replace('_', ' ')}</p>
+                          </div>
+                        </div>
+                        <Link href="/uhni/sourcing" className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase">View</Link>
+                      </div>
+                    ))}
+                    {bespokeOrders.slice(0, 2).map(order => (
+                      <div key={order.id} className="flex items-center justify-between px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-9 h-9 bg-parchment flex items-center justify-center flex-shrink-0">
+                            <Scissors size={14} className="text-stone" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-charcoal-deep">{order.title}</p>
+                            <p className="text-xs text-taupe capitalize">{order.status.replace('_', ' ')}</p>
+                          </div>
+                        </div>
+                        <Link href="/uhni/bespoke" className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase">View</Link>
+                      </div>
+                    ))}
+                    {autonomousActivity.slice(0, 2).map(activity => (
+                      <div key={activity.id} className="flex items-center justify-between px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-9 h-9 bg-parchment flex items-center justify-center flex-shrink-0">
+                            <Bot size={14} className="text-stone" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-charcoal-deep">{activity.product.name}</p>
+                            <p className="text-xs text-taupe capitalize">{activity.type.replace(/_/g, ' ')}</p>
+                          </div>
+                        </div>
+                        <Link href="/uhni/autonomous" className="text-xs text-stone hover:text-charcoal-deep transition-colors tracking-wider uppercase">View</Link>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Concierge card */}
+              {concierge && (
+                <div className="bg-charcoal-deep p-8">
+                  <div className="flex items-center gap-2 mb-5">
+                    <Crown size={12} className="text-gold-soft" />
+                    <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/60">Your Personal Concierge</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-11 h-11 bg-gold-soft/20 rounded-full flex items-center justify-center flex-shrink-0">
+                        <MessageCircle size={18} className="text-gold-soft" />
+                      </div>
+                      <div>
+                        <p className="text-ivory-cream font-display text-base">{concierge.name}</p>
+                        <p className="text-taupe text-sm">{concierge.title}</p>
+                      </div>
+                    </div>
+                    <Link
+                      href="/uhni/concierge"
+                      className="flex-shrink-0 px-5 py-2.5 bg-gold-soft/15 text-gold-soft hover:bg-gold-soft/25 transition-colors text-xs tracking-wider uppercase"
+                    >
+                      Contact
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
