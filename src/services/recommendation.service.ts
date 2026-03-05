@@ -176,6 +176,15 @@ export async function getRecommendedBrands(): Promise<Brand[]> {
 // Product Recommendations
 // ============================================
 
+/** Paginated result with metadata */
+export interface PaginatedProducts {
+  products: Product[];
+  totalMatched: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
 /**
  * POST /api/v1/products/recommendations
  *
@@ -185,6 +194,18 @@ export async function getRecommendedBrands(): Promise<Brand[]> {
 export async function getRecommendedProducts(
   params?: ProductRecommendationRequest
 ): Promise<Product[]> {
+  const result = await getRecommendedProductsPaginated(params);
+  return result.products;
+}
+
+/**
+ * POST /api/v1/products/recommendations (with pagination metadata)
+ *
+ * Returns products along with pagination info (total count, total pages, etc.)
+ */
+export async function getRecommendedProductsPaginated(
+  params?: ProductRecommendationRequest
+): Promise<PaginatedProducts> {
   const body: ProductRecommendationRequest = {
     page_number: 1,
     page_size: 20,
@@ -212,7 +233,13 @@ export async function getRecommendedProducts(
     const data: ProductRecommendationResponse = await res.json();
     if (!data.products_data) {
       console.warn('[products] API returned no products_data field. Response keys:', Object.keys(data));
-      return [];
+      return {
+        products: [],
+        totalMatched: 0,
+        totalPages: 0,
+        pageNumber: body.page_number || 1,
+        pageSize: body.page_size || 20,
+      };
     }
     if (data.products_data.length > 0) {
       const sample = data.products_data[0] as unknown as Record<string, unknown>;
@@ -229,7 +256,13 @@ export async function getRecommendedProducts(
     } else {
       console.warn('[products] API returned 0 products for request:', body);
     }
-    return data.products_data.map(mapToProduct);
+    return {
+      products: data.products_data.map(mapToProduct),
+      totalMatched: data.total_matched || 0,
+      totalPages: data.total_pages || 0,
+      pageNumber: data.page_number || body.page_number || 1,
+      pageSize: data.page_size || body.page_size || 20,
+    };
   }, PRODUCTS_TTL);
 }
 
