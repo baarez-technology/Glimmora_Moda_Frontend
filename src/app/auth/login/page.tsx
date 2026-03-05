@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { brandLogin, userLogin, storeUserAuth, socialSignIn } from '@/services/auth.service';
+import { brandLogin, userLogin, storeUserAuth, socialSignIn, verify2FALogin } from '@/services/auth.service';
+import type { UserTokenResponse } from '@/services/auth.service';
 import { signInWithGoogle, signInWithApple } from '@/lib/firebase';
 
 type LoginTier = 'consumer' | 'uhni' | 'brand';
@@ -31,7 +32,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedTier, setSelectedTier] = useState<LoginTier>(
-    initialMode === 'brand' ? 'brand' : 'consumer'
+    initialMode === 'brand' ? 'brand' : initialMode === 'uhni' ? 'uhni' : 'consumer'
   );
   const [formData, setFormData] = useState({
     email: '',
@@ -41,10 +42,57 @@ function LoginForm() {
   const [isSocialLoading, setIsSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [touched, setTouched] = useState({ email: false, password: false });
+  // 2FA state
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [preAuthToken, setPreAuthToken] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [is2FAVerifying, setIs2FAVerifying] = useState(false);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
+
+  // Complete login after successful auth (shared by normal + 2FA flows)
+  const completeLogin = (data: UserTokenResponse) => {
+    if (!data.user || !data.access_token || !data.refresh_token) return;
+    storeUserAuth({ access_token: data.access_token, refresh_token: data.refresh_token, user: data.user });
+    setUserData(data.user);
+
+    const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+    setAppUserRole(tier as 'uhni' | 'preferred');
+
+    if (data.user.role === 'uhni') {
+      showToast('Welcome back. Your personal concierge is available.', 'success');
+    } else {
+      showToast('Welcome back to ModaGlimmora!', 'success');
+    }
+
+    if (data.context_required) {
+      if (redirectUrl && redirectUrl !== '/') {
+        localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+      }
+      router.push('/onboarding');
+    } else {
+      router.push(redirectUrl);
+    }
+  };
+
+  // Handle 2FA verification
+  const handle2FAVerify = async () => {
+    if (totpCode.length < 6) return;
+    setIs2FAVerifying(true);
+    setLoginError(null);
+    try {
+      const data = await verify2FALogin(preAuthToken, totpCode);
+      completeLogin(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Invalid code';
+      setLoginError(message);
+      showToast(message, 'error');
+    } finally {
+      setIs2FAVerifying(false);
+    }
+  };
 
   // Validation
   const emailError = touched.email && formData.email.length > 0 && !EMAIL_REGEX.test(formData.email)
@@ -93,26 +141,15 @@ function LoginForm() {
           role: selectedTier,
         });
 
-        storeUserAuth(data);
-        setUserData(data.user);
-
-        const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
-        setAppUserRole(tier as 'uhni' | 'preferred');
-
-        if (data.user.role === 'uhni') {
-          showToast('Welcome back. Your personal concierge is available.', 'success');
-        } else {
-          showToast('Welcome back to ModaGlimmora!', 'success');
+        // Check if 2FA is required
+        if (data.requires_2fa && data.pre_auth_token) {
+          setPreAuthToken(data.pre_auth_token);
+          setRequires2FA(true);
+          setIsSubmitting(false);
+          return;
         }
 
-        if (data.context_required) {
-          if (redirectUrl && redirectUrl !== '/') {
-            localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
-          }
-          router.push('/onboarding');
-        } else {
-          router.push(redirectUrl);
-        }
+        completeLogin(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Login failed';
         setLoginError(message);
@@ -135,26 +172,14 @@ function LoginForm() {
       const idToken = await firebaseUser.getIdToken();
       const data = await socialSignIn(provider, idToken, role);
 
-      storeUserAuth(data);
-      setUserData(data.user);
-
-      const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
-      setAppUserRole(tier as 'uhni' | 'preferred');
-
-      if (data.user.role === 'uhni') {
-        showToast('Welcome back. Your personal concierge is available.', 'success');
-      } else {
-        showToast('Welcome back to ModaGlimmora!', 'success');
+      // Check if 2FA is required
+      if (data.requires_2fa && data.pre_auth_token) {
+        setPreAuthToken(data.pre_auth_token);
+        setRequires2FA(true);
+        return;
       }
 
-      if (data.context_required) {
-        if (redirectUrl && redirectUrl !== '/') {
-          localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
-        }
-        router.push('/onboarding');
-      } else {
-        router.push(redirectUrl);
-      }
+      completeLogin(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Social sign-in failed';
       if (!message.includes('popup-closed-by-user')) {
@@ -165,6 +190,110 @@ function LoginForm() {
       setIsSocialLoading(null);
     }
   };
+
+  // 2FA verification screen
+  if (requires2FA) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex">
+        {/* Left Side - Branding */}
+        <div className="hidden lg:block lg:w-1/2 bg-charcoal-deep relative overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-40"
+            style={{
+              backgroundImage: 'url(https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80)'
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-charcoal-deep/90 to-charcoal-deep/50" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="max-w-md px-12 text-center">
+              <Link href="/" className="inline-block mb-8">
+                <h2 className="font-display text-3xl tracking-[0.15em] uppercase text-ivory-cream hover:text-gold-soft transition-colors">
+                  ModaGlimmora
+                </h2>
+              </Link>
+              <p className="text-[10px] tracking-[0.5em] uppercase text-gold-soft mb-6">
+                Two-Factor Verification
+              </p>
+              <p className="text-sand leading-relaxed">
+                Enter the 6-digit code from your authenticator app to complete sign in.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Side - 2FA Form */}
+        <div className="flex-1 flex items-center justify-center px-8 py-16 lg:px-16">
+          <div className="w-full max-w-md">
+            <div className="lg:hidden text-center mb-8">
+              <Link href="/">
+                <h1 className="font-display text-2xl tracking-[0.15em] uppercase text-charcoal-deep">
+                  ModaGlimmora
+                </h1>
+              </Link>
+            </div>
+
+            <div className="text-center mb-10">
+              <div className="w-16 h-16 bg-charcoal-deep/5 flex items-center justify-center mx-auto mb-6">
+                <Eye size={28} className="text-charcoal-deep" />
+              </div>
+              <h1 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-4">
+                Verification Required
+              </h1>
+              <p className="text-stone">
+                Enter the 6-digit code from your authenticator app
+              </p>
+            </div>
+
+            {loginError && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm mb-6">
+                {loginError}
+              </div>
+            )}
+
+            <div className="space-y-6">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                  Authentication Code
+                </label>
+                <input
+                  type="text"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                  maxLength={6}
+                  className="w-full px-5 py-5 bg-transparent border border-sand text-charcoal-deep text-center text-3xl tracking-[0.8em] font-mono focus:outline-none focus:border-charcoal-deep transition-colors"
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handle2FAVerify(); }}
+                />
+              </div>
+
+              <button
+                onClick={handle2FAVerify}
+                disabled={totpCode.length < 6 || is2FAVerifying}
+                className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                {is2FAVerifying ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm tracking-[0.15em] uppercase">Verifying...</span>
+                  </>
+                ) : (
+                  <span className="text-sm tracking-[0.15em] uppercase">Verify & Sign In</span>
+                )}
+              </button>
+
+              <button
+                onClick={() => { setRequires2FA(false); setTotpCode(''); setPreAuthToken(''); setLoginError(null); }}
+                className="w-full text-center text-stone hover:text-charcoal-deep transition-colors text-sm"
+              >
+                Back to login
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream flex">

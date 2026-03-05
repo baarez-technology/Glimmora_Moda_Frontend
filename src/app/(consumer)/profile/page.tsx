@@ -529,6 +529,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
               ) : (
+                /* Style Note - commented out for consumer
                 <div className="p-8 bg-parchment border-l-2 border-gold-muted">
                   <p className="text-[10px] tracking-[0.4em] uppercase text-taupe mb-4">Style Note</p>
                   <p className="text-stone leading-relaxed">
@@ -536,6 +537,8 @@ export default function ProfilePage() {
                     Consider exploring softer silhouettes for variety, particularly from Bottega Veneta's current collection.
                   </p>
                 </div>
+                */
+                null
               )}
             </div>
           </div>
