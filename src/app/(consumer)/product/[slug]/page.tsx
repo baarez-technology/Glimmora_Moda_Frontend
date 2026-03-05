@@ -231,13 +231,14 @@ export default function ProductPage({ params }: ProductPageProps) {
             ]);
             const matchBrand = brands.find(b => b.id === loaded.brandId);
             const brandName = matchBrand ? matchBrand.name : '';
-            // If API returned no images, use the image from the recommendation card
+            // If API returned no real images, use the image from the recommendation card
             const hasImages = loaded.images.length > 0 &&
-              !loaded.images[0].url.includes('placehold.co');
+              !loaded.images[0].url.includes('placehold.co') &&
+              loaded.images[0].url.startsWith('http');
             if (!hasImages && imageParam) {
               loaded.images = [{
                 id: '1',
-                url: decodeURIComponent(imageParam),
+                url: imageParam,
                 alt: loaded.name,
                 type: 'hero',
               }];

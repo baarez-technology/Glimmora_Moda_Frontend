@@ -68,10 +68,19 @@ export default function NotificationsPage() {
     }
   }, [prefs, isHydratedLocal]);
 
+  const labelMap: Record<keyof NotificationPrefs, string> = {
+    orders: 'Order Updates',
+    restock: 'Restock Alerts',
+    styleTips: 'Style Recommendations',
+    events: 'Events & Invitations',
+    promotions: 'Promotions',
+    newArrivals: 'New Arrivals',
+  };
+
   const toggle = (key: keyof NotificationPrefs) => {
     setPrefs(prev => {
       const updated = { ...prev, [key]: !prev[key] };
-      showToast(`${key} notifications ${updated[key] ? 'enabled' : 'disabled'}`, 'success');
+      showToast(`${labelMap[key]} ${updated[key] ? 'enabled' : 'disabled'}`, 'success');
       return updated;
     });
   };
@@ -144,14 +153,32 @@ export default function NotificationsPage() {
                 </div>
                 <button
                   onClick={() => toggle(key)}
-                  className={`w-12 h-7 transition-colors relative flex-shrink-0 ${
-                    prefs[key] ? 'bg-charcoal-deep' : 'bg-sand'
-                  }`}
+                  role="switch"
+                  aria-checked={prefs[key]}
+                  aria-label={`Toggle ${label}`}
+                  style={{
+                    position: 'relative',
+                    width: 48,
+                    height: 28,
+                    backgroundColor: prefs[key] ? '#2C2C2C' : '#C8B89A',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    transition: 'background-color 0.3s ease',
+                  }}
                 >
                   <span
-                    className={`absolute top-1 w-5 h-5 bg-white transition-transform ${
-                      prefs[key] ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    style={{
+                      position: 'absolute',
+                      top: 3,
+                      left: prefs[key] ? 23 : 3,
+                      width: 22,
+                      height: 22,
+                      backgroundColor: '#fff',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      transition: 'left 0.3s ease',
+                    }}
                   />
                 </button>
               </div>

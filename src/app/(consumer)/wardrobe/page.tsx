@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal, Trash2, RefreshCw, ChevronRight } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
-import type { ProductCategory } from '@/types';
+import * as wardrobeService from '@/services/wardrobe.service';
+import type { WardrobeGapAnalysisResponse, GapAnalysisItem } from '@/services/wardrobe.service';
 
 export default function WardrobePage() {
   const { wardrobe, removeFromWardrobe, clearAllWardrobe, isUHNI } = useApp();
@@ -18,11 +19,49 @@ export default function WardrobePage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'recent' | 'brand' | 'worn'>('recent');
   const [showClearAll, setShowClearAll] = useState(false);
+  const GAP_SESSION_KEY = 'moda-gap-analysis';
+
+  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
+  const [selectedGap, setSelectedGap] = useState<GapAnalysisItem | null>(null);
 
   useEffect(() => {
     if (isUHNI) { router.replace('/uhni/wardrobe'); return; }
     setIsLoaded(true);
   }, [isUHNI, router]);
+
+  // Close gap popup on ESC & lock body scroll
+  useEffect(() => {
+    if (!selectedGap) return;
+    document.body.style.overflow = 'hidden';
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedGap(null);
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [selectedGap]);
+
+  const fetchGapAnalysis = (regenerate = false) => {
+    setGapLoading(true);
+    setGapError(null);
+    wardrobeService.getWardrobeGapAnalysis(regenerate)
+      .then((data) => {
+        setGapAnalysis(data);
+        try { sessionStorage.setItem(GAP_SESSION_KEY, JSON.stringify(data)); } catch {}
+      })
+      .catch((err) => setGapError(err instanceof Error ? err.message : 'Failed to analyze wardrobe'))
+      .finally(() => setGapLoading(false));
+  };
 
   const stats = {
     totalPieces: wardrobe.length,
@@ -109,19 +148,7 @@ export default function WardrobePage() {
     return outfits.slice(0, 3);
   })();
 
-  // Identify missing wardrobe categories for the "Wardrobe Gaps" section
-  const wardrobeGaps = (() => {
-    const allCategories: { key: ProductCategory; label: string; suggestion: string }[] = [
-      { key: 'clothing', label: 'Clothing', suggestion: 'Add clothing pieces to build versatile outfits' },
-      { key: 'bags', label: 'Bags', suggestion: 'A bag ties every outfit together' },
-      { key: 'shoes', label: 'Shoes', suggestion: 'Add shoes to complete your looks' },
-      { key: 'accessories', label: 'Accessories', suggestion: 'Accessories elevate any ensemble' },
-      { key: 'jewelry', label: 'Jewelry', suggestion: 'Consider adding jewelry for elegant finishing touches' },
-      { key: 'watches', label: 'Watches', suggestion: 'A timepiece adds sophistication to your wardrobe' },
-    ];
-    const presentCategories = new Set(wardrobe.map(item => item.product.category));
-    return allCategories.filter(cat => !presentCategories.has(cat.key));
-  })();
+  // Gap analysis data from API (replaces hardcoded category-based gaps)
 
   if (isUHNI) return null;
 
@@ -404,6 +431,100 @@ export default function WardrobePage() {
 
               {/* Sidebar */}
               <div className="lg:col-span-1 space-y-8">
+                {/* Wardrobe Gaps — from API */}
+                <div>
+                  <div className="flex items-center justify-between mb-6">
+                    <span className="text-[10px] tracking-[0.5em] uppercase text-taupe">
+                      Wardrobe Gaps
+                    </span>
+                    {!gapAnalysis && !gapLoading && (
+                      <button
+                        onClick={() => fetchGapAnalysis()}
+                        className="text-[10px] tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                      >
+                        Analyze
+                      </button>
+                    )}
+                    {gapAnalysis && (
+                      <button
+                        onClick={() => fetchGapAnalysis(true)}
+                        disabled={gapLoading}
+                        className="text-stone hover:text-charcoal-deep transition-colors disabled:opacity-50"
+                        title="Refresh analysis"
+                      >
+                        <RefreshCw size={12} className={gapLoading ? 'animate-spin' : ''} />
+                      </button>
+                    )}
+                  </div>
+
+                  {gapLoading && !gapAnalysis && (
+                    <div className="py-8 text-center">
+                      <div className="w-6 h-6 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                      <p className="text-xs text-stone">Analyzing your wardrobe...</p>
+                    </div>
+                  )}
+
+                  {gapError && !gapAnalysis && (
+                    <div className="p-4 bg-parchment text-center">
+                      <p className="text-xs text-stone mb-2">Could not analyze wardrobe.</p>
+                      <button
+                        onClick={() => fetchGapAnalysis()}
+                        className="text-[10px] tracking-[0.1em] uppercase text-charcoal-deep hover:text-noir transition-colors"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  )}
+
+                  {!gapAnalysis && !gapLoading && !gapError && (
+                    <div className="p-5 bg-parchment text-center">
+                      <p className="text-sm text-stone mb-4">
+                        Get AI-powered analysis of what's missing from your wardrobe.
+                      </p>
+                      <button
+                        onClick={() => fetchGapAnalysis()}
+                        className="group inline-flex items-center gap-2 text-sm tracking-[0.1em] uppercase text-charcoal-deep"
+                      >
+                        <span>Analyze Wardrobe</span>
+                        <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                      </button>
+                    </div>
+                  )}
+
+                  {gapAnalysis && (
+                    <div className="space-y-3">
+                      {gapAnalysis.gap_analysis.map((gap, idx) => {
+                        const p = gap.matched_product;
+
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setSelectedGap(gap)}
+                            className="w-full text-left border border-sand/60 bg-parchment/50 p-4 hover:bg-parchment transition-colors"
+                          >
+                            <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">
+                              {gap.suggestion.product_category}
+                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-sm font-medium text-charcoal-deep">{gap.suggestion.title}</p>
+                              <ChevronRight size={14} className="text-taupe flex-shrink-0" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Style Note — from API or fallback */}
+                <div className="p-6 bg-charcoal-deep">
+                  <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-4">Style Note</p>
+                  <p className="text-taupe text-sm leading-relaxed">
+                    {gapAnalysis?.style_notes ||
+                      'Your collection shows a refined taste for structured silhouettes. Consider adding softer textures for versatility.'}
+                  </p>
+                </div>
+
                 {/* Outfit Ideas */}
                 <div>
                   <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
@@ -427,47 +548,19 @@ export default function WardrobePage() {
                       Add at least 2 pieces to your wardrobe to see personalized outfit suggestions.
                     </p>
                   )}
-
-                  <Link
-                    href="/planner"
-                    className="group inline-flex items-center gap-2 mt-6 text-sm tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
-                  >
-                    <span>Plan an Outfit</span>
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                  </Link>
                 </div>
 
-                {/* Wardrobe Gaps */}
-                {wardrobeGaps.length > 0 && (
+                {/* Silent Cart link — at the bottom */}
+                <Link
+                  href="/profile/silent-cart"
+                  className="group flex items-center justify-between p-5 bg-parchment border border-sand hover:border-charcoal-deep transition-all"
+                >
                   <div>
-                    <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
-                      Wardrobe Gaps
-                    </span>
-                    <div className="space-y-3">
-                      {wardrobeGaps.map((gap) => (
-                        <div key={gap.key} className="p-4 border border-sand/60 bg-parchment/50">
-                          <p className="text-sm font-medium text-charcoal-deep mb-1">{gap.label}</p>
-                          <p className="text-xs text-stone leading-relaxed">{gap.suggestion}</p>
-                          <Link
-                            href={`/discover?category=${gap.key}`}
-                            className="inline-flex items-center gap-1.5 mt-2 text-[10px] tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
-                          >
-                            <span>Browse {gap.label}</span>
-                            <ArrowRight size={10} />
-                          </Link>
-                        </div>
-                      ))}
-                    </div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">AI Curated</p>
+                    <p className="text-sm font-medium text-charcoal-deep">View Silent Cart</p>
                   </div>
-                )}
-
-                {/* Style Note */}
-                <div className="p-6 bg-charcoal-deep">
-                  <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-4">Style Note</p>
-                  <p className="text-taupe text-sm leading-relaxed">
-                    Your collection shows a refined taste for structured silhouettes. Consider adding softer textures for versatility.
-                  </p>
-                </div>
+                  <ArrowRight size={16} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
+                </Link>
               </div>
             </div>
           ) : (
@@ -538,6 +631,137 @@ export default function WardrobePage() {
         confirmLabel="Clear All"
         confirmVariant="danger"
       />
+
+      {/* Gap Detail Popup — shows the suggestion's matched product */}
+      {selectedGap && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div
+            className="absolute inset-0 bg-noir/50 backdrop-blur-sm"
+            onClick={() => setSelectedGap(null)}
+          />
+          <div className="relative bg-ivory-cream w-full sm:max-w-lg max-h-[90vh] overflow-y-auto sm:mx-4">
+            {/* Header */}
+            <div className="sticky top-0 bg-charcoal-deep px-6 py-5 z-10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/60 mb-1">
+                    {selectedGap.suggestion.product_category}
+                  </p>
+                  <h3 className="font-display text-xl text-ivory-cream">
+                    {selectedGap.suggestion.title}
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setSelectedGap(null)}
+                  className="w-10 h-10 flex items-center justify-center text-ivory-cream/60 hover:text-ivory-cream transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              {(selectedGap.suggestion.fabric || selectedGap.suggestion.pattern || selectedGap.suggestion.color) && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {selectedGap.suggestion.fabric && (
+                    <span className="text-[9px] tracking-[0.15em] uppercase text-taupe px-2 py-0.5 border border-ivory-cream/20">
+                      {selectedGap.suggestion.fabric}
+                    </span>
+                  )}
+                  {selectedGap.suggestion.pattern && (
+                    <span className="text-[9px] tracking-[0.15em] uppercase text-taupe px-2 py-0.5 border border-ivory-cream/20">
+                      {selectedGap.suggestion.pattern}
+                    </span>
+                  )}
+                  {selectedGap.suggestion.color && (
+                    <span className="flex items-center gap-1.5 text-[9px] tracking-[0.15em] uppercase text-taupe px-2 py-0.5 border border-ivory-cream/20">
+                      <span
+                        className="w-3 h-3 rounded-full border border-ivory-cream/30"
+                        style={{ backgroundColor: selectedGap.suggestion.color }}
+                      />
+                      Color
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* All matched products for this category */}
+            {(() => {
+              const category = selectedGap.suggestion.product_category.toLowerCase();
+              const categoryGaps = gapAnalysis?.gap_analysis.filter(
+                g => g.suggestion.product_category.toLowerCase() === category && g.matched_product
+              ) || [];
+
+              if (categoryGaps.length === 0) {
+                return (
+                  <div className="p-6 text-center py-16">
+                    <p className="text-sm text-stone">No matching products found in our catalogue for this category yet.</p>
+                    <Link
+                      href="/discover"
+                      onClick={() => setSelectedGap(null)}
+                      className="inline-flex items-center gap-2 mt-4 text-sm tracking-[0.1em] uppercase text-charcoal-deep hover:text-noir transition-colors"
+                    >
+                      <span>Browse Products</span>
+                      <ArrowRight size={14} />
+                    </Link>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="p-6">
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-4">
+                    {categoryGaps.length} Suggested Product{categoryGaps.length > 1 ? 's' : ''}
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {categoryGaps.map((gap, i) => {
+                      const mp = gap.matched_product!;
+                      const imgSrc = mp.image_urls?.[0] || mp.product_image;
+                      const slug = mp.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                      const productUrl = `/product/${slug}?productId=${mp.product_id}`;
+                      return (
+                        <Link
+                          key={i}
+                          href={productUrl}
+                          className="group"
+                          onClick={() => setSelectedGap(null)}
+                        >
+                          <div className="relative aspect-[3/4] w-full overflow-hidden bg-parchment mb-3">
+                            {imgSrc && (
+                              <Image
+                                src={imgSrc}
+                                alt={mp.product_name}
+                                fill
+                                className="object-cover group-hover:scale-105 transition-transform duration-500"
+                              />
+                            )}
+                          </div>
+                          <p className="text-[9px] tracking-[0.15em] uppercase text-taupe mb-0.5">{mp.brand_name}</p>
+                          <p className="text-sm text-charcoal-deep line-clamp-1 group-hover:text-gold-muted transition-colors">
+                            {mp.product_name}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            {mp.discount_percentage > 0 && (
+                              <span className="text-xs text-taupe line-through">€{mp.price.toLocaleString()}</span>
+                            )}
+                            <span className="text-sm font-medium text-charcoal-deep">
+                              €{(mp.offer_price || mp.price).toLocaleString()}
+                            </span>
+                            {mp.discount_percentage > 0 && (
+                              <span className="text-xs text-success">-{mp.discount_percentage}%</span>
+                            )}
+                          </div>
+                          <p className="text-[9px] text-stone mt-1">
+                            {Math.round(gap.product_match_score * 100)}% match
+                          </p>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

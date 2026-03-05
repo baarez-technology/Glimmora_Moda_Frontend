@@ -298,6 +298,7 @@ export default function Header() {
                           <User size={16} />
                           <span>My Profile</span>
                         </Link>
+                        {/* Membership - hidden for consumers
                         <Link
                           href="/pricing-tiers"
                           onClick={() => setIsAccountOpen(false)}
@@ -309,6 +310,7 @@ export default function Header() {
                           </div>
                           <TierBadge tier={pricingTier} size="sm" />
                         </Link>
+                        */}
                         <Link
                           href="/profile/settings"
                           onClick={() => setIsAccountOpen(false)}

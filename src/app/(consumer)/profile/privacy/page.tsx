@@ -169,14 +169,29 @@ export default function PrivacyPage() {
                 </div>
                 <button
                   onClick={() => toggle(item.key)}
-                  className={`w-12 h-7 transition-colors relative flex-shrink-0 ${
-                    settings[item.key] ? 'bg-charcoal-deep' : 'bg-sand'
-                  }`}
+                  style={{
+                    position: 'relative',
+                    width: 48,
+                    height: 28,
+                    backgroundColor: settings[item.key] ? '#2C2C2C' : '#C8B89A',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    transition: 'background-color 0.3s ease',
+                  }}
                 >
                   <span
-                    className={`absolute top-1 w-5 h-5 bg-white transition-transform ${
-                      settings[item.key] ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    style={{
+                      position: 'absolute',
+                      top: 3,
+                      left: settings[item.key] ? 23 : 3,
+                      width: 22,
+                      height: 22,
+                      backgroundColor: '#fff',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      transition: 'left 0.3s ease',
+                    }}
                   />
                 </button>
               </div>
@@ -208,24 +223,47 @@ export default function PrivacyPage() {
                 </div>
                 {item.locked ? (
                   <div
-                    className="w-12 h-7 relative flex-shrink-0 bg-charcoal-deep/40 opacity-50 cursor-not-allowed select-none"
+                    style={{
+                      position: 'relative',
+                      width: 48,
+                      height: 28,
+                      backgroundColor: 'rgba(44,44,44,0.4)',
+                      opacity: 0.5,
+                      cursor: 'not-allowed',
+                      flexShrink: 0,
+                    }}
                     aria-disabled="true"
                     aria-label={`${item.label} - always enabled`}
                     title="Essential cookies are always enabled"
                   >
-                    <span className="absolute top-1 w-5 h-5 bg-white/70 translate-x-6" />
+                    <span style={{ position: 'absolute', top: 3, left: 23, width: 22, height: 22, backgroundColor: 'rgba(255,255,255,0.7)' }} />
                   </div>
                 ) : (
                   <button
                     onClick={() => toggle(item.key)}
-                    className={`w-12 h-7 transition-colors relative flex-shrink-0 ${
-                      settings[item.key] ? 'bg-charcoal-deep' : 'bg-sand'
-                    }`}
+                    style={{
+                      position: 'relative',
+                      width: 48,
+                      height: 28,
+                      backgroundColor: settings[item.key] ? '#2C2C2C' : '#C8B89A',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'background-color 0.3s ease',
+                    }}
                   >
                     <span
-                      className={`absolute top-1 w-5 h-5 bg-white transition-transform ${
-                        settings[item.key] ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      style={{
+                        position: 'absolute',
+                        top: 3,
+                        left: settings[item.key] ? 23 : 3,
+                        width: 22,
+                        height: 22,
+                        backgroundColor: '#fff',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                        transition: 'left 0.3s ease',
+                      }}
                     />
                   </button>
                 )}
