@@ -76,14 +76,16 @@ function authHeaders(): Record<string, string> {
 /** Map API brand → frontend Brand type */
 function mapToBrand(raw: RecommendedBrand): Brand {
   const slug = raw.brand_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  // Use brand_logo if available, otherwise generate a placeholder
+  const brandImage = raw.brand_logo || `https://placehold.co/800x600/1A1A1A/C9A962?text=${encodeURIComponent(raw.brand_name)}`;
   return {
     id: raw.brand_id,
     name: raw.brand_name,
     slug,
     tagline: '',
     description: '',
-    heroImage: raw.brand_logo,
-    logoUrl: raw.brand_logo,
+    heroImage: brandImage,
+    logoUrl: brandImage,
     heritage: { founded: 0, founder: '', origin: '', story: '' },
     collections: [],
     stories: [],

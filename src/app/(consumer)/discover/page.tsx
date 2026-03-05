@@ -636,7 +636,7 @@ function DiscoverContent() {
       {/* ============================================
           BRANDS - Full Bleed Editorial
           ============================================ */}
-      {(activeTab === 'all' || activeTab === 'brands') && (
+      {(activeTab === 'all' || activeTab === 'brands') && filteredBrands.length > 0 && (
         <section className="bg-charcoal-deep py-20 lg:py-32">
           <div className="max-w-[1800px] mx-auto px-8 md:px-16 lg:px-24">
             {/* Section Header */}
@@ -665,7 +665,7 @@ function DiscoverContent() {
                       className="col-span-12 lg:col-span-8 group relative aspect-[16/9] overflow-hidden"
                     >
                       <Image
-                        src={filteredBrands[0].heroImage}
+                        src={filteredBrands[0].heroImage || filteredBrands[0].logoUrl || 'https://placehold.co/1600x900/1A1A1A/C9A962?text=' + encodeURIComponent(filteredBrands[0].name)}
                         alt={filteredBrands[0].name}
                         fill
                         className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-105"
@@ -694,7 +694,7 @@ function DiscoverContent() {
                         className="group relative aspect-[4/3] lg:aspect-[16/9] overflow-hidden"
                       >
                         <Image
-                          src={brand.heroImage}
+                          src={brand.heroImage || brand.logoUrl || 'https://placehold.co/800x600/1A1A1A/C9A962?text=' + encodeURIComponent(brand.name)}
                           alt={brand.name}
                           fill
                           className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -715,7 +715,7 @@ function DiscoverContent() {
                       className="col-span-4 group relative aspect-square overflow-hidden"
                     >
                       <Image
-                        src={brand.heroImage}
+                        src={brand.heroImage || brand.logoUrl || 'https://placehold.co/600x600/1A1A1A/C9A962?text=' + encodeURIComponent(brand.name)}
                         alt={brand.name}
                         fill
                         className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
@@ -757,7 +757,7 @@ function DiscoverContent() {
                     className="group relative aspect-[4/3] overflow-hidden"
                   >
                     <Image
-                      src={brand.heroImage}
+                      src={brand.heroImage || brand.logoUrl || 'https://placehold.co/800x600/1A1A1A/C9A962?text=' + encodeURIComponent(brand.name)}
                       alt={brand.name}
                       fill
                       className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
