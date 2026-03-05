@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getRecommendedBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
+import { getRecommendedBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import { useApp } from '@/context/AppContext';
 import type { Product, Brand, BrandStory } from '@/types';
 
@@ -38,7 +38,12 @@ function DiscoverContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('relevance');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [storiesPage, setStoriesPage] = useState(1);
   const PRODUCTS_PER_PAGE = 20;
+  const STORIES_PER_PAGE = 6;
 
   // ESC key handler for filter drawer
   useEffect(() => {
@@ -53,14 +58,38 @@ function DiscoverContent() {
     }
   }, [showMobileFilters]);
 
+  // Load brands and stories once on mount
   useEffect(() => {
-    async function loadData() {
+    async function loadBrandsAndStories() {
       try {
-        // Only show the full-page loader on the very first load
-        setDataLoading(prev => (isLoaded ? prev : true));
+        const [brandsResult, storiesResult] = await Promise.allSettled([
+          getRecommendedBrands(),
+          searchStories(),
+        ]);
 
-        const productParams: Parameters<typeof getRecommendedProducts>[0] = {
-          page_size: 100,
+        setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
+        setBrandStories(storiesResult.status === 'fulfilled' ? storiesResult.value : []);
+      } catch (error) {
+        console.error('Failed to load brands/stories:', error);
+      }
+    }
+    loadBrandsAndStories();
+  }, []);
+
+  // Load products with server-side pagination
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        // Show loading overlay for page changes, full loader for initial load
+        if (isLoaded) {
+          setProductsLoading(true);
+        } else {
+          setDataLoading(true);
+        }
+
+        const productParams: Parameters<typeof getRecommendedProductsPaginated>[0] = {
+          page_size: PRODUCTS_PER_PAGE,
+          page_number: currentPage,
         };
 
         if (brandIdParam) {
@@ -92,37 +121,28 @@ function DiscoverContent() {
 
         setLoadError(null);
 
-        // Fetch products, brands, and stories in parallel.
-        // Use allSettled so a products error doesn't block brands/stories.
-        const [productsResult, brandsResult, storiesResult] = await Promise.allSettled([
-          getRecommendedProducts(productParams),
-          getRecommendedBrands(),
-          searchStories(),
-        ]);
+        const result = await getRecommendedProductsPaginated(productParams);
+        setProducts(result.products);
+        setTotalPages(result.totalPages);
+        setTotalProducts(result.totalMatched);
 
-        if (productsResult.status === 'fulfilled') {
-          setProducts(productsResult.value);
-          if (productsResult.value.length === 0) {
-            console.warn('[discover] API returned 0 products — check browser console for [products] logs');
-          }
-        } else {
-          console.error('[discover] Products API failed:', productsResult.reason);
-          setLoadError(productsResult.reason?.message || 'Failed to load products');
-          setProducts([]);
+        if (result.products.length === 0 && currentPage === 1) {
+          console.warn('[discover] API returned 0 products — check browser console for [products] logs');
         }
-
-        setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
-        setBrandStories(storiesResult.status === 'fulfilled' ? storiesResult.value : []);
       } catch (error) {
-        console.error('Failed to load discover page data:', error);
+        console.error('Failed to load products:', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to load products');
+        setProducts([]);
+        setTotalPages(1);
+        setTotalProducts(0);
       } finally {
         setDataLoading(false);
+        setProductsLoading(false);
         setIsLoaded(true);
       }
     }
-    loadData();
-  }, [brandIdParam, budgetRange, selectedOccasions, selectedMoods, isLoaded]);
+    loadProducts();
+  }, [brandIdParam, budgetRange, selectedOccasions, selectedMoods, currentPage, isLoaded]);
 
   const budgetRanges: Record<string, { min: number; max: number }> = {
     'under-500': { min: 0, max: 500 },
@@ -131,21 +151,21 @@ function DiscoverContent() {
     '5000-plus': { min: 5000, max: 50000 },
   };
 
-  const filteredProducts = useMemo(() => {
-    // Occasion and mood filters are already sent to the API (server-side filtering).
-    // Only apply text search client-side so we don't double-filter and remove
-    // products that the recommendation engine returned.
-    const filtered = products.filter(p => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+  // Products are server-side paginated, only apply client-side text search and sorting
+  const displayProducts = useMemo(() => {
+    // Apply text search filter client-side
+    let filtered = products;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = products.filter(p => {
         const matchesName = p.name.toLowerCase().includes(query);
         const matchesBrand = p.brandName.toLowerCase().includes(query);
         const matchesTags = p.tags?.some(tag => tag.toLowerCase().includes(query));
-        if (!matchesName && !matchesBrand && !matchesTags) return false;
-      }
-      return true;
-    });
+        return matchesName || matchesBrand || matchesTags;
+      });
+    }
 
+    // Apply client-side sorting
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'price-asc': return a.price - b.price;
@@ -157,16 +177,11 @@ function DiscoverContent() {
     });
   }, [searchQuery, products, sortBy]);
 
-  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
-    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
-  }, [filteredProducts, currentPage, PRODUCTS_PER_PAGE]);
-
-  // Reset to page 1 when filters change
+  // Reset to page 1 when filters change (not when page changes)
   useEffect(() => {
     setCurrentPage(1);
-  }, [budgetRange, searchQuery, selectedOccasions, selectedMoods, sortBy]);
+    setStoriesPage(1);
+  }, [budgetRange, selectedOccasions, selectedMoods]);
 
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
@@ -440,7 +455,7 @@ function DiscoverContent() {
                   {hasActiveFilters ? 'Your Selection' : 'The Selection'}
                 </span>
                 <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em]">
-                  {hasActiveFilters ? `${filteredProducts.length} Pieces` : 'Curated Pieces'}
+                  {hasActiveFilters ? `${totalProducts} Pieces` : 'Curated Pieces'}
                 </h2>
               </div>
               <p className="text-sm text-stone max-w-sm">
@@ -449,9 +464,16 @@ function DiscoverContent() {
             </div>
 
             {/* Product Grid */}
-            {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-12 md:gap-y-20">
-                {paginatedProducts.map((product, index) => (
+            {displayProducts.length > 0 ? (
+              <div className="relative">
+                {/* Loading overlay for page transitions */}
+                {productsLoading && (
+                  <div className="absolute inset-0 bg-parchment/80 z-10 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-12 md:gap-y-20">
+                {displayProducts.map((product, index) => (
                   <Link
                     key={product.id}
                     href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
@@ -498,6 +520,7 @@ function DiscoverContent() {
                     </div>
                   </Link>
                 ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-32 bg-ivory-cream rounded-sm">
@@ -528,35 +551,73 @@ function DiscoverContent() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="mt-16 lg:mt-20 flex items-center justify-center gap-3">
+              <div className="mt-16 lg:mt-20 flex items-center justify-center gap-3 flex-wrap">
                 {/* Previous */}
                 <button
                   onClick={() => { setCurrentPage(p => p - 1); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || productsLoading}
                   className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
                   <ChevronLeft size={16} />
                 </button>
 
-                {/* Page Numbers */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => { setCurrentPage(page); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                    className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all ${
-                      currentPage === page
-                        ? 'bg-charcoal-deep text-ivory-cream'
-                        : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
+                {/* Page Numbers with Smart Ellipsis */}
+                {(() => {
+                  const pages: (number | string)[] = [];
+
+                  if (totalPages <= 7) {
+                    // Show all pages if 7 or fewer
+                    for (let i = 1; i <= totalPages; i++) pages.push(i);
+                  } else {
+                    // Always show first page
+                    pages.push(1);
+
+                    if (currentPage > 4) {
+                      pages.push('...');
+                    }
+
+                    // Show pages around current
+                    const start = Math.max(2, currentPage - 1);
+                    const end = Math.min(totalPages - 1, currentPage + 1);
+
+                    for (let i = start; i <= end; i++) {
+                      if (!pages.includes(i)) pages.push(i);
+                    }
+
+                    if (currentPage < totalPages - 3) {
+                      pages.push('...');
+                    }
+
+                    // Always show last page
+                    if (!pages.includes(totalPages)) pages.push(totalPages);
+                  }
+
+                  return pages.map((page, idx) => (
+                    page === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="w-10 h-10 flex items-center justify-center text-stone">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => { setCurrentPage(page as number); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                        disabled={productsLoading}
+                        className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all disabled:opacity-50 ${
+                          currentPage === page
+                            ? 'bg-charcoal-deep text-ivory-cream'
+                            : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  ));
+                })()}
 
                 {/* Next */}
                 <button
                   onClick={() => { setCurrentPage(p => p + 1); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || productsLoading}
                   className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                 >
                   <ChevronRight size={16} />
@@ -564,7 +625,7 @@ function DiscoverContent() {
 
                 {/* Count */}
                 <span className="ml-4 text-xs text-stone tracking-wider">
-                  {filteredProducts.length} pieces
+                  {totalProducts} pieces
                 </span>
               </div>
             )}
@@ -735,36 +796,132 @@ function DiscoverContent() {
             </div>
 
             {/* Stories Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
-              {filteredStories.slice(0, 3).map((story) => (
-                <Link
-                  key={story.id}
-                  href={`/story/${story.slug}?storyId=${story.id}`}
-                  className="group"
-                >
-                  <div className="relative aspect-[4/5] overflow-hidden mb-6">
-                    <Image
-                      src={story.heroImage}
-                      alt={story.title}
-                      fill
-                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                    />
-                    <div className="absolute inset-0 bg-noir/10 group-hover:bg-noir/0 transition-colors duration-500" />
-                    <div className="absolute top-5 left-5">
-                      <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream/90 px-3 py-1.5">
-                        {story.type}
+            {(() => {
+              // Paginate stories
+              const storiesToShow = activeTab === 'all'
+                ? filteredStories.slice(0, 3) // Show 3 on "All" tab
+                : filteredStories.slice((storiesPage - 1) * STORIES_PER_PAGE, storiesPage * STORIES_PER_PAGE);
+              const totalStoryPages = Math.ceil(filteredStories.length / STORIES_PER_PAGE);
+
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12">
+                    {storiesToShow.map((story) => (
+                      <Link
+                        key={story.id}
+                        href={`/story/${story.slug}?storyId=${story.id}`}
+                        className="group"
+                      >
+                        <div className="relative aspect-[4/5] overflow-hidden mb-6">
+                          <Image
+                            src={story.heroImage}
+                            alt={story.title}
+                            fill
+                            className="object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <div className="absolute inset-0 bg-noir/10 group-hover:bg-noir/0 transition-colors duration-500" />
+                          <div className="absolute top-5 left-5">
+                            <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream/90 px-3 py-1.5">
+                              {story.type}
+                            </span>
+                          </div>
+                        </div>
+                        <h3 className="font-display text-xl md:text-2xl text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors mb-3">
+                          {story.title}
+                        </h3>
+                        <p className="text-sm text-stone leading-relaxed line-clamp-2">
+                          {story.excerpt}
+                        </p>
+                      </Link>
+                    ))}
+                  </div>
+
+                  {/* Stories Pagination - Only show on Stories tab */}
+                  {activeTab === 'stories' && totalStoryPages > 1 && (
+                    <div className="mt-16 flex items-center justify-center gap-3 flex-wrap">
+                      {/* Previous */}
+                      <button
+                        onClick={() => setStoriesPage(p => p - 1)}
+                        disabled={storiesPage === 1}
+                        className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+
+                      {/* Page Numbers with Smart Ellipsis */}
+                      {(() => {
+                        const pages: (number | string)[] = [];
+
+                        if (totalStoryPages <= 7) {
+                          for (let i = 1; i <= totalStoryPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          if (storiesPage > 4) pages.push('...');
+                          const start = Math.max(2, storiesPage - 1);
+                          const end = Math.min(totalStoryPages - 1, storiesPage + 1);
+                          for (let i = start; i <= end; i++) {
+                            if (!pages.includes(i)) pages.push(i);
+                          }
+                          if (storiesPage < totalStoryPages - 3) pages.push('...');
+                          if (!pages.includes(totalStoryPages)) pages.push(totalStoryPages);
+                        }
+
+                        return pages.map((page, idx) => (
+                          page === '...' ? (
+                            <span key={`ellipsis-${idx}`} className="w-10 h-10 flex items-center justify-center text-stone">
+                              ...
+                            </span>
+                          ) : (
+                            <button
+                              key={page}
+                              onClick={() => setStoriesPage(page as number)}
+                              className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all ${
+                                storiesPage === page
+                                  ? 'bg-charcoal-deep text-ivory-cream'
+                                  : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          )
+                        ));
+                      })()}
+
+                      {/* Next */}
+                      <button
+                        onClick={() => setStoriesPage(p => p + 1)}
+                        disabled={storiesPage === totalStoryPages}
+                        className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+
+                      {/* Count */}
+                      <span className="ml-4 text-xs text-stone tracking-wider">
+                        {filteredStories.length} stories
                       </span>
                     </div>
-                  </div>
-                  <h3 className="font-display text-xl md:text-2xl text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors mb-3">
-                    {story.title}
-                  </h3>
-                  <p className="text-sm text-stone leading-relaxed line-clamp-2">
-                    {story.excerpt}
-                  </p>
-                </Link>
-              ))}
-            </div>
+                  )}
+
+                  {/* View All Stories Button - Show on "All" tab if more stories exist */}
+                  {activeTab === 'all' && filteredStories.length > 3 && (
+                    <div className="mt-12 text-center">
+                      <button
+                        onClick={() => setActiveTab('stories')}
+                        className="group inline-flex items-center gap-4"
+                      >
+                        <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep/60 group-hover:text-charcoal-deep transition-colors">
+                          All Stories ({filteredStories.length})
+                        </span>
+                        <span className="w-10 h-10 rounded-full border border-sand flex items-center justify-center group-hover:bg-charcoal-deep group-hover:border-charcoal-deep transition-all duration-500">
+                          <ArrowRight size={14} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </div>
         </section>
       )}

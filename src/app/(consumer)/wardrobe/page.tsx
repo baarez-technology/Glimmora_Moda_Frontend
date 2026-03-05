@@ -318,6 +318,10 @@ export default function WardrobePage() {
                             {item.product.name}
                           </h3>
                         </Link>
+                        <p className="text-sm text-stone mt-1">
+                          {item.product.currency === 'INR' ? '₹' : item.product.currency === 'GBP' ? '£' : item.product.currency === 'USD' ? '$' : '€'}
+                          {item.product.price.toLocaleString()}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -358,6 +362,10 @@ export default function WardrobePage() {
                                   {item.product.name}
                                 </h3>
                               </Link>
+                              <p className="text-base text-charcoal-deep font-medium mt-2">
+                                {item.product.currency === 'INR' ? '₹' : item.product.currency === 'GBP' ? '£' : item.product.currency === 'USD' ? '$' : '€'}
+                                {item.product.price.toLocaleString()}
+                              </p>
                             </div>
                             <button
                               onClick={() => removeFromWardrobe(item.id)}
