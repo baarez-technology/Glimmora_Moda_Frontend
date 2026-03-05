@@ -480,20 +480,16 @@ export default function StyleDNAPage() {
                 </div>
               ) : (
                 fashionIdentity.budgetRange ? (
-                  <div className="flex items-center gap-6">
-                    <div className="text-center">
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Minimum</p>
-                      <p className="font-display text-2xl text-charcoal-deep">
-                        &euro;{fashionIdentity.budgetRange.min.toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="h-px flex-1 bg-sand" />
-                    <div className="text-center">
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Maximum</p>
-                      <p className="font-display text-2xl text-charcoal-deep">
-                        &euro;{fashionIdentity.budgetRange.max.toLocaleString()}
-                      </p>
-                    </div>
+                  <div className="text-center">
+                    <p className="font-display text-2xl text-charcoal-deep">
+                      {(() => {
+                        const { min, max } = fashionIdentity.budgetRange;
+                        if (min === 0 && max >= 1000000) return 'No Preference';
+                        if (min === 0 && max <= 1000) return `Up to €${max.toLocaleString()}`;
+                        if (min >= 5000 && max >= 1000000) return `€${min.toLocaleString()}+`;
+                        return `€${min.toLocaleString()} — €${max.toLocaleString()}`;
+                      })()}
+                    </p>
                   </div>
                 ) : (
                   <p className="text-sm text-stone">No budget range set. Click edit to add one.</p>

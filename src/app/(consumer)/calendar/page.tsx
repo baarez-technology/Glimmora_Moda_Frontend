@@ -12,7 +12,6 @@ import {
   Sun,
   ChevronRight,
   Check,
-  Plus,
   ArrowRight,
   ArrowLeft,
   Briefcase,
@@ -24,6 +23,7 @@ import {
   Star
 } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
+import type { BackendOutfitRecommendation } from '@/services/calendar.service';
 import { useApp } from '@/context/AppContext';
 import type { CalendarConnection, EventType } from '@/types';
 import { PROVIDER_DISPLAY_NAMES } from '@/types';
@@ -74,20 +74,43 @@ const dressCodeLabels: Record<string, string> = {
 };
 
 export default function CalendarPage() {
-  const { calendarEvents, saveOutfit, addToConsiderations, showToast, isUHNI } = useApp();
+  const { calendarEvents, isUHNI } = useApp();
   const router = useRouter();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(
     calendarEvents[0]?.id || null
   );
-  const [selectedSuggestion, setSelectedSuggestion] = useState(0);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [activeHover, setActiveHover] = useState<number | null>(null);
   const [calendarConnections, setCalendarConnections] = useState<CalendarConnection[]>([]);
+  const [apiRecommendations, setApiRecommendations] = useState<Record<string, BackendOutfitRecommendation>>({});
+  const [loadingRecommendations, setLoadingRecommendations] = useState<string | null>(null);
+  const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
   // Get the selected event from the current calendarEvents (which updates when wardrobe changes)
   const selectedEvent = selectedEventId
-    ? calendarEvents.find(e => e.id === selectedEventId) || null
+    ? calendarEvents.find(e => e.id === selectedEventId) || calendarEvents[0] || null
     : calendarEvents[0] || null;
+
+  // Get the API recommendation for the selected event
+  const activeRecommendation = selectedEvent ? apiRecommendations[selectedEvent.id] : null;
+
+  // Fetch outfit recommendations from API when an event is selected
+  useEffect(() => {
+    const eventId = selectedEvent?.id;
+    if (!eventId || apiRecommendations[eventId] || loadingRecommendations === eventId) return;
+
+    setLoadingRecommendations(eventId);
+    setRecommendationError(null);
+    calendarService.getOutfitRecommendations(eventId)
+      .then((rec: BackendOutfitRecommendation) => {
+        setApiRecommendations(prev => ({ ...prev, [eventId]: rec }));
+      })
+      .catch((err) => {
+        setRecommendationError(err instanceof Error ? err.message : 'Failed to load recommendations');
+      })
+      .finally(() => {
+        setLoadingRecommendations(null);
+      });
+  }, [selectedEvent?.id, apiRecommendations, loadingRecommendations]);
 
   useEffect(() => {
     if (isUHNI) { router.replace('/uhni/calendar'); return; }
@@ -117,40 +140,6 @@ export default function CalendarPage() {
     loadConnections();
   }, [isUHNI, router]);
 
-  const connectedCalendar = calendarConnections.find(c => c.connected);
-
-  const handleSaveOutfit = () => {
-    if (!selectedEvent || !selectedEvent.outfitSuggestions?.[selectedSuggestion]) return;
-
-    const suggestion = selectedEvent.outfitSuggestions[selectedSuggestion];
-    const productIds = suggestion.items.map(item => item.product.id);
-
-    saveOutfit(
-      `${suggestion.name} for ${selectedEvent.title}`,
-      productIds,
-      selectedEvent.id
-    );
-  };
-
-  const handleAddToConsiderations = () => {
-    if (!selectedEvent || !selectedEvent.outfitSuggestions?.[selectedSuggestion]) return;
-
-    const suggestion = selectedEvent.outfitSuggestions[selectedSuggestion];
-    const suggestedItems = suggestion.items.filter(item => item.type === 'suggested');
-
-    if (suggestedItems.length === 0) {
-      showToast('All items are already in your wardrobe', 'info');
-      return;
-    }
-
-    suggestedItems.forEach(item => {
-      addToConsiderations(
-        item.product,
-        {},
-        `Suggested for ${selectedEvent.title}: ${item.note || suggestion.description}`
-      );
-    });
-  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -258,7 +247,6 @@ export default function CalendarPage() {
                         key={event.id}
                         onClick={() => {
                           setSelectedEventId(event.id);
-                          setSelectedSuggestion(0);
                         }}
                         className={`w-full text-left p-6 transition-all duration-300 ${
                           isSelected
@@ -405,170 +393,130 @@ export default function CalendarPage() {
                     )}
                   </div>
 
-                  {/* Outfit Suggestions */}
-                  {selectedEvent.outfitSuggestions && selectedEvent.outfitSuggestions.length > 0 && (
+                  {/* Loading Recommendations */}
+                  {loadingRecommendations === selectedEvent.id && (
+                    <div className="py-16 text-center bg-parchment">
+                      <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                      <p className="text-stone text-sm">Generating outfit recommendations...</p>
+                    </div>
+                  )}
+
+                  {/* Recommendation Error */}
+                  {recommendationError && !loadingRecommendations && !activeRecommendation && (
+                    <div className="py-10 text-center bg-parchment">
+                      <p className="text-stone text-sm mb-4">Could not load outfit recommendations.</p>
+                      <button
+                        onClick={() => {
+                          setApiRecommendations(prev => {
+                            const next = { ...prev };
+                            delete next[selectedEvent.id];
+                            return next;
+                          });
+                          setRecommendationError(null);
+                        }}
+                        className="text-sm tracking-[0.15em] uppercase text-charcoal-deep hover:text-noir transition-colors"
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  )}
+
+                  {/* API Outfit Recommendation */}
+                  {activeRecommendation && (
                     <div>
-                      <div className="flex items-end justify-between mb-8">
+                      {/* Title & Score */}
+                      <div className="flex items-end justify-between mb-6">
                         <div>
                           <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-2">
-                            Curated For You
+                            AI Outfit Recommendation
                           </span>
                           <h3 className="font-display text-[clamp(1.5rem,3vw,2rem)] text-charcoal-deep leading-[1.1]">
-                            Outfit Suggestions
+                            {activeRecommendation.title}
                           </h3>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="w-24 h-1 bg-sand overflow-hidden">
+                            <div
+                              className="h-full bg-gold-muted"
+                              style={{ width: `${activeRecommendation.style_score}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] tracking-[0.2em] uppercase text-taupe">
+                            {activeRecommendation.style_score}% match
+                          </span>
                         </div>
                       </div>
 
-                      {/* Suggestion Tabs */}
-                      {selectedEvent.outfitSuggestions.length > 1 && (
-                        <div className="flex gap-1 mb-8 border-b border-sand" role="tablist">
-                          {selectedEvent.outfitSuggestions.map((suggestion, index) => (
-                            <button
-                              key={suggestion.id}
-                              role="tab"
-                              aria-selected={selectedSuggestion === index}
-                              onClick={() => setSelectedSuggestion(index)}
-                              className={`px-6 py-4 text-sm tracking-[0.1em] uppercase transition-all relative ${
-                                selectedSuggestion === index
-                                  ? 'text-charcoal-deep'
-                                  : 'text-stone hover:text-charcoal-deep'
-                              }`}
+                      {/* Description */}
+                      <p className="text-stone leading-relaxed mb-8">
+                        {activeRecommendation.description}
+                      </p>
+
+                      {/* Product Cards */}
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
+                        {activeRecommendation.outfit_suggestions.map((item, idx) => {
+                          const p = item.suitable_product;
+                          const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                          const productUrl = `/product/${slug}?productId=${p.product_id}`;
+
+                          return (
+                            <Link
+                              key={idx}
+                              href={productUrl}
+                              className="group bg-white border border-sand hover:border-charcoal-deep transition-all duration-300 overflow-hidden"
                             >
-                              {suggestion.name}
-                              {selectedSuggestion === index && (
-                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-charcoal-deep" />
-                              )}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Selected Suggestion */}
-                      {selectedEvent.outfitSuggestions[selectedSuggestion] && (
-                        <div>
-                          <div className="mb-8">
-                            <div className="flex items-center justify-between mb-3">
-                              <h4 className="font-display text-xl text-charcoal-deep">
-                                {selectedEvent.outfitSuggestions[selectedSuggestion].name}
-                              </h4>
-                              <div className="flex items-center gap-3">
-                                <div className="w-24 h-1 bg-sand overflow-hidden">
-                                  <div
-                                    className="h-full bg-gold-muted"
-                                    style={{ width: `${selectedEvent.outfitSuggestions[selectedSuggestion].confidence}%` }}
-                                  />
-                                </div>
-                                <span className="text-[10px] tracking-[0.2em] uppercase text-taupe">
-                                  {selectedEvent.outfitSuggestions[selectedSuggestion].confidence}% match
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-stone leading-relaxed">
-                              {selectedEvent.outfitSuggestions[selectedSuggestion].description}
-                            </p>
-                          </div>
-
-                          {/* Outfit Items */}
-                          <div className="grid sm:grid-cols-2 gap-6 mb-8">
-                            {selectedEvent.outfitSuggestions[selectedSuggestion].items.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className={`p-5 border ${
-                                  item.type === 'wardrobe'
-                                    ? 'border-success/30 bg-success/5'
-                                    : 'border-gold-muted/30 bg-gold-muted/5'
-                                }`}
-                              >
-                                <div className="flex gap-5">
-                                  <Link
-                                    href={`/product/${item.product.slug}`}
-                                    className="group relative w-24 h-32 overflow-hidden flex-shrink-0"
-                                    onMouseEnter={() => setActiveHover(idx)}
-                                    onMouseLeave={() => setActiveHover(null)}
-                                  >
-                                    <Image
-                                      src={item.product.images[0]?.url || ''}
-                                      alt={item.product.name}
-                                      fill
-                                      className="object-cover transition-transform duration-700 group-hover:scale-105"
-                                    />
-                                    <div className="absolute inset-0 bg-noir/0 group-hover:bg-noir/20 transition-all duration-500 flex items-center justify-center">
-                                      <div className={`w-10 h-10 bg-ivory-cream flex items-center justify-center transform transition-all duration-500 ${activeHover === idx ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
-                                        <ArrowRight size={14} className="text-charcoal-deep" />
-                                      </div>
-                                    </div>
-                                  </Link>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      {item.type === 'wardrobe' ? (
-                                        <span className="px-2 py-1 bg-success/20 text-success text-[9px] tracking-[0.15em] uppercase">
-                                          In Wardrobe
-                                        </span>
-                                      ) : (
-                                        <span className="px-2 py-1 bg-gold-muted/20 text-gold-muted text-[9px] tracking-[0.15em] uppercase">
-                                          Suggested
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">{item.product.brandName}</p>
-                                    <Link
-                                      href={`/product/${item.product.slug}`}
-                                      className="font-display text-lg text-charcoal-deep hover:text-charcoal-warm transition-colors line-clamp-1"
-                                    >
-                                      {item.product.name}
-                                    </Link>
-                                    <p className="text-xs text-stone mt-1">{item.category}</p>
-                                    {item.note && (
-                                      <p className="text-xs text-taupe mt-3 italic">{item.note}</p>
-                                    )}
-                                  </div>
-                                </div>
-
-                                {item.type === 'suggested' && (
-                                  <div className="mt-4 pt-4 border-t border-sand/50 flex items-center justify-between">
-                                    <span className="font-display text-lg text-charcoal-deep">
-                                      €{item.product.price.toLocaleString()}
-                                    </span>
-                                    <Link
-                                      href={`/product/${item.product.slug}`}
-                                      className="group inline-flex items-center gap-2 text-[10px] tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
-                                    >
-                                      <span>View</span>
-                                      <ChevronRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                                    </Link>
-                                  </div>
+                              {/* Product Image */}
+                              <div className="relative aspect-[3/4] overflow-hidden bg-parchment">
+                                <Image
+                                  src={p.product_image}
+                                  alt={p.product_name}
+                                  fill
+                                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                                {p.is_wardrobe && (
+                                  <span className="absolute top-3 left-3 px-2 py-1 bg-success/90 text-white text-[9px] tracking-[0.15em] uppercase">
+                                    In Wardrobe
+                                  </span>
                                 )}
                               </div>
-                            ))}
-                          </div>
+                              {/* Card Info */}
+                              <div className="p-4">
+                                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">
+                                  {p.brand_name}
+                                </p>
+                                <h4 className="font-display text-lg text-charcoal-deep leading-tight mb-1 line-clamp-1">
+                                  {p.product_name}
+                                </h4>
+                                <p className="text-xs text-stone capitalize">
+                                  {item.product_category}
+                                </p>
+                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-sand/50">
+                                  <div className="flex items-center gap-2">
+                                    {p.discount_percentage > 0 && (
+                                      <span className="text-xs text-taupe line-through">€{p.price.toLocaleString()}</span>
+                                    )}
+                                    <span className="font-display text-base text-charcoal-deep">
+                                      €{(p.offer_price || p.price).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <span className="flex items-center gap-1 text-[10px] tracking-[0.15em] uppercase text-stone group-hover:text-charcoal-deep transition-colors">
+                                    View
+                                    <ChevronRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                                  </span>
+                                </div>
+                              </div>
+                            </Link>
+                          );
+                        })}
+                      </div>
 
-                          {/* Style Note */}
-                          <div className="p-6 bg-charcoal-deep mb-8">
-                            <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-4">Style Note</p>
-                            <p className="text-taupe leading-relaxed">
-                              {selectedEvent.outfitSuggestions[selectedSuggestion].agiReasoning}
-                            </p>
-                          </div>
-
-                          {/* Actions */}
-                          <div className="flex flex-wrap gap-4">
-                            <button
-                              onClick={handleSaveOutfit}
-                              className="group py-4 px-8 bg-charcoal-deep text-ivory-cream flex items-center gap-3 transition-all duration-300 hover:bg-noir"
-                            >
-                              <Check size={16} />
-                              <span className="text-sm tracking-[0.15em] uppercase">Save This Look</span>
-                            </button>
-                            <button
-                              onClick={handleAddToConsiderations}
-                              className="group py-4 px-8 border border-charcoal-deep text-charcoal-deep flex items-center gap-3 transition-all duration-300 hover:bg-charcoal-deep hover:text-ivory-cream"
-                            >
-                              <Plus size={16} />
-                              <span className="text-sm tracking-[0.15em] uppercase">Add to Considerations</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Style Note */}
+                      <div className="p-6 bg-charcoal-deep">
+                        <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-4">Style Note</p>
+                        <p className="text-taupe leading-relaxed">
+                          {activeRecommendation.style_note}
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>

@@ -381,12 +381,12 @@ export function userLogout(): void {
 }
 
 // ============================================
-// Get User by ID
+// Get Current User (GET /api/v1/user/auth/me)
 // ============================================
 
-export async function getUserById(userId: string): Promise<UserData> {
+export async function getUserById(): Promise<UserData> {
   const token = localStorage.getItem('moda-user-token');
-  const res = await fetchWithTimeout(`/api/v1/user/auth/${userId}`, {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/me`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
