@@ -114,6 +114,9 @@ function ProductPageContent({ product }: { product: Product }) {
               onShowViewOnMe={() => state.setShowViewOnMe(true)}
               isUHNI={state.isUHNI}
               onNegotiatePrice={state.handleNegotiatePrice}
+              pricingTier={state.pricingTier}
+              hasPriceAlert={state.hasPriceAlert}
+              onSetPriceAlert={state.handleSetPriceAlert}
             />
 
             <ProductIntelligencePanel

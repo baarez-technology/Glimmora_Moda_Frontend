@@ -3,16 +3,17 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Heart, ShoppingBag, Menu, X, LogOut, Settings, Building2 } from 'lucide-react';
+import { User, Heart, ShoppingBag, Menu, X, LogOut, Settings, Building2, Sparkles } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { brandLogout } from '@/services/auth.service';
 import { getRecommendedBrands } from '@/services/recommendation.service';
+import { TierBadge } from '@/components/shared/TierBadge';
 import type { Brand } from '@/types';
 
 export default function Header() {
   const router = useRouter();
-  const { considerations, userTier, isUHNI, showToast, cartCount, wishlistCount } = useApp();
+  const { considerations, userTier, isUHNI, showToast, cartCount, wishlistCount, pricingTier } = useApp();
   const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
@@ -296,6 +297,17 @@ export default function Header() {
                         >
                           <User size={16} />
                           <span>My Profile</span>
+                        </Link>
+                        <Link
+                          href="/pricing-tiers"
+                          onClick={() => setIsAccountOpen(false)}
+                          className="flex items-center justify-between px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Sparkles size={16} />
+                            <span>Membership</span>
+                          </div>
+                          <TierBadge tier={pricingTier} size="sm" />
                         </Link>
                         <Link
                           href="/profile/settings"

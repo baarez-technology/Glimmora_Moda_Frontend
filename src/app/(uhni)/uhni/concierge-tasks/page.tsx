@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Crown,
@@ -21,6 +22,7 @@ import {
   CheckCircle,
   Calendar,
   X,
+  Check,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { ConciergeTask, ConciergeTaskType, ConciergeTaskPriority, ConciergeTaskStatus, ConciergeAppointment, AppointmentType } from '@/types/uhni';
@@ -28,6 +30,7 @@ import type { ConciergeTask, ConciergeTaskType, ConciergeTaskPriority, Concierge
 type TabValue = 'tasks' | 'appointments';
 
 export default function ConciergeTasksPage() {
+  const router = useRouter();
   const {
     showToast,
     conciergeTasks,
@@ -36,11 +39,13 @@ export default function ConciergeTasksPage() {
     conciergeAppointments,
     cancelAppointment,
     rescheduleAppointment,
+    concierge,
   } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<TabValue>('tasks');
   const [showNewTaskForm, setShowNewTaskForm] = useState(false);
+  const [showSummaryAppt, setShowSummaryAppt] = useState<ConciergeAppointment | null>(null);
 
   // New task form state
   const [taskTitle, setTaskTitle] = useState('');
@@ -532,25 +537,36 @@ export default function ConciergeTasksPage() {
                   Past ({pastAppts.length})
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {pastAppts.map(appt => (
-                    <div key={appt.id} className="bg-white border border-sand/30 p-6 opacity-70">
-                      <div className="flex items-start justify-between mb-3">
-                        <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getAppointmentStatusBadge(appt.status)}`}>
-                          {appt.status}
-                        </span>
+                  {pastAppts.map(appt => {
+                    const isPast = appt.status === 'completed';
+                    return (
+                      <div key={appt.id} className="bg-white border border-sand/30 p-6 opacity-70">
+                        <div className="flex items-start justify-between mb-3">
+                          <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getAppointmentStatusBadge(appt.status)}`}>
+                            {appt.status}
+                          </span>
+                        </div>
+                        <h3 className="font-display text-lg text-charcoal-deep mb-1">{appt.title}</h3>
+                        <p className="text-xs text-taupe mb-3">{getAppointmentTypeLabel(appt.type)}</p>
+                        <div className="flex items-center gap-2 text-sm text-stone mb-3">
+                          <Calendar size={14} />
+                          {new Date(appt.date + 'T00:00:00').toLocaleDateString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric'
+                          })}
+                          <span>·</span>
+                          <span>{appt.time}</span>
+                        </div>
+                        {isPast && appt.status !== 'cancelled' && (
+                          <button
+                            onClick={() => setShowSummaryAppt(appt)}
+                            className="w-full px-4 py-2 border border-sand text-stone text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+                          >
+                            View Summary
+                          </button>
+                        )}
                       </div>
-                      <h3 className="font-display text-lg text-charcoal-deep mb-1">{appt.title}</h3>
-                      <p className="text-xs text-taupe mb-3">{getAppointmentTypeLabel(appt.type)}</p>
-                      <div className="flex items-center gap-2 text-sm text-stone">
-                        <Calendar size={14} />
-                        {new Date(appt.date + 'T00:00:00').toLocaleDateString('en-US', {
-                          month: 'short', day: 'numeric', year: 'numeric'
-                        })}
-                        <span>·</span>
-                        <span>{appt.time}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -619,6 +635,107 @@ export default function ConciergeTasksPage() {
                   className="flex-1 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   Confirm Reschedule
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Session Summary Modal */}
+      {showSummaryAppt && (
+        <div
+          className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowSummaryAppt(null)}
+        >
+          <div
+            className="bg-white max-w-md w-full p-8"
+            role="dialog"
+            aria-modal="true"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">
+                Session Summary
+              </h3>
+              <button
+                onClick={() => setShowSummaryAppt(null)}
+                className="p-2 hover:bg-sand/20 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-parchment p-4">
+                <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-1">
+                  Session
+                </p>
+                <p className="font-medium text-charcoal-deep text-sm">
+                  {showSummaryAppt.title}
+                </p>
+                <p className="text-xs text-stone mt-0.5">
+                  {new Date(showSummaryAppt.date + 'T' + showSummaryAppt.time).toLocaleDateString(
+                    'en-US', {
+                      weekday: 'long', month: 'long', day: 'numeric',
+                      hour: '2-digit', minute: '2-digit'
+                    }
+                  )}
+                </p>
+              </div>
+
+              {showSummaryAppt.notes && (
+                <div>
+                  <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-2">
+                    Your Notes
+                  </p>
+                  <p className="text-sm text-charcoal-deep italic bg-parchment border border-sand px-4 py-3">
+                    &quot;{showSummaryAppt.notes}&quot;
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-2">
+                  Session Outcome
+                </p>
+                <div className="space-y-2 text-sm text-stone">
+                  <div className="flex items-start gap-2">
+                    <Check size={14} className="text-success mt-0.5 flex-shrink-0" />
+                    <p>Session completed with {concierge?.name || 'your concierge'}</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check size={14} className="text-success mt-0.5 flex-shrink-0" />
+                    <p>All discussion notes saved to your profile</p>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Check size={14} className="text-success mt-0.5 flex-shrink-0" />
+                    <p>Any action items have been added to your concierge tasks</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-sand pt-4">
+                <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-2">
+                  Follow-Up Actions
+                </p>
+                <button
+                  onClick={() => {
+                    setShowSummaryAppt(null)
+                    router.push('/uhni/concierge')
+                  }}
+                  className="w-full px-4 py-2.5 border border-sand text-stone text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors mb-2"
+                >
+                  Continue Conversation with Isabella
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSummaryAppt(null)
+                    router.push('/uhni/concierge?tab=book')
+                  }}
+                  className="w-full px-4 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                >
+                  Book Next Session
                 </button>
               </div>
             </div>

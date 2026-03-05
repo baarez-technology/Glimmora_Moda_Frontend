@@ -4,17 +4,18 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Phone, Mail, MessageCircle, Layers } from 'lucide-react';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Phone, Mail, MessageCircle, Layers, Sparkles } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { TierBadge } from '@/components/shared/TierBadge';
 import type { User } from '@/types';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated, isLoggingOut, userData: authUserData, setUserData } = useAuth();
-  const { wardrobe, calendarEvents, orders, isUHNI, concierge, fashionIdentity } = useApp();
+  const { wardrobe, calendarEvents, orders, isUHNI, concierge, fashionIdentity, pricingTier } = useApp();
   const [mockUserData, setMockUserData] = useState<User | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
@@ -148,6 +149,14 @@ export default function ProfilePage() {
     },
   ];
 
+  // Membership tier link
+  const membershipItem = {
+    href: '/pricing-tiers',
+    icon: Sparkles,
+    title: 'Membership',
+    subtitle: 'View tier benefits',
+  };
+
   // Settings at the end
   const settingsItem = {
     href: '/profile/settings',
@@ -156,7 +165,7 @@ export default function ProfilePage() {
     subtitle: 'Account & preferences',
   };
 
-  const navItems = [...baseNavItems, settingsItem];
+  const navItems = [...baseNavItems, membershipItem, settingsItem];
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -192,17 +201,9 @@ export default function ProfilePage() {
                     ? `Member Since ${new Date(user.memberSince).getFullYear()}`
                     : 'Member Since 2024'}
                 </span>
-                {user.role === 'uhni' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-gold-soft/10 border border-gold-soft/30">
-                    <Crown size={10} className="text-gold-soft" />
-                    <span className="text-[9px] tracking-[0.3em] uppercase text-gold-soft">UHNI</span>
-                  </span>
-                )}
-                {user.role === 'consumer' && (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-ivory-cream/10 border border-ivory-cream/20">
-                    <span className="text-[9px] tracking-[0.3em] uppercase text-ivory-cream/70">Consumer</span>
-                  </span>
-                )}
+                <Link href="/pricing-tiers" className="transition-transform hover:scale-105">
+                  <TierBadge tier={pricingTier} size="md" />
+                </Link>
               </div>
               <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-3">
                 {user.name}

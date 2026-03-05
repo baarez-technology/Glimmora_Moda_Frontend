@@ -14,12 +14,14 @@ import {
 } from '@/services/uhni.service';
 import type { NegotiationStatus, PriceNegotiation, UHNIPriceAlert, UHNIPricingTier, UHNIPricingSummary } from '@/types';
 import type { UHNIPriceOffer } from '@/types/uhni';
+import type { PriceAlert } from '@/types/pricing-tiers';
 
 export default function PricingPage() {
   const {
     concierge, showToast,
     priceNegotiations: contextNegotiations, respondToCounterOffer,
-    uhniOffers, claimedOffers, claimOffer
+    uhniOffers, claimedOffers, claimOffer,
+    priceAlerts: contextPriceAlerts, deletePriceAlert, togglePriceAlert
   } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<'negotiations' | 'offers' | 'alerts'>('negotiations');
@@ -253,7 +255,7 @@ export default function PricingPage() {
           {[
             { value: 'negotiations' as const, label: 'Negotiations', count: negotiations.length, actionCount: negotiations.filter(n => n.status === 'counter_offered').length },
             { value: 'offers' as const, label: 'Special Offers', count: uhniOffers.length, actionCount: 0 },
-            { value: 'alerts' as const, label: 'Price Alerts', count: alerts.length, actionCount: 0 },
+            { value: 'alerts' as const, label: 'Price Alerts', count: contextPriceAlerts.length + alerts.length, actionCount: contextPriceAlerts.filter(a => a.triggeredAt).length },
           ].map(tab => (
             <button
               key={tab.value}
@@ -576,58 +578,204 @@ export default function PricingPage() {
 
         {/* Alerts Tab */}
         {activeTab === 'alerts' && (
-          <div className="space-y-4">
-            {alerts.map((alert) => {
-              const priceGap = alert.currentPrice - alert.targetPrice;
-              const percentageGap = ((priceGap / alert.currentPrice) * 100).toFixed(1);
+          <div className="space-y-6">
+            {/* Active alerts from context */}
+            {contextPriceAlerts.length > 0 && (
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">
+                  Your Price Alerts — {contextPriceAlerts.filter(a => a.isActive).length} active
+                </p>
+                <div className="space-y-4">
+                  {contextPriceAlerts.map((alert) => {
+                    const priceGap = alert.currentPrice - alert.targetPrice;
+                    const percentageGap = ((priceGap / alert.currentPrice) * 100).toFixed(1);
+                    const isTriggered = alert.triggeredAt !== undefined;
 
-              return (
-                <div key={alert.id} className="bg-white p-6">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="relative w-full md:w-24 h-24 flex-shrink-0">
-                      <Image
-                        src={alert.productImage}
-                        alt={alert.productName}
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <span className="text-xs text-taupe">{alert.brandName}</span>
-                          <h3 className="font-display text-lg text-charcoal-deep">{alert.productName}</h3>
-                        </div>
-                        <div className={`px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase ${
-                          alert.triggered ? 'bg-success/10 text-success' : 'bg-parchment text-stone'
-                        }`}>
-                          {alert.triggered ? 'Triggered!' : 'Monitoring'}
+                    return (
+                      <div
+                        key={alert.id}
+                        className={`bg-white p-6 border transition-all ${
+                          isTriggered
+                            ? 'border-success/30 bg-success/5'
+                            : alert.isActive
+                            ? 'border-sand'
+                            : 'border-sand/50 opacity-60'
+                        }`}
+                      >
+                        <div className="flex flex-col md:flex-row gap-6">
+                          <Link
+                            href={`/product/${alert.productSlug}`}
+                            className="relative w-full md:w-24 h-24 flex-shrink-0 group overflow-hidden"
+                          >
+                            {alert.productImage ? (
+                              <Image
+                                src={alert.productImage}
+                                alt={alert.productName}
+                                fill
+                                className="object-cover transition-transform group-hover:scale-105"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-parchment flex items-center justify-center">
+                                <Tag size={24} className="text-taupe" />
+                              </div>
+                            )}
+                          </Link>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <span className="text-xs text-taupe">{alert.brandName}</span>
+                                <Link
+                                  href={`/product/${alert.productSlug}`}
+                                  className="block font-display text-lg text-charcoal-deep hover:text-noir transition-colors"
+                                >
+                                  {alert.productName}
+                                </Link>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {isTriggered ? (
+                                  <div className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success flex items-center gap-1.5">
+                                    <Check size={12} />
+                                    Price Dropped!
+                                  </div>
+                                ) : alert.isActive ? (
+                                  <div className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-parchment text-stone flex items-center gap-1.5">
+                                    <Clock size={12} />
+                                    Monitoring
+                                  </div>
+                                ) : (
+                                  <div className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-sand/50 text-taupe">
+                                    Paused
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-6 mt-3">
+                              <div>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Current Price</span>
+                                <span className="text-charcoal-deep">{formatCurrency(alert.currentPrice)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Your Target</span>
+                                <span className="text-charcoal-deep font-medium">{formatCurrency(alert.targetPrice)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Gap</span>
+                                <span className="text-gold-muted">{percentageGap}% ({formatCurrency(priceGap)})</span>
+                              </div>
+                              {isTriggered && alert.triggeredPrice && (
+                                <div>
+                                  <span className="text-[10px] tracking-[0.1em] uppercase text-success block">Triggered At</span>
+                                  <span className="text-success font-medium">{formatCurrency(alert.triggeredPrice)}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between mt-4 pt-4 border-t border-sand/50">
+                              <p className="text-xs text-taupe">
+                                Created {new Date(alert.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </p>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => togglePriceAlert(alert.id)}
+                                  className="px-3 py-1.5 text-xs tracking-[0.1em] uppercase border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+                                >
+                                  {alert.isActive ? 'Pause' : 'Resume'}
+                                </button>
+                                <button
+                                  onClick={() => deletePriceAlert(alert.id)}
+                                  className="px-3 py-1.5 text-xs tracking-[0.1em] uppercase border border-error/30 text-error hover:bg-error/10 transition-colors"
+                                >
+                                  Remove
+                                </button>
+                                {isTriggered && (
+                                  <Link
+                                    href={`/product/${alert.productSlug}`}
+                                    className="px-4 py-1.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                                  >
+                                    View Product
+                                  </Link>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="flex gap-6 mt-3">
-                        <div>
-                          <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Current Price</span>
-                          <span className="text-charcoal-deep">{formatCurrency(alert.currentPrice)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Your Target</span>
-                          <span className="text-charcoal-deep">{formatCurrency(alert.targetPrice)}</span>
-                        </div>
-                        <div>
-                          <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Gap</span>
-                          <span className="text-gold-muted">{percentageGap}% ({formatCurrency(priceGap)})</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            )}
 
-            {alerts.length === 0 && (
-              <div className="text-center py-16 bg-white">
+            {/* Service-based alerts (legacy) */}
+            {alerts.length > 0 && (
+              <div>
+                <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">
+                  Service Alerts — {alerts.length} items
+                </p>
+                <div className="space-y-4">
+                  {alerts.map((alert) => {
+                    const priceGap = alert.currentPrice - alert.targetPrice;
+                    const percentageGap = ((priceGap / alert.currentPrice) * 100).toFixed(1);
+
+                    return (
+                      <div key={alert.id} className="bg-white p-6 border border-sand">
+                        <div className="flex flex-col md:flex-row gap-6">
+                          <div className="relative w-full md:w-24 h-24 flex-shrink-0">
+                            <Image
+                              src={alert.productImage}
+                              alt={alert.productName}
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <span className="text-xs text-taupe">{alert.brandName}</span>
+                                <h3 className="font-display text-lg text-charcoal-deep">{alert.productName}</h3>
+                              </div>
+                              <div className={`px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase ${
+                                alert.triggered ? 'bg-success/10 text-success' : 'bg-parchment text-stone'
+                              }`}>
+                                {alert.triggered ? 'Triggered!' : 'Monitoring'}
+                              </div>
+                            </div>
+                            <div className="flex gap-6 mt-3">
+                              <div>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Current Price</span>
+                                <span className="text-charcoal-deep">{formatCurrency(alert.currentPrice)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Your Target</span>
+                                <span className="text-charcoal-deep">{formatCurrency(alert.targetPrice)}</span>
+                              </div>
+                              <div>
+                                <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block">Gap</span>
+                                <span className="text-gold-muted">{percentageGap}% ({formatCurrency(priceGap)})</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {contextPriceAlerts.length === 0 && alerts.length === 0 && (
+              <div className="text-center py-16 bg-white border border-sand">
                 <Bell size={32} className="text-taupe mx-auto mb-4" />
-                <p className="text-stone">No price alerts set.</p>
+                <p className="text-charcoal-deep font-medium mb-2">No price alerts set</p>
+                <p className="text-stone text-sm mb-6 max-w-md mx-auto">
+                  Set price alerts on any product to be notified when the price drops to your target.
+                </p>
+                <Link
+                  href="/discover"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors"
+                >
+                  Browse Collection
+                  <ArrowRight size={14} />
+                </Link>
               </div>
             )}
           </div>

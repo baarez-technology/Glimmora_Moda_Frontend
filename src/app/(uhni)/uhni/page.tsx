@@ -25,8 +25,11 @@ import {
   Star,
   Zap,
   Package,
+  Clock,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { TierBadge } from '@/components/shared/TierBadge';
+import { getTierDefinition, getBenefitsForTier } from '@/lib/pricing-tiers';
 
 // Nav groups — shown in left column, same pattern as consumer profile Quick Access
 const navGroups = [
@@ -86,6 +89,10 @@ export default function UHNIDashboardPage() {
     autonomousSettings,
     autonomousActivity,
     wardrobe,
+    conciergeAppointments,
+    pricingTier,
+    tierSince,
+    priceAlerts,
   } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -190,6 +197,32 @@ export default function UHNIDashboardPage() {
                 </div>
               </div>
 
+              {/* UHNI Tier Banner */}
+              <div className="bg-gradient-to-r from-charcoal-deep to-charcoal-warm p-6 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-gold-soft/5 to-transparent" />
+                <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <TierBadge tier={pricingTier} size="lg" />
+                    <div>
+                      <p className="text-ivory-cream text-sm font-medium">
+                        {getTierDefinition(pricingTier).tagline}
+                      </p>
+                      <p className="text-taupe text-xs">
+                        Member since {new Date(tierSince).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                        {priceAlerts.length > 0 && ` · ${priceAlerts.filter(a => a.isActive).length} active price alerts`}
+                      </p>
+                    </div>
+                  </div>
+                  <Link
+                    href="/pricing-tiers"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-gold-soft/10 border border-gold-soft/20 text-gold-soft hover:bg-gold-soft/20 transition-colors text-xs tracking-wider uppercase"
+                  >
+                    <span>View Benefits</span>
+                    <ArrowRight size={12} />
+                  </Link>
+                </div>
+              </div>
+
               {/* Recent activity */}
               {(sourcingRequests.length > 0 || bespokeOrders.length > 0 || autonomousActivity.length > 0) && (
                 <div>
@@ -248,6 +281,53 @@ export default function UHNIDashboardPage() {
                     <Crown size={12} className="text-gold-soft" />
                     <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/60">Your Personal Concierge</span>
                   </div>
+
+                  {/* Next appointment preview */}
+                  {(conciergeAppointments || []).filter(a =>
+                    a.status !== 'cancelled' &&
+                    new Date(a.scheduledAt || `${a.date}T${a.time}`) > new Date()
+                  ).length > 0 && (
+                    <div className="mb-4 p-3 bg-gold-soft/10 border border-gold-soft/20 text-xs">
+                      <div className="flex items-center gap-2 text-gold-soft">
+                        <Clock size={12} />
+                        <span className="font-medium">Next appointment — </span>
+                        <span className="text-sand">
+                          {new Date(
+                            (conciergeAppointments || [])
+                              .filter(a =>
+                                a.status !== 'cancelled' &&
+                                new Date(a.scheduledAt || `${a.date}T${a.time}`) > new Date()
+                              )
+                              .sort((a, b) =>
+                                new Date(a.scheduledAt || `${a.date}T${a.time}`).getTime() -
+                                new Date(b.scheduledAt || `${b.date}T${b.time}`).getTime()
+                              )[0]?.scheduledAt ||
+                            `${(conciergeAppointments || [])
+                              .filter(a =>
+                                a.status !== 'cancelled' &&
+                                new Date(a.scheduledAt || `${a.date}T${a.time}`) > new Date()
+                              )
+                              .sort((a, b) =>
+                                new Date(a.scheduledAt || `${a.date}T${a.time}`).getTime() -
+                                new Date(b.scheduledAt || `${b.date}T${b.time}`).getTime()
+                              )[0]?.date}T${(conciergeAppointments || [])
+                              .filter(a =>
+                                a.status !== 'cancelled' &&
+                                new Date(a.scheduledAt || `${a.date}T${a.time}`) > new Date()
+                              )
+                              .sort((a, b) =>
+                                new Date(a.scheduledAt || `${a.date}T${a.time}`).getTime() -
+                                new Date(b.scheduledAt || `${b.date}T${b.time}`).getTime()
+                              )[0]?.time}`
+                          ).toLocaleDateString('en-US', {
+                            weekday: 'short', month: 'short',
+                            day: 'numeric', hour: '2-digit', minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
                       <div className="w-11 h-11 bg-gold-soft/20 rounded-full flex items-center justify-center flex-shrink-0">

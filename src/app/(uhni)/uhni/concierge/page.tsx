@@ -4,13 +4,13 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Crown, Phone, Mail, MessageCircle, Calendar, Clock, Globe, Award, Send, ChevronRight, X, User, Star } from 'lucide-react';
+import { ArrowLeft, Crown, Phone, Mail, MessageCircle, Calendar, Clock, Globe, Award, Send, ChevronRight, X, User, Star, Users, Check } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { AppointmentType, ConciergeAppointment } from '@/types/uhni';
 
 interface Message {
   id: string;
-  sender: 'client' | 'concierge';
+  sender: 'user' | 'client' | 'concierge';
   content: string;
   timestamp: string;
 }
@@ -26,7 +26,17 @@ const durationOptions = [30, 45, 60, 90, 120];
 
 export default function ConciergePage() {
   const router = useRouter();
-  const { concierge, showToast, conciergeAppointments, bookAppointment, cancelAppointment } = useApp();
+  const {
+    concierge,
+    showToast,
+    conciergeAppointments,
+    bookAppointment,
+    cancelAppointment,
+    calendarEvents,
+    sourcingRequests,
+    bespokeOrders,
+    orders
+  } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -41,6 +51,11 @@ export default function ConciergePage() {
     ];
   });
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showBriefingId, setShowBriefingId] = useState<string | null>(null);
+  const [showEscalateModal, setShowEscalateModal] = useState(false);
+  const [escalateReason, setEscalateReason] = useState('');
+  const [escalateType, setEscalateType] = useState<'complaint' | 'complex_request' | 'preference' | 'other'>('complex_request');
+  const [escalated, setEscalated] = useState(false);
 
   // Booking form state
   const [bookingType, setBookingType] = useState<AppointmentType>('styling_session');
@@ -59,14 +74,176 @@ export default function ConciergePage() {
     }
   }, [messages]);
 
-  const conciergeResponses = [
-    'Thank you for your message. Let me look into that for you right away.',
-    'Absolutely. I will coordinate the details and follow up with you shortly.',
-    'That is an excellent choice. I will make the necessary arrangements immediately.',
-    'I understand completely. Allow me to check availability and get back to you within the hour.',
-    'Of course. I will prioritize this and ensure everything is handled to your satisfaction.',
-    'Wonderful. I have noted your preference and will curate some options for you.',
-  ];
+  // Handle product context from product page
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const stored = sessionStorage.getItem('concierge-product-context')
+    if (!stored) return
+
+    try {
+      const context = JSON.parse(stored)
+
+      // Only use if fresh (within 5 minutes)
+      if (Date.now() - context.timestamp > 5 * 60 * 1000) {
+        sessionStorage.removeItem('concierge-product-context')
+        return
+      }
+
+      // Auto-inject a message about the product
+      const productMessage: Message = {
+        id: `msg-product-${Date.now()}`,
+        sender: 'user',
+        content: `I am looking at the ${context.productName} by ${context.brandName} — priced at €${context.price?.toLocaleString()}. Can you tell me more about it and whether it would suit me?`,
+        timestamp: new Date().toISOString()
+      }
+
+      const conciergeResponse: Message = {
+        id: `msg-product-reply-${Date.now()}`,
+        sender: 'concierge',
+        content: `Ah, the ${context.productName} by ${context.brandName} — an excellent choice. I have reviewed this piece against your style profile and wardrobe. Let me prepare a full assessment for you, including how it would complement your existing pieces and any upcoming occasions. Shall I also check current availability and whether there are any exclusive pricing arrangements available to you?`,
+        timestamp: new Date().toISOString()
+      }
+
+      setMessages(prev => [...prev, productMessage, conciergeResponse])
+      sessionStorage.removeItem('concierge-product-context')
+
+    } catch {
+      sessionStorage.removeItem('concierge-product-context')
+    }
+  }, []);
+
+  // Context-aware suggestions based on client data
+  const getContextualSuggestions = () => {
+    const suggestions: string[] = []
+
+    // Based on upcoming calendar events
+    const upcomingEvents = calendarEvents?.filter(e =>
+      new Date(e.date) > new Date() &&
+      new Date(e.date) < new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+    )
+    if (upcomingEvents && upcomingEvents.length > 0) {
+      suggestions.push(
+        `Help me plan an outfit for ${upcomingEvents[0].title}`
+      )
+    }
+
+    // Based on active sourcing requests
+    const activeSourcing = sourcingRequests?.filter(r =>
+      r.status === 'options_found' || r.status === 'awaiting_approval'
+    )
+    if (activeSourcing && activeSourcing.length > 0) {
+      suggestions.push(
+        `Review the sourcing options for ${activeSourcing[0].title}`
+      )
+    }
+
+    // Based on active bespoke orders
+    const activeBespoke = bespokeOrders?.filter(o =>
+      o.status !== 'complete' && o.clientApprovalRequired && !o.clientApproved
+    )
+    if (activeBespoke && activeBespoke.length > 0) {
+      suggestions.push(
+        `I need to review the design for my ${activeBespoke[0].title}`
+      )
+    }
+
+    // Based on upcoming appointment
+    const nextAppt = (conciergeAppointments || []).find(a =>
+      a.status !== 'cancelled' &&
+      new Date(a.scheduledAt || `${a.date}T${a.time}`) > new Date()
+    )
+    if (nextAppt) {
+      suggestions.push(
+        `Prepare me for my upcoming ${nextAppt.type.replace('_', ' ')}`
+      )
+    }
+
+    // Always available fallbacks
+    const fallbacks = [
+      'What should I wear to my next event?',
+      'Show me new arrivals from my preferred brands',
+      'Help me plan my seasonal wardrobe',
+      'Find me something for a black tie event'
+    ]
+
+    // Fill up to 4 suggestions
+    while (suggestions.length < 4 && fallbacks.length > 0) {
+      const fallback = fallbacks.shift()
+      if (fallback) suggestions.push(fallback)
+    }
+
+    return suggestions.slice(0, 4)
+  }
+
+  // Context-aware response generation
+  const getContextualResponse = (message: string): string => {
+    const lower = message.toLowerCase()
+
+    if (lower.includes('outfit') || lower.includes('wear') || lower.includes('style')) {
+      const events = calendarEvents?.filter(e => new Date(e.date) > new Date())
+      if (events && events.length > 0) {
+        return `Wonderful. I see you have ${events[0].title} coming up — let me curate some options that would be perfect for that occasion. I will have suggestions ready for you shortly.`
+      }
+      return 'Absolutely, I would be delighted to assist with styling. Tell me more about the occasion and I will curate the perfect selections from your preferred brands.'
+    }
+
+    if (lower.includes('sourc') || lower.includes('find') || lower.includes('looking for')) {
+      return 'Of course. I can initiate a global sourcing request on your behalf. Would you like me to search across our entire network of boutiques and private sellers? Please share the details of what you are seeking.'
+    }
+
+    if (lower.includes('bespoke') || lower.includes('custom') || lower.includes('made to measure')) {
+      return 'A bespoke commission is one of our most exclusive services. I can connect you with our partner ateliers. Shall I arrange an initial consultation, or would you like to review the available specialists first?'
+    }
+
+    if (lower.includes('event') || lower.includes('gala') || lower.includes('dinner')) {
+      return 'I have noted the occasion. I will review your wardrobe and suggest pieces that would be most appropriate, along with sourcing options for anything that may be missing. May I ask about the dress code?'
+    }
+
+    if (lower.includes('appointment') || lower.includes('book') || lower.includes('meet')) {
+      return 'I would be glad to arrange that. I have availability for video consultations, phone calls, and in-person meetings. Would you like me to present some time slots, or shall we discuss by message first?'
+    }
+
+    if (lower.includes('price') || lower.includes('cost') || lower.includes('budget')) {
+      return 'I can assist with pricing and negotiation on your behalf. As an UHNI client you have access to exclusive pricing arrangements. Which item or collection were you interested in?'
+    }
+
+    if (lower.includes('track') || lower.includes('where') || lower.includes('order')) {
+      const recentOrder = orders?.[0]
+      if (recentOrder) {
+        return `Your most recent order ${recentOrder.id} is currently ${recentOrder.status}. Would you like me to pull up the full tracking details or arrange a priority delivery update?`
+      }
+      return 'I can check on any of your orders right away. Could you provide the order reference, or would you like me to pull up your complete order history?'
+    }
+
+    // Default contextual responses
+    const defaults = [
+      'Thank you for reaching out. I am looking into that for you right away and will have a response within moments.',
+      'Absolutely. Allow me to review the best options available and I will present you with a curated selection shortly.',
+      'Consider it done. I will coordinate all the details and follow up with you as soon as everything is arranged.',
+      'I understand completely. Given your preferences and history with us, I have a few ideas in mind — shall I share them now?',
+      'Of course. I will prioritise this immediately and ensure everything is handled to your exact standards.'
+    ]
+
+    return defaults[Math.floor(Math.random() * defaults.length)]
+  }
+
+  // Check for appointment in next 24 hours
+  const imminentAppointment = (conciergeAppointments || []).find(a => {
+    if (a.status === 'cancelled') return false
+    const apptTime = new Date(a.scheduledAt || `${a.date}T${a.time}`).getTime()
+    const now = Date.now()
+    const hoursUntil = (apptTime - now) / (1000 * 60 * 60)
+    return hoursUntil > 0 && hoursUntil <= 24
+  })
+
+  // Check if appointment is within 2 hours (for pre-session briefing)
+  const isImminentAppt = (scheduledAt: string) => {
+    const hoursUntil = (new Date(scheduledAt).getTime() - Date.now()) / (1000 * 60 * 60)
+    return hoursUntil > 0 && hoursUntil <= 2
+  }
+
+  const suggestions = getContextualSuggestions();
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,11 +263,11 @@ export default function ConciergePage() {
       const response: Message = {
         id: `msg-${Date.now()}-reply`,
         sender: 'concierge',
-        content: conciergeResponses[Math.floor(Math.random() * conciergeResponses.length)],
+        content: getContextualResponse(newMessage),
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, response]);
-    }, 1500);
+    }, 1200);
   };
 
   const handleBookAppointment = () => {
@@ -187,6 +364,52 @@ export default function ConciergePage() {
           </div>
         </div>
       </div>
+
+      {/* Appointment Reminder Banner */}
+      {imminentAppointment && (
+        <div className="bg-gold-soft/10 border-b border-gold-soft/30 px-8 py-4">
+          <div className="max-w-[900px] mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gold-soft/20 flex items-center justify-center flex-shrink-0">
+                <Clock size={16} className="text-gold-deep" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-charcoal-deep">
+                  Upcoming appointment reminder
+                </p>
+                <p className="text-xs text-stone">
+                  {imminentAppointment.title} —{' '}
+                  {new Date(imminentAppointment.scheduledAt || `${imminentAppointment.date}T${imminentAppointment.time}`)
+                    .toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })
+                  }
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {imminentAppointment.meetingLink && imminentAppointment.type === 'video_call' && (
+                <a
+                  href={imminentAppointment.meetingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                >
+                  Join Now
+                </a>
+              )}
+              <button
+                onClick={() => cancelAppointment(imminentAppointment.id)}
+                className="text-xs text-taupe hover:text-error transition-colors tracking-[0.05em] uppercase"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <div className="grid lg:grid-cols-3 gap-8">
@@ -288,35 +511,47 @@ export default function ConciergePage() {
                 <p className="text-sm text-stone">No upcoming appointments</p>
               ) : (
                 <div className="space-y-3">
-                  {upcomingAppointments.map(appt => (
-                    <div key={appt.id} className="border border-sand/50 p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <p className="text-sm font-medium text-charcoal-deep">{appt.title}</p>
-                          <p className="text-xs text-taupe">{getAppointmentTypeLabel(appt.type)}</p>
+                  {upcomingAppointments.map(appt => {
+                    const apptScheduledAt = appt.scheduledAt || `${appt.date}T${appt.time}`;
+                    const isWithin2Hours = isImminentAppt(apptScheduledAt);
+                    return (
+                      <div key={appt.id} className="border border-sand/50 p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-medium text-charcoal-deep">{appt.title}</p>
+                            <p className="text-xs text-taupe">{getAppointmentTypeLabel(appt.type)}</p>
+                          </div>
+                          <button
+                            onClick={() => cancelAppointment(appt.id)}
+                            className="text-xs text-stone hover:text-error transition-colors"
+                          >
+                            Cancel
+                          </button>
                         </div>
-                        <button
-                          onClick={() => cancelAppointment(appt.id)}
-                          className="text-xs text-stone hover:text-error transition-colors"
-                        >
-                          Cancel
-                        </button>
+                        <div className="flex items-center gap-3 text-xs text-stone">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            {formatAppointmentDate(appt.date)}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} />
+                            {appt.time} · {appt.duration}min
+                          </span>
+                        </div>
+                        {appt.notes && (
+                          <p className="text-xs text-taupe mt-2 italic">{appt.notes}</p>
+                        )}
+                        {isWithin2Hours && (
+                          <button
+                            onClick={() => setShowBriefingId(appt.id)}
+                            className="mt-3 w-full px-4 py-2 border border-gold-soft text-gold-deep text-xs tracking-[0.1em] uppercase hover:bg-gold-soft/10 transition-colors"
+                          >
+                            Pre-Session Brief
+                          </button>
+                        )}
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-stone">
-                        <span className="flex items-center gap-1">
-                          <Calendar size={12} />
-                          {formatAppointmentDate(appt.date)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} />
-                          {appt.time} · {appt.duration}min
-                        </span>
-                      </div>
-                      {appt.notes && (
-                        <p className="text-xs text-taupe mt-2 italic">{appt.notes}</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               <button
@@ -368,14 +603,56 @@ export default function ConciergePage() {
                 </h3>
               </div>
 
+              {/* Context Summary Banner */}
+              {((sourcingRequests?.filter(r => r.status === 'options_found').length || 0) > 0 ||
+                (bespokeOrders?.filter(o => o.clientApprovalRequired && !o.clientApproved).length || 0) > 0) && (
+                <div className="mx-4 mt-4 p-3 bg-gold-soft/10 border border-gold-soft/20 text-xs text-stone">
+                  <span className="font-medium text-gold-deep">
+                    Isabella has updates for you —{' '}
+                  </span>
+                  {(sourcingRequests?.filter(r => r.status === 'options_found').length || 0) > 0 && (
+                    <span>
+                      {sourcingRequests?.filter(r => r.status === 'options_found').length} sourcing option
+                      {(sourcingRequests?.filter(r => r.status === 'options_found').length || 0) !== 1 ? 's' : ''} ready to review
+                    </span>
+                  )}
+                  {(bespokeOrders?.filter(o => o.clientApprovalRequired && !o.clientApproved).length || 0) > 0 && (
+                    <span className="ml-2">
+                      · {bespokeOrders?.filter(o => o.clientApprovalRequired && !o.clientApproved).length} bespoke design
+                      {(bespokeOrders?.filter(o => o.clientApprovalRequired && !o.clientApproved).length || 0) !== 1 ? 's' : ''} awaiting approval
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Context-Aware Suggestions */}
+              {suggestions.length > 0 && messages.length <= 3 && (
+                <div className="px-4 pt-4">
+                  <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-2">Suggested topics</p>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestions.map((suggestion, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setNewMessage(suggestion);
+                        }}
+                        className="px-3 py-1.5 bg-parchment text-xs text-charcoal-deep hover:bg-sand transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="h-[400px] overflow-y-auto p-6 space-y-4">
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.sender === 'client' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex ${message.sender === 'client' || message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
                     <div className={`max-w-[80%] ${
-                      message.sender === 'client'
+                      message.sender === 'client' || message.sender === 'user'
                         ? 'bg-charcoal-deep text-ivory-cream'
                         : 'bg-parchment text-charcoal-deep'
                     } p-4`}>
@@ -386,7 +663,7 @@ export default function ConciergePage() {
                       )}
                       <p className="text-sm leading-relaxed">{message.content}</p>
                       <p className={`text-[10px] mt-2 ${
-                        message.sender === 'client' ? 'text-ivory-cream/50' : 'text-taupe'
+                        message.sender === 'client' || message.sender === 'user' ? 'text-ivory-cream/50' : 'text-taupe'
                       }`}>
                         {new Date(message.timestamp).toLocaleTimeString('en-US', {
                           hour: 'numeric',
@@ -417,6 +694,17 @@ export default function ConciergePage() {
                   </button>
                 </div>
               </form>
+
+              {/* Human Escalation Link */}
+              <div className="px-4 pb-4 pt-2 border-t border-sand/30">
+                <button
+                  onClick={() => setShowEscalateModal(true)}
+                  className="text-xs text-taupe hover:text-charcoal-deep transition-colors tracking-[0.05em] flex items-center gap-1"
+                >
+                  <Users size={12} />
+                  Request human concierge
+                </button>
+              </div>
             </div>
 
             {/* Related Links */}
@@ -576,6 +864,363 @@ export default function ConciergePage() {
           </div>
         </div>
       )}
+
+      {/* Human Escalation Modal */}
+      {showEscalateModal && (
+        <div
+          className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setShowEscalateModal(false)}
+        >
+          <div
+            className="bg-white max-w-md w-full p-8"
+            role="dialog"
+            aria-modal="true"
+            onClick={e => e.stopPropagation()}
+          >
+            {!escalated ? (
+              <>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="font-display text-xl text-charcoal-deep">
+                    Request Human Concierge
+                  </h3>
+                  <button
+                    onClick={() => setShowEscalateModal(false)}
+                    className="p-2 hover:bg-sand/20 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <p className="text-sm text-stone mb-6 leading-relaxed">
+                  A dedicated human concierge will be assigned to assist you.
+                  They will contact you within 2 hours during business hours
+                  (Mon–Sat, 9am–8pm CET).
+                </p>
+
+                <div className="mb-4">
+                  <label className="block text-xs tracking-[0.1em] uppercase text-taupe mb-2">
+                    Reason for Request
+                  </label>
+                  <div className="space-y-2">
+                    {[
+                      { value: 'complex_request', label: 'Complex sourcing or styling request' },
+                      { value: 'complaint', label: 'I have a concern I need resolved' },
+                      { value: 'preference', label: 'I prefer to speak with a person' },
+                      { value: 'other', label: 'Other' }
+                    ].map(option => (
+                      <label
+                        key={option.value}
+                        className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
+                          escalateType === option.value
+                            ? 'border-charcoal-deep bg-parchment'
+                            : 'border-sand hover:border-charcoal-deep/50'
+                        }`}
+                      >
+                        <div className={`w-4 h-4 border flex items-center justify-center flex-shrink-0 ${
+                          escalateType === option.value
+                            ? 'border-charcoal-deep bg-charcoal-deep'
+                            : 'border-sand'
+                        }`}>
+                          {escalateType === option.value && (
+                            <Check size={10} className="text-ivory-cream" />
+                          )}
+                        </div>
+                        <input
+                          type="radio"
+                          className="sr-only"
+                          checked={escalateType === option.value as typeof escalateType}
+                          onChange={() => setEscalateType(option.value as typeof escalateType)}
+                        />
+                        <span className="text-sm text-charcoal-deep">
+                          {option.label}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <label className="block text-xs tracking-[0.1em] uppercase text-taupe mb-2">
+                    Additional Details (optional)
+                  </label>
+                  <textarea
+                    value={escalateReason}
+                    onChange={e => setEscalateReason(e.target.value)}
+                    rows={3}
+                    placeholder="Describe what you need help with..."
+                    className="w-full px-3 py-3 border border-sand focus:outline-none focus:border-charcoal-deep text-sm placeholder:text-taupe resize-none"
+                  />
+                </div>
+
+                <button
+                  onClick={() => {
+                    const escalateMsg: Message = {
+                      id: `msg-${Date.now()}-escalate`,
+                      sender: 'concierge',
+                      content: `I understand. I have flagged your request for a human concierge specialist. They will contact you within 2 hours. Your reference number is ESC-${Date.now().toString(36).toUpperCase()}. Is there anything else I can assist you with in the meantime?`,
+                      timestamp: new Date().toISOString()
+                    }
+                    setMessages(prev => [...prev, escalateMsg])
+                    setEscalated(true)
+                    setTimeout(() => {
+                      setShowEscalateModal(false)
+                      setEscalated(false)
+                      setEscalateReason('')
+                      showToast('Human concierge request submitted', 'success')
+                    }, 3000)
+                  }}
+                  className="w-full px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Submit Request
+                </button>
+              </>
+            ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-success/10 flex items-center justify-center mx-auto mb-6">
+                  <Check size={32} className="text-success" />
+                </div>
+                <h3 className="font-display text-xl text-charcoal-deep mb-3">
+                  Request Submitted
+                </h3>
+                <p className="text-stone text-sm">
+                  A human concierge specialist will contact you within 2 hours.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Pre-Session Briefing Modal */}
+      {showBriefingId && (() => {
+        const appt = (conciergeAppointments || []).find(a => a.id === showBriefingId)
+        if (!appt) return null
+
+        const scheduledAt = appt.scheduledAt || `${appt.date}T${appt.time}`
+        const durationMinutes = appt.duration || appt.durationMinutes || 60
+
+        const upcomingEvents = (calendarEvents || []).filter(e =>
+          new Date(e.date) > new Date() &&
+          new Date(e.date) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        ).slice(0, 3)
+
+        const activeSourcing = (sourcingRequests || []).filter(r =>
+          r.status !== 'delivered' && r.status !== 'cancelled'
+        ).slice(0, 3)
+
+        const activeBespoke = (bespokeOrders || []).filter(o =>
+          o.status !== 'complete'
+        ).slice(0, 2)
+
+        const recentOrders = (orders || []).slice(0, 2)
+
+        return (
+          <div
+            className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowBriefingId(null)}
+          >
+            <div
+              className="bg-white max-w-xl w-full max-h-[85vh] overflow-y-auto"
+              role="dialog"
+              aria-modal="true"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Briefing header */}
+              <div className="bg-charcoal-deep px-8 py-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/70 mb-1">
+                      Pre-Session Briefing
+                    </p>
+                    <h3 className="font-display text-xl text-ivory-cream">
+                      {appt.title}
+                    </h3>
+                    <p className="text-sand text-sm mt-1">
+                      {new Date(scheduledAt).toLocaleDateString('en-US', {
+                        weekday: 'long', month: 'long', day: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                      })}
+                      {' · '}{durationMinutes} minutes
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowBriefingId(null)}
+                    className="p-2 text-sand hover:text-ivory-cream transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-8 space-y-6">
+                {/* Session notes if any */}
+                {appt.notes && (
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                      Your Session Notes
+                    </p>
+                    <p className="text-sm text-charcoal-deep bg-parchment border border-sand px-4 py-3 italic">
+                      &quot;{appt.notes}&quot;
+                    </p>
+                  </div>
+                )}
+
+                {/* Upcoming events summary */}
+                {upcomingEvents.length > 0 && (
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                      Your Upcoming Events
+                    </p>
+                    <div className="space-y-2">
+                      {upcomingEvents.map(event => (
+                        <div
+                          key={event.id}
+                          className="flex items-center justify-between p-3 bg-parchment"
+                        >
+                          <p className="text-sm text-charcoal-deep">
+                            {event.title}
+                          </p>
+                          <p className="text-xs text-stone">
+                            {new Date(event.date).toLocaleDateString('en-US', {
+                              month: 'short', day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active sourcing requests */}
+                {activeSourcing.length > 0 && (
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                      Active Sourcing Requests
+                    </p>
+                    <div className="space-y-2">
+                      {activeSourcing.map(req => (
+                        <div
+                          key={req.id}
+                          className="flex items-center justify-between p-3 border border-sand"
+                        >
+                          <p className="text-sm text-charcoal-deep">
+                            {req.title}
+                          </p>
+                          <span className={`text-[10px] px-2 py-0.5 tracking-[0.05em] uppercase ${
+                            req.status === 'options_found'
+                              ? 'bg-success/10 text-success'
+                              : 'bg-gold-soft/20 text-gold-deep'
+                          }`}>
+                            {req.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Active bespoke orders */}
+                {activeBespoke.length > 0 && (
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                      Active Bespoke Commissions
+                    </p>
+                    <div className="space-y-2">
+                      {activeBespoke.map(order => (
+                        <div
+                          key={order.id}
+                          className="flex items-center justify-between p-3 border border-sand"
+                        >
+                          <p className="text-sm text-charcoal-deep">
+                            {order.title}
+                          </p>
+                          <span className="text-[10px] px-2 py-0.5 tracking-[0.05em] uppercase bg-parchment text-stone">
+                            {order.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent orders */}
+                {recentOrders.length > 0 && (
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                      Recent Orders
+                    </p>
+                    <div className="space-y-2">
+                      {recentOrders.map(order => (
+                        <div
+                          key={order.id}
+                          className="flex items-center justify-between p-3 border border-sand"
+                        >
+                          <p className="text-sm font-mono text-charcoal-deep">
+                            {order.id}
+                          </p>
+                          <span className="text-xs text-stone capitalize">
+                            {order.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Talking points suggestion */}
+                <div className="bg-gold-soft/10 border border-gold-soft/20 p-5">
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-gold-muted mb-2">
+                    Suggested Talking Points
+                  </p>
+                  <ul className="space-y-1.5">
+                    {upcomingEvents.length > 0 && (
+                      <li className="flex items-start gap-2 text-sm text-stone">
+                        <span className="w-1 h-1 rounded-full bg-gold-soft mt-2 flex-shrink-0" />
+                        Outfit planning for {upcomingEvents[0].title}
+                      </li>
+                    )}
+                    {activeSourcing.length > 0 && (
+                      <li className="flex items-start gap-2 text-sm text-stone">
+                        <span className="w-1 h-1 rounded-full bg-gold-soft mt-2 flex-shrink-0" />
+                        Review sourcing options for {activeSourcing[0].title}
+                      </li>
+                    )}
+                    {activeBespoke.length > 0 && (
+                      <li className="flex items-start gap-2 text-sm text-stone">
+                        <span className="w-1 h-1 rounded-full bg-gold-soft mt-2 flex-shrink-0" />
+                        Bespoke commission progress for {activeBespoke[0].title}
+                      </li>
+                    )}
+                    <li className="flex items-start gap-2 text-sm text-stone">
+                      <span className="w-1 h-1 rounded-full bg-gold-soft mt-2 flex-shrink-0" />
+                      Seasonal wardrobe review and upcoming purchase plans
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Join button if video */}
+                {appt.meetingLink && appt.type === 'video_call' && (
+                  <a
+                    href={appt.meetingLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full text-center px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+                  >
+                    Join Video Session
+                  </a>
+                )}
+
+                <button
+                  onClick={() => setShowBriefingId(null)}
+                  className="block w-full text-center px-6 py-3 border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   );
 }

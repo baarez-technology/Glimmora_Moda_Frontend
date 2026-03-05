@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity, BespokeDetailedSpec, PriceNegotiation, CollectionInvitation, ConciergeAppointment, ConciergeTask, ConciergeTaskInput, ClaimedOffer } from '@/types';
 import type { UHNIPriceOffer } from '@/types/uhni';
+import type { PricingTier, PriceAlert, TierUpgradeRequest } from '@/types/pricing-tiers';
 import type { StylingSession, StylingSessionRequest } from '@/types/brand-portal';
 import { generateOutfitSuggestions } from '@/lib/outfit-intelligence';
 import * as calendarService from '@/services/calendar.service';
@@ -168,6 +169,24 @@ interface AppContextType {
   cancelStylingSession: (sessionId: string) => void;
   setUserRole: (tier: UserTier) => void;
   logout: () => void;
+  // Pricing Tiers
+  pricingTier: PricingTier;
+  tierSince: string;
+  priceAlerts: PriceAlert[];
+  tierUpgradeRequest: TierUpgradeRequest | null;
+  createPriceAlert: (data: {
+    productId: string;
+    productName: string;
+    productSlug: string;
+    productImage?: string;
+    brandName: string;
+    currentPrice: number;
+    targetPrice: number;
+    currency?: string;
+  }) => PriceAlert | undefined;
+  deletePriceAlert: (alertId: string) => void;
+  togglePriceAlert: (alertId: string) => void;
+  requestTierUpgrade: (targetTier: PricingTier) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -177,6 +196,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Auth state — single source of truth from AuthContext
   const { userTier, isUHNI, isAuthenticated, setUserRole, logout } = useAuth();
+
+  // Pricing Tiers
+  const [pricingTier, setPricingTier] = useState<PricingTier>('standard');
+  const [tierSince] = useState<string>(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()); // Mock: 90 days ago
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [tierUpgradeRequest, setTierUpgradeRequest] = useState<TierUpgradeRequest | null>(null);
+
+  // Sync pricing tier with UHNI status
+  useEffect(() => {
+    if (isUHNI) {
+      setPricingTier('uhni');
+    } else if (userTier === 'preferred') {
+      setPricingTier('preferred');
+    } else {
+      setPricingTier('standard');
+    }
+  }, [isUHNI, userTier]);
 
   // Wishlist state (TODO: Move to dedicated hook)
   const [wishlist, setWishlist] = useState<WardrobeItem[]>([]);
@@ -552,6 +588,79 @@ export function AppProvider({ children }: { children: ReactNode }) {
     showToast('Removed from wishlist', 'info');
   }, [showToast]);
 
+  // Pricing Tier functions
+  const createPriceAlert = useCallback((data: {
+    productId: string;
+    productName: string;
+    productSlug: string;
+    productImage?: string;
+    brandName: string;
+    currentPrice: number;
+    targetPrice: number;
+    currency?: string;
+  }): PriceAlert | undefined => {
+    // Only available for preferred and uhni tiers
+    if (pricingTier === 'standard') {
+      showToast('Price alerts are available for Preferred and UHNI members', 'info');
+      return undefined;
+    }
+
+    // Check if alert already exists for this product
+    if (priceAlerts.some(alert => alert.productId === data.productId && alert.isActive)) {
+      showToast('You already have an active price alert for this product', 'info');
+      return undefined;
+    }
+
+    const newAlert: PriceAlert = {
+      id: `alert-${Date.now()}`,
+      productId: data.productId,
+      productName: data.productName,
+      productSlug: data.productSlug,
+      productImage: data.productImage,
+      brandName: data.brandName,
+      currentPrice: data.currentPrice,
+      targetPrice: data.targetPrice,
+      currency: data.currency || 'EUR',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPriceAlerts(prev => [newAlert, ...prev]);
+    showToast(`Price alert set for ${data.productName}`, 'success');
+    return newAlert;
+  }, [pricingTier, priceAlerts, showToast]);
+
+  const deletePriceAlert = useCallback((alertId: string) => {
+    setPriceAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    showToast('Price alert removed', 'info');
+  }, [showToast]);
+
+  const togglePriceAlert = useCallback((alertId: string) => {
+    setPriceAlerts(prev => prev.map(alert =>
+      alert.id === alertId
+        ? { ...alert, isActive: !alert.isActive }
+        : alert
+    ));
+  }, []);
+
+  const requestTierUpgrade = useCallback((targetTier: PricingTier) => {
+    if (tierUpgradeRequest && tierUpgradeRequest.status === 'pending') {
+      showToast('You already have a pending upgrade request', 'info');
+      return;
+    }
+
+    const request: TierUpgradeRequest = {
+      id: `upgrade-${Date.now()}`,
+      fromTier: pricingTier,
+      toTier: targetTier,
+      status: 'pending',
+      requestedAt: new Date().toISOString(),
+    };
+
+    setTierUpgradeRequest(request);
+    showToast(`Upgrade request submitted for ${targetTier === 'preferred' ? 'Preferred Member' : 'UHNI'} tier`, 'success');
+  }, [pricingTier, tierUpgradeRequest, showToast]);
+
   // Load from localStorage on mount
   useEffect(() => {
     const loadFromStorage = () => {
@@ -562,6 +671,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const storedAlerts = localStorage.getItem('moda-restock-alerts');
         const storedOrders = localStorage.getItem('moda-orders');
         const storedFashionIdentity = localStorage.getItem('moda-fashion-identity');
+        const storedPriceAlerts = localStorage.getItem('moda-price-alerts');
+        const storedTierUpgradeRequest = localStorage.getItem('moda-tier-upgrade-request');
 
         if (storedConsiderations) {
           setConsiderations(JSON.parse(storedConsiderations));
@@ -580,6 +691,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         initializeFashionIdentity(storedFashionIdentity);
+
+        if (storedPriceAlerts) {
+          setPriceAlerts(JSON.parse(storedPriceAlerts));
+        }
+        if (storedTierUpgradeRequest) {
+          setTierUpgradeRequest(JSON.parse(storedTierUpgradeRequest));
+        }
       } catch (error) {
         console.error('Error loading from localStorage:', error);
       }
@@ -613,6 +731,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     persistFashionIdentity(fashionIdentity);
   }, [fashionIdentity, persistFashionIdentity]);
+
+  useEffect(() => {
+    if (isHydrated) {
+      safeLocalStorageSave('moda-price-alerts', priceAlerts);
+    }
+  }, [priceAlerts, isHydrated, safeLocalStorageSave]);
+
+  useEffect(() => {
+    if (isHydrated) {
+      safeLocalStorageSave('moda-tier-upgrade-request', tierUpgradeRequest);
+    }
+  }, [tierUpgradeRequest, isHydrated, safeLocalStorageSave]);
 
   return (
     <AppContext.Provider value={{
@@ -718,7 +848,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       bookStylingSession,
       cancelStylingSession,
       setUserRole,
-      logout
+      logout,
+      // Pricing Tiers
+      pricingTier,
+      tierSince,
+      priceAlerts,
+      tierUpgradeRequest,
+      createPriceAlert,
+      deletePriceAlert,
+      togglePriceAlert,
+      requestTierUpgrade,
     }}>
       {children}
     </AppContext.Provider>

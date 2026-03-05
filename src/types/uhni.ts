@@ -566,7 +566,7 @@ export interface ConciergeTask {
 }
 
 // Concierge Appointments
-export type AppointmentType = 'styling_session' | 'private_viewing' | 'consultation' | 'fitting';
+export type AppointmentType = 'styling_session' | 'private_viewing' | 'consultation' | 'fitting' | 'video_call' | 'phone_call';
 export type AppointmentStatus = 'upcoming' | 'completed' | 'cancelled' | 'rescheduled';
 
 export interface ConciergeAppointment {
@@ -576,11 +576,14 @@ export interface ConciergeAppointment {
   date: string;
   time: string;
   duration: number; // minutes
+  durationMinutes?: number; // alias for duration
+  scheduledAt?: string; // ISO datetime string (computed from date+time if not provided)
   notes?: string;
   status: AppointmentStatus;
   conciergeId: string;
   conciergeName: string;
   createdAt: string;
+  meetingLink?: string; // for video_call appointments
 }
 
 export interface ConciergeTaskInput {
