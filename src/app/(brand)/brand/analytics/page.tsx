@@ -15,6 +15,8 @@ import Link from 'next/link';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
+import ExportButton from '@/components/brand/ExportButton';
+import { convertToCSV, downloadCSV, buildFilename } from '@/lib/export-utils';
 
 type TimePeriod = '7d' | '30d' | '90d' | '12m';
 
@@ -88,27 +90,57 @@ export default function AnalyticsPage() {
     }
   };
 
+  const exportTopProductsCSV = () => {
+    const rows = analytics.topProducts.map(p => ({
+      Product: p.name,
+      SKU: p.sku,
+      Revenue: Math.round(p.revenue * scale.revenue),
+      'Units Sold': Math.round(p.units * scale.orders),
+      'Change %': p.changePercent,
+    }));
+    const csv = convertToCSV(rows);
+    downloadCSV(buildFilename('top-products', periodLabels[period]), csv);
+  };
+
+  const exportRegionalCSV = () => {
+    const rows = analytics.regionalMetrics.map(r => ({
+      Region: r.region,
+      Revenue: Math.round(r.revenue * scale.revenue),
+      Orders: r.orders,
+      'Top Product': r.topProduct,
+      'Change %': +(r.changePercent * scale.change).toFixed(1),
+    }));
+    const csv = convertToCSV(rows);
+    downloadCSV(buildFilename('regional-analytics', periodLabels[period]), csv);
+  };
+
   return (
     <div>
       <BrandPageHeader
         title="Analytics"
         subtitle={`Performance data for ${periodLabels[period]}`}
       >
-        {/* Period Selector */}
-        <div className="flex items-center gap-1 bg-parchment p-1 w-fit">
-          {periods.map(p => (
-            <button
-              key={p.value}
-              onClick={() => setPeriod(p.value)}
-              className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors ${
-                period === p.value
-                  ? 'bg-white text-charcoal-deep'
-                  : 'text-stone hover:text-charcoal-deep'
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          {/* Period Selector */}
+          <div className="flex items-center gap-1 bg-parchment p-1 w-fit">
+            {periods.map(p => (
+              <button
+                key={p.value}
+                onClick={() => setPeriod(p.value)}
+                className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors ${
+                  period === p.value
+                    ? 'bg-white text-charcoal-deep'
+                    : 'text-stone hover:text-charcoal-deep'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <ExportButton options={[
+            { label: 'Export Top Products (CSV)', onClick: exportTopProductsCSV },
+            { label: 'Export Regional Data (CSV)', onClick: exportRegionalCSV },
+          ]} />
         </div>
       </BrandPageHeader>
 

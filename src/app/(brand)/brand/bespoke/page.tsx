@@ -99,7 +99,13 @@ export default function BespokeOrdersPage() {
       <BrandPageHeader
         title="Bespoke Orders"
         subtitle={`${filteredOrders.length} custom commission${filteredOrders.length !== 1 ? 's' : ''}`}
-      />
+      >
+        {bespokeOrders.filter(o => o.status === 'design_approval' && !o.clientApproved).length > 0 && (
+          <span className="px-2 py-0.5 bg-gold-soft/20 text-gold-deep text-xs">
+            {bespokeOrders.filter(o => o.status === 'design_approval' && !o.clientApproved).length} awaiting client approval
+          </span>
+        )}
+      </BrandPageHeader>
 
       <div className="p-8 space-y-6">
         {/* Filter Tabs */}

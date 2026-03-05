@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, Lock, Sparkles, Users, Calendar, ChevronRight } from 'lucide-react';
+import { Plus, Lock, Sparkles, Users, Calendar, ChevronRight, Trash2, AlertTriangle } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { PrivateCollectionAccess } from '@/types/uhni';
@@ -11,8 +11,10 @@ import type { PrivateCollectionAccess } from '@/types/uhni';
 type FilterTab = 'all' | 'active' | 'upcoming' | 'archived';
 
 export default function PrivateCollectionsPage() {
-  const { privateCollections } = useBrand();
+  const { privateCollections, deletePrivateCollection } = useBrand();
   const [filter, setFilter] = useState<FilterTab>('all');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
   const now = new Date();
 
@@ -166,10 +168,33 @@ export default function PrivateCollectionsPage() {
 
                   {/* Content */}
                   <div className="p-5">
-                    <h3 className="font-medium text-charcoal-deep group-hover:text-gold-muted transition-colors">
-                      {collection.name}
-                    </h3>
-                    <p className="text-sm text-stone mt-1 line-clamp-2">{collection.description}</p>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-medium text-charcoal-deep group-hover:text-gold-muted transition-colors">
+                            {collection.name}
+                          </h3>
+                          {(collection.accessRequests?.filter(r => r.status === 'pending').length || 0) > 0 && (
+                            <span className="px-2 py-0.5 bg-gold-soft/20 text-gold-deep text-[10px] tracking-[0.05em] uppercase">
+                              {collection.accessRequests?.filter(r => r.status === 'pending').length} request{(collection.accessRequests?.filter(r => r.status === 'pending').length || 0) !== 1 ? 's' : ''}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-stone mt-1 line-clamp-2">{collection.description}</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteConfirmId(collection.id);
+                          setDeleteConfirmName(collection.name);
+                        }}
+                        className="p-2 text-taupe hover:text-error transition-colors flex-shrink-0"
+                        title="Delete collection"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
 
                     <div className="mt-4 pt-4 border-t border-sand/30 flex items-center justify-between text-xs text-taupe">
                       <div className="flex items-center gap-1">
@@ -188,6 +213,53 @@ export default function PrivateCollectionsPage() {
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div
+          className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4"
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            className="bg-white max-w-md w-full p-8"
+            role="dialog"
+            aria-modal="true"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4 mb-6">
+              <div className="w-10 h-10 bg-error/10 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle size={20} className="text-error" />
+              </div>
+              <div>
+                <h3 className="font-display text-lg text-charcoal-deep mb-2">Delete Collection</h3>
+                <p className="text-sm text-stone leading-relaxed">
+                  Are you sure you want to delete{' '}
+                  <span className="font-medium text-charcoal-deep">{deleteConfirmName}</span>?
+                  This will remove all access for invited clients. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  deletePrivateCollection(deleteConfirmId);
+                  setDeleteConfirmId(null);
+                  setDeleteConfirmName('');
+                }}
+                className="flex-1 px-4 py-3 bg-error text-white text-sm tracking-[0.1em] uppercase hover:bg-error/90 transition-colors"
+              >
+                Delete Collection
+              </button>
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="flex-1 px-4 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

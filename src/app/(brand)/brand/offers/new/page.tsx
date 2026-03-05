@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Package, FolderOpen, Building, Percent, DollarSign, Plus, X } from 'lucide-react';
+import { ArrowLeft, Package, FolderOpen, Building, Percent, DollarSign, Plus, X, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import type { UHNIPriceOffer } from '@/types/brand-portal';
@@ -23,7 +23,9 @@ export default function NewOfferPage() {
     validFrom: new Date().toISOString().split('T')[0],
     validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     conditions: [] as string[],
-    newCondition: ''
+    newCondition: '',
+    maxClaims: 0,
+    isPrivate: false,
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,6 +56,8 @@ export default function NewOfferPage() {
       targetImage = '';
     }
 
+    const selectedProduct = formData.type === 'product' ? products.find(p => p.id === formData.targetId) : undefined;
+
     createUHNIOffer({
       type: formData.type,
       targetId: formData.type === 'brand' ? partner.brandId : formData.targetId,
@@ -64,7 +68,14 @@ export default function NewOfferPage() {
       validFrom: new Date(formData.validFrom).toISOString(),
       validUntil: new Date(formData.validUntil).toISOString(),
       claimed: false,
-      conditions: formData.conditions.length > 0 ? formData.conditions : undefined
+      conditions: formData.conditions.length > 0 ? formData.conditions : undefined,
+      maxClaims: formData.maxClaims,
+      isPrivate: formData.isPrivate,
+      claimedCount: 0,
+      brandName: partner.brandName,
+      originalPrice: selectedProduct?.price,
+      productSlug: selectedProduct?.slug,
+      productImage: targetImage || undefined,
     });
 
     setTimeout(() => {
@@ -322,6 +333,39 @@ export default function NewOfferPage() {
                   min={formData.validFrom}
                   className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
+              </div>
+            </div>
+            {/* Max Claims & Private Toggle */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                  Maximum Claims (0 = unlimited)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.maxClaims}
+                  onChange={(e) => setFormData({ ...formData, maxClaims: Number(e.target.value) })}
+                  className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <div className="flex items-center">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, isPrivate: !prev.isPrivate }))}
+                    className="relative"
+                  >
+                    {formData.isPrivate
+                      ? <ToggleRight size={28} className="text-charcoal-deep" />
+                      : <ToggleLeft size={28} className="text-taupe" />
+                    }
+                  </button>
+                  <div>
+                    <p className="text-sm text-charcoal-deep">Private Offer</p>
+                    <p className="text-xs text-stone">Only visible to specifically invited UHNI clients</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

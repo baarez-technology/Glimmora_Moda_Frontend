@@ -1,102 +1,98 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Crown, Search, Upload, Calendar, DollarSign, Tag, FileText, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Search, CheckCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import type { SourcingRequestType } from '@/types';
+
+const categories = [
+  'Clothing', 'Accessories', 'Jewellery', 'Watches',
+  'Bags', 'Shoes', 'Fragrance', 'Art', 'Other'
+];
 
 export default function NewSourcingRequestPage() {
-  const router = useRouter();
-  const { showToast } = useApp();
+  const { createSourcingRequest } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [step, setStep] = useState(1);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [submitted, setSubmitted] = useState(false);
+
   const [formData, setFormData] = useState({
-    type: '' as SourcingRequestType | '',
     title: '',
+    category: '',
     description: '',
-    budgetMin: '',
-    budgetMax: '',
-    budgetFlexible: false,
+    budget: '',
+    priority: 'standard' as 'standard' | 'urgent' | 'when_available',
     deadline: '',
-    occasion: '',
-    notes: '',
+    specifications: '',
   });
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setUploadedFiles(prev => [...prev, ...Array.from(e.target.files!)]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
-  };
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
 
-  const requestTypes: { value: SourcingRequestType; label: string; description: string }[] = [
-    {
-      value: 'specific_item',
-      label: 'Specific Item',
-      description: 'You know exactly what you want - a particular product, model, or vintage piece'
-    },
-    {
-      value: 'category',
-      label: 'Category Search',
-      description: 'Looking for options within a category (e.g., a classic black handbag)'
-    },
-    {
-      value: 'occasion',
-      label: 'For an Occasion',
-      description: 'Need something special for an event or occasion'
-    },
-    {
-      value: 'bespoke',
-      label: 'Bespoke Commission',
-      description: 'Custom-made or made-to-measure piece'
-    }
-  ];
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.title || !formData.category || !formData.description || !formData.budget) return;
 
-    const newRequest = {
-      id: `src-${Date.now()}`,
-      type: formData.type,
+    createSourcingRequest({
       title: formData.title,
       description: formData.description,
-      budget: {
-        min: Number(formData.budgetMin),
-        max: Number(formData.budgetMax),
-        flexible: formData.budgetFlexible,
-      },
-      deadline: formData.deadline || null,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      notes: formData.notes || '',
-    };
+      category: formData.category,
+      budget: Number(formData.budget),
+      priority: formData.priority,
+      deadline: formData.deadline || undefined,
+      specifications: formData.specifications || undefined,
+    });
 
-    // Load existing requests from localStorage, append, and save back
-    const existingRaw = localStorage.getItem('uhni-sourcing-requests');
-    const existing = existingRaw ? JSON.parse(existingRaw) : [];
-    existing.push(newRequest);
-    localStorage.setItem('uhni-sourcing-requests', JSON.stringify(existing));
-
-    showToast('Sourcing request submitted! Your concierge will review it shortly.', 'success');
-    router.push('/uhni/sourcing');
+    setSubmitted(true);
   };
 
-  const canProceed = () => {
-    if (step === 1) return formData.type !== '';
-    if (step === 2) return formData.title.trim() !== '' && formData.description.trim() !== '';
-    return true;
-  };
+  if (submitted) {
+    return (
+      <div className="min-h-screen bg-ivory-cream">
+        <div className="bg-charcoal-deep">
+          <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
+            <div className="flex items-center gap-2 mb-4">
+              <Search size={12} className="text-gold-soft" />
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70">
+                Private Request
+              </span>
+            </div>
+            <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
+              New Sourcing Request
+            </h1>
+          </div>
+        </div>
+        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-16">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-success/10 flex items-center justify-center mx-auto mb-6">
+              <CheckCircle size={40} className="text-success" />
+            </div>
+            <h2 className="font-display text-2xl text-charcoal-deep mb-3">
+              Sourcing Request Submitted
+            </h2>
+            <p className="text-stone max-w-md mx-auto mb-10">
+              Our global network is now searching for your item.
+              You will be notified when options are found — typically within 24-72 hours.
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <Link
+                href="/uhni/sourcing"
+                className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+              >
+                View My Requests
+              </Link>
+              <Link
+                href="/uhni"
+                className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+              >
+                Return to Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -127,278 +123,138 @@ export default function NewSourcingRequestPage() {
       </div>
 
       <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        {/* Progress Steps */}
-        <div className="flex items-center gap-2 mb-12">
-          {[1, 2, 3].map((s) => (
-            <div key={s} className="flex items-center gap-2 flex-1">
-              <div className={`w-8 h-8 flex items-center justify-center text-sm transition-colors ${
-                s === step ? 'bg-charcoal-deep text-ivory-cream' :
-                s < step ? 'bg-success text-ivory-cream' : 'bg-sand text-stone'
-              }`}>
-                {s < step ? '✓' : s}
-              </div>
-              {s < 3 && (
-                <div className={`flex-1 h-0.5 ${s < step ? 'bg-success' : 'bg-sand'}`} />
-              )}
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Title */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              What are you looking for? *
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              placeholder="e.g., Hermès Birkin 25 in Gold Togo"
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              required
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Category *
+            </label>
+            <select
+              value={formData.category}
+              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+              required
+            >
+              <option value="">Select a category</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Description *
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Describe the item in detail — brand, style, era, condition..."
+              rows={4}
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+              required
+            />
+          </div>
+
+          {/* Budget */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Budget *
+            </label>
+            <div className="relative">
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-stone">€</span>
+              <input
+                type="number"
+                value={formData.budget}
+                onChange={(e) => setFormData(prev => ({ ...prev, budget: e.target.value }))}
+                placeholder="0"
+                className="w-full pl-10 pr-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                required
+              />
             </div>
-          ))}
-        </div>
+          </div>
 
-        <form onSubmit={handleSubmit}>
-          {/* Step 1: Request Type */}
-          {step === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="font-display text-2xl text-charcoal-deep mb-2">What type of request?</h2>
-                <p className="text-stone">Select the category that best describes your search</p>
-              </div>
-
-              <div className="grid gap-4">
-                {requestTypes.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: type.value })}
-                    className={`p-6 text-left border transition-all ${
-                      formData.type === type.value
-                        ? 'border-charcoal-deep bg-parchment'
-                        : 'border-sand hover:border-charcoal-deep bg-white'
-                    }`}
-                  >
-                    <p className="font-display text-lg text-charcoal-deep mb-1">{type.label}</p>
-                    <p className="text-sm text-stone">{type.description}</p>
-                  </button>
-                ))}
-              </div>
+          {/* Priority */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Priority
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {([
+                { value: 'standard', label: 'Standard', desc: 'Within your preferred timeline' },
+                { value: 'urgent', label: 'Urgent', desc: 'Required within 2 weeks' },
+                { value: 'when_available', label: 'When Available', desc: 'No time pressure, find the perfect piece' },
+              ] as const).map(p => (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, priority: p.value }))}
+                  className={`p-4 text-left border transition-colors ${
+                    formData.priority === p.value
+                      ? 'border-charcoal-deep bg-parchment'
+                      : 'border-sand bg-white hover:border-charcoal-deep/50'
+                  }`}
+                >
+                  <p className="text-sm font-medium text-charcoal-deep">{p.label}</p>
+                  <p className="text-xs text-stone mt-1">{p.desc}</p>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
-          {/* Step 2: Details */}
-          {step === 2 && (
-            <div className="space-y-8">
-              <div>
-                <h2 className="font-display text-2xl text-charcoal-deep mb-2">Describe what you're looking for</h2>
-                <p className="text-stone">Provide as much detail as possible to help us find the perfect piece</p>
-              </div>
+          {/* Deadline */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Requested Deadline (Optional)
+            </label>
+            <input
+              type="date"
+              value={formData.deadline}
+              min={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setFormData(prev => ({ ...prev, deadline: e.target.value }))}
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+            />
+          </div>
 
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    placeholder="e.g., Hermès Birkin 25 in Gold Togo"
-                    className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                    required
-                  />
-                </div>
+          {/* Specifications */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Specifications (Optional)
+            </label>
+            <textarea
+              value={formData.specifications}
+              onChange={(e) => setFormData(prev => ({ ...prev, specifications: e.target.value }))}
+              placeholder="Size, material, color, condition requirements..."
+              rows={3}
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+            />
+          </div>
 
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
-                    Description *
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Describe the item in detail - specific features, colors, materials, condition preferences, etc."
-                    rows={5}
-                    className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
-                    required
-                  />
-                </div>
-
-                {/* Reference Images */}
-                <div>
-                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
-                    Reference Images (Optional)
-                  </label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*,.pdf"
-                    multiple
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-sand p-8 text-center bg-white cursor-pointer hover:border-charcoal-deep transition-colors"
-                  >
-                    <Upload size={32} className="mx-auto text-stone mb-4" />
-                    <p className="text-sm text-stone mb-2">Drag and drop images here, or click to browse</p>
-                    <p className="text-xs text-taupe">PNG, JPG, PDF up to 10MB each</p>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
-                      className="mt-4 px-6 py-2 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm"
-                    >
-                      Browse Files
-                    </button>
-                  </div>
-                  {uploadedFiles.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                      {uploadedFiles.map((file, i) => (
-                        <div key={i} className="flex items-center justify-between bg-parchment px-3 py-2 rounded text-sm text-charcoal-deep/80">
-                          <span>{file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
-                          <button
-                            type="button"
-                            onClick={() => removeFile(i)}
-                            className="text-taupe hover:text-charcoal-deep ml-2"
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Preferences */}
-          {step === 3 && (
-            <div className="space-y-8">
-              <div>
-                <h2 className="font-display text-2xl text-charcoal-deep mb-2">Additional preferences</h2>
-                <p className="text-stone">Help us narrow down the search with your preferences</p>
-              </div>
-
-              <div className="space-y-6">
-                {/* Budget */}
-                <div className="bg-white p-6 border border-sand">
-                  <div className="flex items-center gap-3 mb-4">
-                    <DollarSign size={18} className="text-stone" />
-                    <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep">
-                      Budget Range (Optional)
-                    </label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <input
-                        type="number"
-                        value={formData.budgetMin}
-                        onChange={(e) => setFormData({ ...formData, budgetMin: e.target.value })}
-                        placeholder="Min €"
-                        className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep placeholder:text-taupe focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
-                      />
-                    </div>
-                    <div>
-                      <input
-                        type="number"
-                        value={formData.budgetMax}
-                        onChange={(e) => setFormData({ ...formData, budgetMax: e.target.value })}
-                        placeholder="Max €"
-                        className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep placeholder:text-taupe focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
-                      />
-                    </div>
-                  </div>
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={formData.budgetFlexible}
-                      onChange={(e) => setFormData({ ...formData, budgetFlexible: e.target.checked })}
-                      className="w-5 h-5 accent-charcoal-deep"
-                    />
-                    <span className="text-sm text-stone">Budget is flexible for the right piece</span>
-                  </label>
-                </div>
-
-                {/* Deadline */}
-                <div className="bg-white p-6 border border-sand">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Calendar size={18} className="text-stone" />
-                    <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep">
-                      Deadline (Optional)
-                    </label>
-                  </div>
-                  <input
-                    type="date"
-                    value={formData.deadline}
-                    min={new Date().toISOString().split('T')[0]}
-                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                    className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
-                  />
-                  <p className="text-xs text-taupe mt-2">When do you need this item by?</p>
-                </div>
-
-                {/* Occasion */}
-                {formData.type === 'occasion' && (
-                  <div className="bg-white p-6 border border-sand">
-                    <div className="flex items-center gap-3 mb-4">
-                      <Tag size={18} className="text-stone" />
-                      <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep">
-                        Occasion
-                      </label>
-                    </div>
-                    <input
-                      type="text"
-                      value={formData.occasion}
-                      onChange={(e) => setFormData({ ...formData, occasion: e.target.value })}
-                      placeholder="e.g., Wedding, Gala, Business Meeting"
-                      className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep placeholder:text-taupe focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Summary */}
-              <div className="bg-parchment p-6 border border-sand">
-                <div className="flex items-center gap-2 mb-4">
-                  <FileText size={16} className="text-stone" />
-                  <span className="text-[10px] tracking-[0.2em] uppercase text-taupe">Request Summary</span>
-                </div>
-                <div className="space-y-2 text-sm">
-                  <p><span className="text-taupe">Type:</span> <span className="text-charcoal-deep">{requestTypes.find(t => t.value === formData.type)?.label}</span></p>
-                  <p><span className="text-taupe">Title:</span> <span className="text-charcoal-deep">{formData.title || '-'}</span></p>
-                  {formData.budgetMin && formData.budgetMax && (
-                    <p><span className="text-taupe">Budget:</span> <span className="text-charcoal-deep">€{formData.budgetMin} - €{formData.budgetMax}</span></p>
-                  )}
-                  {formData.deadline && (
-                    <p><span className="text-taupe">Deadline:</span> <span className="text-charcoal-deep">{new Date(formData.deadline).toLocaleDateString()}</span></p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Navigation */}
-          <div className="flex justify-between mt-12 pt-8 border-t border-sand">
-            {step > 1 ? (
-              <button
-                type="button"
-                onClick={() => setStep(step - 1)}
-                className="flex items-center gap-2 px-6 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors"
-              >
-                <ArrowLeft size={16} />
-                <span className="text-sm tracking-[0.15em] uppercase">Back</span>
-              </button>
-            ) : (
-              <div />
-            )}
-
-            {step < 3 ? (
-              <button
-                type="button"
-                onClick={() => setStep(step + 1)}
-                disabled={!canProceed()}
-                className="flex items-center gap-2 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <span className="text-sm tracking-[0.15em] uppercase">Continue</span>
-                <ChevronRight size={16} />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="flex items-center gap-2 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors"
-              >
-                <span className="text-sm tracking-[0.15em] uppercase">Submit Request</span>
-                <ChevronRight size={16} />
-              </button>
-            )}
+          {/* Submit */}
+          <div className="pt-8 border-t border-sand">
+            <button
+              type="submit"
+              disabled={!formData.title || !formData.category || !formData.description || !formData.budget}
+              className="px-8 py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Submit Request
+            </button>
           </div>
         </form>
       </div>

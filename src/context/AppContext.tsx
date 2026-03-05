@@ -1,11 +1,16 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity } from '@/types';
+import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity, BespokeDetailedSpec, PriceNegotiation, CollectionInvitation, ConciergeAppointment, ConciergeTask, ConciergeTaskInput, ClaimedOffer } from '@/types';
+import type { UHNIPriceOffer } from '@/types/uhni';
+import type { PricingTier, PriceAlert, TierUpgradeRequest } from '@/types/pricing-tiers';
+import type { StylingSession, StylingSessionRequest } from '@/types/brand-portal';
 import { generateOutfitSuggestions } from '@/lib/outfit-intelligence';
 import * as calendarService from '@/services/calendar.service';
 import * as productService from '@/services/product.service';
 import { useAuth } from './AuthContext';
+import { getSharedOffers, subscribeToOffers, updateSharedOfferClaimCount } from '@/lib/shared-store';
+import { getSharedSessions, addSharedSession, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
 
 // Import focused hooks
 import {
@@ -102,11 +107,86 @@ interface AppContextType {
   concierge: PersonalConcierge | null;
   autonomousSettings: AutonomousShoppingSettings | null;
   sourcingRequests: SourcingRequest[];
+  createSourcingRequest: (data: {
+    title: string;
+    description: string;
+    category: string;
+    budget: number;
+    currency?: string;
+    deadline?: string;
+    specifications?: string;
+    priority: 'standard' | 'urgent' | 'when_available';
+  }) => SourcingRequest;
+  selectSourcingOption: (requestId: string, optionId: string) => void;
+  addSourcingMessage: (requestId: string, content: string) => void;
   bespokeOrders: BespokeOrder[];
   autonomousActivity: AutonomousActivity[];
   updateAutonomousSettings: (settings: Partial<AutonomousShoppingSettings>) => void;
+  createBespokeOrder: (orderData: {
+    title: string;
+    type: 'made_to_measure' | 'custom_design' | 'modification';
+    description: string;
+    detailedSpec: BespokeDetailedSpec;
+    estimatedBudget: number;
+    requestedDeadline?: string;
+  }) => BespokeOrder;
+  addMessageToBespokeOrder: (orderId: string, content: string, role: 'client' | 'brand') => void;
+  approveBespokeDesign: (orderId: string) => void;
+  priceNegotiations: PriceNegotiation[];
+  createNegotiation: (data: {
+    productId: string;
+    productName: string;
+    productImage: string;
+    productSlug: string;
+    brandName: string;
+    originalPrice: number;
+    proposedPrice: number;
+    clientMessage: string;
+  }) => PriceNegotiation;
+  respondToCounterOffer: (negotiationId: string, action: 'accept' | 'reject') => void;
+  collectionInvitations: CollectionInvitation[];
+  respondToInvitation: (invitationId: string, action: 'accept' | 'decline') => void;
+  submitAccessRequest: (collectionId: string, collectionName: string, brandId: string) => void;
+  conciergeAppointments: ConciergeAppointment[];
+  bookAppointment: (data: {
+    type: ConciergeAppointment['type'];
+    title: string;
+    date: string;
+    time: string;
+    duration: number;
+    notes?: string;
+  }) => ConciergeAppointment;
+  cancelAppointment: (appointmentId: string) => void;
+  rescheduleAppointment: (appointmentId: string, newDate: string, newTime: string) => void;
+  conciergeTasks: ConciergeTask[];
+  addConciergeTask: (input: ConciergeTaskInput) => ConciergeTask;
+  completeConciergeTask: (taskId: string) => void;
+  uhniOffers: UHNIPriceOffer[];
+  claimedOffers: ClaimedOffer[];
+  claimOffer: (offer: UHNIPriceOffer) => void;
+  stylingSessions: StylingSession[];
+  bookStylingSession: (request: StylingSessionRequest) => StylingSession;
+  cancelStylingSession: (sessionId: string) => void;
   setUserRole: (tier: UserTier) => void;
   logout: () => void;
+  // Pricing Tiers
+  pricingTier: PricingTier;
+  tierSince: string;
+  priceAlerts: PriceAlert[];
+  tierUpgradeRequest: TierUpgradeRequest | null;
+  createPriceAlert: (data: {
+    productId: string;
+    productName: string;
+    productSlug: string;
+    productImage?: string;
+    brandName: string;
+    currentPrice: number;
+    targetPrice: number;
+    currency?: string;
+  }) => PriceAlert | undefined;
+  deletePriceAlert: (alertId: string) => void;
+  togglePriceAlert: (alertId: string) => void;
+  requestTierUpgrade: (targetTier: PricingTier) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -116,6 +196,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Auth state — single source of truth from AuthContext
   const { userTier, isUHNI, isAuthenticated, setUserRole, logout } = useAuth();
+
+  // Pricing Tiers
+  const [pricingTier, setPricingTier] = useState<PricingTier>('standard');
+  const [tierSince] = useState<string>(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()); // Mock: 90 days ago
+  const [priceAlerts, setPriceAlerts] = useState<PriceAlert[]>([]);
+  const [tierUpgradeRequest, setTierUpgradeRequest] = useState<TierUpgradeRequest | null>(null);
+
+  // Sync pricing tier with UHNI status
+  useEffect(() => {
+    if (isUHNI) {
+      setPricingTier('uhni');
+    } else if (userTier === 'preferred') {
+      setPricingTier('preferred');
+    } else {
+      setPricingTier('standard');
+    }
+  }, [isUHNI, userTier]);
 
   // Wishlist state (TODO: Move to dedicated hook)
   const [wishlist, setWishlist] = useState<WardrobeItem[]>([]);
@@ -279,16 +376,290 @@ export function AppProvider({ children }: { children: ReactNode }) {
     concierge,
     autonomousSettings,
     sourcingRequests,
+    createSourcingRequest,
+    selectSourcingOption,
+    addSourcingMessage,
     bespokeOrders,
     autonomousActivity,
     updateAutonomousSettings,
+    createBespokeOrder,
+    addMessageToBespokeOrder,
+    approveBespokeDesign,
+    priceNegotiations: uhniNegotiations,
+    createNegotiation,
+    respondToCounterOffer,
+    conciergeAppointments,
+    bookAppointment,
+    cancelAppointment,
+    rescheduleAppointment,
+    localConciergeTasks,
+    addConciergeTask,
+    completeConciergeTask,
   } = useUHNIFeatures({ isUHNI, showToast });
+
+  // Collection Invitations (UHNI)
+  const [collectionInvitations, setCollectionInvitations] = useState<CollectionInvitation[]>([]);
+
+  useEffect(() => {
+    if (isUHNI && collectionInvitations.length === 0) {
+      setCollectionInvitations([
+        {
+          id: 'inv-demo-1',
+          collectionId: 'pc-demo-1',
+          collectionName: 'Automne Privé 2026',
+          brandName: 'Maison Lumière',
+          brandId: 'brand-demo-1',
+          sentAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+          status: 'pending',
+          message: 'You are exclusively invited to preview our autumn private collection before public release.'
+        }
+      ]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUHNI]);
+
+  const respondToInvitation = useCallback((invitationId: string, action: 'accept' | 'decline') => {
+    setCollectionInvitations(prev =>
+      prev.map(inv =>
+        inv.id === invitationId
+          ? { ...inv, status: action === 'accept' ? 'accepted' as const : 'declined' as const }
+          : inv
+      )
+    );
+    if (action === 'accept') {
+      showToast('Invitation accepted — collection access granted', 'success');
+    } else {
+      showToast('Invitation declined', 'info');
+    }
+  }, [showToast]);
+
+  const submitAccessRequest = useCallback((collectionId: string, collectionName: string, _brandId: string) => {
+    showToast(`Access request sent for ${collectionName}`, 'success');
+  }, [showToast]);
+
+  // UHNI Offers (shared store)
+  const [sharedUhniOffers, setSharedUhniOffers] = useState<UHNIPriceOffer[]>(getSharedOffers());
+  const [claimedOffers, setClaimedOffers] = useState<ClaimedOffer[]>([]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToOffers(offers => {
+      setSharedUhniOffers(offers);
+    });
+    return unsubscribe;
+  }, []);
+
+  const visibleOffers = useMemo(() => {
+    return sharedUhniOffers.filter(offer => {
+      const now = new Date();
+      const validFrom = new Date(offer.validFrom);
+      const validUntil = new Date(offer.validUntil);
+      if (now < validFrom || now > validUntil) return false;
+      if (offer.isPrivate && offer.targetClientIds?.length) {
+        return offer.targetClientIds.includes('uhni-user');
+      }
+      return true;
+    });
+  }, [sharedUhniOffers]);
+
+  const computeDiscountedPrice = (
+    originalPrice: number,
+    discountType: 'percentage' | 'fixed',
+    discountValue: number
+  ): number => {
+    if (discountType === 'percentage') {
+      return Math.round(originalPrice * (1 - discountValue / 100));
+    }
+    return Math.max(0, originalPrice - discountValue);
+  };
+
+  const handleClaimOffer = useCallback((offer: UHNIPriceOffer) => {
+    if (claimedOffers.some(c => c.offerId === offer.id)) {
+      showToast('You have already claimed this offer', 'info');
+      return;
+    }
+    if (offer.maxClaims && offer.maxClaims > 0) {
+      if ((offer.claimedCount || 0) >= offer.maxClaims) {
+        showToast('This offer has reached its claim limit', 'error');
+        return;
+      }
+    }
+
+    const discountLabel = offer.discountType === 'percentage'
+      ? `${offer.discountValue}% off`
+      : `€${offer.discountValue} off`;
+
+    const originalPrice = offer.originalPrice || 0;
+    const discountedPrice = computeDiscountedPrice(
+      originalPrice, offer.discountType, offer.discountValue
+    );
+
+    const claimed: ClaimedOffer = {
+      id: `claimed-${Date.now()}`,
+      offerId: offer.id,
+      offerTitle: `${discountLabel} — ${offer.targetName}`,
+      brandName: offer.brandName || '',
+      productId: offer.type === 'product' ? offer.targetId : undefined,
+      productName: offer.type === 'product' ? offer.targetName : undefined,
+      productSlug: offer.productSlug,
+      originalPrice,
+      discountedPrice,
+      discountLabel,
+      claimedAt: new Date().toISOString(),
+      expiresAt: offer.validUntil,
+      status: 'active',
+    };
+
+    setClaimedOffers(prev => [claimed, ...prev]);
+    updateSharedOfferClaimCount(offer.id);
+
+    if (offer.type === 'product' && offer.targetId && offer.productSlug) {
+      addToConsiderations(
+        {
+          id: offer.targetId,
+          name: offer.targetName,
+          price: discountedPrice,
+          images: offer.productImage
+            ? [{ url: offer.productImage, alt: offer.targetName }]
+            : [],
+          slug: offer.productSlug,
+          brandName: offer.brandName || '',
+        } as unknown as Product,
+        {},
+        `${discountLabel} offer applied`
+      );
+      showToast(
+        `Offer claimed — ${offer.targetName} added at ${discountLabel}`,
+        'success'
+      );
+    } else {
+      showToast(
+        `Offer claimed — ${discountLabel} saved to your offer wallet`,
+        'success'
+      );
+    }
+  }, [claimedOffers, showToast, addToConsiderations]);
+
+  // Styling Sessions (shared store)
+  const [sharedStylingSessions, setSharedStylingSessions] = useState<StylingSession[]>(getSharedSessions());
+
+  useEffect(() => {
+    const unsubscribe = subscribeToSessions(sessions => {
+      setSharedStylingSessions(sessions);
+    });
+    return unsubscribe;
+  }, []);
+
+  const mySessions = useMemo(() => {
+    return sharedStylingSessions.filter(s => s.customerId === 'uhni-user');
+  }, [sharedStylingSessions]);
+
+  const bookStylingSession = useCallback((request: StylingSessionRequest): StylingSession => {
+    const newSession: StylingSession = {
+      id: `session-${Date.now()}`,
+      brandId: request.brandId,
+      brandName: request.brandName,
+      scheduledAt: request.scheduledAt,
+      duration: request.duration,
+      type: request.type,
+      status: 'pending',
+      notes: request.notes,
+      contextInfo: request.contextInfo,
+      customerId: 'uhni-user',
+      customerName: 'Alexandra V.',
+      customerEmail: 'alexandra@example.com',
+      customerTier: request.customerTier,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    addSharedSession(newSession);
+    showToast(`Styling session booked with ${request.brandName}`, 'success');
+    return newSession;
+  }, [showToast]);
+
+  const cancelStylingSession = useCallback((sessionId: string) => {
+    updateSharedSessionStatus(sessionId, 'cancelled');
+    showToast('Styling session cancelled', 'info');
+  }, [showToast]);
 
   // Wishlist functions (TODO: Move to dedicated hook)
   const removeFromWishlist = useCallback((id: string) => {
     setWishlist(prev => prev.filter(w => w.id !== id));
     showToast('Removed from wishlist', 'info');
   }, [showToast]);
+
+  // Pricing Tier functions
+  const createPriceAlert = useCallback((data: {
+    productId: string;
+    productName: string;
+    productSlug: string;
+    productImage?: string;
+    brandName: string;
+    currentPrice: number;
+    targetPrice: number;
+    currency?: string;
+  }): PriceAlert | undefined => {
+    // Only available for preferred and uhni tiers
+    if (pricingTier === 'standard') {
+      showToast('Price alerts are available for Preferred and UHNI members', 'info');
+      return undefined;
+    }
+
+    // Check if alert already exists for this product
+    if (priceAlerts.some(alert => alert.productId === data.productId && alert.isActive)) {
+      showToast('You already have an active price alert for this product', 'info');
+      return undefined;
+    }
+
+    const newAlert: PriceAlert = {
+      id: `alert-${Date.now()}`,
+      productId: data.productId,
+      productName: data.productName,
+      productSlug: data.productSlug,
+      productImage: data.productImage,
+      brandName: data.brandName,
+      currentPrice: data.currentPrice,
+      targetPrice: data.targetPrice,
+      currency: data.currency || 'EUR',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    setPriceAlerts(prev => [newAlert, ...prev]);
+    showToast(`Price alert set for ${data.productName}`, 'success');
+    return newAlert;
+  }, [pricingTier, priceAlerts, showToast]);
+
+  const deletePriceAlert = useCallback((alertId: string) => {
+    setPriceAlerts(prev => prev.filter(alert => alert.id !== alertId));
+    showToast('Price alert removed', 'info');
+  }, [showToast]);
+
+  const togglePriceAlert = useCallback((alertId: string) => {
+    setPriceAlerts(prev => prev.map(alert =>
+      alert.id === alertId
+        ? { ...alert, isActive: !alert.isActive }
+        : alert
+    ));
+  }, []);
+
+  const requestTierUpgrade = useCallback((targetTier: PricingTier) => {
+    if (tierUpgradeRequest && tierUpgradeRequest.status === 'pending') {
+      showToast('You already have a pending upgrade request', 'info');
+      return;
+    }
+
+    const request: TierUpgradeRequest = {
+      id: `upgrade-${Date.now()}`,
+      fromTier: pricingTier,
+      toTier: targetTier,
+      status: 'pending',
+      requestedAt: new Date().toISOString(),
+    };
+
+    setTierUpgradeRequest(request);
+    showToast(`Upgrade request submitted for ${targetTier === 'preferred' ? 'Preferred Member' : 'UHNI'} tier`, 'success');
+  }, [pricingTier, tierUpgradeRequest, showToast]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -300,6 +671,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const storedAlerts = localStorage.getItem('moda-restock-alerts');
         const storedOrders = localStorage.getItem('moda-orders');
         const storedFashionIdentity = localStorage.getItem('moda-fashion-identity');
+        const storedPriceAlerts = localStorage.getItem('moda-price-alerts');
+        const storedTierUpgradeRequest = localStorage.getItem('moda-tier-upgrade-request');
 
         if (storedConsiderations) {
           setConsiderations(JSON.parse(storedConsiderations));
@@ -318,6 +691,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
 
         initializeFashionIdentity(storedFashionIdentity);
+
+        if (storedPriceAlerts) {
+          setPriceAlerts(JSON.parse(storedPriceAlerts));
+        }
+        if (storedTierUpgradeRequest) {
+          setTierUpgradeRequest(JSON.parse(storedTierUpgradeRequest));
+        }
       } catch (error) {
         console.error('Error loading from localStorage:', error);
       }
@@ -351,6 +731,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     persistFashionIdentity(fashionIdentity);
   }, [fashionIdentity, persistFashionIdentity]);
+
+  useEffect(() => {
+    if (isHydrated) {
+      safeLocalStorageSave('moda-price-alerts', priceAlerts);
+    }
+  }, [priceAlerts, isHydrated, safeLocalStorageSave]);
+
+  useEffect(() => {
+    if (isHydrated) {
+      safeLocalStorageSave('moda-tier-upgrade-request', tierUpgradeRequest);
+    }
+  }, [tierUpgradeRequest, isHydrated, safeLocalStorageSave]);
 
   return (
     <AppContext.Provider value={{
@@ -427,11 +819,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
       concierge,
       autonomousSettings,
       sourcingRequests,
+      createSourcingRequest,
+      selectSourcingOption,
+      addSourcingMessage,
       bespokeOrders,
       autonomousActivity,
       updateAutonomousSettings,
+      createBespokeOrder,
+      addMessageToBespokeOrder,
+      approveBespokeDesign,
+      priceNegotiations: uhniNegotiations,
+      createNegotiation,
+      respondToCounterOffer,
+      collectionInvitations,
+      respondToInvitation,
+      submitAccessRequest,
+      conciergeAppointments,
+      bookAppointment,
+      cancelAppointment,
+      rescheduleAppointment,
+      conciergeTasks: localConciergeTasks,
+      addConciergeTask,
+      completeConciergeTask,
+      uhniOffers: visibleOffers,
+      claimedOffers,
+      claimOffer: handleClaimOffer,
+      stylingSessions: mySessions,
+      bookStylingSession,
+      cancelStylingSession,
       setUserRole,
-      logout
+      logout,
+      // Pricing Tiers
+      pricingTier,
+      tierSince,
+      priceAlerts,
+      tierUpgradeRequest,
+      createPriceAlert,
+      deletePriceAlert,
+      togglePriceAlert,
+      requestTierUpgrade,
     }}>
       {children}
     </AppContext.Provider>

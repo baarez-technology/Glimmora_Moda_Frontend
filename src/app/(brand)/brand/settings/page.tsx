@@ -16,16 +16,22 @@ import {
   Trash2,
   Users,
   X,
-  AlertTriangle
+  AlertTriangle,
+  ShoppingCart,
+  Truck,
+  Percent,
+  ToggleLeft,
+  ToggleRight,
+  AlertCircle
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 
-type SettingsTab = 'profile' | 'team' | 'api' | 'notifications';
+type SettingsTab = 'profile' | 'team' | 'api' | 'notifications' | 'commerce';
 
 export default function SettingsPage() {
-  const { partner } = useBrand();
+  const { partner, commerceSettings, updateTaxRule, updateShippingMethod, addShippingMethod, removeShippingMethod, updateCommerceConfig } = useBrand();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showKey, setShowKey] = useState<string | null>(null);
@@ -54,6 +60,18 @@ export default function SettingsPage() {
   const [webhookUrl, setWebhookUrl] = useState(partner?.settings.integration.webhookUrl || '');
   const [syncFrequency, setSyncFrequency] = useState(partner?.settings.integration.syncFrequency || 'realtime');
 
+  // Commerce - new shipping form
+  const [showNewShippingForm, setShowNewShippingForm] = useState(false);
+  const [newShipping, setNewShipping] = useState({
+    name: '',
+    carrier: '',
+    estimatedDays: '',
+    baseRate: 0,
+    freeAbove: 0,
+    isEnabled: true,
+    regions: [] as string[]
+  });
+
   // Team member delete confirmation
   const [deleteMemberId, setDeleteMemberId] = useState<string | null>(null);
   const [showDeleteMemberModal, setShowDeleteMemberModal] = useState(false);
@@ -68,7 +86,8 @@ export default function SettingsPage() {
     { id: 'profile', label: 'Profile', icon: Building2 },
     { id: 'team', label: 'Team', icon: Users },
     { id: 'api', label: 'API Keys', icon: Key },
-    { id: 'notifications', label: 'Notifications', icon: Bell }
+    { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'commerce', label: 'Commerce', icon: ShoppingCart }
   ];
 
   const copyToClipboard = (text: string, keyId: string) => {
@@ -492,6 +511,308 @@ export default function SettingsPage() {
                         </label>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Commerce Tab */}
+            {activeTab === 'commerce' && (
+              <div className="space-y-6">
+                {/* Section A — Tax Configuration */}
+                <div className="bg-white border border-sand/50 p-6">
+                  <h2 className="text-sm font-medium text-charcoal-deep tracking-[0.05em] uppercase mb-1">
+                    Tax Rules
+                  </h2>
+                  <p className="text-xs text-taupe mb-6">
+                    Configure tax rates per region. Rates apply at checkout based on delivery destination.
+                  </p>
+
+                  <div className="space-y-4">
+                    {commerceSettings.taxRules.map(rule => (
+                      <div key={rule.id} className="flex items-center gap-4 py-3 border-b border-sand/30 last:border-0">
+                        <button
+                          onClick={() => updateTaxRule(rule.id, { isEnabled: !rule.isEnabled })}
+                          className="cursor-pointer transition-colors"
+                        >
+                          {rule.isEnabled ? (
+                            <ToggleRight size={24} className="text-gold-soft" />
+                          ) : (
+                            <ToggleLeft size={24} className="text-taupe" />
+                          )}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-charcoal-deep">{rule.regionName}</p>
+                          <p className="text-xs text-stone">{rule.countryCode}</p>
+                        </div>
+                        <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-parchment text-stone">
+                          {rule.taxLabel}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            value={rule.taxRate}
+                            onChange={(e) => updateTaxRule(rule.id, { taxRate: Number(e.target.value) })}
+                            className="w-20 border border-sand focus:border-charcoal-deep focus:outline-none px-2 py-1 text-sm text-right"
+                          />
+                          <span className="text-sm text-stone">%</span>
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={rule.includeInPrice}
+                            onChange={() => updateTaxRule(rule.id, { includeInPrice: !rule.includeInPrice })}
+                          />
+                          <span className="text-xs text-stone whitespace-nowrap">Price includes tax</span>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 bg-parchment border border-sand p-4 flex items-start gap-3">
+                    <AlertCircle size={16} className="text-taupe mt-0.5 shrink-0" />
+                    <p className="text-xs text-stone">
+                      Tax calculations apply to all orders from this brand. Ensure rates comply with local regulations in each region.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Section B — Shipping Methods */}
+                <div className="bg-white border border-sand/50 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-sm font-medium text-charcoal-deep tracking-[0.05em] uppercase mb-1">
+                        Shipping Methods
+                      </h2>
+                    </div>
+                    <button
+                      onClick={() => setShowNewShippingForm(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wide hover:bg-noir transition-colors"
+                    >
+                      <Plus size={14} />
+                      Add Method
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {commerceSettings.shippingMethods.map(method => (
+                      <div key={method.id} className="bg-white border border-sand/50 p-5 space-y-4">
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => updateShippingMethod(method.id, { isEnabled: !method.isEnabled })}
+                            className="cursor-pointer transition-colors"
+                          >
+                            {method.isEnabled ? (
+                              <ToggleRight size={24} className="text-gold-soft" />
+                            ) : (
+                              <ToggleLeft size={24} className="text-taupe" />
+                            )}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-charcoal-deep">{method.name}</p>
+                          </div>
+                          <span className="text-sm text-stone">{method.carrier}</span>
+                          <span className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-parchment text-stone">
+                            {method.estimatedDays}
+                          </span>
+                          {method.id !== 'ship-complimentary' && (
+                            <button
+                              onClick={() => removeShippingMethod(method.id)}
+                              className="text-error hover:text-error/80 transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 pl-10">
+                          <div>
+                            <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">
+                              Base Rate
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-stone">&euro;</span>
+                              <input
+                                type="number"
+                                value={method.baseRate}
+                                onChange={(e) => updateShippingMethod(method.id, { baseRate: Number(e.target.value) })}
+                                className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">
+                              Free Above
+                            </label>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-stone">&euro;</span>
+                              <input
+                                type="number"
+                                value={method.freeAbove}
+                                onChange={(e) => updateShippingMethod(method.id, { freeAbove: Number(e.target.value) })}
+                                className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm"
+                              />
+                            </div>
+                            <p className="text-[10px] text-taupe mt-1">0 = never free</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Global Free Shipping Threshold */}
+                  <div className="mt-6 pt-6 border-t border-sand/30">
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                      Global Free Shipping Threshold
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm text-stone">&euro;</span>
+                      <input
+                        type="number"
+                        value={commerceSettings.freeShippingThreshold}
+                        onChange={(e) => updateCommerceConfig({ freeShippingThreshold: Number(e.target.value) })}
+                        className="w-40 border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <p className="text-[10px] text-taupe mt-1">
+                      Orders above this amount get free shipping regardless of method. Set 0 to disable.
+                    </p>
+                  </div>
+
+                  {/* New Shipping Form */}
+                  {showNewShippingForm && (
+                    <div className="mt-6 bg-parchment border border-sand p-6 space-y-4">
+                      <h3 className="text-sm font-medium text-charcoal-deep">New Shipping Method</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Method Name</label>
+                          <input
+                            type="text"
+                            value={newShipping.name}
+                            onChange={(e) => setNewShipping(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="e.g. Priority Delivery"
+                            className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm placeholder:text-taupe"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Carrier</label>
+                          <input
+                            type="text"
+                            value={newShipping.carrier}
+                            onChange={(e) => setNewShipping(prev => ({ ...prev, carrier: e.target.value }))}
+                            placeholder="e.g. FedEx"
+                            className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm placeholder:text-taupe"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Estimated Days</label>
+                          <input
+                            type="text"
+                            value={newShipping.estimatedDays}
+                            onChange={(e) => setNewShipping(prev => ({ ...prev, estimatedDays: e.target.value }))}
+                            placeholder="e.g. 3-5 business days"
+                            className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm placeholder:text-taupe"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Base Rate</label>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-stone">&euro;</span>
+                              <input
+                                type="number"
+                                value={newShipping.baseRate}
+                                onChange={(e) => setNewShipping(prev => ({ ...prev, baseRate: Number(e.target.value) }))}
+                                className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-1">Free Above</label>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm text-stone">&euro;</span>
+                              <input
+                                type="number"
+                                value={newShipping.freeAbove}
+                                onChange={(e) => setNewShipping(prev => ({ ...prev, freeAbove: Number(e.target.value) }))}
+                                className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <button
+                          onClick={() => {
+                            setShowNewShippingForm(false);
+                            setNewShipping({ name: '', carrier: '', estimatedDays: '', baseRate: 0, freeAbove: 0, isEnabled: true, regions: [] });
+                          }}
+                          className="px-4 py-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            addShippingMethod(newShipping);
+                            setNewShipping({ name: '', carrier: '', estimatedDays: '', baseRate: 0, freeAbove: 0, isEnabled: true, regions: [] });
+                            setShowNewShippingForm(false);
+                            setSavedMessage('Shipping method added');
+                            setTimeout(() => setSavedMessage(null), 3000);
+                          }}
+                          disabled={!newShipping.name || !newShipping.carrier}
+                          className="px-6 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Add Method
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section C — Returns & Policy */}
+                <div className="bg-white border border-sand/50 p-6">
+                  <h2 className="text-sm font-medium text-charcoal-deep tracking-[0.05em] uppercase mb-6">
+                    Returns & Policy
+                  </h2>
+
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                        Return Window
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={commerceSettings.returnWindowDays}
+                          onChange={(e) => updateCommerceConfig({ returnWindowDays: Number(e.target.value) })}
+                          className="w-24 border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm"
+                        />
+                        <span className="text-sm text-stone">days</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                        Return Policy
+                      </label>
+                      <textarea
+                        value={commerceSettings.returnPolicy}
+                        onChange={(e) => updateCommerceConfig({ returnPolicy: e.target.value })}
+                        rows={4}
+                        className="w-full border border-sand focus:border-charcoal-deep focus:outline-none px-3 py-2 text-sm resize-none"
+                      />
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => {
+                          setSavedMessage('Commerce settings saved');
+                          setTimeout(() => setSavedMessage(null), 3000);
+                        }}
+                        className="px-6 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
+                      >
+                        Save Commerce Settings
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

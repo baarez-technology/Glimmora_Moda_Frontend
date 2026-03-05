@@ -7,6 +7,8 @@ import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHead
 import { ApiProductCard, ApiProductGridCard } from '@/components/brand/ProductCard';
 import { fetchProducts } from '@/services/brand-product.service';
 import type { BackendProduct } from '@/services/brand-product.service';
+import ExportButton from '@/components/brand/ExportButton';
+import { convertToCSV, downloadCSV, buildFilename } from '@/lib/export-utils';
 
 type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'out-of-stock' | 'archived' | 'deleted';
 type ViewMode = 'list' | 'grid';
@@ -159,6 +161,21 @@ export default function ProductsPage() {
     setPage(1);
   };
 
+  const exportProductsCSV = () => {
+    const rows = filteredAndSortedProducts.map(p => ({
+      Name: p.product_name,
+      SKU: p.sku,
+      Price: p.price,
+      Collection: p.collection_name,
+      Status: p.status,
+      'Total Stock': getTotalStock(p),
+      'Demand Score': getDemandScore(p).toFixed(1),
+      'Created At': p.created_at,
+    }));
+    const csv = convertToCSV(rows);
+    downloadCSV(buildFilename('products', filter === 'all' ? 'all' : filter), csv);
+  };
+
   if (isLoading) {
     return (
       <div>
@@ -209,9 +226,14 @@ export default function ProductsPage() {
         title="Products"
         subtitle={`${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''}`}
         actions={
-          <PrimaryButton href="/brand/products/new" icon={Plus}>
-            Add Product
-          </PrimaryButton>
+          <div className="flex items-center gap-3">
+            <ExportButton options={[
+              { label: 'Export Products (CSV)', onClick: exportProductsCSV },
+            ]} />
+            <PrimaryButton href="/brand/products/new" icon={Plus}>
+              Add Product
+            </PrimaryButton>
+          </div>
         }
       />
 

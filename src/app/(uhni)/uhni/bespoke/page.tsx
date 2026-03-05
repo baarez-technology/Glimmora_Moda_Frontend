@@ -3,13 +3,40 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Crown, Gem, Plus, Clock, CheckCircle, Ruler, Palette, Scissors, Eye, ChevronDown, ChevronUp, Calendar, FileText, Printer, X } from 'lucide-react';
+import { ArrowLeft, Crown, Gem, Plus, Clock, CheckCircle, Ruler, Palette, Scissors, Eye, ChevronDown, ChevronUp, Calendar, FileText, Printer, X, Download, Send } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { BespokeOrderStatus } from '@/types';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 
+function BespokeMessageInput({ onSend }: { onSend: (content: string) => void }) {
+  const [value, setValue] = useState('');
+  const handleSend = () => {
+    if (!value.trim()) return;
+    onSend(value.trim());
+    setValue('');
+  };
+  return (
+    <div className="flex gap-2 mt-3">
+      <input
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => e.key === 'Enter' && handleSend()}
+        placeholder="Send a message to the atelier..."
+        className="flex-1 border border-sand px-3 py-2 text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+      />
+      <button
+        onClick={handleSend}
+        className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
+      >
+        Send
+      </button>
+    </div>
+  );
+}
+
 export default function BespokeOrdersPage() {
-  const { bespokeOrders, concierge } = useApp();
+  const { bespokeOrders, concierge, addMessageToBespokeOrder, approveBespokeDesign } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
@@ -104,7 +131,7 @@ export default function BespokeOrdersPage() {
             </div>
 
             <Link
-              href="/uhni/concierge"
+              href="/uhni/bespoke/new"
               className="flex items-center gap-2 px-5 py-3 bg-gold-soft/20 text-gold-soft hover:bg-gold-soft/30 transition-colors"
             >
               <Plus size={18} />
@@ -137,10 +164,10 @@ export default function BespokeOrdersPage() {
               Commission a custom piece crafted exclusively for you. Contact your concierge to begin.
             </p>
             <Link
-              href="/uhni/concierge"
+              href="/uhni/bespoke/new"
               className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
             >
-              <span className="text-sm tracking-[0.15em] uppercase">Contact Concierge</span>
+              <span className="text-sm tracking-[0.15em] uppercase">Start New Commission</span>
             </Link>
           </div>
         ) : (
@@ -251,6 +278,97 @@ export default function BespokeOrdersPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Expanded: Timeline Events, Design Approval, Messages */}
+                {expandedOrder === order.id && (
+                  <div className="p-6 border-t border-sand space-y-6">
+                    {/* Status Timeline Events */}
+                    {order.timelineEvents && order.timelineEvents.length > 0 && (
+                      <div>
+                        <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                          Progress Timeline
+                        </p>
+                        <div className="space-y-2">
+                          {order.timelineEvents.map(event => (
+                            <div key={event.id} className="flex items-start gap-3">
+                              <div className="w-2 h-2 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />
+                              <div>
+                                <p className="text-sm text-charcoal-deep font-medium">
+                                  {getStatusLabel(event.status)}
+                                </p>
+                                <p className="text-xs text-stone">{event.note}</p>
+                                <p className="text-xs text-taupe">
+                                  {new Date(event.createdAt).toLocaleDateString('en-US', {
+                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                  })}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Design Approval Prompt */}
+                    {order.clientApprovalRequired && !order.clientApproved && (
+                      <div className="bg-gold-soft/10 border border-gold-soft/30 p-4">
+                        <p className="text-sm font-medium text-gold-deep mb-2">
+                          Design Approval Required
+                        </p>
+                        <p className="text-xs text-stone mb-3">
+                          The brand has shared a design for your approval.
+                          Please review and confirm to proceed to production.
+                        </p>
+                        <button
+                          onClick={() => approveBespokeDesign(order.id)}
+                          className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                        >
+                          Approve Design &amp; Proceed to Production
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Messages */}
+                    <div>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
+                        Messages
+                      </p>
+
+                      {(!order.messages || order.messages.length === 0) ? (
+                        <p className="text-sm text-stone italic">
+                          No messages yet. Your atelier team will be in touch soon.
+                        </p>
+                      ) : (
+                        <div className="space-y-3 max-h-48 overflow-y-auto">
+                          {order.messages.map(msg => (
+                            <div
+                              key={msg.id}
+                              className={`p-3 max-w-sm ${
+                                msg.senderRole === 'client'
+                                  ? 'ml-auto bg-charcoal-deep text-ivory-cream'
+                                  : 'bg-parchment text-charcoal-deep'
+                              }`}
+                            >
+                              <p className="text-xs font-medium mb-1 opacity-70">
+                                {msg.senderName}
+                              </p>
+                              <p className="text-sm">{msg.content}</p>
+                              <p className="text-xs opacity-50 mt-1">
+                                {new Date(msg.createdAt).toLocaleTimeString('en-US', {
+                                  hour: '2-digit', minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <BespokeMessageInput
+                        onSend={(content) => addMessageToBespokeOrder(order.id, content, 'client')}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Specifications */}
                 {order.specifications.length > 0 && (

@@ -75,6 +75,32 @@ export interface SourcingOption {
   availableUntil?: string;
   conciergeRecommendation?: string;
   images: string[];
+  title?: string;
+  description?: string;
+  currency?: string;
+  imageUrl?: string;
+  sourceLocation?: string;
+  brandName?: string;
+  estimatedDelivery?: string;
+  notes?: string;
+  addedAt?: string;
+}
+
+export interface SourcingMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'client' | 'brand' | 'concierge';
+  content: string;
+  createdAt: string;
+}
+
+export interface SourcingTimelineEvent {
+  id: string;
+  status: SourcingRequestStatus;
+  note: string;
+  updatedBy: 'brand' | 'client' | 'system';
+  createdAt: string;
 }
 
 export interface SourcingRequest {
@@ -94,6 +120,12 @@ export interface SourcingRequest {
   conciergeNotes: SourcingNote[];
   foundOptions: SourcingOption[];
   selectedOptionId?: string;
+  messages?: SourcingMessage[];
+  timeline?: SourcingTimelineEvent[];
+  clientApprovalRequired?: boolean;
+  category?: string;
+  specifications?: string;
+  priority?: 'standard' | 'urgent' | 'when_available';
   createdAt: string;
   updatedAt: string;
 }
@@ -123,6 +155,44 @@ export interface BespokeTimelineStep {
   notes?: string;
 }
 
+export interface BespokeMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: 'client' | 'brand';
+  content: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
+  createdAt: string;
+}
+
+export interface BespokeDetailedSpec {
+  measurements?: {
+    chest?: number;
+    waist?: number;
+    hips?: number;
+    inseam?: number;
+    shoulders?: number;
+    sleeveLength?: number;
+    height?: number;
+    notes?: string;
+  };
+  fabricPreferences?: string;
+  colorPreferences?: string;
+  referenceImages?: string[];
+  specialInstructions?: string;
+  occasionContext?: string;
+  deliveryDeadline?: string;
+}
+
+export interface BespokeTimelineEvent {
+  id: string;
+  status: BespokeOrderStatus;
+  note: string;
+  updatedBy: 'brand' | 'system';
+  createdAt: string;
+}
+
 export interface BespokeOrder {
   id: string;
   brandId: string;
@@ -142,6 +212,13 @@ export interface BespokeOrder {
   progressImages: string[];
   createdAt: string;
   updatedAt: string;
+  // Bespoke flow fields
+  messages?: BespokeMessage[];
+  detailedSpec?: BespokeDetailedSpec;
+  timelineEvents?: BespokeTimelineEvent[];
+  brandNotes?: string;
+  clientApprovalRequired?: boolean;
+  clientApproved?: boolean;
 }
 
 // ============================================
@@ -163,6 +240,9 @@ export interface PrivateCollection {
   releaseDate: string;
   invitationRequired: boolean;
   hasAccess: boolean;
+  accessRequests?: CollectionAccessRequest[];
+  invitedClients?: string[];
+  deletedAt?: string;
 }
 
 // ============================================
@@ -209,16 +289,22 @@ export interface UHNIProfile {
 
 export type NegotiationStatus = 'pending' | 'approved' | 'counter_offered' | 'declined' | 'accepted';
 
+export type NegotiationAction = 'approve' | 'decline' | 'counter';
+
 export interface PriceNegotiation {
   id: string;
   productId: string;
   productName: string;
   productImage: string;
+  productSlug?: string;
   brandName: string;
   originalPrice: number;
   proposedPrice: number;
   counterOffer?: number;
   status: NegotiationStatus;
+  clientMessage?: string;
+  brandMessage?: string;
+  respondedAt?: string;
   conciergeNotes: string[];
   createdAt: string;
   expiresAt: string;
@@ -236,6 +322,15 @@ export interface UHNIPriceOffer {
   validUntil: string;
   claimed: boolean;
   conditions?: string[];
+  targetClientIds?: string[];
+  isPrivate?: boolean;
+  claimedBy?: string[];
+  claimedCount?: number;
+  maxClaims?: number;
+  originalPrice?: number;
+  productSlug?: string;
+  brandName?: string;
+  productImage?: string;
 }
 
 export interface UHNIPriceAlert {
@@ -453,7 +548,7 @@ export interface InvisibleTransaction {
 
 export type ConciergeTaskType = 'styling' | 'sourcing' | 'delivery' | 'reservation' | 'alteration';
 export type ConciergeTaskStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
-export type ConciergeTaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type ConciergeTaskPriority = 'low' | 'normal' | 'medium' | 'high' | 'urgent';
 
 export interface ConciergeTask {
   id: string;
@@ -468,6 +563,36 @@ export interface ConciergeTask {
   clientInstructions?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// Concierge Appointments
+export type AppointmentType = 'styling_session' | 'private_viewing' | 'consultation' | 'fitting' | 'video_call' | 'phone_call';
+export type AppointmentStatus = 'upcoming' | 'completed' | 'cancelled' | 'rescheduled';
+
+export interface ConciergeAppointment {
+  id: string;
+  type: AppointmentType;
+  title: string;
+  date: string;
+  time: string;
+  duration: number; // minutes
+  durationMinutes?: number; // alias for duration
+  scheduledAt?: string; // ISO datetime string (computed from date+time if not provided)
+  notes?: string;
+  status: AppointmentStatus;
+  conciergeId: string;
+  conciergeName: string;
+  createdAt: string;
+  meetingLink?: string; // for video_call appointments
+}
+
+export interface ConciergeTaskInput {
+  title: string;
+  description: string;
+  type: ConciergeTaskType;
+  priority: ConciergeTaskPriority;
+  dueDate: string;
+  clientInstructions?: string;
 }
 
 // ============================================
@@ -488,4 +613,52 @@ export interface SilentCommerceItem {
   context: string;
   displayMode: DisplayMode;
   relevanceScore: number;
+}
+
+// ============================================
+// Collection Invitation & Access Request Types
+// ============================================
+
+export interface CollectionInvitation {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  brandName: string;
+  brandId: string;
+  sentAt: string;
+  expiresAt: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  message?: string;
+}
+
+export interface CollectionAccessRequest {
+  id: string;
+  collectionId: string;
+  clientId: string;
+  clientName: string;
+  clientTier: string;
+  requestedAt: string;
+  status: 'pending' | 'approved' | 'denied';
+  reviewedAt?: string;
+  reviewNote?: string;
+}
+
+// ============================================
+// Claimed Offers
+// ============================================
+
+export interface ClaimedOffer {
+  id: string;
+  offerId: string;
+  offerTitle: string;
+  brandName: string;
+  productId?: string;
+  productName?: string;
+  productSlug?: string;
+  originalPrice: number;
+  discountedPrice: number;
+  discountLabel: string;
+  claimedAt: string;
+  expiresAt: string;
+  status: 'active' | 'used' | 'expired';
 }

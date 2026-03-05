@@ -56,6 +56,11 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     isInCart,
     refreshWishlist,
     refreshCart,
+    isUHNI,
+    createNegotiation,
+    pricingTier,
+    priceAlerts,
+    createPriceAlert,
   } = useApp();
 
   // UI State
@@ -90,6 +95,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const watchingRestock = hasRestockAlert(product.id);
   const inWardrobe = isInWardrobe(product.id);
   const inCart = isInCart(product.id);
+  const hasPriceAlert = priceAlerts.some(alert => alert.productId === product.id && alert.isActive);
 
   // Track the wishlist_id for the current product (for removal)
   const [wishlistItemId, setWishlistItemId] = useState<string | null>(null);
@@ -259,6 +265,32 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     }
   }, [product, showToast]);
 
+  const handleNegotiatePrice = useCallback((proposedPrice: number, message: string) => {
+    createNegotiation({
+      productId: product.id,
+      productName: product.name,
+      productImage: product.images[0]?.url || '',
+      productSlug: product.slug,
+      brandName: product.brandName,
+      originalPrice: product.price,
+      proposedPrice,
+      clientMessage: message,
+    });
+  }, [product, createNegotiation]);
+
+  const handleSetPriceAlert = useCallback((targetPrice: number) => {
+    createPriceAlert({
+      productId: product.id,
+      productName: product.name,
+      productSlug: product.slug,
+      productImage: product.images[0]?.url,
+      brandName: product.brandName,
+      currentPrice: product.price,
+      targetPrice,
+      currency: 'EUR',
+    });
+  }, [product, createPriceAlert]);
+
   const handleSizeSelect = useCallback((size: string) => {
     setSelectedSize(size);
     setSizeError(false);
@@ -357,8 +389,13 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     handleRemoveFromWardrobe,
     handleNotifyRestock,
     handleShare,
+    handleNegotiatePrice,
+    handleSetPriceAlert,
     showToast,
-    wardrobe
+    wardrobe,
+    isUHNI,
+    pricingTier,
+    hasPriceAlert,
   };
 }
 

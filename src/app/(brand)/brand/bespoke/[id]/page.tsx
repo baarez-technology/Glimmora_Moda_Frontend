@@ -16,7 +16,9 @@ import {
   ChevronDown,
   FileText,
   Printer,
-  X
+  X,
+  Send,
+  DollarSign
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { useApp } from '@/context/AppContext';
@@ -26,11 +28,17 @@ import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/componen
 
 export default function BespokeOrderDetailPage() {
   const params = useParams();
-  const { getBespokeOrderById, updateBespokeOrderStatus, partner } = useBrand();
+  const { getBespokeOrderById, updateBespokeOrderStatus, updateBespokeStatus, sendBespokeMessage, updateBespokePrice, partner } = useBrand();
   const { showToast } = useApp();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
+  const [statusNote, setStatusNote] = useState('');
+  const [selectedNextStatus, setSelectedNextStatus] = useState<BespokeOrderStatus | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [priceInput, setPriceInput] = useState('');
+  const [depositPctInput, setDepositPctInput] = useState('50');
+  const [statusSuccess, setStatusSuccess] = useState(false);
 
   const orderId = params.id as string;
   const order = getBespokeOrderById(orderId);
@@ -126,6 +134,37 @@ export default function BespokeOrderDetailPage() {
     updateBespokeOrderStatus(order.id, newStatus);
     setShowStatusDropdown(false);
     setTimeout(() => setIsUpdating(false), 500);
+  };
+
+  const statusFlow: Record<BespokeOrderStatus, BespokeOrderStatus[]> = {
+    consultation: ['design_approval'],
+    design_approval: ['production'],
+    production: ['fitting'],
+    fitting: ['final_adjustments'],
+    final_adjustments: ['complete'],
+    complete: [],
+  };
+
+  const nextStatuses = statusFlow[order.status] || [];
+
+  const handleAdvancedStatusUpdate = () => {
+    if (!selectedNextStatus) return;
+    updateBespokeStatus(order.id, selectedNextStatus, statusNote || `Status updated to ${getStatusLabel(selectedNextStatus)}`);
+    if (priceInput && Number(priceInput) > 0) {
+      updateBespokePrice(order.id, Number(priceInput), Number(depositPctInput) || 50);
+    }
+    setSelectedNextStatus(null);
+    setStatusNote('');
+    setPriceInput('');
+    setStatusSuccess(true);
+    setTimeout(() => setStatusSuccess(false), 3000);
+  };
+
+  const handleSendMessage = () => {
+    if (!messageText.trim()) return;
+    sendBespokeMessage(order.id, messageText.trim());
+    setMessageText('');
+    showToast('Message sent', 'success');
   };
 
   const TypeIcon = getTypeIcon(order.type);
@@ -403,8 +442,231 @@ export default function BespokeOrderDetailPage() {
                 <p className="text-sm text-stone leading-relaxed">{order.description}</p>
               </div>
             </div>
+
+            {/* SECTION A — Update Order Status */}
+            {nextStatuses.length > 0 && (
+              <div className="bg-white border border-sand/50">
+                <div className="px-6 py-4 border-b border-sand/50">
+                  <h2 className="font-medium text-charcoal-deep">Update Order Status</h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div>
+                    <p className="text-xs text-taupe mb-2">Next Status</p>
+                    <div className="flex flex-wrap gap-2">
+                      {nextStatuses.map(ns => (
+                        <button
+                          key={ns}
+                          onClick={() => setSelectedNextStatus(ns)}
+                          className={`px-3 py-1.5 text-xs tracking-[0.1em] uppercase transition-colors ${
+                            selectedNextStatus === ns
+                              ? 'bg-charcoal-deep text-ivory-cream'
+                              : 'border border-sand text-stone hover:border-charcoal-deep'
+                          }`}
+                        >
+                          {getStatusLabel(ns)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-taupe mb-1">Status Note</p>
+                    <textarea
+                      value={statusNote}
+                      onChange={e => setStatusNote(e.target.value)}
+                      rows={2}
+                      placeholder="Add a note for this status change..."
+                      className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                    />
+                  </div>
+                  {(order.status === 'consultation' || order.status === 'design_approval') && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-taupe mb-1">Final Price (€)</p>
+                        <input
+                          type="number"
+                          min={0}
+                          value={priceInput}
+                          onChange={e => setPriceInput(e.target.value)}
+                          placeholder={String(order.price)}
+                          className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs text-taupe mb-1">Deposit %</p>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={depositPctInput}
+                          onChange={e => setDepositPctInput(e.target.value)}
+                          className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                        />
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleAdvancedStatusUpdate}
+                    disabled={!selectedNextStatus}
+                    className="w-full px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Update Status
+                  </button>
+                  {statusSuccess && (
+                    <p className="text-xs text-success text-center">Status updated successfully</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {/* SECTION B — Client Specifications */}
+        {order.detailedSpec && (
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Client Specifications</h2>
+            </div>
+            <div className="p-6 space-y-4">
+              {order.detailedSpec.measurements && (() => {
+                const m = order.detailedSpec!.measurements!;
+                const entries = Object.entries(m).filter(([k, v]) => k !== 'notes' && v !== undefined);
+                if (entries.length === 0) return null;
+                return (
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Measurements</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {entries.map(([key, val]) => (
+                        <div key={key} className="text-center p-2 bg-parchment/30">
+                          <p className="text-sm font-medium text-charcoal-deep">{String(val)}</p>
+                          <p className="text-[10px] text-taupe capitalize">{key.replace(/([A-Z])/g, ' $1')} cm</p>
+                        </div>
+                      ))}
+                    </div>
+                    {m.notes && <p className="text-xs text-stone mt-2 italic">{m.notes}</p>}
+                  </div>
+                );
+              })()}
+              {order.detailedSpec.fabricPreferences && (
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Fabric Preferences</p>
+                  <p className="text-sm text-stone">{order.detailedSpec.fabricPreferences}</p>
+                </div>
+              )}
+              {order.detailedSpec.colorPreferences && (
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Color Preferences</p>
+                  <p className="text-sm text-stone">{order.detailedSpec.colorPreferences}</p>
+                </div>
+              )}
+              {order.detailedSpec.occasionContext && (
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Occasion</p>
+                  <p className="text-sm text-stone">{order.detailedSpec.occasionContext}</p>
+                </div>
+              )}
+              {order.detailedSpec.specialInstructions && (
+                <div>
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Special Instructions</p>
+                  <p className="text-sm text-stone">{order.detailedSpec.specialInstructions}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!order.detailedSpec && (
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Client Specifications</h2>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-stone italic">No specifications provided — discuss at consultation</p>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION C — Client Communication */}
+        <div className="bg-white border border-sand/50">
+          <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
+            <Mail size={18} className="text-stone" />
+            <h2 className="font-medium text-charcoal-deep">Client Communication</h2>
+          </div>
+          <div className="p-6">
+            {(!order.messages || order.messages.length === 0) ? (
+              <p className="text-sm text-stone italic mb-4">No messages yet. Send a message to the client below.</p>
+            ) : (
+              <div className="space-y-3 max-h-64 overflow-y-auto mb-4">
+                {order.messages.map(msg => (
+                  <div
+                    key={msg.id}
+                    className={`p-3 max-w-[80%] ${
+                      msg.senderRole === 'brand'
+                        ? 'ml-auto bg-charcoal-deep text-ivory-cream'
+                        : 'bg-parchment text-charcoal-deep'
+                    }`}
+                  >
+                    <p className="text-xs font-medium mb-1 opacity-70">{msg.senderName}</p>
+                    <p className="text-sm">{msg.content}</p>
+                    <p className="text-xs opacity-50 mt-1">
+                      {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <textarea
+                value={messageText}
+                onChange={e => setMessageText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); } }}
+                rows={2}
+                placeholder="Type a message to the client..."
+                className="flex-1 border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!messageText.trim()}
+                className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors self-end disabled:opacity-40"
+              >
+                <Send size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* SECTION D — Timeline Events */}
+        {order.timelineEvents && order.timelineEvents.length > 0 && (
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Status History</h2>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {order.timelineEvents.map(event => (
+                  <div key={event.id} className="flex items-start gap-3">
+                    <div className="w-2 h-2 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-charcoal-deep">
+                          {getStatusLabel(event.status)}
+                        </p>
+                        <span className="px-1.5 py-0.5 text-[9px] tracking-[0.1em] uppercase bg-parchment text-taupe">
+                          {event.updatedBy}
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone mt-0.5">{event.note}</p>
+                      <p className="text-xs text-taupe mt-0.5">
+                        {new Date(event.createdAt).toLocaleDateString('en-US', {
+                          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Invoice Modal */}

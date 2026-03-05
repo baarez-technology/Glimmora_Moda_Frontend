@@ -436,9 +436,9 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               invoiceDate={order.createdAt}
               orderType="standard"
               brandName={order.items[0]?.product.brandName || 'ModaGlimmora'}
-              buyerName={order.customerName || 'Valued Client'}
-              buyerEmail={order.customerEmail || ''}
-              buyerAddress={order.shippingAddress || ''}
+              buyerName="Valued Client"
+              buyerEmail=""
+              buyerAddress=""
               items={order.items.map(item => ({
                 description: item.product.name,
                 detail: [
@@ -449,6 +449,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 unitPrice: item.product.price,
                 currency: 'EUR',
               }))}
+              // TODO: fetch brand commerce settings via API when available
               subtotal={order.total}
               shippingAmount={0}
               taxRate={0.20}

@@ -128,12 +128,17 @@ export {
   type SourcingRequestStatus,
   type SourcingNote,
   type SourcingOption,
+  type SourcingMessage,
+  type SourcingTimelineEvent,
   type SourcingRequest,
   type BespokeOrderType,
   type BespokeOrderStatus,
   type BespokeSpecification,
   type BespokeTimelineStep,
   type BespokeOrder,
+  type BespokeMessage,
+  type BespokeDetailedSpec,
+  type BespokeTimelineEvent,
   type PrivateCollectionAccess,
   type PrivateCollection,
   type AutonomousActivityType,
@@ -141,6 +146,7 @@ export {
   type UHNIProfile,
   // Pricing & Negotiation
   type NegotiationStatus,
+  type NegotiationAction,
   type PriceNegotiation,
   type UHNIPriceOffer,
   type UHNIPriceAlert,
@@ -175,10 +181,20 @@ export {
   type ConciergeTaskStatus,
   type ConciergeTaskPriority,
   type ConciergeTask,
+  // Concierge Appointments
+  type AppointmentType,
+  type AppointmentStatus,
+  type ConciergeAppointment,
+  type ConciergeTaskInput,
   // Silent Commerce (U16)
   type AwarenessLevel,
   type DisplayMode,
-  type SilentCommerceItem
+  type SilentCommerceItem,
+  // Collection Invitation & Access
+  type CollectionInvitation,
+  type CollectionAccessRequest,
+  // Claimed Offers
+  type ClaimedOffer
 } from './uhni';
 
 // ============================================

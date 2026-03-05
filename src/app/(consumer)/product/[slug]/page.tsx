@@ -112,6 +112,11 @@ function ProductPageContent({ product }: { product: Product }) {
               onShowConcierge={() => state.setShowConcierge(true)}
               onShowIV={() => state.setShowIV(true)}
               onShowViewOnMe={() => state.setShowViewOnMe(true)}
+              isUHNI={state.isUHNI}
+              onNegotiatePrice={state.handleNegotiatePrice}
+              pricingTier={state.pricingTier}
+              hasPriceAlert={state.hasPriceAlert}
+              onSetPriceAlert={state.handleSetPriceAlert}
             />
 
             <ProductIntelligencePanel

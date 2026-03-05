@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import type {
   BrandPartner,
   BrandProduct,
@@ -12,18 +12,28 @@ import type {
   RecentActivity,
   HeritageEvent,
   BrandStory,
-  StylingSession
+  StylingSession,
+  CommerceSettings,
+  TaxRule,
+  ShippingMethod
 } from '@/types/brand-portal';
 import type {
   BespokeOrder,
   BespokeOrderStatus,
+  BespokeMessage,
+  BespokeTimelineEvent,
   PriceNegotiation,
   NegotiationStatus,
   PrivateCollection,
   SourcingRequest,
+  SourcingRequestStatus,
+  SourcingOption,
+  SourcingMessage,
   UHNIPriceOffer
 } from '@/types/uhni';
 import * as brandPortalService from '@/services/brand-portal.service';
+import { addSharedOffer } from '@/lib/shared-store';
+import { getSharedSessions, addSharedSession as addSessionToStore, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
 import type { BrandLoginResponse } from '@/services/auth.service';
 import { brandLogout as clearBrandTokens } from '@/services/auth.service';
 
@@ -109,17 +119,24 @@ interface BrandContextType {
   bespokeOrders: BespokeOrder[];
   getBespokeOrderById: (id: string) => BespokeOrder | undefined;
   updateBespokeOrderStatus: (id: string, status: BespokeOrderStatus) => void;
+  updateBespokeStatus: (orderId: string, newStatus: BespokeOrderStatus, note: string) => void;
+  sendBespokeMessage: (orderId: string, content: string) => void;
+  updateBespokePrice: (orderId: string, price: number, depositPercentage: number) => void;
 
   priceNegotiations: PriceNegotiation[];
   getNegotiationById: (id: string) => PriceNegotiation | undefined;
-  submitCounterOffer: (id: string, amount: number) => void;
-  approveNegotiation: (id: string) => void;
-  declineNegotiation: (id: string) => void;
+  submitCounterOffer: (id: string, amount: number, brandMessage?: string) => void;
+  approveNegotiation: (id: string, brandMessage?: string) => void;
+  declineNegotiation: (id: string, brandMessage?: string) => void;
 
   privateCollections: PrivateCollection[];
   getPrivateCollectionById: (id: string) => PrivateCollection | undefined;
   createPrivateCollection: (collection: Omit<PrivateCollection, 'id'>) => PrivateCollection;
   updatePrivateCollection: (id: string, updates: Partial<PrivateCollection>) => void;
+  deletePrivateCollection: (collectionId: string) => void;
+  sendCollectionInvitation: (collectionId: string, clientIds: string[], message?: string) => void;
+  approveAccessRequest: (collectionId: string, requestId: string, reviewNote?: string) => void;
+  denyAccessRequest: (collectionId: string, requestId: string, reviewNote?: string) => void;
 
   sourcingRequests: SourcingRequest[];
   getSourcingRequestById: (id: string) => SourcingRequest | undefined;
@@ -130,6 +147,10 @@ interface BrandContextType {
     source?: string;
     conciergeRecommendation?: string;
   }) => void;
+  updateSourcingStatus: (requestId: string, newStatus: SourcingRequestStatus, note: string) => void;
+  addSourcingOption: (requestId: string, option: Omit<SourcingOption, 'id' | 'addedAt' | 'source' | 'condition' | 'images'>) => void;
+  removeSourcingOption: (requestId: string, optionId: string) => void;
+  sendSourcingMessage: (requestId: string, content: string) => void;
 
   heritageEvents: HeritageEvent[];
   getHeritageEventById: (id: string) => HeritageEvent | undefined;
@@ -149,8 +170,16 @@ interface BrandContextType {
 
   stylingSessions: StylingSession[];
   getStylingSessionById: (id: string) => StylingSession | undefined;
-  updateStylingSessionStatus: (id: string, status: StylingSession['status']) => void;
+  updateStylingSessionStatus: (id: string, status: StylingSession['status'], extras?: Partial<StylingSession>) => void;
   createStylingSession: (session: Omit<StylingSession, 'id'>) => void;
+
+  // Commerce Settings
+  commerceSettings: CommerceSettings;
+  updateTaxRule: (ruleId: string, updates: Partial<TaxRule>) => void;
+  updateShippingMethod: (methodId: string, updates: Partial<ShippingMethod>) => void;
+  addShippingMethod: (method: Omit<ShippingMethod, 'id'>) => void;
+  removeShippingMethod: (methodId: string) => void;
+  updateCommerceConfig: (updates: Partial<CommerceSettings>) => void;
 
   // Auth
   loginAsBrand: (data: BrandLoginResponse) => void;
@@ -182,6 +211,102 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
   const [uhniOffers, setUhniOffers] = useState<UHNIPriceOffer[]>([]);
   const [stylingSessions, setStylingSessions] = useState<StylingSession[]>([]);
+  const [sharedSessionsList, setSharedSessionsList] = useState<StylingSession[]>(getSharedSessions());
+
+  useEffect(() => {
+    const unsubscribe = subscribeToSessions(sessions => {
+      setSharedSessionsList(sessions);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Merge API-loaded sessions with shared store sessions (deduplicated by id)
+  const mergedStylingSessions = useMemo(() => {
+    const ids = new Set(stylingSessions.map(s => s.id));
+    const merged = [...stylingSessions];
+    for (const s of sharedSessionsList) {
+      if (!ids.has(s.id)) merged.push(s);
+    }
+    return merged;
+  }, [stylingSessions, sharedSessionsList]);
+
+  // Commerce Settings
+  const [commerceSettings, setCommerceSettings] = useState<CommerceSettings>({
+    taxRules: [
+      {
+        id: 'tax-eu',
+        regionName: 'European Union',
+        countryCode: 'EU',
+        taxRate: 20,
+        taxLabel: 'VAT',
+        isEnabled: true,
+        includeInPrice: true
+      },
+      {
+        id: 'tax-us',
+        regionName: 'United States',
+        countryCode: 'US',
+        taxRate: 0,
+        taxLabel: 'Sales Tax',
+        isEnabled: false,
+        includeInPrice: false
+      },
+      {
+        id: 'tax-ae',
+        regionName: 'UAE',
+        countryCode: 'AE',
+        taxRate: 5,
+        taxLabel: 'VAT',
+        isEnabled: false,
+        includeInPrice: false
+      },
+      {
+        id: 'tax-uk',
+        regionName: 'United Kingdom',
+        countryCode: 'UK',
+        taxRate: 20,
+        taxLabel: 'VAT',
+        isEnabled: false,
+        includeInPrice: true
+      }
+    ],
+    shippingMethods: [
+      {
+        id: 'ship-complimentary',
+        name: 'Complimentary Delivery',
+        carrier: 'Private Courier',
+        estimatedDays: '5-7 business days',
+        baseRate: 0,
+        freeAbove: 0,
+        isEnabled: true,
+        regions: []
+      },
+      {
+        id: 'ship-express',
+        name: 'Express Delivery',
+        carrier: 'DHL Express',
+        estimatedDays: '1-2 business days',
+        baseRate: 45,
+        freeAbove: 5000,
+        isEnabled: true,
+        regions: []
+      },
+      {
+        id: 'ship-white-glove',
+        name: 'White Glove Delivery',
+        carrier: 'Private Concierge',
+        estimatedDays: 'Scheduled',
+        baseRate: 150,
+        freeAbove: 0,
+        isEnabled: false,
+        regions: []
+      }
+    ],
+    freeShippingThreshold: 1000,
+    returnWindowDays: 30,
+    returnPolicy: 'Items may be returned within 30 days of delivery in original condition with tags attached. Bespoke orders are non-refundable.',
+    defaultCurrency: 'EUR'
+  });
 
   // Load all brand data from service
   const loadBrandData = useCallback(async () => {
@@ -395,27 +520,91 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     brandPortalService.updateBespokeOrderStatus(id, status).catch(console.error);
   }, []);
 
+  const updateBespokeStatus = useCallback((orderId: string, newStatus: BespokeOrderStatus, note: string) => {
+    setBespokeOrders(prev =>
+      prev.map(order => {
+        if (order.id !== orderId) return order;
+        const timelineEvent: BespokeTimelineEvent = {
+          id: `tl-${Date.now()}`,
+          status: newStatus,
+          note,
+          updatedBy: 'brand',
+          createdAt: new Date().toISOString(),
+        };
+        // Also update the existing BespokeTimelineStep[] for visual timeline
+        const statusOrder: BespokeOrderStatus[] = ['consultation', 'design_approval', 'production', 'fitting', 'final_adjustments', 'complete'];
+        const newStatusIndex = statusOrder.indexOf(newStatus);
+        const updatedTimeline = order.timeline.map(step => {
+          const stepIndex = statusOrder.indexOf(step.stage);
+          if (stepIndex < newStatusIndex) {
+            return { ...step, status: 'completed' as const, completedAt: step.completedAt || new Date().toISOString() };
+          }
+          if (step.stage === newStatus) {
+            return { ...step, status: 'current' as const };
+          }
+          return { ...step, status: 'upcoming' as const };
+        });
+        return {
+          ...order,
+          status: newStatus,
+          timeline: updatedTimeline,
+          timelineEvents: [...(order.timelineEvents || []), timelineEvent],
+          clientApprovalRequired: newStatus === 'design_approval',
+          updatedAt: new Date().toISOString(),
+        };
+      })
+    );
+  }, []);
+
+  const sendBespokeMessage = useCallback((orderId: string, content: string) => {
+    const newMessage: BespokeMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: 'brand-user',
+      senderName: 'Brand Atelier',
+      senderRole: 'brand',
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    setBespokeOrders(prev =>
+      prev.map(order =>
+        order.id === orderId
+          ? { ...order, messages: [...(order.messages || []), newMessage] }
+          : order
+      )
+    );
+  }, []);
+
+  const updateBespokePrice = useCallback((orderId: string, price: number, depositPercentage: number) => {
+    setBespokeOrders(prev =>
+      prev.map(order =>
+        order.id === orderId
+          ? { ...order, price, depositPercentage, updatedAt: new Date().toISOString() }
+          : order
+      )
+    );
+  }, []);
+
   const getNegotiationById = useCallback((id: string): PriceNegotiation | undefined => {
     return priceNegotiations.find(n => n.id === id);
   }, [priceNegotiations]);
 
-  const submitCounterOffer = useCallback((id: string, amount: number) => {
+  const submitCounterOffer = useCallback((id: string, amount: number, brandMessage?: string) => {
     setPriceNegotiations(prev => prev.map(n =>
-      n.id === id ? { ...n, counterOffer: amount, status: 'counter_offered' as NegotiationStatus } : n
+      n.id === id ? { ...n, counterOffer: amount, status: 'counter_offered' as NegotiationStatus, brandMessage: brandMessage || n.brandMessage, respondedAt: new Date().toISOString() } : n
     ));
     brandPortalService.submitCounterOffer(id, amount).catch(console.error);
   }, []);
 
-  const approveNegotiation = useCallback((id: string) => {
+  const approveNegotiation = useCallback((id: string, brandMessage?: string) => {
     setPriceNegotiations(prev => prev.map(n =>
-      n.id === id ? { ...n, status: 'approved' as NegotiationStatus } : n
+      n.id === id ? { ...n, status: 'approved' as NegotiationStatus, brandMessage: brandMessage || n.brandMessage, respondedAt: new Date().toISOString() } : n
     ));
     brandPortalService.approveNegotiation(id).catch(console.error);
   }, []);
 
-  const declineNegotiation = useCallback((id: string) => {
+  const declineNegotiation = useCallback((id: string, brandMessage?: string) => {
     setPriceNegotiations(prev => prev.map(n =>
-      n.id === id ? { ...n, status: 'declined' as NegotiationStatus } : n
+      n.id === id ? { ...n, status: 'declined' as NegotiationStatus, brandMessage: brandMessage || n.brandMessage, respondedAt: new Date().toISOString() } : n
     ));
     brandPortalService.declineNegotiation(id).catch(console.error);
   }, []);
@@ -439,6 +628,60 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       c.id === id ? { ...c, ...updates } : c
     ));
     brandPortalService.updatePrivateCollection(id, updates).catch(console.error);
+  }, []);
+
+  const deletePrivateCollection = useCallback((collectionId: string) => {
+    setPrivateCollections(prev => prev.filter(col => col.id !== collectionId));
+  }, []);
+
+  const sendCollectionInvitation = useCallback((collectionId: string, clientIds: string[], _message?: string) => {
+    setPrivateCollections(prev =>
+      prev.map(col =>
+        col.id === collectionId
+          ? {
+              ...col,
+              invitedClients: [
+                ...(col.invitedClients || []),
+                ...clientIds.filter(id => !(col.invitedClients || []).includes(id))
+              ]
+            }
+          : col
+      )
+    );
+  }, []);
+
+  const approveAccessRequest = useCallback((collectionId: string, requestId: string, reviewNote?: string) => {
+    setPrivateCollections(prev =>
+      prev.map(col =>
+        col.id === collectionId
+          ? {
+              ...col,
+              accessRequests: (col.accessRequests || []).map(req =>
+                req.id === requestId
+                  ? { ...req, status: 'approved' as const, reviewedAt: new Date().toISOString(), reviewNote: reviewNote || '' }
+                  : req
+              )
+            }
+          : col
+      )
+    );
+  }, []);
+
+  const denyAccessRequest = useCallback((collectionId: string, requestId: string, reviewNote?: string) => {
+    setPrivateCollections(prev =>
+      prev.map(col =>
+        col.id === collectionId
+          ? {
+              ...col,
+              accessRequests: (col.accessRequests || []).map(req =>
+                req.id === requestId
+                  ? { ...req, status: 'denied' as const, reviewedAt: new Date().toISOString(), reviewNote: reviewNote || '' }
+                  : req
+              )
+            }
+          : col
+      )
+    );
   }, []);
 
   const getSourcingRequestById = useCallback((id: string): SourcingRequest | undefined => {
@@ -476,6 +719,90 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       condition: option.condition,
       source: option.source,
     }).catch(console.error);
+  }, []);
+
+  const updateSourcingStatus = useCallback((requestId: string, newStatus: SourcingRequestStatus, note: string) => {
+    setSourcingRequests(prev =>
+      prev.map(req => {
+        if (req.id !== requestId) return req;
+        return {
+          ...req,
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+          timeline: [
+            ...(req.timeline || []),
+            {
+              id: `tl-${Date.now()}`,
+              status: newStatus,
+              note,
+              updatedBy: 'brand' as const,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        };
+      })
+    );
+  }, []);
+
+  const addSourcingOption = useCallback((requestId: string, option: Omit<SourcingOption, 'id' | 'addedAt' | 'source' | 'condition' | 'images'>) => {
+    const newOption: SourcingOption = {
+      ...option,
+      id: `opt-${Date.now()}`,
+      addedAt: new Date().toISOString(),
+      customDescription: option.title || option.customDescription || '',
+      source: option.sourceLocation || 'Brand Inventory',
+      condition: 'new',
+      images: option.imageUrl ? [option.imageUrl] : [],
+    };
+    setSourcingRequests(prev =>
+      prev.map(req => {
+        if (req.id !== requestId) return req;
+        return {
+          ...req,
+          foundOptions: [...req.foundOptions, newOption],
+          status: 'options_found' as SourcingRequestStatus,
+          updatedAt: new Date().toISOString(),
+          timeline: [
+            ...(req.timeline || []),
+            {
+              id: `tl-${Date.now()}`,
+              status: 'options_found' as SourcingRequestStatus,
+              note: `Option added: ${option.title || option.customDescription || 'New option'}`,
+              updatedBy: 'brand' as const,
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        };
+      })
+    );
+  }, []);
+
+  const removeSourcingOption = useCallback((requestId: string, optionId: string) => {
+    setSourcingRequests(prev =>
+      prev.map(req =>
+        req.id === requestId
+          ? { ...req, foundOptions: req.foundOptions.filter(o => o.id !== optionId) }
+          : req
+      )
+    );
+  }, []);
+
+  const sendSourcingMessage = useCallback((requestId: string, content: string) => {
+    const newMessage: SourcingMessage = {
+      id: `msg-${Date.now()}`,
+      senderId: 'brand-user',
+      senderName: 'Sourcing Team',
+      senderRole: 'brand',
+      content,
+      createdAt: new Date().toISOString(),
+    };
+    setSourcingRequests(prev =>
+      prev.map(req =>
+        req.id === requestId
+          ? { ...req, messages: [...(req.messages || []), newMessage] }
+          : req
+      )
+    );
   }, []);
 
   const getHeritageEventById = useCallback((id: string): HeritageEvent | undefined => {
@@ -547,6 +874,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       id: `offer-${Date.now()}`
     };
     setUhniOffers(prev => [newOffer, ...prev]);
+    addSharedOffer(newOffer);
     brandPortalService.createUHNIOffer(offer).catch(console.error);
     return newOffer;
   }, []);
@@ -555,10 +883,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     return stylingSessions.find(s => s.id === id);
   }, [stylingSessions]);
 
-  const updateStylingSessionStatus = useCallback((id: string, status: StylingSession['status']) => {
+  const updateStylingSessionStatus = useCallback((id: string, status: StylingSession['status'], extras?: Partial<StylingSession>) => {
     setStylingSessions(prev => prev.map(s =>
-      s.id === id ? { ...s, status, updatedAt: new Date().toISOString() } : s
+      s.id === id ? { ...s, ...extras, status, updatedAt: new Date().toISOString() } : s
     ));
+    updateSharedSessionStatus(id, status, extras);
     brandPortalService.updateStylingSessionStatus(id, status).catch(console.error);
   }, []);
 
@@ -568,7 +897,51 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       id: `styling-${Date.now()}`
     };
     setStylingSessions(prev => [newSession, ...prev]);
+    addSessionToStore(newSession);
     brandPortalService.createStylingSession(session).catch(console.error);
+  }, []);
+
+  // ============================================
+  // Commerce Settings
+  // ============================================
+
+  const updateTaxRule = useCallback((ruleId: string, updates: Partial<TaxRule>) => {
+    setCommerceSettings(prev => ({
+      ...prev,
+      taxRules: prev.taxRules.map(rule =>
+        rule.id === ruleId ? { ...rule, ...updates } : rule
+      )
+    }));
+  }, []);
+
+  const updateShippingMethod = useCallback((methodId: string, updates: Partial<ShippingMethod>) => {
+    setCommerceSettings(prev => ({
+      ...prev,
+      shippingMethods: prev.shippingMethods.map(method =>
+        method.id === methodId ? { ...method, ...updates } : method
+      )
+    }));
+  }, []);
+
+  const addShippingMethod = useCallback((method: Omit<ShippingMethod, 'id'>) => {
+    setCommerceSettings(prev => ({
+      ...prev,
+      shippingMethods: [
+        ...prev.shippingMethods,
+        { ...method, id: `ship-${Date.now()}` }
+      ]
+    }));
+  }, []);
+
+  const removeShippingMethod = useCallback((methodId: string) => {
+    setCommerceSettings(prev => ({
+      ...prev,
+      shippingMethods: prev.shippingMethods.filter(m => m.id !== methodId)
+    }));
+  }, []);
+
+  const updateCommerceConfig = useCallback((updates: Partial<CommerceSettings>) => {
+    setCommerceSettings(prev => ({ ...prev, ...updates }));
   }, []);
 
   return (
@@ -600,6 +973,9 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         bespokeOrders,
         getBespokeOrderById,
         updateBespokeOrderStatus,
+        updateBespokeStatus,
+        sendBespokeMessage,
+        updateBespokePrice,
         priceNegotiations,
         getNegotiationById,
         submitCounterOffer,
@@ -609,9 +985,17 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         getPrivateCollectionById,
         createPrivateCollection,
         updatePrivateCollection,
+        deletePrivateCollection,
+        sendCollectionInvitation,
+        approveAccessRequest,
+        denyAccessRequest,
         sourcingRequests,
         getSourcingRequestById,
         submitSourcingOption,
+        updateSourcingStatus,
+        addSourcingOption,
+        removeSourcingOption,
+        sendSourcingMessage,
         heritageEvents,
         getHeritageEventById,
         createHeritageEvent,
@@ -625,10 +1009,17 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         uhniOffers,
         getUHNIOfferById,
         createUHNIOffer,
-        stylingSessions,
+        stylingSessions: mergedStylingSessions,
         getStylingSessionById,
         updateStylingSessionStatus,
         createStylingSession,
+        // Commerce Settings
+        commerceSettings,
+        updateTaxRule,
+        updateShippingMethod,
+        addShippingMethod,
+        removeShippingMethod,
+        updateCommerceConfig,
         // Auth
         loginAsBrand,
         logout,
