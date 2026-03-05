@@ -12,8 +12,8 @@ function UHNILoginRedirect() {
     // Redirect to unified login page, preserving any redirect parameter
     const redirect = searchParams.get('redirect');
     const targetUrl = redirect
-      ? `/auth/login?redirect=${encodeURIComponent(redirect)}`
-      : '/auth/login';
+      ? `/auth/login?mode=uhni&redirect=${encodeURIComponent(redirect)}`
+      : '/auth/login?mode=uhni';
 
     router.replace(targetUrl);
   }, [router, searchParams]);
