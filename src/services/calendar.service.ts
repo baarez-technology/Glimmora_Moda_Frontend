@@ -281,6 +281,70 @@ export async function updateSuggestionPreferences(
   return res.json();
 }
 
+// ─── Backend outfit recommendation response types ────────────────────────────
+
+export interface BackendOutfitProduct {
+  product_id: string;
+  product_name: string;
+  brand_id: string;
+  brand_name: string;
+  sku: string;
+  status: string;
+  price: number;
+  offer_price: number;
+  discount_percentage: number;
+  sizes: string[];
+  collection_name: string;
+  product_category: string;
+  tagline: string;
+  product_description: string;
+  product_image: string;
+  occasions: string[];
+  aesthetics: string[];
+  color: string;
+  pattern: string;
+  fabrics: string;
+  image_urls: string[];
+  score: number;
+  is_wardrobe: boolean;
+}
+
+export interface BackendOutfitItem {
+  product_category: string;
+  color: string;
+  pattern: string;
+  fabrics: string;
+  suitable_product: BackendOutfitProduct;
+}
+
+export interface BackendOutfitRecommendation {
+  title: string;
+  description: string;
+  style_note: string;
+  outfit_suggestions: BackendOutfitItem[];
+  style_score: number;
+}
+
+/** Get AI outfit recommendations for a calendar event */
+export async function getOutfitRecommendations(
+  calendarEventId: string
+): Promise<BackendOutfitRecommendation> {
+  const res = await fetch(`/api/v1/calendar/events/outfit-recommendations`, {
+    method: 'POST',
+    headers: getUserAuthHeaders(),
+    body: JSON.stringify({ calendar_event_id: calendarEventId }),
+  });
+
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ detail: 'Failed to get outfit recommendations' }));
+    throw new Error(err.detail || `Outfit recommendations failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
 /** Disconnect a specific calendar provider */
 export async function disconnectCalendar(provider: string): Promise<void> {
   const res = await fetch(`/api/v1/calendar/disconnect?provider=${encodeURIComponent(provider)}`, {
