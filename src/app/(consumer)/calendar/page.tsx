@@ -80,8 +80,15 @@ export default function CalendarPage() {
   );
   const [isLoaded, setIsLoaded] = useState(false);
   const [calendarConnections, setCalendarConnections] = useState<CalendarConnection[]>([]);
-  // Local cache for outfit recommendations fetched via "Suggest Outfit" button
-  const [apiRecommendations, setApiRecommendations] = useState<Record<string, BackendOutfitRecommendation>>({});
+  // Session-cached outfit recommendations — persists across page navigations within the same session
+  const SESSION_KEY = 'moda-outfit-recommendations';
+  const [apiRecommendations, setApiRecommendations] = useState<Record<string, BackendOutfitRecommendation>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const cached = sessionStorage.getItem(SESSION_KEY);
+      return cached ? JSON.parse(cached) : {};
+    } catch { return {}; }
+  });
   const [loadingRecommendations, setLoadingRecommendations] = useState<string | null>(null);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
@@ -99,7 +106,11 @@ export default function CalendarPage() {
     setRecommendationError(null);
     calendarService.getOutfitRecommendations(eventId, regenerate)
       .then((rec) => {
-        setApiRecommendations(prev => ({ ...prev, [eventId]: rec }));
+        setApiRecommendations(prev => {
+          const updated = { ...prev, [eventId]: rec };
+          try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated)); } catch { /* full */ }
+          return updated;
+        });
       })
       .catch((err) => {
         setRecommendationError(err instanceof Error ? err.message : 'Failed to load recommendations');

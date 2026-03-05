@@ -6,11 +6,12 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Info, Layers, ChevronRight, RefreshCw } from 'lucide-react';
 import * as wardrobeService from '@/services/wardrobe.service';
-import { NotFoundError } from '@/services/wardrobe.service';
 import type { WardrobeGapAnalysisResponse } from '@/services/wardrobe.service';
 import { useAuth } from '@/context/AuthContext';
 
-type PageState = 'LOADING' | 'EMPTY' | 'ANALYSING' | 'RESULTS' | 'ERROR';
+const GAP_SESSION_KEY = 'moda-gap-analysis';
+
+type PageState = 'EMPTY' | 'ANALYSING' | 'RESULTS' | 'ERROR';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -31,31 +32,24 @@ export default function SilentCartPage() {
     if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/silent-cart');
   }, [isAuthenticated, isHydrated, router]);
 
-  const [pageState, setPageState] = useState<PageState>('LOADING');
-  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(null);
+  const [pageState, setPageState] = useState<PageState>(() => {
+    if (typeof window === 'undefined') return 'EMPTY';
+    try {
+      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
+      return cached ? 'RESULTS' : 'EMPTY';
+    } catch { return 'EMPTY'; }
+  });
+  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
   const [error, setError] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(true);
 
-  // Page load: GET /silent-cart (read cache, no computation)
-  useEffect(() => {
-    wardrobeService.getSilentCart()
-      .then((data) => {
-        setGapAnalysis(data);
-        setPageState('RESULTS');
-        setIsLoaded(true);
-      })
-      .catch((err) => {
-        if (err instanceof NotFoundError) {
-          setPageState('EMPTY');
-        } else {
-          setError(err instanceof Error ? err.message : 'Failed to load');
-          setPageState('ERROR');
-        }
-        setIsLoaded(true);
-      });
-  }, []);
-
-  // Run analysis (first time or refresh)
+  // Run analysis (first time or refresh) — caches in sessionStorage
   const runAnalysis = useCallback((regenerate: boolean) => {
     setPageState('ANALYSING');
     setError(null);
@@ -63,6 +57,7 @@ export default function SilentCartPage() {
       .then((data) => {
         setGapAnalysis(data);
         setPageState('RESULTS');
+        try { sessionStorage.setItem(GAP_SESSION_KEY, JSON.stringify(data)); } catch {}
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : 'Analysis failed');
@@ -106,15 +101,7 @@ export default function SilentCartPage() {
 
       <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
 
-        {/* State: LOADING */}
-        {pageState === 'LOADING' && (
-          <div className="py-20 flex flex-col items-center justify-center gap-4">
-            <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-stone">Loading your silent cart...</p>
-          </div>
-        )}
-
-        {/* State: EMPTY (404 — never run or wardrobe changed) */}
+        {/* State: EMPTY (no analysis yet — click to trigger) */}
         {pageState === 'EMPTY' && (
           <div className="text-center py-16 bg-white border border-sand">
             <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
@@ -338,8 +325,8 @@ export default function SilentCartPage() {
           </>
         )}
 
-        {/* Info Box — always visible except during loading */}
-        {pageState !== 'LOADING' && (
+        {/* Info Box — always visible */}
+        {(
           <div className="mt-10 flex items-start gap-4 p-6 bg-parchment border border-sand text-sm">
             <Info size={18} className="text-stone flex-shrink-0 mt-0.5" />
             <div className="text-stone">

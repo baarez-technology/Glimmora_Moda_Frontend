@@ -8,7 +8,6 @@ import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal
 import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as wardrobeService from '@/services/wardrobe.service';
-import { NotFoundError } from '@/services/wardrobe.service';
 import type { WardrobeGapAnalysisResponse, GapAnalysisItem } from '@/services/wardrobe.service';
 
 export default function WardrobePage() {
@@ -20,7 +19,15 @@ export default function WardrobePage() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortBy, setSortBy] = useState<'recent' | 'brand' | 'worn'>('recent');
   const [showClearAll, setShowClearAll] = useState(false);
-  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(null);
+  const GAP_SESSION_KEY = 'moda-gap-analysis';
+
+  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
   const [gapLoading, setGapLoading] = useState(false);
   const [gapError, setGapError] = useState<string | null>(null);
   const [selectedGap, setSelectedGap] = useState<GapAnalysisItem | null>(null);
@@ -44,26 +51,14 @@ export default function WardrobePage() {
     };
   }, [selectedGap]);
 
-  // Auto-fetch gap analysis on page load via GET /silent-cart (cached, no computation)
-  useEffect(() => {
-    if (isUHNI) return;
-    setGapLoading(true);
-    wardrobeService.getSilentCart()
-      .then(setGapAnalysis)
-      .catch((err) => {
-        // 404 = no cache, that's fine — show the "Analyze" CTA
-        if (!(err instanceof NotFoundError)) {
-          setGapError(err instanceof Error ? err.message : 'Failed to load wardrobe gaps');
-        }
-      })
-      .finally(() => setGapLoading(false));
-  }, [isUHNI]);
-
   const fetchGapAnalysis = (regenerate = false) => {
     setGapLoading(true);
     setGapError(null);
     wardrobeService.getWardrobeGapAnalysis(regenerate)
-      .then(setGapAnalysis)
+      .then((data) => {
+        setGapAnalysis(data);
+        try { sessionStorage.setItem(GAP_SESSION_KEY, JSON.stringify(data)); } catch {}
+      })
       .catch((err) => setGapError(err instanceof Error ? err.message : 'Failed to analyze wardrobe'))
       .finally(() => setGapLoading(false));
   };

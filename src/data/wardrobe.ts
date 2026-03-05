@@ -153,7 +153,7 @@ export function getMockOutfits(product: Product): CompleteOutfit[] {
     },
     {
       id: 'outfit-2',
-      name: 'Gallery Evening',
+      name: 'Evening Events',
       occasion: 'Art & Culture',
       description: 'An artistically sophisticated look for cultural events and gallery openings.',
       items: [

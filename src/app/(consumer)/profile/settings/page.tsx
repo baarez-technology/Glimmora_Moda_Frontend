@@ -483,6 +483,7 @@ export default function SettingsPage() {
                       await updateUserProfile({
                         notifications: { [item.apiKey]: newValue }
                       });
+                      showToast(`${item.label} ${newValue ? 'enabled' : 'disabled'}`, 'success');
                     } catch {
                       // Revert on failure
                       const reverted = { ...notifications };
@@ -493,18 +494,30 @@ export default function SettingsPage() {
                       setNotificationLoading(null);
                     }
                   }}
-                  className={`w-12 h-7 transition-colors relative ${
-                    notifications[item.id as keyof typeof notifications]
-                      ? 'bg-charcoal-deep'
-                      : 'bg-sand'
-                  } ${notificationLoading === item.id ? 'opacity-50' : ''}`}
+                  style={{
+                    position: 'relative',
+                    width: 48,
+                    height: 28,
+                    backgroundColor: notifications[item.id as keyof typeof notifications] ? '#2C2C2C' : '#C8B89A',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    transition: 'background-color 0.3s ease',
+                    opacity: notificationLoading === item.id ? 0.5 : 1,
+                  }}
                 >
                   <span
-                    className={`absolute top-1 w-5 h-5 bg-white transition-transform ${
-                      notifications[item.id as keyof typeof notifications]
-                        ? 'translate-x-6'
-                        : 'translate-x-1'
-                    }`}
+                    style={{
+                      position: 'absolute',
+                      top: 3,
+                      left: notifications[item.id as keyof typeof notifications] ? 23 : 3,
+                      width: 22,
+                      height: 22,
+                      backgroundColor: '#fff',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+                      transition: 'left 0.3s ease',
+                    }}
                   />
                 </button>
               </div>
