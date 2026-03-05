@@ -263,14 +263,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     persistWardrobe
   } = useWardrobeState({ showToast, safeLocalStorageSave });
 
-  // Calendar events loaded from service
+  // Calendar events loaded from service — prefer events with outfit suggestions when deduplicating
   const dedupeEvents = (events: CalendarEvent[]) => {
-    const seen = new Set<string>();
-    return events.filter(e => {
-      if (seen.has(e.id)) return false;
-      seen.add(e.id);
-      return true;
-    });
+    const map = new Map<string, CalendarEvent>();
+    for (const e of events) {
+      const existing = map.get(e.id);
+      if (!existing || (!existing.backendOutfitSuggestions && e.backendOutfitSuggestions)) {
+        map.set(e.id, e);
+      }
+    }
+    return Array.from(map.values());
   };
   const [baseCalendarEvents, setBaseCalendarEvents] = useState<CalendarEvent[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);

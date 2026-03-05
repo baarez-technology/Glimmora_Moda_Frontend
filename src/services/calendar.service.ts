@@ -8,6 +8,7 @@ import type {
   CalendarEvent,
   EventType,
   BackendCalendarEvent,
+  BackendOutfitRecommendation,
   CalendarConnectionStatus,
   ManualEventRequest,
   SuggestionPreferences,
@@ -117,7 +118,7 @@ export function mapBackendToFrontendEvent(
       : undefined;
 
   return {
-    id: ev.event_id,
+    id: ev.calendar_event_id,
     title: ev.title ? stripHtml(ev.title) : 'Untitled Event',
     eventType: inferEventType(ev.tags || []),
     date: ev.event_date,
@@ -126,7 +127,7 @@ export function mapBackendToFrontendEvent(
     venue: ev.location || undefined,
     description: ev.description ? stripHtml(ev.description) : undefined,
     weather,
-    // outfitSuggestions are generated client-side by AppContext
+    backendOutfitSuggestions: ev.outfit_suggestions || undefined,
   };
 }
 
@@ -281,55 +282,16 @@ export async function updateSuggestionPreferences(
   return res.json();
 }
 
-// ─── Backend outfit recommendation response types ────────────────────────────
-
-export interface BackendOutfitProduct {
-  product_id: string;
-  product_name: string;
-  brand_id: string;
-  brand_name: string;
-  sku: string;
-  status: string;
-  price: number;
-  offer_price: number;
-  discount_percentage: number;
-  sizes: string[];
-  collection_name: string;
-  product_category: string;
-  tagline: string;
-  product_description: string;
-  product_image: string;
-  occasions: string[];
-  aesthetics: string[];
-  color: string;
-  pattern: string;
-  fabrics: string;
-  image_urls: string[];
-  score: number;
-  is_wardrobe: boolean;
-}
-
-export interface BackendOutfitItem {
-  product_category: string;
-  color: string;
-  pattern: string;
-  fabrics: string;
-  suitable_product: BackendOutfitProduct;
-}
-
-export interface BackendOutfitRecommendation {
-  title: string;
-  description: string;
-  style_note: string;
-  outfit_suggestions: BackendOutfitItem[];
-  style_score: number;
-}
+// ─── Outfit Recommendations ─────────────────────────────────────────────────
 
 /** Get AI outfit recommendations for a calendar event */
 export async function getOutfitRecommendations(
-  calendarEventId: string
+  calendarEventId: string,
+  regenerate = false
 ): Promise<BackendOutfitRecommendation> {
-  const res = await fetch(`/api/v1/calendar/events/outfit-recommendations`, {
+  const url = `/api/v1/calendar/events/outfit-recommendations${regenerate ? '?regenerate=true' : ''}`;
+
+  const res = await fetch(url, {
     method: 'POST',
     headers: getUserAuthHeaders(),
     body: JSON.stringify({ calendar_event_id: calendarEventId }),

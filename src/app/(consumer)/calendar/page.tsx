@@ -23,9 +23,8 @@ import {
   Star
 } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
-import type { BackendOutfitRecommendation } from '@/services/calendar.service';
 import { useApp } from '@/context/AppContext';
-import type { CalendarConnection, EventType } from '@/types';
+import type { CalendarConnection, EventType, BackendOutfitRecommendation } from '@/types';
 import { PROVIDER_DISPLAY_NAMES } from '@/types';
 
 const eventTypeIcons: Record<EventType, React.ReactNode> = {
@@ -81,27 +80,25 @@ export default function CalendarPage() {
   );
   const [isLoaded, setIsLoaded] = useState(false);
   const [calendarConnections, setCalendarConnections] = useState<CalendarConnection[]>([]);
+  // Local cache for outfit recommendations fetched via "Suggest Outfit" button
   const [apiRecommendations, setApiRecommendations] = useState<Record<string, BackendOutfitRecommendation>>({});
   const [loadingRecommendations, setLoadingRecommendations] = useState<string | null>(null);
   const [recommendationError, setRecommendationError] = useState<string | null>(null);
 
-  // Get the selected event from the current calendarEvents (which updates when wardrobe changes)
   const selectedEvent = selectedEventId
     ? calendarEvents.find(e => e.id === selectedEventId) || calendarEvents[0] || null
     : calendarEvents[0] || null;
 
-  // Get the API recommendation for the selected event
-  const activeRecommendation = selectedEvent ? apiRecommendations[selectedEvent.id] : null;
+  // Resolve recommendation: prefer backend-cached (from event), then locally fetched
+  const activeRecommendation: BackendOutfitRecommendation | null = selectedEvent
+    ? (selectedEvent.backendOutfitSuggestions || apiRecommendations[selectedEvent.id] || null)
+    : null;
 
-  // Fetch outfit recommendations from API when an event is selected
-  useEffect(() => {
-    const eventId = selectedEvent?.id;
-    if (!eventId || apiRecommendations[eventId] || loadingRecommendations === eventId) return;
-
+  const fetchOutfitRecommendations = (eventId: string, regenerate = false) => {
     setLoadingRecommendations(eventId);
     setRecommendationError(null);
-    calendarService.getOutfitRecommendations(eventId)
-      .then((rec: BackendOutfitRecommendation) => {
+    calendarService.getOutfitRecommendations(eventId, regenerate)
+      .then((rec) => {
         setApiRecommendations(prev => ({ ...prev, [eventId]: rec }));
       })
       .catch((err) => {
@@ -110,7 +107,7 @@ export default function CalendarPage() {
       .finally(() => {
         setLoadingRecommendations(null);
       });
-  }, [selectedEvent?.id, apiRecommendations, loadingRecommendations]);
+  };
 
   useEffect(() => {
     if (isUHNI) { router.replace('/uhni/calendar'); return; }
@@ -238,15 +235,16 @@ export default function CalendarPage() {
 
               {calendarEvents.length > 0 ? (
                 <div className="space-y-4">
-                  {calendarEvents.map((event) => {
+                  {calendarEvents.map((event, index) => {
                     const dateInfo = formatDate(event.date);
                     const isSelected = selectedEvent?.id === event.id;
 
                     return (
                       <button
-                        key={event.id}
+                        key={`${event.id}-${index}`}
                         onClick={() => {
                           setSelectedEventId(event.id);
+                          setRecommendationError(null);
                         }}
                         className={`w-full text-left p-6 transition-all duration-300 ${
                           isSelected
@@ -407,12 +405,8 @@ export default function CalendarPage() {
                       <p className="text-stone text-sm mb-4">Could not load outfit recommendations.</p>
                       <button
                         onClick={() => {
-                          setApiRecommendations(prev => {
-                            const next = { ...prev };
-                            delete next[selectedEvent.id];
-                            return next;
-                          });
                           setRecommendationError(null);
+                          fetchOutfitRecommendations(selectedEvent.id);
                         }}
                         className="text-sm tracking-[0.15em] uppercase text-charcoal-deep hover:text-noir transition-colors"
                       >
@@ -421,10 +415,29 @@ export default function CalendarPage() {
                     </div>
                   )}
 
-                  {/* API Outfit Recommendation */}
+                  {/* Suggest Outfit Button — shown when no recommendations and not loading */}
+                  {!activeRecommendation && !loadingRecommendations && !recommendationError && (
+                    <div className="py-12 text-center bg-parchment">
+                      <Star size={32} className="mx-auto text-gold-muted mb-4" />
+                      <p className="text-stone text-sm mb-6">Get AI-powered outfit suggestions for this event.</p>
+                      <button
+                        onClick={() => fetchOutfitRecommendations(selectedEvent.id)}
+                        className="group inline-flex items-center gap-4"
+                      >
+                        <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
+                          Suggest Outfit
+                        </span>
+                        <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-300">
+                          <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors" />
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Outfit Recommendation Display */}
                   {activeRecommendation && (
                     <div>
-                      {/* Title & Score */}
+                      {/* Title, Score & Regenerate */}
                       <div className="flex items-end justify-between mb-6">
                         <div>
                           <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-2">
@@ -434,16 +447,25 @@ export default function CalendarPage() {
                             {activeRecommendation.title}
                           </h3>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <div className="w-24 h-1 bg-sand overflow-hidden">
-                            <div
-                              className="h-full bg-gold-muted"
-                              style={{ width: `${activeRecommendation.style_score}%` }}
-                            />
+                        <div className="flex items-center gap-4 flex-shrink-0">
+                          <div className="flex items-center gap-3">
+                            <div className="w-24 h-1 bg-sand overflow-hidden">
+                              <div
+                                className="h-full bg-gold-muted"
+                                style={{ width: `${activeRecommendation.style_score}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] tracking-[0.2em] uppercase text-taupe">
+                              {activeRecommendation.style_score}% match
+                            </span>
                           </div>
-                          <span className="text-[10px] tracking-[0.2em] uppercase text-taupe">
-                            {activeRecommendation.style_score}% match
-                          </span>
+                          <button
+                            onClick={() => fetchOutfitRecommendations(selectedEvent.id, true)}
+                            disabled={loadingRecommendations === selectedEvent.id}
+                            className="text-[10px] tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors disabled:opacity-50"
+                          >
+                            Regenerate
+                          </button>
                         </div>
                       </div>
 
@@ -456,6 +478,23 @@ export default function CalendarPage() {
                       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-8">
                         {activeRecommendation.outfit_suggestions.map((item, idx) => {
                           const p = item.suitable_product;
+
+                          // No matching product found
+                          if (!p) {
+                            return (
+                              <div
+                                key={idx}
+                                className="bg-parchment border border-sand p-6 flex flex-col items-center justify-center text-center"
+                              >
+                                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                                  {item.product_category}
+                                </p>
+                                <p className="text-stone text-sm">No match found</p>
+                              </div>
+                            );
+                          }
+
+                          const imgSrc = p.image_urls?.[0] || p.product_image;
                           const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
                           const productUrl = `/product/${slug}?productId=${p.product_id}`;
 
@@ -467,12 +506,14 @@ export default function CalendarPage() {
                             >
                               {/* Product Image */}
                               <div className="relative aspect-[3/4] overflow-hidden bg-parchment">
-                                <Image
-                                  src={p.product_image}
-                                  alt={p.product_name}
-                                  fill
-                                  className="object-cover transition-transform duration-700 group-hover:scale-105"
-                                />
+                                {imgSrc && (
+                                  <Image
+                                    src={imgSrc}
+                                    alt={p.product_name}
+                                    fill
+                                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                                  />
+                                )}
                                 {p.is_wardrobe && (
                                   <span className="absolute top-3 left-3 px-2 py-1 bg-success/90 text-white text-[9px] tracking-[0.15em] uppercase">
                                     In Wardrobe
