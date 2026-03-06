@@ -551,6 +551,8 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   function resolveColorHex(hex: string | undefined | null, colorName: string): string {
     // If hex looks valid (#xxx or #xxxxxx), use it
     if (hex && /^#[0-9a-fA-F]{3,8}$/.test(hex)) return hex;
+    // If colorName itself is a hex code (API sends hex in color field), use it
+    if (colorName && /^#[0-9a-fA-F]{3,8}$/.test(colorName)) return colorName;
     // Try matching color name to known hex values
     const lower = colorName.toLowerCase().trim();
     if (colorNameToHex[lower]) return colorNameToHex[lower];
@@ -563,14 +565,76 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     return '#8B8680';
   }
 
+  // Parse hex to RGB
+  function hexToRgb(hex: string): [number, number, number] | null {
+    const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (!m) return null;
+    return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+  }
+
+  // Find closest named color by RGB distance
+  function hexToColorName(hex: string): string {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return '';
+    let bestName = '';
+    let bestDist = Infinity;
+    for (const [name, val] of Object.entries(colorNameToHex)) {
+      const ref = hexToRgb(val);
+      if (!ref) continue;
+      const dist = Math.sqrt(
+        (rgb[0] - ref[0]) ** 2 + (rgb[1] - ref[1]) ** 2 + (rgb[2] - ref[2]) ** 2
+      );
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestName = name;
+      }
+    }
+    // Only accept if reasonably close (distance < 80 out of max ~441)
+    if (bestDist < 80 && bestName) {
+      return bestName.charAt(0).toUpperCase() + bestName.slice(1);
+    }
+    return '';
+  }
+
+  // Resolve a display name for a color (never show raw hex to user)
+  function resolveColorName(color: string, hex: string | undefined | null): string {
+    // If color is already a readable name (not a hex code), use it
+    if (color && !/^#[0-9a-fA-F]+$/.test(color)) {
+      return color.charAt(0).toUpperCase() + color.slice(1);
+    }
+    // Try ai_metadata.color first (most reliable human-readable source)
+    if (raw.ai_metadata?.color && !/^#/.test(raw.ai_metadata.color)) {
+      return raw.ai_metadata.color.charAt(0).toUpperCase() + raw.ai_metadata.color.slice(1);
+    }
+    // Try to extract from product name
+    const nameLower = raw.product_name.toLowerCase();
+    for (const name of Object.keys(colorNameToHex)) {
+      if (nameLower.includes(name)) {
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }
+    }
+    // If color is a hex code, find closest named color
+    if (color && /^#[0-9a-fA-F]+$/.test(color)) {
+      const name = hexToColorName(color);
+      if (name) return name;
+    }
+    // Try hex field
+    if (hex && /^#[0-9a-fA-F]+$/.test(hex)) {
+      const name = hexToColorName(hex);
+      if (name) return name;
+    }
+    return 'Color';
+  }
+
   // Colors from color_based_images_mapping (real API data) or fallback to ai_metadata or product name
   if (raw.color_based_images_mapping && raw.color_based_images_mapping.length > 0) {
     raw.color_based_images_mapping.forEach((cm) => {
       const hexValue = resolveColorHex(cm.hex, cm.color);
+      const displayName = resolveColorName(cm.color, cm.hex);
       variants.push({
-        id: `color-${cm.color.toLowerCase().replace(/\s+/g, '-')}`,
+        id: `color-${displayName.toLowerCase().replace(/\s+/g, '-')}`,
         type: 'color',
-        name: cm.color,
+        name: displayName,
         value: hexValue,
         available: true,
       });
@@ -579,7 +643,6 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     // Try ai_metadata.color first, then extract from product name
     let colorName = raw.ai_metadata?.color || '';
     if (!colorName) {
-      // Try to find a known color in the product name (e.g. "Elegant Navy Kurta")
       const nameLower = raw.product_name.toLowerCase();
       for (const name of Object.keys(colorNameToHex)) {
         if (nameLower.includes(name)) {

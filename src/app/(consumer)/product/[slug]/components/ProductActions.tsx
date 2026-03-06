@@ -262,16 +262,6 @@ export default function ProductActions({
           )
         )}
 
-        {/* Upgrade prompt for Standard users */}
-        {pricingTier === 'standard' && (
-          <Link
-            href="/pricing-tiers"
-            className="w-full py-3 px-6 bg-parchment border border-sand/50 text-stone flex items-center justify-center gap-3 transition-all duration-300 hover:bg-sand/20"
-          >
-            <TrendingDown size={16} className="text-taupe" />
-            <span className="text-sm tracking-[0.1em]">Upgrade for Price Alerts</span>
-          </Link>
-        )}
       </div>
 
       {/* Quick Concierge */}
