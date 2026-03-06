@@ -107,4 +107,5 @@ export interface Product {
   commerceEligible: boolean;
   craftTags: string[];
   media?: ProductMedia;
+  colorImageMap?: Record<string, ProductImage[]>;
 }

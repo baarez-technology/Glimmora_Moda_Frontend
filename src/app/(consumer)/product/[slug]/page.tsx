@@ -61,6 +61,7 @@ function ProductPageContent({ product }: { product: Product }) {
           {/* Image Gallery */}
           <ProductGallery
             product={product}
+            images={state.displayImages}
             activeImage={state.activeImage}
             setActiveImage={state.setActiveImage}
             onPrev={state.prevImage}
