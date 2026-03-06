@@ -149,13 +149,13 @@ export default function ProfilePage() {
     },
   ];
 
-  // Membership tier link
-  const membershipItem = {
-    href: '/pricing-tiers',
-    icon: Sparkles,
-    title: 'Membership',
-    subtitle: 'View tier benefits',
-  };
+  // // Membership tier link
+  // const membershipItem = {
+  //   href: '/pricing-tiers',
+  //   icon: Sparkles,
+  //   title: 'Membership',
+  //   subtitle: 'View tier benefits',
+  // };
 
   // Settings at the end
   const settingsItem = {
@@ -165,7 +165,7 @@ export default function ProfilePage() {
     subtitle: 'Account & preferences',
   };
 
-  const navItems = [...baseNavItems, membershipItem, settingsItem];
+  const navItems = [...baseNavItems, settingsItem];
 
   return (
     <div className="min-h-screen bg-ivory-cream">

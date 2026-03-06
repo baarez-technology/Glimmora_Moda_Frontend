@@ -30,25 +30,42 @@ export default function SilentCartPage() {
     if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/silent-cart');
   }, [isAuthenticated, isHydrated, router]);
 
-  const [pageState, setPageState] = useState<PageState>('LOADING');
-  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(null);
+  const SESSION_KEY = 'moda-silent-cart';
+
+  const [pageState, setPageState] = useState<PageState>(() => {
+    if (typeof window !== 'undefined') {
+      try { if (sessionStorage.getItem(SESSION_KEY)) return 'RESULTS'; } catch { /* ignore */ }
+    }
+    return 'LOADING';
+  });
+  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = sessionStorage.getItem(SESSION_KEY);
+        return cached ? JSON.parse(cached) : null;
+      } catch { return null; }
+    }
+    return null;
+  });
   const [error, setError] = useState<string | null>(null);
   const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
 
-  // Load silent cart on mount
+  // Load silent cart on mount — skipped if session cache exists
   useEffect(() => {
     if (!isHydrated || !isAuthenticated) return;
+    if (gapAnalysis !== null) return; // already loaded from session cache
 
     // Try to load cached silent cart first, fallback to gap analysis
     wardrobeService.getSilentCart()
       .then((data) => {
+        try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch { /* full */ }
         setGapAnalysis(data);
         setPageState('RESULTS');
       })
       .catch(() => {
-        // No cached result, run analysis
         wardrobeService.getWardrobeGapAnalysis(false)
           .then((data) => {
+            try { sessionStorage.setItem(SESSION_KEY, JSON.stringify(data)); } catch { /* full */ }
             setGapAnalysis(data);
             setPageState('RESULTS');
           })
@@ -57,7 +74,7 @@ export default function SilentCartPage() {
             setPageState('ERROR');
           });
       });
-  }, [isHydrated, isAuthenticated]);
+  }, [isHydrated, isAuthenticated, gapAnalysis]);
 
   const gaps = gapAnalysis?.gap_analysis?.filter(g => g.matched_product) || [];
 
@@ -178,10 +195,9 @@ export default function SilentCartPage() {
             <p className="text-[#6B6560] mb-4">{error || 'Could not load silent cart.'}</p>
             <button
               onClick={() => {
+                try { sessionStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+                setGapAnalysis(null);
                 setPageState('LOADING');
-                wardrobeService.getWardrobeGapAnalysis(true)
-                  .then((data) => { setGapAnalysis(data); setPageState('RESULTS'); })
-                  .catch((err) => { setError(err instanceof Error ? err.message : 'Failed'); setPageState('ERROR'); });
               }}
               className="text-sm tracking-wide uppercase text-[#3D3529] hover:text-[#1A1A1A] transition-colors"
             >

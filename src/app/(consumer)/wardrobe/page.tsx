@@ -437,7 +437,7 @@ export default function WardrobePage() {
                     <span className="text-[10px] tracking-[0.5em] uppercase text-taupe">
                       Wardrobe Gaps
                     </span>
-                    {!gapAnalysis && !gapLoading && (
+                    {/* {!gapAnalysis && !gapLoading && (
                       <button
                         onClick={() => fetchGapAnalysis()}
                         className="text-[10px] tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
@@ -454,7 +454,7 @@ export default function WardrobePage() {
                       >
                         <RefreshCw size={12} className={gapLoading ? 'animate-spin' : ''} />
                       </button>
-                    )}
+                    )} */}
                   </div>
 
                   {gapLoading && !gapAnalysis && (
@@ -515,7 +515,18 @@ export default function WardrobePage() {
                     </div>
                   )}
                 </div>
-
+                {gapAnalysis && (
+                <Link
+                  href="/profile/silent-cart"
+                  className="group flex items-center justify-between p-5 bg-parchment border border-sand hover:border-charcoal-deep transition-all"
+                >
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">AI Curated</p>
+                    <p className="text-sm font-medium text-charcoal-deep">Plan An Outfit</p>
+                  </div>
+                  <ArrowRight size={16} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
+                </Link>
+                )}
                 {/* Style Note — from API or fallback */}
                 <div className="p-6 bg-charcoal-deep">
                   <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-4">Style Note</p>
@@ -526,7 +537,7 @@ export default function WardrobePage() {
                 </div>
 
                 {/* Outfit Ideas */}
-                <div>
+                {/* <div>
                   <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-6">
                     Suggested Outfits
                   </span>
@@ -548,19 +559,10 @@ export default function WardrobePage() {
                       Add at least 2 pieces to your wardrobe to see personalized outfit suggestions.
                     </p>
                   )}
-                </div>
+                </div> */}
 
                 {/* Silent Cart link — at the bottom */}
-                <Link
-                  href="/profile/silent-cart"
-                  className="group flex items-center justify-between p-5 bg-parchment border border-sand hover:border-charcoal-deep transition-all"
-                >
-                  <div>
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">AI Curated</p>
-                    <p className="text-sm font-medium text-charcoal-deep">View Silent Cart</p>
-                  </div>
-                  <ArrowRight size={16} className="text-stone group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
-                </Link>
+                
               </div>
             </div>
           ) : (

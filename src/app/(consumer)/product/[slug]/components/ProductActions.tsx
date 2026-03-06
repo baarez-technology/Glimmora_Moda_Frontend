@@ -285,7 +285,7 @@ export default function ProductActions({
       </button>
 
       {/* UHNI: Negotiate Price */}
-      {isUHNI && onNegotiatePrice && (
+      {false && isUHNI && onNegotiatePrice && (
         <>
           <button
             onClick={() => setShowNegotiateModal(true)}
