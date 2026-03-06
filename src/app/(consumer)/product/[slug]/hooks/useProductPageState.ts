@@ -97,6 +97,14 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const inCart = isInCart(product.id);
   const hasPriceAlert = priceAlerts.some(alert => alert.productId === product.id && alert.isActive);
 
+  // Effective images: swap to color-specific images when a color is selected
+  const displayImages = useMemo(() => {
+    if (selectedColor && product.colorImageMap?.[selectedColor]) {
+      return product.colorImageMap[selectedColor];
+    }
+    return product.images;
+  }, [selectedColor, product.colorImageMap, product.images]);
+
   // Track the wishlist_id for the current product (for removal)
   const [wishlistItemId, setWishlistItemId] = useState<string | null>(null);
 
@@ -158,12 +166,12 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
 
   // Image navigation
   const nextImage = useCallback(() => {
-    setActiveImage((prev) => (prev + 1) % product.images.length);
-  }, [product.images.length]);
+    setActiveImage((prev) => (prev + 1) % displayImages.length);
+  }, [displayImages.length]);
 
   const prevImage = useCallback(() => {
-    setActiveImage((prev) => (prev - 1 + product.images.length) % product.images.length);
-  }, [product.images.length]);
+    setActiveImage((prev) => (prev - 1 + displayImages.length) % displayImages.length);
+  }, [displayImages.length]);
 
   // Actions
   const handleAddToConsiderations = useCallback(() => {
@@ -299,7 +307,11 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const handleColorSelect = useCallback((color: string) => {
     setSelectedColor(color);
     setColorError(false);
-  }, []);
+    // If product has color-specific images, swap to them
+    if (product.colorImageMap?.[color]) {
+      setActiveImage(0);
+    }
+  }, [product.colorImageMap]);
 
   const handleAddToWardrobe = useCallback(() => {
     const sizeVars = product.variants.filter(v => v.type === 'size');
@@ -362,6 +374,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     brand,
     sizeVariants,
     colorVariants,
+    displayImages,
     inConsiderations,
     inWardrobe,
     inCart,

@@ -33,14 +33,9 @@ export default function ProductVariants({
       {/* Size Selection */}
       {sizeVariants.length > 0 && (
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-4">
-            <p className={`text-[11px] tracking-[0.3em] uppercase ${sizeError ? 'text-error' : 'text-taupe'}`}>
-              Select Size {sizeError && <span className="text-error">*</span>}
-            </p>
-            <button className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors">
-              Size Guide
-            </button>
-          </div>
+          <p className={`text-[11px] tracking-[0.3em] uppercase mb-4 ${sizeError ? 'text-error' : 'text-taupe'}`}>
+            Select Size {sizeError && <span className="text-error">*</span>}
+          </p>
           <div className="flex flex-wrap gap-2">
             {sizeVariants.map((variant) => (
               <button
@@ -78,15 +73,19 @@ export default function ProductVariants({
                   key={variant.id}
                   onClick={() => onColorSelect(variant.value)}
                   disabled={!variant.available}
-                  className={`w-10 h-10 transition-all duration-300 ${
+                  className={`flex items-center gap-2.5 px-4 py-2.5 border transition-all duration-300 ${
                     selectedColor === variant.value
-                      ? 'ring-1 ring-charcoal-deep ring-offset-2'
-                      : `hover:ring-1 hover:ring-sand hover:ring-offset-1 ${colorError ? 'ring-1 ring-error/50 ring-offset-1' : ''}`
+                      ? 'border-charcoal-deep bg-charcoal-deep/5'
+                      : `border-sand hover:border-charcoal-deep ${colorError ? 'border-error/50' : ''}`
                   } ${!variant.available ? 'opacity-30 cursor-not-allowed' : ''}`}
-                  style={{ backgroundColor: variant.value }}
-                  title={variant.name}
                   aria-label={`Select ${variant.name} color`}
-                />
+                >
+                  <span
+                    className="w-5 h-5 rounded-full border border-sand/50 flex-shrink-0"
+                    style={{ backgroundColor: variant.value }}
+                  />
+                  <span className="text-sm text-charcoal-deep">{variant.name}</span>
+                </button>
               ))}
             </div>
             {colorError && (

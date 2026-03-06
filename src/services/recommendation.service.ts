@@ -492,7 +492,7 @@ interface ApiProductDetail {
   product_images: string[];
   product_image: string | null;
   sizes?: string[];
-  color_based_images_mapping?: { color: string; hex: string; images: string[] }[];
+  color_based_images_mapping?: { color: string; hex?: string | null; images?: string[] }[];
   regional_stocks: {
     stock_id: string;
     city: string;
@@ -507,12 +507,12 @@ interface ApiProductDetail {
     purchases: number;
     conversion_rate: number;
   };
-  ai_metadata: {
+  ai_metadata?: {
     product_category?: string;
     color?: string;
     pattern?: string;
     fabrics?: string;
-  };
+  } | null;
   occasions: string[];
   aesthetics: string[];
   is_low_stock: boolean;
@@ -527,34 +527,140 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   // Build variants from backend data
   const variants: Product['variants'] = [];
 
-  // Colors from color_based_images_mapping (real API data) or fallback to ai_metadata
+  // Name→hex lookup for color swatches
+  const colorNameToHex: Record<string, string> = {
+    black: '#000000', white: '#FFFFFF', red: '#C41E3A', blue: '#1E3A5F',
+    navy: '#1B2A4A', brown: '#6B4226', beige: '#C8B89A', cream: '#FFFDD0',
+    grey: '#808080', gray: '#808080', green: '#2D5A27', pink: '#E8A0BF',
+    gold: '#C9A962', silver: '#C0C0C0', tan: '#D2B48C', ivory: '#FFFFF0',
+    burgundy: '#800020', olive: '#556B2F', camel: '#C19A6B', charcoal: '#36454F',
+    orange: '#E07020', yellow: '#D4A017', purple: '#6B3FA0', maroon: '#800000',
+    coral: '#FF6F61', teal: '#008080', indigo: '#3F51B5', khaki: '#C3B091',
+    peach: '#FFDAB9', lavender: '#B57EDC', rose: '#C77986', mint: '#98D4BB',
+    taupe: '#8B7E74', nude: '#E3BC9A', mustard: '#C89B3C', rust: '#B7410E',
+    wine: '#722F37', plum: '#6B3A5D', sage: '#9CAF88', mauve: '#915F6D',
+    blush: '#DE98AB', champagne: '#F7E7CE', emerald: '#046307', sapphire: '#0F52BA',
+    ruby: '#9B111E', amber: '#FFBF00', chocolate: '#3C1414', espresso: '#3C2415',
+    midnight: '#191970', pewter: '#8A8D8F', stone: '#928E85', sand: '#C2B280',
+    sky: '#87CEEB', lilac: '#C8A2C8', fuchsia: '#C74375', magenta: '#C20078',
+    turquoise: '#30D5C8', aqua: '#00CED1', steel: '#71797E', slate: '#708090',
+    'off-white': '#FAF9F6', 'off white': '#FAF9F6', offwhite: '#FAF9F6',
+    multicolor: '#8B8680', multi: '#8B8680', 'multi-color': '#8B8680',
+  };
+
+  function resolveColorHex(hex: string | undefined | null, colorName: string): string {
+    // If hex looks valid (#xxx or #xxxxxx), use it
+    if (hex && /^#[0-9a-fA-F]{3,8}$/.test(hex)) return hex;
+    // If colorName itself is a hex code (API sends hex in color field), use it
+    if (colorName && /^#[0-9a-fA-F]{3,8}$/.test(colorName)) return colorName;
+    // Try matching color name to known hex values
+    const lower = colorName.toLowerCase().trim();
+    if (colorNameToHex[lower]) return colorNameToHex[lower];
+    // Check if any known name is a substring (e.g. "Light Blue" → blue)
+    for (const [name, val] of Object.entries(colorNameToHex)) {
+      if (lower.includes(name)) return val;
+    }
+    // If hex is a CSS color name string (not a hex code), use it as-is for backgroundColor
+    if (hex && !hex.startsWith('#')) return hex;
+    return '#8B8680';
+  }
+
+  // Parse hex to RGB
+  function hexToRgb(hex: string): [number, number, number] | null {
+    const m = hex.replace('#', '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+    if (!m) return null;
+    return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+  }
+
+  // Find closest named color by RGB distance
+  function hexToColorName(hex: string): string {
+    const rgb = hexToRgb(hex);
+    if (!rgb) return '';
+    let bestName = '';
+    let bestDist = Infinity;
+    for (const [name, val] of Object.entries(colorNameToHex)) {
+      const ref = hexToRgb(val);
+      if (!ref) continue;
+      const dist = Math.sqrt(
+        (rgb[0] - ref[0]) ** 2 + (rgb[1] - ref[1]) ** 2 + (rgb[2] - ref[2]) ** 2
+      );
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestName = name;
+      }
+    }
+    // Only accept if reasonably close (distance < 80 out of max ~441)
+    if (bestDist < 80 && bestName) {
+      return bestName.charAt(0).toUpperCase() + bestName.slice(1);
+    }
+    return '';
+  }
+
+  // Resolve a display name for a color (never show raw hex to user)
+  function resolveColorName(color: string, hex: string | undefined | null): string {
+    // If color is already a readable name (not a hex code), use it
+    if (color && !/^#[0-9a-fA-F]+$/.test(color)) {
+      return color.charAt(0).toUpperCase() + color.slice(1);
+    }
+    // Try ai_metadata.color first (most reliable human-readable source)
+    if (raw.ai_metadata?.color && !/^#/.test(raw.ai_metadata.color)) {
+      return raw.ai_metadata.color.charAt(0).toUpperCase() + raw.ai_metadata.color.slice(1);
+    }
+    // Try to extract from product name
+    const nameLower = raw.product_name.toLowerCase();
+    for (const name of Object.keys(colorNameToHex)) {
+      if (nameLower.includes(name)) {
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }
+    }
+    // If color is a hex code, find closest named color
+    if (color && /^#[0-9a-fA-F]+$/.test(color)) {
+      const name = hexToColorName(color);
+      if (name) return name;
+    }
+    // Try hex field
+    if (hex && /^#[0-9a-fA-F]+$/.test(hex)) {
+      const name = hexToColorName(hex);
+      if (name) return name;
+    }
+    return 'Color';
+  }
+
+  // Colors from color_based_images_mapping (real API data) or fallback to ai_metadata or product name
   if (raw.color_based_images_mapping && raw.color_based_images_mapping.length > 0) {
     raw.color_based_images_mapping.forEach((cm) => {
+      const hexValue = resolveColorHex(cm.hex, cm.color);
+      const displayName = resolveColorName(cm.color, cm.hex);
       variants.push({
-        id: `color-${cm.color.toLowerCase().replace(/\s+/g, '-')}`,
+        id: `color-${displayName.toLowerCase().replace(/\s+/g, '-')}`,
         type: 'color',
-        name: cm.color,
-        value: cm.hex || '#8B8680',
+        name: displayName,
+        value: hexValue,
         available: true,
       });
     });
-  } else if (raw.ai_metadata?.color) {
-    const colorName = raw.ai_metadata.color;
-    const colorMap: Record<string, string> = {
-      black: '#000000', white: '#FFFFFF', red: '#C41E3A', blue: '#1E3A5F',
-      navy: '#1B2A4A', brown: '#6B4226', beige: '#C8B89A', cream: '#FFFDD0',
-      grey: '#808080', gray: '#808080', green: '#2D5A27', pink: '#E8A0BF',
-      gold: '#C9A962', silver: '#C0C0C0', tan: '#D2B48C', ivory: '#FFFFF0',
-      burgundy: '#800020', olive: '#556B2F', camel: '#C19A6B', charcoal: '#36454F',
-    };
-    const colorValue = colorMap[colorName.toLowerCase()] || colorName;
-    variants.push({
-      id: `color-${colorName.toLowerCase()}`,
-      type: 'color',
-      name: colorName.charAt(0).toUpperCase() + colorName.slice(1),
-      value: colorValue,
-      available: true,
-    });
+  } else {
+    // Try ai_metadata.color first, then extract from product name
+    let colorName = raw.ai_metadata?.color || '';
+    if (!colorName) {
+      const nameLower = raw.product_name.toLowerCase();
+      for (const name of Object.keys(colorNameToHex)) {
+        if (nameLower.includes(name)) {
+          colorName = name.charAt(0).toUpperCase() + name.slice(1);
+          break;
+        }
+      }
+    }
+    if (colorName) {
+      const hexValue = resolveColorHex(null, colorName);
+      variants.push({
+        id: `color-${colorName.toLowerCase().replace(/\s+/g, '-')}`,
+        type: 'color',
+        name: colorName.charAt(0).toUpperCase() + colorName.slice(1),
+        value: hexValue,
+        available: true,
+      });
+    }
   }
 
   // Sizes from real API data or fallback defaults
@@ -570,6 +676,23 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
       available: true,
     });
   });
+
+  // Build color → images mapping from API (key = resolved hex, must match variant value)
+  const colorImageMap: Record<string, Product['images']> = {};
+  if (raw.color_based_images_mapping && raw.color_based_images_mapping.length > 0) {
+    raw.color_based_images_mapping.forEach((cm) => {
+      const colorImages = (cm.images || []).filter(Boolean);
+      if (colorImages.length > 0) {
+        const hexKey = resolveColorHex(cm.hex, cm.color);
+        colorImageMap[hexKey] = colorImages.map((url, i) => ({
+          id: `${cm.color}-${i + 1}`,
+          url,
+          alt: `${raw.product_name} - ${cm.color}`,
+          type: i === 0 ? 'hero' as const : 'detail' as const,
+        }));
+      }
+    });
+  }
 
   // Build images list: product_images > color images > product_image > recommendation cache > placeholder
   let imageUrls = raw.product_images?.filter(Boolean) || [];
@@ -597,8 +720,8 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     tagline: raw.tagline || '',
     description: raw.product_description || '',
     narrative: '',
-    price: raw.offer_price || raw.price,
-    originalPrice: raw.offer_price ? raw.price : undefined,
+    price: raw.price,
+    originalPrice: undefined,
     currency: 'INR',
     images: imageUrls.map((url, i) => ({
       id: String(i + 1),
@@ -631,6 +754,7 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     commerceAction: 'add_to_considerations',
     commerceEligible: true,
     craftTags: [],
+    colorImageMap: Object.keys(colorImageMap).length > 0 ? colorImageMap : undefined,
   };
 }
 
@@ -657,11 +781,11 @@ export async function getProductDetail(productId: string, brandName?: string): P
     const data: ApiProductDetail = await res.json();
     console.log('[product-detail] Raw API:', {
       product_id: data.product_id,
-      product_images: data.product_images,
+      product_images: data.product_images?.length,
       product_image: data.product_image,
       sizes: data.sizes,
-      color_based_images_mapping: data.color_based_images_mapping?.map(c => ({ color: c.color, imageCount: c.images?.length })),
-      offer_price: data.offer_price,
+      ai_metadata_color: data.ai_metadata?.color,
+      color_based_images_mapping: data.color_based_images_mapping?.map(c => ({ color: c.color, hex: c.hex, imageCount: c.images?.length })),
     });
     return mapProductDetail(data, brandName);
   }, PRODUCT_DETAIL_TTL);

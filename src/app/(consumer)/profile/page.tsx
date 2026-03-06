@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Clock, MapPin, Package, Crown, Phone, Mail, MessageCircle, Layers, Sparkles } from 'lucide-react';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
@@ -149,14 +149,6 @@ export default function ProfilePage() {
     },
   ];
 
-  // Membership tier link
-  const membershipItem = {
-    href: '/pricing-tiers',
-    icon: Sparkles,
-    title: 'Membership',
-    subtitle: 'View tier benefits',
-  };
-
   // Settings at the end
   const settingsItem = {
     href: '/profile/settings',
@@ -165,7 +157,7 @@ export default function ProfilePage() {
     subtitle: 'Account & preferences',
   };
 
-  const navItems = [...baseNavItems, membershipItem, settingsItem];
+  const navItems = [...baseNavItems, settingsItem];
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -201,9 +193,7 @@ export default function ProfilePage() {
                     ? `Member Since ${new Date(user.memberSince).getFullYear()}`
                     : 'Member Since 2024'}
                 </span>
-                <Link href="/pricing-tiers" className="transition-transform hover:scale-105">
-                  <TierBadge tier={pricingTier} size="md" />
-                </Link>
+                <TierBadge tier={pricingTier} size="md" />
               </div>
               <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-3">
                 {user.name}
@@ -277,40 +267,6 @@ export default function ProfilePage() {
                 ))}
               </nav>
 
-              {/* Upcoming Event */}
-              {calendarEvents.length > 0 && (
-                <div className="mt-10 p-6 bg-charcoal-deep">
-                  <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 block mb-4">
-                    Next Event
-                  </span>
-                  <h3 className="font-display text-xl text-ivory-cream mb-4">
-                    {calendarEvents[0].title}
-                  </h3>
-                  <div className="space-y-2 text-sm text-taupe mb-6">
-                    <div className="flex items-center gap-3">
-                      <Calendar size={14} className="text-gold-soft/60" />
-                      <span>{new Date(calendarEvents[0].date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Clock size={14} className="text-gold-soft/60" />
-                      <span>{calendarEvents[0].time}</span>
-                    </div>
-                    {calendarEvents[0].venue && (
-                      <div className="flex items-center gap-3">
-                        <MapPin size={14} className="text-gold-soft/60" />
-                        <span className="truncate">{calendarEvents[0].venue}</span>
-                      </div>
-                    )}
-                  </div>
-                  <Link
-                    href="/calendar"
-                    className="group inline-flex items-center gap-2 text-sm tracking-[0.1em] uppercase text-gold-soft hover:text-ivory-cream transition-colors"
-                  >
-                    <span>Plan Outfit</span>
-                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              )}
               </div>
             </div>
 

@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft, Crown, Phone, Mail, MessageCircle, Calendar, Clock, Globe, Award, Send, ChevronRight, X, User, Star, Users, Check } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Crown, Phone, Mail, MessageCircle, Calendar, Clock, Globe, Award, Send, ChevronRight, X, User, Star, Users, Check, ClipboardList } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { AppointmentType, ConciergeAppointment } from '@/types/uhni';
+import TasksSection from './TasksSection';
 
 interface Message {
   id: string;
@@ -24,8 +25,13 @@ const appointmentTypes: { value: AppointmentType; label: string; description: st
 
 const durationOptions = [30, 45, 60, 90, 120];
 
+type PageTab = 'chat' | 'tasks';
+
 export default function ConciergePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'tasks' ? 'tasks' : 'chat';
+  const [pageTab, setPageTab] = useState<PageTab>(initialTab);
   const {
     concierge,
     showToast,
@@ -334,7 +340,7 @@ export default function ConciergePage() {
   const quickActions = [
     { label: 'Book Appointment', icon: Calendar, description: 'Schedule a session', onClick: () => setShowBookingModal(true) },
     { label: 'Request Sourcing', icon: Award, description: 'Find a specific item', onClick: () => router.push('/uhni/sourcing/new') },
-    { label: 'View Tasks', icon: Clock, description: 'Concierge tasks', onClick: () => router.push('/uhni/concierge-tasks') },
+    { label: 'View Tasks', icon: Clock, description: 'Concierge tasks', onClick: () => setPageTab('tasks') },
   ];
 
   return (
@@ -361,6 +367,32 @@ export default function ConciergePage() {
               Personal Concierge
             </h1>
             <p className="text-sand mt-3">Your dedicated fashion advisor</p>
+
+            {/* Page Tabs */}
+            <div className="flex items-center gap-1 mt-6">
+              <button
+                onClick={() => setPageTab('chat')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs tracking-[0.1em] uppercase transition-colors ${
+                  pageTab === 'chat'
+                    ? 'bg-ivory-cream text-charcoal-deep'
+                    : 'text-sand hover:text-ivory-cream hover:bg-ivory-cream/10'
+                }`}
+              >
+                <MessageCircle size={14} />
+                Chat & Booking
+              </button>
+              <button
+                onClick={() => setPageTab('tasks')}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs tracking-[0.1em] uppercase transition-colors ${
+                  pageTab === 'tasks'
+                    ? 'bg-ivory-cream text-charcoal-deep'
+                    : 'text-sand hover:text-ivory-cream hover:bg-ivory-cream/10'
+                }`}
+              >
+                <ClipboardList size={14} />
+                Tasks & Appointments
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -411,6 +443,15 @@ export default function ConciergePage() {
         </div>
       )}
 
+      {/* Tasks & Appointments Tab */}
+      {pageTab === 'tasks' && (
+        <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <TasksSection />
+        </div>
+      )}
+
+      {/* Chat & Booking Tab */}
+      {pageTab === 'chat' && (
       <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Left Column - Concierge Profile & Appointments */}
@@ -731,21 +772,22 @@ export default function ConciergePage() {
                   </div>
                   <ChevronRight size={18} className="text-taupe group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
                 </Link>
-                <Link
-                  href="/uhni/concierge-tasks"
-                  className="flex items-center justify-between p-4 border border-sand hover:border-charcoal-deep transition-colors group"
+                <button
+                  onClick={() => setPageTab('tasks')}
+                  className="flex items-center justify-between p-4 border border-sand hover:border-charcoal-deep transition-colors group w-full text-left"
                 >
                   <div>
                     <p className="font-medium text-charcoal-deep">Concierge Tasks</p>
                     <p className="text-sm text-taupe">Track ongoing tasks and appointments</p>
                   </div>
                   <ChevronRight size={18} className="text-taupe group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
-                </Link>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </div>
+      )}
 
       {/* Book Appointment Modal */}
       {showBookingModal && (

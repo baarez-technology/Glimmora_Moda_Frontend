@@ -16,14 +16,11 @@ import {
   ArrowRight,
   DollarSign,
   Sparkles,
-  EyeOff,
-  ClipboardList,
   Radio,
   Layers,
   Heart,
   BookOpen,
   Star,
-  Zap,
   Package,
   Clock,
 } from 'lucide-react';
@@ -36,8 +33,7 @@ const navGroups = [
   {
     label: 'Concierge',
     items: [
-      { href: '/uhni/concierge', icon: MessageCircle, title: 'Personal Concierge', subtitle: 'Direct line to your advisor' },
-      { href: '/uhni/concierge-tasks', icon: ClipboardList, title: 'Concierge Tasks', subtitle: 'Track open requests' },
+      { href: '/uhni/concierge', icon: MessageCircle, title: 'Personal Concierge', subtitle: 'Chat, tasks & appointments' },
     ],
   },
   {
@@ -47,7 +43,6 @@ const navGroups = [
       { href: '/uhni/bespoke', icon: Scissors, title: 'Bespoke', subtitle: 'Custom commissions' },
       { href: '/uhni/pricing', icon: DollarSign, title: 'Private Pricing', subtitle: 'Negotiations & offers' },
       { href: '/uhni/private-collections', icon: Lock, title: 'Private Collections', subtitle: 'Invitation-only access' },
-      { href: '/uhni/private-shopping', icon: ShoppingBag, title: 'Private Shopping', subtitle: 'VIP events' },
     ],
   },
   {
@@ -63,20 +58,17 @@ const navGroups = [
   {
     label: 'Intelligence',
     items: [
-      { href: '/uhni/autonomous', icon: Bot, title: 'Autonomous', subtitle: 'AI shopping agent' },
+      { href: '/uhni/autonomous', icon: Bot, title: 'Autonomous Commerce', subtitle: 'AI shopping, budgets & automation' },
       { href: '/uhni/intelligence', icon: Sparkles, title: 'Intelligence', subtitle: 'AI insights on your taste' },
       { href: '/uhni/global-sourcing', icon: Globe, title: 'Global Sourcing', subtitle: 'Worldwide availability' },
-      { href: '/uhni/zero-ui', icon: Zap, title: 'Zero UI', subtitle: 'Automation settings' },
-      { href: '/uhni/invisible-commerce', icon: EyeOff, title: 'Invisible Commerce', subtitle: 'No digital footprint' },
-      { href: '/uhni/silent-commerce', icon: Radio, title: 'Silent Commerce', subtitle: 'Ambient transactions' },
+      { href: '/uhni/silent-commerce', icon: Radio, title: 'Silent Commerce', subtitle: 'Awareness & discreet transactions' },
     ],
   },
   {
     label: 'Heritage',
     items: [
-      { href: '/uhni/stories', icon: BookOpen, title: 'Stories', subtitle: 'Heritage & craft narratives' },
-      { href: '/uhni/heritage-archive', icon: Crown, title: 'Heritage Archive', subtitle: 'Brand archives' },
-      { href: '/uhni/events', icon: Star, title: 'Events', subtitle: 'Exclusive experiences' },
+      { href: '/uhni/heritage-archive', icon: BookOpen, title: 'Heritage & Stories', subtitle: 'Archives, timelines & narratives' },
+      { href: '/uhni/events', icon: Star, title: 'Events & Shopping', subtitle: 'Experiences & private shopping' },
     ],
   },
 ];
@@ -213,13 +205,6 @@ export default function UHNIDashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <Link
-                    href="/pricing-tiers"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-gold-soft/10 border border-gold-soft/20 text-gold-soft hover:bg-gold-soft/20 transition-colors text-xs tracking-wider uppercase"
-                  >
-                    <span>View Benefits</span>
-                    <ArrowRight size={12} />
-                  </Link>
                 </div>
               </div>
 
