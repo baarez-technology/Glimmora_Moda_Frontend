@@ -4,341 +4,363 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Info, Layers, ChevronRight, RefreshCw } from 'lucide-react';
+import { Info, Check } from 'lucide-react';
 import * as wardrobeService from '@/services/wardrobe.service';
-import type { WardrobeGapAnalysisResponse } from '@/services/wardrobe.service';
+import type { GapAnalysisItem, WardrobeGapAnalysisResponse } from '@/services/wardrobe.service';
 import { useAuth } from '@/context/AuthContext';
+import { useApp } from '@/context/AppContext';
 
-const GAP_SESSION_KEY = 'moda-gap-analysis';
+type PageState = 'EMPTY' | 'LOADING' | 'RESULTS' | 'ERROR';
 
-type PageState = 'EMPTY' | 'ANALYSING' | 'RESULTS' | 'ERROR';
-
-function timeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+function formatExpiryDate(dateStr?: string): string {
+  if (!dateStr) {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export default function SilentCartPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
+  const { addToConsiderations } = useApp();
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/silent-cart');
   }, [isAuthenticated, isHydrated, router]);
 
-  const [pageState, setPageState] = useState<PageState>(() => {
-    if (typeof window === 'undefined') return 'EMPTY';
-    try {
-      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
-      return cached ? 'RESULTS' : 'EMPTY';
-    } catch { return 'EMPTY'; }
-  });
-  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(() => {
-    if (typeof window === 'undefined') return null;
-    try {
-      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
-      return cached ? JSON.parse(cached) : null;
-    } catch { return null; }
-  });
+  const [pageState, setPageState] = useState<PageState>('LOADING');
+  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(true);
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
 
-  // Run analysis (first time or refresh) — caches in sessionStorage
-  const runAnalysis = useCallback((regenerate: boolean) => {
-    setPageState('ANALYSING');
-    setError(null);
-    wardrobeService.getWardrobeGapAnalysis(regenerate)
+  // Load silent cart on mount
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated) return;
+
+    // Try to load cached silent cart first, fallback to gap analysis
+    wardrobeService.getSilentCart()
       .then((data) => {
         setGapAnalysis(data);
         setPageState('RESULTS');
-        try { sessionStorage.setItem(GAP_SESSION_KEY, JSON.stringify(data)); } catch {}
       })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Analysis failed');
-        setPageState('ERROR');
+      .catch(() => {
+        // No cached result, run analysis
+        wardrobeService.getWardrobeGapAnalysis(false)
+          .then((data) => {
+            setGapAnalysis(data);
+            setPageState('RESULTS');
+          })
+          .catch((err) => {
+            setError(err instanceof Error ? err.message : 'Failed to load silent cart');
+            setPageState('ERROR');
+          });
       });
+  }, [isHydrated, isAuthenticated]);
+
+  const gaps = gapAnalysis?.gap_analysis?.filter(g => g.matched_product) || [];
+
+  const toggleItem = useCallback((idx: number) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
   }, []);
 
-  const gaps = gapAnalysis?.gap_analysis || [];
+  const toggleSelectAll = useCallback(() => {
+    if (selectedItems.size === gaps.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(gaps.map((_, i) => i)));
+    }
+  }, [selectedItems.size, gaps]);
+
+  const selectedTotal = Array.from(selectedItems).reduce((sum, idx) => {
+    const p = gaps[idx]?.matched_product;
+    return sum + (p ? (p.offer_price || p.price) : 0);
+  }, 0);
+
+  const fullCartValue = gaps.reduce((sum, g) => {
+    const p = g.matched_product;
+    return sum + (p ? (p.offer_price || p.price) : 0);
+  }, 0);
+
+  const handleMoveToConsiderations = useCallback(() => {
+    const items = Array.from(selectedItems).map(idx => gaps[idx]).filter(Boolean);
+    items.forEach((gap) => {
+      const p = gap.matched_product;
+      if (!p) return;
+      const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      addToConsiderations({
+        id: p.product_id,
+        brandId: p.brand_id,
+        brandName: p.brand_name,
+        name: p.product_name,
+        slug,
+        tagline: p.tagline || '',
+        description: p.product_description || '',
+        narrative: '',
+        price: p.offer_price || p.price,
+        currency: 'EUR',
+        images: (p.image_urls?.length ? p.image_urls : p.product_image ? [p.product_image] : []).map((url, i) => ({
+          id: String(i + 1),
+          url,
+          alt: p.product_name,
+          type: i === 0 ? 'hero' as const : 'detail' as const,
+        })),
+        variants: [],
+        materials: [],
+        craftsmanship: [],
+        ivEnabled: false,
+        availability: { status: p.is_low_stock ? 'limited' as const : 'available' as const, regions: [] },
+        collection: p.collection_name,
+        category: (p.product_category as 'bags' | 'clothing' | 'shoes' | 'accessories' | 'jewelry') || 'clothing',
+        tags: [...(p.occasions || []), ...(p.aesthetics || [])],
+        visibility: 'public',
+        experienceMode: 'standard',
+        pricingVisibility: 'visible',
+        commerceAction: 'add_to_considerations',
+        commerceEligible: true,
+        craftTags: [],
+      });
+    });
+    setSelectedItems(new Set());
+  }, [selectedItems, gaps, addToConsiderations]);
+
+  // Reason text generator based on suggestion data
+  const getReasonText = (gap: GapAnalysisItem): string => {
+    const s = gap.suggestion;
+    if (s.title) return s.title;
+    return `Complements items in your wardrobe and fills a style gap`;
+  };
+
+  const getEventText = (gap: GapAnalysisItem): string | null => {
+    const p = gap.matched_product;
+    if (p?.occasions && p.occasions.length > 0) {
+      return p.occasions[0];
+    }
+    return null;
+  };
 
   return (
-    <div className="min-h-screen bg-ivory-cream">
-      {/* Header */}
-      <div className="bg-charcoal-deep">
-        <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
-          >
-            <ArrowLeft size={16} />
-            Back to Profile
-          </Link>
+    <div className="min-h-screen bg-[#FAF8F5]">
+      <div className="max-w-[720px] mx-auto px-6 md:px-8 py-10">
 
-          <div className={`flex items-center gap-4 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="w-14 h-14 bg-gold-soft/20 flex items-center justify-center">
-              <Layers size={28} className="text-gold-soft" />
-            </div>
-            <div>
-              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-2">
-                Curated For You
-              </span>
-              <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
-                Silent Cart
-              </h1>
-              <p className="text-sand mt-2">
-                AI-powered wardrobe recommendations based on what you're missing
-              </p>
-            </div>
+        {/* How Silent Cart Works */}
+        <div className="mb-10 flex gap-4">
+          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[#D4C5A9] flex items-center justify-center">
+            <span className="text-xs font-semibold text-[#3D3529]">1</span>
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-[#1A1A1A] mb-1">How Silent Cart Works</h2>
+            <p className="text-sm text-[#6B6560] leading-relaxed">
+              Based on your browsing patterns, style preferences, and upcoming calendar events, I&apos;ve quietly prepared these
+              items for your consideration. Each piece has been selected to complement your existing wardrobe and align with
+              your aesthetic.
+            </p>
           </div>
         </div>
-      </div>
 
-      <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-
-        {/* State: EMPTY (no analysis yet — click to trigger) */}
-        {pageState === 'EMPTY' && (
-          <div className="text-center py-16 bg-white border border-sand">
-            <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
-              <Layers size={32} className="text-charcoal-deep" />
-            </div>
-            <h3 className="font-display text-xl text-charcoal-deep mb-3">
-              No Analysis Yet
-            </h3>
-            <p className="text-stone mb-2 max-w-md mx-auto">
-              Your wardrobe gap analysis hasn't run yet, or your wardrobe has changed since the last analysis.
-            </p>
-            <p className="text-stone mb-8 max-w-md mx-auto text-sm">
-              Run an analysis to discover what's missing and get personalized product recommendations.
-            </p>
-            <button
-              onClick={() => runAnalysis(false)}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
-            >
-              <span className="text-sm tracking-[0.15em] uppercase">Analyse My Wardrobe</span>
-            </button>
-          </div>
-        )}
-
-        {/* State: ANALYSING */}
-        {pageState === 'ANALYSING' && (
+        {/* Loading State */}
+        {pageState === 'LOADING' && (
           <div className="py-20 flex flex-col items-center justify-center gap-4">
-            <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-stone">Analysing your wardrobe...</p>
-            <p className="text-xs text-taupe">This may take a moment as our AI reviews your collection</p>
+            <div className="w-8 h-8 border-2 border-[#3D3529] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-[#6B6560]">Preparing your silent cart...</p>
           </div>
         )}
 
-        {/* State: ERROR */}
+        {/* Error State */}
         {pageState === 'ERROR' && (
-          <div className="text-center py-16 bg-white border border-sand">
-            <p className="text-stone mb-4">{error || 'Could not load recommendations.'}</p>
+          <div className="text-center py-16 bg-white border border-[#E8E3DB]">
+            <p className="text-[#6B6560] mb-4">{error || 'Could not load silent cart.'}</p>
             <button
-              onClick={() => runAnalysis(false)}
-              className="text-sm tracking-[0.15em] uppercase text-charcoal-deep hover:text-noir transition-colors"
+              onClick={() => {
+                setPageState('LOADING');
+                wardrobeService.getWardrobeGapAnalysis(true)
+                  .then((data) => { setGapAnalysis(data); setPageState('RESULTS'); })
+                  .catch((err) => { setError(err instanceof Error ? err.message : 'Failed'); setPageState('ERROR'); });
+              }}
+              className="text-sm tracking-wide uppercase text-[#3D3529] hover:text-[#1A1A1A] transition-colors"
             >
               Try Again
             </button>
           </div>
         )}
 
-        {/* State: RESULTS */}
-        {pageState === 'RESULTS' && gapAnalysis && (
+        {/* Empty State */}
+        {pageState === 'RESULTS' && gaps.length === 0 && (
+          <div className="text-center py-16 bg-white border border-[#E8E3DB]">
+            <p className="text-lg font-medium text-[#1A1A1A] mb-2">No items prepared yet</p>
+            <p className="text-sm text-[#6B6560] mb-6 max-w-md mx-auto">
+              Add items to your wardrobe and browse products so the Silent Cart can learn your preferences.
+            </p>
+            <Link
+              href="/discover"
+              className="inline-block px-6 py-3 bg-[#3D3529] text-white text-sm tracking-wide uppercase hover:bg-[#1A1A1A] transition-colors"
+            >
+              Browse Products
+            </Link>
+          </div>
+        )}
+
+        {/* Results */}
+        {pageState === 'RESULTS' && gaps.length > 0 && (
           <>
-            {/* Meta bar: timestamp + cached badge + refresh */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-sand/50">
-              <div className="flex items-center gap-3">
-                {gapAnalysis.analyzed_at && (
-                  <span className="text-xs text-stone">
-                    Last analysed {timeAgo(gapAnalysis.analyzed_at)}
-                  </span>
-                )}
-                {gapAnalysis.cached && (
-                  <span className="text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 bg-sand/50 text-taupe">
-                    Cached
-                  </span>
-                )}
-              </div>
+            {/* Items count + Select All */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#E8E3DB]">
+              <p className="text-sm text-[#1A1A1A]">
+                <span className="font-semibold">{gaps.length} items</span> prepared
+              </p>
               <button
-                onClick={() => runAnalysis(true)}
-                className="flex items-center gap-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
-                title="Refresh analysis"
+                onClick={toggleSelectAll}
+                className="text-sm font-medium tracking-wide uppercase text-[#3D3529] hover:text-[#1A1A1A] transition-colors"
               >
-                <RefreshCw size={14} />
-                <span className="text-xs tracking-[0.1em] uppercase">Refresh</span>
+                {selectedItems.size === gaps.length ? 'Deselect All' : 'Select All'}
               </button>
             </div>
 
-            {/* Style Note */}
-            {gapAnalysis.style_notes && (
-              <div className="p-6 bg-charcoal-deep mb-8">
-                <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-3">Style Note</p>
-                <p className="text-taupe text-sm leading-relaxed">{gapAnalysis.style_notes}</p>
-              </div>
-            )}
+            {/* Item Cards */}
+            <div className="space-y-6">
+              {gaps.map((gap, idx) => {
+                const p = gap.matched_product!;
+                const imgSrc = p.image_urls?.[0] || p.product_image;
+                const isSelected = selectedItems.has(idx);
+                const matchScore = Math.round(gap.product_match_score * 100);
+                const eventText = getEventText(gap);
+                const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                const productUrl = `/product/${slug}?productId=${p.product_id}`;
 
-            {/* Stats + Wardrobe link */}
-            {gaps.length > 0 && (
-              <div className="mb-6 flex items-end justify-between">
-                <div>
-                  <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-2">
-                    Wardrobe Gap Analysis
-                  </span>
-                  <p className="text-stone text-sm">
-                    {gapAnalysis.gap_suggestions_count} gaps identified · {gapAnalysis.total_recommendations} products matched
-                  </p>
-                </div>
-                <Link
-                  href="/wardrobe"
-                  className="flex items-center gap-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
-                >
-                  View Wardrobe
-                  <ChevronRight size={14} />
-                </Link>
-              </div>
-            )}
+                return (
+                  <div key={idx} className="bg-white border border-[#E8E3DB] overflow-hidden">
+                    {/* Product Row */}
+                    <div className="flex gap-4 p-5">
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => toggleItem(idx)}
+                        className={`flex-shrink-0 w-5 h-5 mt-1 border transition-colors ${
+                          isSelected
+                            ? 'bg-[#3D3529] border-[#3D3529]'
+                            : 'border-[#C5BDB1] hover:border-[#8B8680]'
+                        } flex items-center justify-center`}
+                      >
+                        {isSelected && <Check size={12} className="text-white" />}
+                      </button>
 
-            {/* Empty gaps (analysis ran but nothing found) */}
-            {gaps.length === 0 && (
-              <div className="text-center py-16 bg-white border border-sand">
-                <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
-                  <Layers size={32} className="text-charcoal-deep" />
-                </div>
-                <h3 className="font-display text-xl text-charcoal-deep mb-3">
-                  No Gaps Found
-                </h3>
-                <p className="text-stone mb-8 max-w-md mx-auto">
-                  Your wardrobe looks well-rounded! Add more items or check back later for new recommendations.
-                </p>
-                <Link
-                  href="/discover"
-                  className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
-                >
-                  <span className="text-sm tracking-[0.15em] uppercase">Browse Products</span>
-                </Link>
-              </div>
-            )}
-
-            {/* Recommendations Grid */}
-            {gaps.length > 0 && (
-              <div className="grid sm:grid-cols-2 gap-6">
-                {gaps.map((gap, idx) => {
-                  const p = gap.matched_product;
-
-                  // Handle null matched_product
-                  if (!p) {
-                    return (
-                      <div key={idx} className="bg-white border border-sand overflow-hidden">
-                        <div className="px-5 pt-5 pb-3 border-b border-sand/50">
-                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">
-                            {gap.suggestion.product_category}
-                          </p>
-                          <p className="text-sm font-medium text-charcoal-deep">
-                            {gap.suggestion.title}
-                          </p>
-                        </div>
-                        <div className="flex gap-4 p-5">
-                          <div className="w-24 h-32 bg-parchment flex items-center justify-center flex-shrink-0">
-                            <Layers size={24} className="text-taupe" />
-                          </div>
-                          <div className="flex-1 min-w-0 flex flex-col justify-center">
-                            <p className="text-sm text-stone mb-1">No matching product found</p>
-                            <p className="text-xs text-taupe">
-                              We couldn't find a product in our catalogue for this gap yet.
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
-
-                  const imgSrc = p.image_urls?.[0] || p.product_image;
-                  const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-                  const productUrl = `/product/${slug}?productId=${p.product_id}`;
-
-                  return (
-                    <div key={idx} className="bg-white border border-sand overflow-hidden">
-                      {/* Gap Suggestion Header */}
-                      <div className="px-5 pt-5 pb-3 border-b border-sand/50">
-                        <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">
-                          {gap.suggestion.product_category}
-                        </p>
-                        <p className="text-sm font-medium text-charcoal-deep">
-                          {gap.suggestion.title}
-                        </p>
-                      </div>
-
-                      {/* Matched Product */}
-                      <Link href={productUrl} className="group flex gap-4 p-5">
-                        <div className="relative w-24 h-32 overflow-hidden bg-parchment flex-shrink-0">
+                      {/* Image */}
+                      <Link href={productUrl} className="flex-shrink-0">
+                        <div className="relative w-[90px] h-[110px] bg-[#F5F0EB] overflow-hidden">
                           {imgSrc && (
                             <Image
                               src={imgSrc}
                               alt={p.product_name}
                               fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-500"
+                              className="object-cover hover:scale-105 transition-transform duration-500"
                             />
                           )}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">
-                            {p.brand_name}
-                          </p>
-                          <p className="font-display text-lg text-charcoal-deep leading-tight mb-1 line-clamp-2 group-hover:text-gold-muted transition-colors">
+                      </Link>
+
+                      {/* Details */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] tracking-[0.15em] uppercase text-[#8B8680] mb-0.5">
+                          {p.brand_name}
+                        </p>
+                        <Link href={productUrl} className="hover:underline">
+                          <p className="text-sm font-medium text-[#1A1A1A] leading-tight mb-1">
                             {p.product_name}
                           </p>
-                          <p className="text-xs text-stone uppercase mb-3">
-                            {p.product_category}
-                          </p>
-                          <div className="flex items-center gap-2">
-                            {p.discount_percentage > 0 && (
-                              <span className="text-xs text-taupe line-through">€{p.price.toLocaleString()}</span>
-                            )}
-                            <span className="font-display text-base text-charcoal-deep">
-                              €{(p.offer_price || p.price).toLocaleString()}
-                            </span>
-                            {p.discount_percentage > 0 && (
-                              <span className="text-xs text-success">-{p.discount_percentage}%</span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between mt-3">
-                            <span className="text-[9px] text-stone">
-                              {Math.round(gap.product_match_score * 100)}% match
-                            </span>
-                            <span className="flex items-center gap-1 text-[10px] tracking-[0.15em] uppercase text-stone group-hover:text-charcoal-deep transition-colors">
-                              View
-                              <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
+                        </Link>
+                        <p className="text-sm font-semibold text-[#1A1A1A]">
+                          &euro;{(p.offer_price || p.price).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                  );
-                })}
+
+                    {/* Reason Tag */}
+                    <div className="px-5 pb-4">
+                      <div className="bg-[#F7F4EF] border border-[#E8E3DB] px-4 py-3 mb-3">
+                        <p className="text-xs text-[#6B6560] leading-relaxed">
+                          {getReasonText(gap)}
+                        </p>
+                        {eventText && (
+                          <p className="text-[10px] text-[#8B8680] mt-1.5">
+                            For: {eventText}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Match + Expiry */}
+                      <div className="flex items-center gap-4 text-[11px] text-[#8B8680]">
+                        <span>{matchScore}% match confidence</span>
+                        <span className="w-1 h-1 rounded-full bg-[#C5BDB1]" />
+                        <span>Expires {formatExpiryDate()}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Cart Summary */}
+            <div className="mt-8 border-t border-[#E8E3DB] pt-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-[10px] tracking-[0.15em] uppercase text-[#8B8680] mb-1">Selected Items Total</p>
+                  <p className="text-lg font-semibold text-[#1A1A1A]">
+                    &euro;{selectedTotal.toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] tracking-[0.15em] uppercase text-[#8B8680] mb-1">Full Cart Value</p>
+                  <p className="text-lg font-semibold text-[#1A1A1A]">
+                    &euro;{fullCartValue.toLocaleString()}
+                  </p>
+                </div>
               </div>
-            )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleMoveToConsiderations}
+                  disabled={selectedItems.size === 0}
+                  className={`flex-1 py-3.5 text-sm tracking-wide uppercase text-center transition-colors ${
+                    selectedItems.size > 0
+                      ? 'bg-[#3D3529] text-white hover:bg-[#1A1A1A]'
+                      : 'bg-[#C5BDB1] text-white cursor-not-allowed'
+                  }`}
+                >
+                  Move to Considerations ({selectedItems.size})
+                </button>
+                <Link
+                  href="/profile"
+                  className="px-6 py-3.5 text-sm tracking-wide uppercase text-[#3D3529] border border-[#3D3529] hover:bg-[#3D3529] hover:text-white transition-colors text-center"
+                >
+                  View Considerations &rsaquo;
+                </Link>
+              </div>
+
+              <p className="text-xs text-[#8B8680] text-center mt-4">
+                Items moved to Considerations can be reviewed before purchase.
+              </p>
+            </div>
           </>
         )}
 
-        {/* Info Box — always visible */}
-        {(
-          <div className="mt-10 flex items-start gap-4 p-6 bg-parchment border border-sand text-sm">
-            <Info size={18} className="text-stone flex-shrink-0 mt-0.5" />
-            <div className="text-stone">
-              <p className="font-medium text-charcoal-deep mb-2">About Silent Cart</p>
-              <p>
-                Silent Cart analyses your wardrobe to identify style gaps — missing categories,
-                fabrics, or occasions — and matches each gap with the best product from our catalogue.
-                Recommendations refresh automatically when your wardrobe changes.
+        {/* About Silent Cart */}
+        <div className="mt-10 border border-[#E8E3DB] bg-[#F7F4EF] p-6">
+          <div className="flex items-start gap-3">
+            <Info size={18} className="text-[#8B8680] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-[#1A1A1A] mb-2">About Silent Cart</p>
+              <p className="text-sm text-[#6B6560] leading-relaxed">
+                The Silent Cart feature observes your browsing patterns, wardrobe composition, and upcoming events to prepare
+                items you might love. It&apos;s designed to help, not pressure. Items expire after 30 days and you&apos;re always in control.
               </p>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

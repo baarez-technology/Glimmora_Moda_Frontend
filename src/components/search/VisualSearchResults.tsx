@@ -81,7 +81,7 @@ export default function VisualSearchResults({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.05 }}
           >
-            <Link href={`/product/${result.product.slug}`}>
+            <Link href={`/product/${result.product.slug}?productId=${result.product.id}`}>
               <div className="group bg-white rounded-xl border border-stone/20 overflow-hidden hover:shadow-lg transition-all duration-300">
                 {/* Image */}
                 <div className="relative aspect-[3/4] bg-stone/5 overflow-hidden">

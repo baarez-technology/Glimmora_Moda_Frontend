@@ -43,7 +43,7 @@ export default function ProductRelated({ products, brand }: ProductRelatedProps)
           {products.map((item, index) => (
             <Link
               key={item.id}
-              href={`/product/${item.slug}`}
+              href={`/product/${item.slug}?productId=${item.id}`}
               className="group"
               onMouseEnter={() => setActiveHover(index)}
               onMouseLeave={() => setActiveHover(null)}

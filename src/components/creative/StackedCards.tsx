@@ -56,7 +56,7 @@ export default function StackedCards({ products }: StackedCardsProps) {
                 zIndex: products.length - index,
               }}
             >
-              <Link href={`/product/${product.slug}`} className="block group">
+              <Link href={`/product/${product.slug}?productId=${product.id}`} className="block group">
                 <div className="relative aspect-[3/4] overflow-hidden bg-ivory-warm mb-6">
                   <Image
                     src={product.images[0]?.url || ''}

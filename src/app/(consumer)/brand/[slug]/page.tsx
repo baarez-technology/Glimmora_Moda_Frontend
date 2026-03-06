@@ -255,7 +255,7 @@ export default function BrandPage({ params }: BrandPageProps) {
                 {paginatedProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}

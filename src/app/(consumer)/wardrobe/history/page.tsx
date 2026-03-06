@@ -298,7 +298,7 @@ export default function WardrobeHistoryPage() {
                     {entryProducts.map((product) => (
                       <Link
                         key={product.id}
-                        href={`/product/${product.slug}`}
+                        href={`/product/${product.slug}?productId=${product.id}`}
                         className="flex-shrink-0"
                       >
                         <div className="w-20 h-20 bg-stone/5 rounded-lg overflow-hidden relative">

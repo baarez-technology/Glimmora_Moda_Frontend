@@ -145,7 +145,7 @@ export default function SeasonalRotation({
                 {bringOut.map(({ product }) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="flex items-center gap-3 p-2 hover:bg-stone/5 rounded-lg transition-colors"
                   >
                     <div className="w-12 h-12 bg-stone/5 rounded-lg overflow-hidden relative">
@@ -184,7 +184,7 @@ export default function SeasonalRotation({
                 {toStore.map(({ product }) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="flex items-center gap-3 p-2 hover:bg-stone/5 rounded-lg transition-colors"
                   >
                     <div className="w-12 h-12 bg-stone/5 rounded-lg overflow-hidden relative">
@@ -223,7 +223,7 @@ export default function SeasonalRotation({
                 {allSeason.map(({ product }) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="flex items-center gap-3 p-2 hover:bg-stone/5 rounded-lg transition-colors"
                   >
                     <div className="w-12 h-12 bg-stone/5 rounded-lg overflow-hidden relative">
