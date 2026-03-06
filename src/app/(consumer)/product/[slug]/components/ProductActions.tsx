@@ -390,7 +390,7 @@ export default function ProductActions({
                       onClick={() => {
                         const price = parseFloat(negotiatePrice);
                         if (isNaN(price) || price <= 0) return;
-                        onNegotiatePrice(price, negotiateMessage);
+                        onNegotiatePrice?.(price, negotiateMessage);
                         setShowNegotiateModal(false);
                         setNegotiatePrice('');
                         setNegotiateMessage('');
