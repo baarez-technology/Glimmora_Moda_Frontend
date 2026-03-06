@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight, Crown, AlertTriangle, RefreshCw } from 'lucide-react';
-import { getRecommendedBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
+import { getRecommendedBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 function DiscoverContent() {
@@ -27,9 +27,12 @@ function DiscoverContent() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState('relevance');
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const PRODUCTS_PER_PAGE = 20;
 
   useEffect(() => {
@@ -40,11 +43,37 @@ function DiscoverContent() {
     }
   }, [showFilters]);
 
+  // Load brands and stories once on mount
   useEffect(() => {
-    async function loadData() {
+    async function loadBrandsAndStories() {
       try {
-        setDataLoading(prev => (isLoaded ? prev : true));
-        const productParams: Parameters<typeof getRecommendedProducts>[0] = { page_size: 100 };
+        const [brandsResult, storiesResult] = await Promise.allSettled([
+          getRecommendedBrands(),
+          searchStories(),
+        ]);
+        setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
+        setBrandStories(storiesResult.status === 'fulfilled' ? storiesResult.value : []);
+      } catch (err) {
+        console.error('Failed to load brands/stories:', err);
+      }
+    }
+    loadBrandsAndStories();
+  }, []);
+
+  // Load products with server-side pagination
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        if (isLoaded) {
+          setProductsLoading(true);
+        } else {
+          setDataLoading(true);
+        }
+
+        const productParams: Parameters<typeof getRecommendedProductsPaginated>[0] = {
+          page_size: PRODUCTS_PER_PAGE,
+          page_number: currentPage,
+        };
         if (brandIdParam) productParams.filter_brand_id = brandIdParam;
 
         if (budgetRange) {
@@ -59,38 +88,30 @@ function DiscoverContent() {
           productParams.user_preferences = {};
           if (selectedOccasions.length) productParams.user_preferences.occasions = selectedOccasions;
           if (selectedMoods.length) {
-            // Send aesthetic IDs directly — backend uses the same keys
             productParams.user_preferences.aesthetics = selectedMoods;
           }
         }
 
-        const [productsResult, brandsResult, storiesResult] = await Promise.allSettled([
-          getRecommendedProducts(productParams),
-          getRecommendedBrands(),
-          searchStories(),
-        ]);
-
-        if (productsResult.status === 'fulfilled') {
-          setProducts(productsResult.value);
-        } else {
-          console.error('[uhni-discover] Products API failed:', productsResult.reason);
-          setError(productsResult.reason?.message || 'Failed to load products');
-          setProducts([]);
-        }
-
-        setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
-        setBrandStories(storiesResult.status === 'fulfilled' ? storiesResult.value : []);
+        setError(null);
+        const result = await getRecommendedProductsPaginated(productParams);
+        setProducts(result.products);
+        setTotalPages(result.totalPages);
+        setTotalProducts(result.totalMatched);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load data';
-        console.error('Failed to load discover page data:', err);
+        const message = err instanceof Error ? err.message : 'Failed to load products';
+        console.error('[uhni-discover] Products API failed:', err);
         setError(message);
+        setProducts([]);
+        setTotalPages(1);
+        setTotalProducts(0);
       } finally {
         setDataLoading(false);
+        setProductsLoading(false);
         setIsLoaded(true);
       }
     }
-    loadData();
-  }, [brandIdParam, budgetRange, selectedOccasions, selectedMoods, isLoaded]);
+    loadProducts();
+  }, [brandIdParam, budgetRange, selectedOccasions, selectedMoods, currentPage, isLoaded]);
 
   const budgetRanges: Record<string, { min: number; max: number }> = {
     'under-500': { min: 0, max: 500 },
@@ -99,21 +120,22 @@ function DiscoverContent() {
     '5000-plus': { min: 5000, max: 50000 },
   };
 
-  const filteredProducts = useMemo(() => {
-    const filtered = products.filter(p => {
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
+  // Products are server-side paginated, apply client-side text search and sorting
+  const displayProducts = useMemo(() => {
+    let filtered = products;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = products.filter(p => {
         const matchesName = p.name.toLowerCase().includes(query);
         const matchesBrand = p.brandName.toLowerCase().includes(query);
         const matchesTags = p.tags?.some(tag => tag.toLowerCase().includes(query));
-        if (!matchesName && !matchesBrand && !matchesTags) return false;
-      }
-      if (categoryParam) {
-        const cat = p.category?.toLowerCase() || '';
-        if (!cat.includes(categoryParam.toLowerCase())) return false;
-      }
-      return true;
-    });
+        return matchesName || matchesBrand || matchesTags;
+      });
+    }
+    if (categoryParam) {
+      const cat = categoryParam.toLowerCase();
+      filtered = filtered.filter(p => (p.category?.toLowerCase() || '').includes(cat));
+    }
     return [...filtered].sort((a, b) => {
       switch (sortBy) {
         case 'price-asc': return a.price - b.price;
@@ -125,13 +147,8 @@ function DiscoverContent() {
     });
   }, [searchQuery, categoryParam, products, sortBy]);
 
-  const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
-  const paginatedProducts = useMemo(() => {
-    const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
-    return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
-  }, [filteredProducts, currentPage]);
-
-  useEffect(() => { setCurrentPage(1); }, [budgetRange, searchQuery, selectedOccasions, selectedMoods, sortBy]);
+  // Reset to page 1 when filters change (not when page changes)
+  useEffect(() => { setCurrentPage(1); }, [budgetRange, selectedOccasions, selectedMoods]);
 
   const filteredBrands = useMemo(() => {
     if (!searchQuery) return brands;
@@ -405,12 +422,19 @@ function DiscoverContent() {
               {activeTab === 'all' && (
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">
-                    {filteredProducts.length} Pieces
+                    {totalProducts} Pieces
                   </h2>
                 </div>
               )}
+              <div className="relative">
+                {/* Loading overlay for page transitions */}
+                {productsLoading && (
+                  <div className="absolute inset-0 bg-noir/80 z-10 flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-gold-soft border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 md:gap-x-6 gap-y-10">
-                {paginatedProducts.map((product, index) => (
+                {displayProducts.map((product, index) => (
                   <Link
                     key={product.id}
                     href={`/product/${product.slug}?productId=${product.id}`}
@@ -446,26 +470,67 @@ function DiscoverContent() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-12">
+                <div className="flex items-center justify-center gap-3 mt-12 flex-wrap">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-3 border border-gold-soft/20 text-sand hover:border-gold-soft disabled:opacity-30 transition-colors"
+                    disabled={currentPage === 1 || productsLoading}
+                    className="w-10 h-10 border border-gold-soft/20 text-sand hover:border-gold-soft disabled:opacity-30 transition-colors flex items-center justify-center"
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span className="text-sm text-sand">
-                    {currentPage} of {totalPages}
-                  </span>
+
+                  {/* Page Numbers with Smart Ellipsis */}
+                  {(() => {
+                    const pages: (number | string)[] = [];
+                    if (totalPages <= 7) {
+                      for (let i = 1; i <= totalPages; i++) pages.push(i);
+                    } else {
+                      pages.push(1);
+                      if (currentPage > 4) pages.push('...');
+                      const start = Math.max(2, currentPage - 1);
+                      const end = Math.min(totalPages - 1, currentPage + 1);
+                      for (let i = start; i <= end; i++) {
+                        if (!pages.includes(i)) pages.push(i);
+                      }
+                      if (currentPage < totalPages - 3) pages.push('...');
+                      if (!pages.includes(totalPages)) pages.push(totalPages);
+                    }
+                    return pages.map((page, idx) => (
+                      page === '...' ? (
+                        <span key={`ellipsis-${idx}`} className="w-10 h-10 flex items-center justify-center text-sand/50">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page as number)}
+                          disabled={productsLoading}
+                          className={`w-10 h-10 text-sm tracking-wider transition-all disabled:opacity-50 ${
+                            currentPage === page
+                              ? 'bg-gold-soft text-noir'
+                              : 'border border-gold-soft/20 text-sand hover:border-gold-soft'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ));
+                  })()}
+
                   <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-3 border border-gold-soft/20 text-sand hover:border-gold-soft disabled:opacity-30 transition-colors"
+                    disabled={currentPage === totalPages || productsLoading}
+                    className="w-10 h-10 border border-gold-soft/20 text-sand hover:border-gold-soft disabled:opacity-30 transition-colors flex items-center justify-center"
                   >
                     <ChevronRight size={16} />
                   </button>
+
+                  <span className="ml-4 text-xs text-sand/50 tracking-wider">
+                    {totalProducts} pieces
+                  </span>
                 </div>
               )}
+              </div>
             </div>
           )}
 
@@ -479,7 +544,7 @@ function DiscoverContent() {
                 {filteredBrands.map((brand) => (
                   <Link
                     key={brand.id}
-                    href={`/brand/${brand.slug}`}
+                    href={`/brand/${brand.slug}?brandId=${brand.id}`}
                     className="group"
                   >
                     <div className="relative aspect-square overflow-hidden mb-4 bg-charcoal-deep">
@@ -532,7 +597,7 @@ function DiscoverContent() {
           )}
 
           {/* Empty State */}
-          {filteredProducts.length === 0 && filteredBrands.length === 0 && filteredStories.length === 0 && (
+          {displayProducts.length === 0 && filteredBrands.length === 0 && filteredStories.length === 0 && (
             <div className="text-center py-20">
               <p className="text-sand mb-4">No results found for your current filters.</p>
               <button onClick={clearFilters} className="text-xs tracking-wider uppercase text-gold-soft hover:text-gold-deep">

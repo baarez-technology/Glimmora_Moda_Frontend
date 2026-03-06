@@ -3,11 +3,11 @@
 import { use, useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, X, SlidersHorizontal } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as collectionService from '@/services/collection.service';
 import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
-import { getCollections, getRecommendedProducts, getRecommendedBrands } from '@/services/recommendation.service';
+import { getCollections, getRecommendedProductsPaginated, getRecommendedBrands } from '@/services/recommendation.service';
 import { notFound, useSearchParams } from 'next/navigation';
 import type { Product, Brand, Collection } from '@/types';
 
@@ -15,7 +15,7 @@ interface CollectionPageProps {
   params: Promise<{ slug: string }>;
 }
 
-type CategoryFilter = 'all' | 'bags' | 'clothing' | 'shoes' | 'accessories';
+const PRODUCTS_PER_PAGE = 20;
 
 export default function CollectionPage({ params }: CollectionPageProps) {
   const { slug } = use(params);
@@ -23,61 +23,43 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   const collectionIdParam = searchParams.get('collectionId');
   const brandIdParam = searchParams.get('brandId');
   const [collection, setCollection] = useState<Collection | null>(null);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
-  const [showFilters, setShowFilters] = useState(false);
+  const [productsLoading, setProductsLoading] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [sortBy, setSortBy] = useState('relevance');
   const [isRealApi, setIsRealApi] = useState(false);
-  const filterCloseRef = useRef<HTMLButtonElement>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
-  // ESC key handler for filter drawer
+  // Load collection metadata and brands once
   useEffect(() => {
-    if (!showFilters) return;
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowFilters(false);
-    };
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [showFilters]);
-
-  // Auto-focus close button when drawer opens
-  useEffect(() => {
-    if (showFilters) filterCloseRef.current?.focus();
-  }, [showFilters]);
-
-  useEffect(() => {
-    async function loadData() {
+    async function loadCollectionData() {
       try {
         if (collectionIdParam) {
-          // Real API — load collection and brand products
-          const [apiCollections, apiProducts, apiBrands] = await Promise.all([
+          // Real API — load collection metadata and brands
+          const [apiCollections, apiBrands] = await Promise.all([
             getCollections(brandIdParam || undefined),
-            getRecommendedProducts(brandIdParam ? { filter_brand_id: brandIdParam } : {}),
             getRecommendedBrands(),
           ]);
 
           const match = apiCollections.find(c => c.id === collectionIdParam);
           if (match) {
-            setCollection({ ...match, products: apiProducts });
+            setCollection(match);
             setIsRealApi(true);
           }
-          setAllProducts(apiProducts);
-          // Map API brands to frontend Brand shape for the "More Maisons" section
           setBrands(apiBrands);
         } else {
           // No collectionId param — fall back to mock data
-          const [collectionRes, productsRes, brandsRes] = await Promise.all([
+          const [collectionRes, brandsRes] = await Promise.all([
             collectionService.getCollectionBySlug(slug),
-            productService.getAllProducts(),
             brandService.getAllBrands(),
           ]);
           setCollection(collectionRes.data ?? null);
-          setAllProducts(productsRes.data ?? []);
           setBrands(brandsRes.data ?? []);
         }
       } catch (error) {
@@ -85,59 +67,72 @@ export default function CollectionPage({ params }: CollectionPageProps) {
         // If real API fails, try mock as fallback
         if (collectionIdParam) {
           try {
-            const [collectionRes, productsRes, brandsRes] = await Promise.all([
+            const [collectionRes, brandsRes] = await Promise.all([
               collectionService.getCollectionBySlug(slug),
-              productService.getAllProducts(),
               brandService.getAllBrands(),
             ]);
             setCollection(collectionRes.data ?? null);
-            setAllProducts(productsRes.data ?? []);
             setBrands(brandsRes.data ?? []);
           } catch { /* ignore fallback errors */ }
         }
+      }
+    }
+    loadCollectionData();
+  }, [slug, collectionIdParam, brandIdParam]);
+
+  // Load products with server-side pagination
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        if (isLoaded) {
+          setProductsLoading(true);
+        } else {
+          setLoading(true);
+        }
+
+        if (collectionIdParam || brandIdParam) {
+          // Real API with pagination
+          const result = await getRecommendedProductsPaginated({
+            filter_brand_id: brandIdParam || undefined,
+            page_size: PRODUCTS_PER_PAGE,
+            page_number: currentPage,
+          });
+
+          setProducts(result.products);
+          setTotalPages(result.totalPages);
+          setTotalProducts(result.totalMatched);
+          setIsRealApi(true);
+        } else {
+          // Mock data fallback - client-side pagination
+          const productsRes = await productService.getAllProducts();
+          const allMockProducts = productsRes.data ?? [];
+          const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
+          const paginatedProducts = allMockProducts.slice(start, start + PRODUCTS_PER_PAGE);
+
+          setProducts(paginatedProducts);
+          setTotalPages(Math.ceil(allMockProducts.length / PRODUCTS_PER_PAGE));
+          setTotalProducts(allMockProducts.length);
+        }
+      } catch (error) {
+        console.error('Failed to load products:', error);
+        setProducts([]);
+        setTotalPages(1);
+        setTotalProducts(0);
       } finally {
         setLoading(false);
+        setProductsLoading(false);
         setIsLoaded(true);
       }
     }
-    loadData();
-  }, [slug, collectionIdParam, brandIdParam]);
+    loadProducts();
+  }, [collectionIdParam, brandIdParam, currentPage, isLoaded]);
 
   // If no specific collection found, show all products
   const isAllProducts = slug === 'all';
-  const baseProducts = isAllProducts ? allProducts : collection?.products || [];
 
-  // Reset visible count when filter changes
-  useEffect(() => {
-    setVisibleCount(12);
-  }, [categoryFilter]);
-
-  // Filter products by category and sort
+  // Apply client-side sorting to products
   const displayProducts = useMemo(() => {
-    const filtered = categoryFilter === 'all'
-      ? baseProducts
-      : baseProducts.filter(p => {
-          const category = p.category?.toLowerCase() || '';
-          const tags = p.tags?.map(t => t.toLowerCase()) || [];
-
-          switch (categoryFilter) {
-            case 'bags':
-              return category.includes('bag') || tags.some(t => t.includes('bag') || t.includes('handbag'));
-            case 'clothing':
-              return category.includes('clothing') || category.includes('jacket') || category.includes('coat') ||
-                     tags.some(t => t.includes('jacket') || t.includes('coat') || t.includes('dress') || t.includes('blazer'));
-            case 'shoes':
-              return category.includes('shoe') || category.includes('footwear') ||
-                     tags.some(t => t.includes('shoe') || t.includes('loafer') || t.includes('heel') || t.includes('boot'));
-            case 'accessories':
-              return category.includes('accessor') || category.includes('jewelry') ||
-                     tags.some(t => t.includes('scarf') || t.includes('belt') || t.includes('jewelry') || t.includes('watch'));
-            default:
-              return true;
-          }
-        });
-
-    return [...filtered].sort((a, b) => {
+    return [...products].sort((a, b) => {
       switch (sortBy) {
         case 'price-asc': return a.price - b.price;
         case 'price-desc': return b.price - a.price;
@@ -146,7 +141,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
         default: return 0;
       }
     });
-  }, [baseProducts, categoryFilter, sortBy]);
+  }, [products, sortBy]);
 
   if (loading) {
     return (
@@ -159,14 +154,6 @@ export default function CollectionPage({ params }: CollectionPageProps) {
   if (!collection && !isAllProducts) {
     notFound();
   }
-
-  const categoryOptions: { id: CategoryFilter; label: string }[] = [
-    { id: 'all', label: 'All' },
-    { id: 'bags', label: 'Bags' },
-    { id: 'clothing', label: 'Clothing' },
-    { id: 'shoes', label: 'Shoes' },
-    { id: 'accessories', label: 'Accessories' }
-  ];
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -214,34 +201,11 @@ export default function CollectionPage({ params }: CollectionPageProps) {
           <div className="flex items-center justify-between py-5 border-b border-sand/30">
             {/* Product Count */}
             <div className="text-sm text-stone">
-              <span className="text-charcoal-deep font-medium">{displayProducts.length}</span>
-              {' '}piece{displayProducts.length !== 1 ? 's' : ''}
-              {categoryFilter !== 'all' && (
-                <span className="text-taupe"> in {categoryOptions.find(c => c.id === categoryFilter)?.label}</span>
-              )}
+              <span className="text-charcoal-deep font-medium">{totalProducts}</span>
+              {' '}piece{totalProducts !== 1 ? 's' : ''}
             </div>
 
-            {/* Desktop Filters */}
-            <nav className="hidden lg:flex gap-8">
-              {categoryOptions.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setCategoryFilter(category.id)}
-                  className={`relative text-sm tracking-[0.15em] uppercase transition-all duration-300 ${
-                    categoryFilter === category.id
-                      ? 'text-charcoal-deep'
-                      : 'text-stone hover:text-charcoal-deep'
-                  }`}
-                >
-                  {category.label}
-                  {categoryFilter === category.id && (
-                    <span className="absolute -bottom-5 left-0 right-0 h-px bg-charcoal-deep" />
-                  )}
-                </button>
-              ))}
-            </nav>
-
-            {/* Sort & Mobile Filter */}
+            {/* Sort */}
             <div className="flex items-center gap-3">
               <select
                 value={sortBy}
@@ -254,131 +218,161 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                 <option value="newest">Newest</option>
                 <option value="brand-az">Brand A-Z</option>
               </select>
-
-              {/* Mobile Filter Toggle */}
-              <button
-                onClick={() => setShowFilters(true)}
-                className="lg:hidden group flex items-center gap-2 text-sm tracking-[0.15em] uppercase text-charcoal-deep"
-              >
-                <span>Filter</span>
-                <span className="relative">
-                  <SlidersHorizontal size={16} />
-                  {categoryFilter !== 'all' && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-gold-muted rounded-full" />
-                  )}
-                </span>
-              </button>
             </div>
           </div>
-
-          {/* Active Filter Chip */}
-          {categoryFilter !== 'all' && (
-            <div className="py-4">
-              <span className="inline-flex items-center gap-3 px-4 py-2 border border-charcoal-deep text-charcoal-deep text-xs tracking-[0.1em]">
-                {categoryOptions.find(c => c.id === categoryFilter)?.label}
-                <button onClick={() => setCategoryFilter('all')} className="hover:text-gold-deep transition-colors">
-                  <X size={12} />
-                </button>
-              </span>
-            </div>
-          )}
         </div>
       </section>
 
       {/* ============================================
           PRODUCTS GRID
           ============================================ */}
-      <section className="bg-parchment py-16 lg:py-24">
+      <section ref={resultsRef} className="bg-parchment py-16 lg:py-24">
         <div className="max-w-[1800px] mx-auto px-8 md:px-16 lg:px-24">
           {displayProducts.length > 0 ? (
-            <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-10 md:gap-y-16">
-              {displayProducts.slice(0, visibleCount).map((product, index) => (
-                <Link
-                  key={product.id}
-                  href={`/product/${product.slug}?productId=${product.id}`}
-                  className="group"
-                  onMouseEnter={() => setActiveProductHover(index)}
-                  onMouseLeave={() => setActiveProductHover(null)}
-                >
-                  <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-5">
-                    <Image
-                      src={product.images[0]?.url || ''}
-                      alt={product.name}
-                      fill
-                      className="object-cover transition-all duration-700 group-hover:scale-105"
-                    />
+            <div className="relative">
+              {/* Loading overlay for page transitions */}
+              {productsLoading && (
+                <div className="absolute inset-0 bg-parchment/80 z-10 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
 
-                    {/* Hover Action */}
-                    <div className="absolute inset-0 flex items-center justify-center bg-noir/0 group-hover:bg-noir/20 transition-all duration-500">
-                      <div className={`w-14 h-14 rounded-full bg-ivory-cream flex items-center justify-center transform transition-all duration-500 ${activeProductHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
-                        <ArrowRight size={18} className="text-charcoal-deep" />
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 md:gap-x-8 gap-y-10 md:gap-y-16">
+                {displayProducts.map((product, index) => (
+                  <Link
+                    key={product.id}
+                    href={`/product/${product.slug}?productId=${product.id}`}
+                    className="group"
+                    onMouseEnter={() => setActiveProductHover(index)}
+                    onMouseLeave={() => setActiveProductHover(null)}
+                  >
+                    <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-5">
+                      <Image
+                        src={product.images[0]?.url || ''}
+                        alt={product.name}
+                        fill
+                        className="object-cover transition-all duration-700 group-hover:scale-105"
+                      />
+
+                      {/* Hover Action */}
+                      <div className="absolute inset-0 flex items-center justify-center bg-noir/0 group-hover:bg-noir/20 transition-all duration-500">
+                        <div className={`w-14 h-14 rounded-full bg-ivory-cream flex items-center justify-center transform transition-all duration-500 ${activeProductHover === index ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}`}>
+                          <ArrowRight size={18} className="text-charcoal-deep" />
+                        </div>
                       </div>
+
+                      {/* Limited Badge */}
+                      {product.availability.status === 'limited' && (
+                        <div className="absolute top-4 left-4">
+                          <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream px-3 py-1.5">
+                            Limited Edition
+                          </span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Limited Badge */}
-                    {product.availability.status === 'limited' && (
-                      <div className="absolute top-4 left-4">
-                        <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream px-3 py-1.5">
-                          Limited Edition
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="space-y-1.5">
-                    <p className="text-[10px] tracking-[0.25em] uppercase text-taupe">
-                      {product.brandName}
-                    </p>
-                    <h3 className="font-display text-lg md:text-xl text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors">
-                      {product.name}
-                    </h3>
-                    <p className="text-sm text-stone">
-                      {product.currency === 'INR' ? '₹' : product.currency === 'GBP' ? '£' : product.currency === 'EUR' ? '€' : '$'}
-                      {product.price.toLocaleString()}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-
-            {visibleCount < displayProducts.length && (
-              <div className="text-center mt-16">
-                <p className="text-sm text-stone mb-6">
-                  Showing {Math.min(visibleCount, displayProducts.length)} of {displayProducts.length} pieces
-                </p>
-                <button
-                  onClick={() => setVisibleCount(prev => prev + 12)}
-                  className="group inline-flex items-center gap-4"
-                >
-                  <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep group-hover:text-gold-deep transition-colors">
-                    Load More
-                  </span>
-                  <span className="w-12 h-12 rounded-full border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
-                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
-                  </span>
-                </button>
+                    {/* Product Info */}
+                    <div className="space-y-1.5">
+                      <p className="text-[10px] tracking-[0.25em] uppercase text-taupe">
+                        {product.brandName}
+                      </p>
+                      <h3 className="font-display text-lg md:text-xl text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors">
+                        {product.name}
+                      </h3>
+                      <p className="text-sm text-stone">
+                        {product.currency === 'INR' ? '₹' : product.currency === 'GBP' ? '£' : product.currency === 'EUR' ? '€' : '$'}
+                        {product.price.toLocaleString()}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
               </div>
-            )}
-            </>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-16 flex items-center justify-center gap-3 flex-wrap">
+                  {/* Previous */}
+                  <button
+                    onClick={() => { setCurrentPage(p => p - 1); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                    disabled={currentPage === 1 || productsLoading}
+                    className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {/* Page Numbers with Smart Ellipsis */}
+                  {(() => {
+                    const pages: (number | string)[] = [];
+
+                    if (totalPages <= 7) {
+                      for (let i = 1; i <= totalPages; i++) pages.push(i);
+                    } else {
+                      pages.push(1);
+                      if (currentPage > 4) pages.push('...');
+                      const start = Math.max(2, currentPage - 1);
+                      const end = Math.min(totalPages - 1, currentPage + 1);
+                      for (let i = start; i <= end; i++) {
+                        if (!pages.includes(i)) pages.push(i);
+                      }
+                      if (currentPage < totalPages - 3) pages.push('...');
+                      if (!pages.includes(totalPages)) pages.push(totalPages);
+                    }
+
+                    return pages.map((page, idx) => (
+                      page === '...' ? (
+                        <span key={`ellipsis-${idx}`} className="w-10 h-10 flex items-center justify-center text-stone">
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => { setCurrentPage(page as number); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                          disabled={productsLoading}
+                          className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all disabled:opacity-50 ${
+                            currentPage === page
+                              ? 'bg-charcoal-deep text-ivory-cream'
+                              : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ));
+                  })()}
+
+                  {/* Next */}
+                  <button
+                    onClick={() => { setCurrentPage(p => p + 1); resultsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                    disabled={currentPage === totalPages || productsLoading}
+                    className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+
+                  {/* Count */}
+                  <span className="ml-4 text-xs text-stone tracking-wider">
+                    {totalProducts} pieces
+                  </span>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="text-center py-24 bg-ivory-cream">
               <p className="font-display text-2xl text-charcoal-deep mb-4">No pieces found</p>
               <p className="text-stone mb-8 max-w-md mx-auto">
-                No {categoryOptions.find(c => c.id === categoryFilter)?.label.toLowerCase()} in this collection.
+                No pieces available in this collection.
               </p>
-              <button
-                onClick={() => setCategoryFilter('all')}
+              <Link
+                href="/discover"
                 className="group inline-flex items-center gap-4"
               >
                 <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep group-hover:text-gold-deep transition-colors">
-                  View All Pieces
+                  Explore All Pieces
                 </span>
                 <span className="w-12 h-12 rounded-full border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
                   <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
                 </span>
-              </button>
+              </Link>
             </div>
           )}
         </div>
@@ -432,77 +426,6 @@ export default function CollectionPage({ params }: CollectionPageProps) {
         </div>
       </section>
 
-      {/* ============================================
-          MOBILE FILTER DRAWER
-          ============================================ */}
-      <div
-        className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-500 ${showFilters ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="filter-drawer-title"
-      >
-        {/* Backdrop */}
-        <div
-          className="absolute inset-0 bg-noir/50 backdrop-blur-sm"
-          onClick={() => setShowFilters(false)}
-        />
-
-        {/* Drawer */}
-        <div
-          className={`absolute right-0 top-0 bottom-0 w-full max-w-sm bg-ivory-cream transform transition-transform duration-500 ease-out ${showFilters ? 'translate-x-0' : 'translate-x-full'}`}
-        >
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-6 border-b border-sand/30">
-            <h3 id="filter-drawer-title" className="font-display text-xl text-charcoal-deep">Filter</h3>
-            <button
-              ref={filterCloseRef}
-              onClick={() => setShowFilters(false)}
-              className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-all"
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Filter Content */}
-          <div className="px-6 py-8">
-            <h4 className="text-[11px] tracking-[0.4em] uppercase text-taupe mb-6">Category</h4>
-            <div className="space-y-1">
-              {categoryOptions.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => {
-                    setCategoryFilter(category.id);
-                    setShowFilters(false);
-                  }}
-                  className={`flex items-center justify-between w-full text-left py-3 text-sm transition-all ${
-                    categoryFilter === category.id
-                      ? 'text-charcoal-deep'
-                      : 'text-stone hover:text-charcoal-deep'
-                  }`}
-                >
-                  <span>{category.label}</span>
-                  {categoryFilter === category.id && (
-                    <span className="w-2 h-2 bg-gold-muted rounded-full" />
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="absolute bottom-0 left-0 right-0 px-6 py-6 border-t border-sand/30 bg-ivory-cream">
-            <button
-              onClick={() => {
-                setCategoryFilter('all');
-                setShowFilters(false);
-              }}
-              className="w-full py-4 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors border border-sand hover:border-charcoal-deep"
-            >
-              Clear Filter
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

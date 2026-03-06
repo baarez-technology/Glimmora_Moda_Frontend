@@ -5,7 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight, Sparkles } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
-import { getRecommendedProducts, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
+import { getRecommendedProductsPaginated, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
+import type { PaginatedProducts } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import type { Product, Brand, BrandStory, Collection } from '@/types';
@@ -27,8 +28,12 @@ export default function BrandPage({ params }: BrandPageProps) {
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [productsLoading, setProductsLoading] = useState(false);
   const PRODUCTS_PER_PAGE = 20;
   const productsRef = useRef<HTMLElement>(null);
+  const loadedBrandRef = useRef<Brand | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -69,15 +74,22 @@ export default function BrandPage({ params }: BrandPageProps) {
         }
 
         setBrand(loadedBrand);
+        loadedBrandRef.current = loadedBrand;
 
-        // Load products, stories, and collections from real API
-        const [recommendedProducts, brandStories, brandCollections] = await Promise.all([
-          getRecommendedProducts({ filter_brand_id: loadedBrand.id }),
+        // Load products (page 1), stories, and collections from real API
+        const [productsResult, brandStories, brandCollections] = await Promise.all([
+          getRecommendedProductsPaginated({
+            filter_brand_id: loadedBrand.id,
+            page_number: 1,
+            page_size: PRODUCTS_PER_PAGE,
+          }),
           searchStories({ brand_id: loadedBrand.id }),
           getCollections(loadedBrand.id),
         ]);
 
-        setProducts(recommendedProducts);
+        setProducts(productsResult.products);
+        setTotalPages(productsResult.totalPages);
+        setTotalProducts(productsResult.totalMatched);
         setStories(brandStories);
         setCollections(brandCollections);
       } catch (err) {
@@ -94,6 +106,31 @@ export default function BrandPage({ params }: BrandPageProps) {
 
     loadData();
   }, [slug, brandIdParam]);
+
+  // Fetch products when page changes
+  useEffect(() => {
+    if (!loadedBrandRef.current || currentPage === 1) return;
+
+    async function loadPageProducts() {
+      setProductsLoading(true);
+      try {
+        const result = await getRecommendedProductsPaginated({
+          filter_brand_id: loadedBrandRef.current!.id,
+          page_number: currentPage,
+          page_size: PRODUCTS_PER_PAGE,
+        });
+        setProducts(result.products);
+        setTotalPages(result.totalPages);
+        setTotalProducts(result.totalMatched);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to load products.');
+      } finally {
+        setProductsLoading(false);
+      }
+    }
+
+    loadPageProducts();
+  }, [currentPage]);
 
   if (loading) {
     return (
@@ -231,28 +268,31 @@ export default function BrandPage({ params }: BrandPageProps) {
           </div>
         </section>
       )}
-      {!error && products.length > 0 && (() => {
-        const totalPages = Math.ceil(products.length / PRODUCTS_PER_PAGE);
-        const start = (currentPage - 1) * PRODUCTS_PER_PAGE;
-        const paginatedProducts = products.slice(start, start + PRODUCTS_PER_PAGE);
-
-        return (
-          <section ref={productsRef} className="py-20 lg:py-28 bg-white">
-            <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-16">
-              <div className="flex items-end justify-between mb-12">
-                <div>
-                  <span className="font-body text-[10px] tracking-[0.4em] uppercase text-stone block mb-3">
-                    The Collection
-                  </span>
-                  <h2 className="font-display text-3xl md:text-4xl text-charcoal-deep tracking-[-0.02em]">
-                    Pieces by {brand.name}
-                  </h2>
-                </div>
-                <span className="text-sm text-stone">{products.length} pieces</span>
+      {!error && (products.length > 0 || totalProducts > 0) && (
+        <section ref={productsRef} className="py-20 lg:py-28 bg-white">
+          <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-16">
+            <div className="flex items-end justify-between mb-12">
+              <div>
+                <span className="font-body text-[10px] tracking-[0.4em] uppercase text-stone block mb-3">
+                  The Collection
+                </span>
+                <h2 className="font-display text-3xl md:text-4xl text-charcoal-deep tracking-[-0.02em]">
+                  Pieces by {brand.name}
+                </h2>
               </div>
+              <span className="text-sm text-stone">{totalProducts} pieces</span>
+            </div>
+
+            {/* Products loading overlay */}
+            <div className={`relative ${productsLoading ? 'opacity-50 pointer-events-none' : ''}`}>
+              {productsLoading && (
+                <div className="absolute inset-0 flex items-center justify-center z-10">
+                  <div className="w-8 h-8 border border-charcoal-deep/20 border-t-charcoal-deep rounded-full animate-spin" />
+                </div>
+              )}
 
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-                {paginatedProducts.map((product, index) => (
+                {products.map((product, index) => (
                   <Link
                     key={product.id}
                     href={`/product/${product.slug}?productId=${product.id}`}
@@ -282,45 +322,85 @@ export default function BrandPage({ params }: BrandPageProps) {
                   </Link>
                 ))}
               </div>
+            </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="mt-16 flex items-center justify-center gap-3">
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-16 flex flex-col items-center gap-4">
+                <p className="text-sm text-stone">
+                  Showing {((currentPage - 1) * PRODUCTS_PER_PAGE) + 1}-{Math.min(currentPage * PRODUCTS_PER_PAGE, totalProducts)} of {totalProducts} pieces
+                </p>
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => { setCurrentPage(p => p - 1); productsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                    disabled={currentPage === 1}
+                    disabled={currentPage === 1 || productsLoading}
                     className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                   >
                     <ChevronLeft size={16} />
                   </button>
 
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => { setCurrentPage(page); productsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                      className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all ${
-                        currentPage === page
-                          ? 'bg-charcoal-deep text-ivory-cream'
-                          : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {/* Show limited page numbers with ellipsis for many pages */}
+                  {(() => {
+                    const pages: (number | string)[] = [];
+                    if (totalPages <= 7) {
+                      // Show all pages if 7 or less
+                      for (let i = 1; i <= totalPages; i++) pages.push(i);
+                    } else {
+                      // Always show first page
+                      pages.push(1);
+
+                      if (currentPage > 3) {
+                        pages.push('...');
+                      }
+
+                      // Show pages around current page
+                      for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                        if (!pages.includes(i)) pages.push(i);
+                      }
+
+                      if (currentPage < totalPages - 2) {
+                        pages.push('...');
+                      }
+
+                      // Always show last page
+                      if (!pages.includes(totalPages)) pages.push(totalPages);
+                    }
+
+                    return pages.map((page, idx) => (
+                      typeof page === 'string' ? (
+                        <span key={`ellipsis-${idx}`} className="w-10 h-10 flex items-center justify-center text-stone">
+                          {page}
+                        </span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => { setCurrentPage(page); productsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
+                          disabled={productsLoading}
+                          className={`w-10 h-10 rounded-full text-sm tracking-wider transition-all disabled:cursor-not-allowed ${
+                            currentPage === page
+                              ? 'bg-charcoal-deep text-ivory-cream'
+                              : 'border border-sand text-charcoal-deep hover:border-charcoal-deep'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ));
+                  })()}
 
                   <button
                     onClick={() => { setCurrentPage(p => p + 1); productsRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                    disabled={currentPage === totalPages}
+                    disabled={currentPage === totalPages || productsLoading}
                     className="w-10 h-10 rounded-full border border-sand flex items-center justify-center text-charcoal-deep hover:border-charcoal-deep disabled:opacity-30 disabled:cursor-not-allowed transition-all"
                   >
                     <ChevronRight size={16} />
                   </button>
                 </div>
-              )}
-            </div>
-          </section>
-        );
-      })()}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ═══ COLLECTIONS ═══ */}
       {collections.length > 0 && (

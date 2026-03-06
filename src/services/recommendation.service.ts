@@ -76,14 +76,16 @@ function authHeaders(): Record<string, string> {
 /** Map API brand → frontend Brand type */
 function mapToBrand(raw: RecommendedBrand): Brand {
   const slug = raw.brand_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  // Use brand_logo if available, otherwise generate a placeholder
+  const brandImage = raw.brand_logo || `https://placehold.co/800x600/1A1A1A/C9A962?text=${encodeURIComponent(raw.brand_name)}`;
   return {
     id: raw.brand_id,
     name: raw.brand_name,
     slug,
     tagline: '',
     description: '',
-    heroImage: raw.brand_logo,
-    logoUrl: raw.brand_logo,
+    heroImage: brandImage,
+    logoUrl: brandImage,
     heritage: { founded: 0, founder: '', origin: '', story: '' },
     collections: [],
     stories: [],
@@ -180,6 +182,15 @@ export async function getRecommendedBrands(): Promise<Brand[]> {
 // Product Recommendations
 // ============================================
 
+/** Paginated result with metadata */
+export interface PaginatedProducts {
+  products: Product[];
+  totalMatched: number;
+  totalPages: number;
+  pageNumber: number;
+  pageSize: number;
+}
+
 /**
  * POST /api/v1/products/recommendations
  *
@@ -189,6 +200,18 @@ export async function getRecommendedBrands(): Promise<Brand[]> {
 export async function getRecommendedProducts(
   params?: ProductRecommendationRequest
 ): Promise<Product[]> {
+  const result = await getRecommendedProductsPaginated(params);
+  return result.products;
+}
+
+/**
+ * POST /api/v1/products/recommendations (with pagination metadata)
+ *
+ * Returns products along with pagination info (total count, total pages, etc.)
+ */
+export async function getRecommendedProductsPaginated(
+  params?: ProductRecommendationRequest
+): Promise<PaginatedProducts> {
   const body: ProductRecommendationRequest = {
     page_number: 1,
     page_size: 20,
@@ -216,7 +239,13 @@ export async function getRecommendedProducts(
     const data: ProductRecommendationResponse = await res.json();
     if (!data.products_data) {
       console.warn('[products] API returned no products_data field. Response keys:', Object.keys(data));
-      return [];
+      return {
+        products: [],
+        totalMatched: 0,
+        totalPages: 0,
+        pageNumber: body.page_number || 1,
+        pageSize: body.page_size || 20,
+      };
     }
     if (data.products_data.length > 0) {
       const sample = data.products_data[0] as unknown as Record<string, unknown>;
@@ -233,7 +262,13 @@ export async function getRecommendedProducts(
     } else {
       console.warn('[products] API returned 0 products for request:', body);
     }
-    return data.products_data.map(mapToProduct);
+    return {
+      products: data.products_data.map(mapToProduct),
+      totalMatched: data.total_matched || 0,
+      totalPages: data.total_pages || 0,
+      pageNumber: data.page_number || body.page_number || 1,
+      pageSize: data.page_size || body.page_size || 20,
+    };
   }, PRODUCTS_TTL);
 }
 
