@@ -8,6 +8,7 @@ import type {
   CalendarEvent,
   EventType,
   BackendCalendarEvent,
+  BackendOutfitRecommendation,
   CalendarConnectionStatus,
   ManualEventRequest,
   SuggestionPreferences,
@@ -117,7 +118,7 @@ export function mapBackendToFrontendEvent(
       : undefined;
 
   return {
-    id: ev.event_id,
+    id: ev.calendar_event_id,
     title: ev.title ? stripHtml(ev.title) : 'Untitled Event',
     eventType: inferEventType(ev.tags || []),
     date: ev.event_date,
@@ -126,7 +127,7 @@ export function mapBackendToFrontendEvent(
     venue: ev.location || undefined,
     description: ev.description ? stripHtml(ev.description) : undefined,
     weather,
-    // outfitSuggestions are generated client-side by AppContext
+    backendOutfitSuggestions: ev.outfit_suggestions || undefined,
   };
 }
 
@@ -276,6 +277,31 @@ export async function updateSuggestionPreferences(
       .json()
       .catch(() => ({ detail: 'Failed to update preferences' }));
     throw new Error(err.detail || `Update preferences failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ─── Outfit Recommendations ─────────────────────────────────────────────────
+
+/** Get AI outfit recommendations for a calendar event */
+export async function getOutfitRecommendations(
+  calendarEventId: string,
+  regenerate = false
+): Promise<BackendOutfitRecommendation> {
+  const url = `/api/v1/calendar/events/outfit-recommendations${regenerate ? '?regenerate=true' : ''}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: getUserAuthHeaders(),
+    body: JSON.stringify({ calendar_event_id: calendarEventId }),
+  });
+
+  if (!res.ok) {
+    const err = await res
+      .json()
+      .catch(() => ({ detail: 'Failed to get outfit recommendations' }));
+    throw new Error(err.detail || `Outfit recommendations failed (${res.status})`);
   }
 
   return res.json();

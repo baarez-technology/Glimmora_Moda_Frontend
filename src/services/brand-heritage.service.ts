@@ -3,7 +3,7 @@
  * Endpoints: /api/v1/event/*
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+const API_BASE = '';
 
 function getToken(): string | null {
   try {

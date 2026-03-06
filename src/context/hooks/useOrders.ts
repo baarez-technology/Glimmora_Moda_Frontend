@@ -11,6 +11,9 @@ export interface OrderRecord {
   createdAt: string;
   estimatedDelivery: string;
   trackingNumber?: string;
+  customerName?: string;
+  customerEmail?: string;
+  shippingAddress?: string;
 }
 
 interface UseOrdersProps {

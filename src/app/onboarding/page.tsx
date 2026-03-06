@@ -78,10 +78,10 @@ export default function OnboardingPage() {
   ];
 
   const budgetOptions = [
-    { id: 'no-limit', label: 'No preference', desc: 'Show me everything', range: undefined },
+    { id: 'no-limit', label: 'No preference', desc: 'Show me everything', range: { min: 0, max: 1000000 } },
     { id: 'under-1000', label: 'Up to €1,000', desc: 'Per piece', range: { min: 0, max: 1000 } },
     { id: '1000-5000', label: '€1,000 — €5,000', desc: 'Per piece', range: { min: 1000, max: 5000 } },
-    { id: '5000-plus', label: '€5,000+', desc: 'Investment pieces', range: { min: 5000, max: Infinity } }
+    { id: '5000-plus', label: '€5,000+', desc: 'Investment pieces', range: { min: 5000, max: 1000000 } }
   ] as const;
 
   const toggleSelection = (type: 'occasions' | 'aesthetics', id: string) => {

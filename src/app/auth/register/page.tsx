@@ -79,10 +79,10 @@ function RegisterForm() {
         role: selectedRole,
       });
 
-      storeUserAuth(data);
-      setUserData(data.user);
+      storeUserAuth({ access_token: data.access_token!, refresh_token: data.refresh_token!, user: data.user! });
+      setUserData(data.user!);
 
-      const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+      const tier = data.user!.role === 'uhni' ? 'uhni' : 'preferred';
       setAppUserRole(tier as 'uhni' | 'preferred');
 
       showToast('Account created successfully!', 'success');
@@ -112,10 +112,10 @@ function RegisterForm() {
       const idToken = await firebaseUser.getIdToken();
       const data = await socialSignIn(provider, idToken, selectedRole);
 
-      storeUserAuth(data);
-      setUserData(data.user);
+      storeUserAuth({ access_token: data.access_token!, refresh_token: data.refresh_token!, user: data.user! });
+      setUserData(data.user!);
 
-      const tier = data.user.role === 'uhni' ? 'uhni' : 'preferred';
+      const tier = data.user!.role === 'uhni' ? 'uhni' : 'preferred';
       setAppUserRole(tier as 'uhni' | 'preferred');
 
       showToast('Account created successfully!', 'success');

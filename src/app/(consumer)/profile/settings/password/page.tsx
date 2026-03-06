@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Lock, Eye, EyeOff, Check, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
+import { changeUserPassword } from '@/services/auth.service';
 
 function getPasswordStrength(password: string): { score: number; label: string; color: string } {
   let score = 0;
@@ -34,6 +35,7 @@ export default function PasswordPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -75,15 +77,28 @@ export default function PasswordPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
-    localStorage.setItem('moda-password-updated', new Date().toISOString());
-    showToast('Password updated successfully', 'success');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setErrors({});
+    setIsSubmitting(true);
+    try {
+      await changeUserPassword({
+        current_password: currentPassword,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      });
+      showToast('Password updated successfully', 'success');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setErrors({});
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to change password';
+      setErrors({ currentPassword: message });
+      showToast(message, 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -242,9 +257,13 @@ export default function PasswordPage() {
             </Link>
             <button
               type="submit"
-              className="px-8 py-3 bg-charcoal-deep text-ivory-cream hover:bg-charcoal-deep/90 transition-colors text-sm tracking-[0.1em] uppercase"
+              disabled={isSubmitting}
+              className="px-8 py-3 bg-charcoal-deep text-ivory-cream hover:bg-charcoal-deep/90 transition-colors text-sm tracking-[0.1em] uppercase disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Update Password
+              {isSubmitting && (
+                <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+              )}
+              {isSubmitting ? 'Updating...' : 'Update Password'}
             </button>
           </div>
         </form>

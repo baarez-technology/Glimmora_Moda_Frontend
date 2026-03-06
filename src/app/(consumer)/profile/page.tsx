@@ -78,10 +78,10 @@ export default function ProfilePage() {
       };
       loadUser();
     } else if (isHydrated && isAuthenticated && authUserData) {
-      // Fetch fresh user data from backend using GET /api/v1/user/auth/{user_id}
+      // Fetch fresh user data from backend using GET /api/v1/user/auth/me
       const refreshUser = async () => {
         try {
-          const freshUserData = await authService.getUserById(authUserData.user_id);
+          const freshUserData = await authService.getUserById();
           setUserData(freshUserData);
           if (freshUserData.profile_picture) {
             setProfilePicture(freshUserData.profile_picture);
@@ -373,7 +373,13 @@ export default function ProfilePage() {
                       <div className="md:col-span-2 pt-6 border-t border-sand/50">
                         <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-3">Investment Range</p>
                         <p className="font-display text-2xl text-charcoal-deep">
-                          €{user.fashionIdentity.budgetRange.min.toLocaleString()} — €{user.fashionIdentity.budgetRange.max.toLocaleString()}
+                          {(() => {
+                            const { min, max } = user.fashionIdentity.budgetRange;
+                            if (min === 0 && max >= 1000000) return 'No Preference';
+                            if (min === 0 && max <= 1000) return `Up to €${max.toLocaleString()}`;
+                            if (min >= 5000 && max >= 1000000) return `€${min.toLocaleString()}+`;
+                            return `€${min.toLocaleString()} — €${max.toLocaleString()}`;
+                          })()}
                         </p>
                       </div>
                     )}
@@ -529,6 +535,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
               ) : (
+                /* Style Note - commented out for consumer
                 <div className="p-8 bg-parchment border-l-2 border-gold-muted">
                   <p className="text-[10px] tracking-[0.4em] uppercase text-taupe mb-4">Style Note</p>
                   <p className="text-stone leading-relaxed">
@@ -536,6 +543,8 @@ export default function ProfilePage() {
                     Consider exploring softer silhouettes for variety, particularly from Bottega Veneta's current collection.
                   </p>
                 </div>
+                */
+                null
               )}
             </div>
           </div>

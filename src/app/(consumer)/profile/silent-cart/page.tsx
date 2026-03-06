@@ -1,164 +1,77 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ShoppingBag, Trash2, Check, Clock, Info, ChevronRight, Layers, Crown, Zap, Settings, MessageCircle } from 'lucide-react';
-import ConfirmModal from '@/components/shared/ConfirmModal';
-import * as userService from '@/services/user.service';
-import { useApp } from '@/context/AppContext';
+import { ArrowLeft, ArrowRight, Info, Layers, ChevronRight, RefreshCw } from 'lucide-react';
+import * as wardrobeService from '@/services/wardrobe.service';
+import type { WardrobeGapAnalysisResponse } from '@/services/wardrobe.service';
 import { useAuth } from '@/context/AuthContext';
+
+const GAP_SESSION_KEY = 'moda-gap-analysis';
+
+type PageState = 'EMPTY' | 'ANALYSING' | 'RESULTS' | 'ERROR';
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function SilentCartPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
-  const { addToConsiderations, showToast, isUHNI, autonomousSettings, concierge } = useApp();
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) router.push('/auth/login/consumer?redirect=/profile/silent-cart');
   }, [isAuthenticated, isHydrated, router]);
-  const [cart, setCart] = useState<Awaited<ReturnType<typeof userService.getSilentCart>>['data'] | null>(null);
-  const [approvedItems, setApprovedItems] = useState<string[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [showAutoPurchaseConfirm, setShowAutoPurchaseConfirm] = useState(false);
 
-  useEffect(() => {
-    const loadSilentCart = async () => {
-      const response = await userService.getSilentCart();
-      setCart(response.data);
-      setLoading(false);
-      setIsLoaded(true);
-    };
-    loadSilentCart();
+  const [pageState, setPageState] = useState<PageState>(() => {
+    if (typeof window === 'undefined') return 'EMPTY';
+    try {
+      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
+      return cached ? 'RESULTS' : 'EMPTY';
+    } catch { return 'EMPTY'; }
+  });
+  const [gapAnalysis, setGapAnalysis] = useState<WardrobeGapAnalysisResponse | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = sessionStorage.getItem(GAP_SESSION_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(true);
+
+  // Run analysis (first time or refresh) — caches in sessionStorage
+  const runAnalysis = useCallback((regenerate: boolean) => {
+    setPageState('ANALYSING');
+    setError(null);
+    wardrobeService.getWardrobeGapAnalysis(regenerate)
+      .then((data) => {
+        setGapAnalysis(data);
+        setPageState('RESULTS');
+        try { sessionStorage.setItem(GAP_SESSION_KEY, JSON.stringify(data)); } catch {}
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Analysis failed');
+        setPageState('ERROR');
+      });
   }, []);
 
-  const handleRemove = (productId: string) => {
-    if (!cart) return;
-    setCart({
-      ...cart,
-      items: cart.items.filter(item => item.productId !== productId),
-      totalValue: cart.items
-        .filter(item => item.productId !== productId)
-        .reduce((sum, item) => sum + item.product.price, 0)
-    });
-  };
-
-  const handleApprove = (productId: string) => {
-    if (approvedItems.includes(productId)) {
-      setApprovedItems(approvedItems.filter(id => id !== productId));
-    } else {
-      setApprovedItems([...approvedItems, productId]);
-    }
-  };
-
-  const handleApproveAll = () => {
-    if (!cart) return;
-    if (approvedItems.length === cart.items.length) {
-      setApprovedItems([]);
-    } else {
-      setApprovedItems(cart.items.map(item => item.productId));
-    }
-  };
-
-  const handleMoveToConsiderations = () => {
-    if (!cart) return;
-    const itemsToMove = cart.items.filter(item => approvedItems.includes(item.productId));
-
-    if (itemsToMove.length === 0) {
-      showToast('Please select items to move', 'info');
-      return;
-    }
-
-    itemsToMove.forEach(item => {
-      addToConsiderations(
-        item.product,
-        {},
-        `Curated for you: ${item.reason}`
-      );
-    });
-
-    setCart({
-      ...cart,
-      items: cart.items.filter(item => !approvedItems.includes(item.productId)),
-      totalValue: cart.items
-        .filter(item => !approvedItems.includes(item.productId))
-        .reduce((sum, item) => sum + item.product.price, 0)
-    });
-
-    setApprovedItems([]);
-    router.push('/consideration');
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
-      </div>
-    );
-  }
-
-  if (!cart || cart.items.length === 0) {
-    return (
-      <div className="min-h-screen bg-ivory-cream">
-        <div className="bg-charcoal-deep">
-          <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
-            <Link
-              href="/profile"
-              className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
-            >
-              <ArrowLeft size={16} />
-              Back to Profile
-            </Link>
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-gold-soft/20 flex items-center justify-center">
-                <Layers size={28} className="text-gold-soft" />
-              </div>
-              <div>
-                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-2">
-                  Curated For You
-                </span>
-                <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
-                  Silent Cart
-                </h1>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
-          <div className="text-center py-20 bg-white">
-            <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
-              <ShoppingBag size={32} className="text-charcoal-deep" />
-            </div>
-            <h3 className="font-display text-xl text-charcoal-deep mb-3">
-              Your Silent Cart is Empty
-            </h3>
-            <p className="text-stone mb-8 max-w-md mx-auto">
-              We don't have any curated items for you yet. Browse our collection and we'll
-              quietly prepare suggestions that align with your style and upcoming occasions.
-            </p>
-            <Link
-              href="/discover"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
-            >
-              <span className="text-sm tracking-[0.15em] uppercase">Browse Products</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const approvedTotal = cart.items
-    .filter(item => approvedItems.includes(item.productId))
-    .reduce((sum, item) => sum + item.product.price, 0);
+  const gaps = gapAnalysis?.gap_analysis || [];
 
   return (
     <div className="min-h-screen bg-ivory-cream">
       {/* Header */}
       <div className="bg-charcoal-deep">
-        <div className="max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12">
+        <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
             href="/profile"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
@@ -178,341 +91,254 @@ export default function SilentCartPage() {
               <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
                 Silent Cart
               </h1>
-              <p className="text-sand mt-2">Items curated based on your preferences</p>
+              <p className="text-sand mt-2">
+                AI-powered wardrobe recommendations based on what you're missing
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className={`max-w-[1000px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        {/* How It Works */}
-        <div className="bg-parchment p-6 border border-sand mb-6">
-          <div className="flex items-start gap-4">
-            <div className="w-8 h-8 bg-charcoal-deep flex items-center justify-center flex-shrink-0">
-              <span className="text-ivory-cream text-sm font-medium">?</span>
-            </div>
-            <div>
-              <p className="font-medium text-charcoal-deep mb-2">How Silent Cart Works</p>
-              <p className="text-sm text-stone">{cart.agiExplanation}</p>
-            </div>
-          </div>
-        </div>
+      <div className={`max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
 
-        {/* UHNI: Autonomous Shopping Status */}
-        {isUHNI && autonomousSettings && (
-          <div className="bg-charcoal-deep p-6 mb-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gold-soft/20 flex items-center justify-center">
-                  <Zap size={20} className="text-gold-soft" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <Zap size={12} className="text-gold-soft" />
-                    <span className="text-[10px] tracking-[0.3em] uppercase text-gold-soft/70">Zero-UI Commerce</span>
-                  </div>
-                  <p className="text-ivory-cream font-medium">Autonomous Shopping</p>
-                </div>
-              </div>
-              <div className={`px-3 py-1 text-xs tracking-[0.1em] uppercase ${
-                autonomousSettings.enabled ? 'bg-success/20 text-success' : 'bg-stone/20 text-stone'
-              }`}>
-                {autonomousSettings.enabled ? 'Active' : 'Paused'}
-              </div>
+        {/* State: EMPTY (no analysis yet — click to trigger) */}
+        {pageState === 'EMPTY' && (
+          <div className="text-center py-16 bg-white border border-sand">
+            <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
+              <Layers size={32} className="text-charcoal-deep" />
             </div>
-
-            <div className="grid sm:grid-cols-3 gap-4 mb-4">
-              <div className="bg-ivory-cream/5 p-4">
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Monthly Budget</p>
-                <p className="font-display text-xl text-ivory-cream">
-                  €{autonomousSettings.currentMonthSpend.toLocaleString()} <span className="text-sm text-taupe">/ €{autonomousSettings.monthlyBudget.toLocaleString()}</span>
-                </p>
-              </div>
-              <div className="bg-ivory-cream/5 p-4">
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Auto-Approve Limit</p>
-                <p className="font-display text-xl text-gold-soft">€{autonomousSettings.autoApproveThreshold.toLocaleString()}</p>
-              </div>
-              <div className="bg-ivory-cream/5 p-4">
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Review Mode</p>
-                <p className="font-display text-lg text-ivory-cream capitalize">{autonomousSettings.requireReviewBefore.replace('_', ' ')}</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-ivory-cream/10">
-              <p className="text-sm text-taupe">
-                Items below €{autonomousSettings.autoApproveThreshold.toLocaleString()} can be auto-purchased
-              </p>
-              <Link
-                href="/uhni/autonomous"
-                className="flex items-center gap-2 text-gold-soft hover:text-gold-soft/80 transition-colors"
-              >
-                <Settings size={16} />
-                <span className="text-sm">Settings</span>
-              </Link>
-            </div>
+            <h3 className="font-display text-xl text-charcoal-deep mb-3">
+              No Analysis Yet
+            </h3>
+            <p className="text-stone mb-2 max-w-md mx-auto">
+              Your wardrobe gap analysis hasn't run yet, or your wardrobe has changed since the last analysis.
+            </p>
+            <p className="text-stone mb-8 max-w-md mx-auto text-sm">
+              Run an analysis to discover what's missing and get personalized product recommendations.
+            </p>
+            <button
+              onClick={() => runAnalysis(false)}
+              className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
+            >
+              <span className="text-sm tracking-[0.15em] uppercase">Analyse My Wardrobe</span>
+            </button>
           </div>
         )}
 
-        {cart.items.length === 0 ? (
-          <div className="text-center py-20 bg-white">
-            <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
-              <ShoppingBag size={32} className="text-charcoal-deep" />
-            </div>
-            <h3 className="font-display text-xl text-charcoal-deep mb-3">
-              Your Silent Cart is Empty
-            </h3>
-            <p className="text-stone mb-8 max-w-md mx-auto">
-              As you browse, we'll quietly prepare items that align with your style
-              and upcoming occasions. You'll see suggestions here.
-            </p>
-            <Link
-              href="/discover"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
-            >
-              <span className="text-sm tracking-[0.15em] uppercase">Start Exploring</span>
-            </Link>
+        {/* State: ANALYSING */}
+        {pageState === 'ANALYSING' && (
+          <div className="py-20 flex flex-col items-center justify-center gap-4">
+            <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-stone">Analysing your wardrobe...</p>
+            <p className="text-xs text-taupe">This may take a moment as our AI reviews your collection</p>
           </div>
-        ) : (
+        )}
+
+        {/* State: ERROR */}
+        {pageState === 'ERROR' && (
+          <div className="text-center py-16 bg-white border border-sand">
+            <p className="text-stone mb-4">{error || 'Could not load recommendations.'}</p>
+            <button
+              onClick={() => runAnalysis(false)}
+              className="text-sm tracking-[0.15em] uppercase text-charcoal-deep hover:text-noir transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* State: RESULTS */}
+        {pageState === 'RESULTS' && gapAnalysis && (
           <>
-            {/* Cart Items */}
-            <div className="bg-white overflow-hidden mb-6">
-              <div className="p-6 border-b border-sand flex items-center justify-between">
-                <p className="font-medium text-charcoal-deep">
-                  {cart.items.length} item{cart.items.length !== 1 ? 's' : ''} prepared
-                </p>
-                <button
-                  onClick={handleApproveAll}
-                  className="text-sm text-charcoal-deep hover:text-gold-muted transition-colors tracking-[0.1em] uppercase"
-                >
-                  {approvedItems.length === cart.items.length ? 'Deselect All' : 'Select All'}
-                </button>
+            {/* Meta bar: timestamp + cached badge + refresh */}
+            <div className="flex items-center justify-between mb-6 pb-4 border-b border-sand/50">
+              <div className="flex items-center gap-3">
+                {gapAnalysis.analyzed_at && (
+                  <span className="text-xs text-stone">
+                    Last analysed {timeAgo(gapAnalysis.analyzed_at)}
+                  </span>
+                )}
+                {gapAnalysis.cached && (
+                  <span className="text-[9px] tracking-[0.15em] uppercase px-2 py-0.5 bg-sand/50 text-taupe">
+                    Cached
+                  </span>
+                )}
               </div>
+              <button
+                onClick={() => runAnalysis(true)}
+                className="flex items-center gap-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
+                title="Refresh analysis"
+              >
+                <RefreshCw size={14} />
+                <span className="text-xs tracking-[0.1em] uppercase">Refresh</span>
+              </button>
+            </div>
 
-              <div className="divide-y divide-sand">
-                {cart.items.map((item) => (
-                  <div key={item.productId} className="p-6">
-                    <div className="flex gap-6">
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => handleApprove(item.productId)}
-                        className={`w-6 h-6 border-2 flex items-center justify-center flex-shrink-0 mt-2 transition-colors ${
-                          approvedItems.includes(item.productId)
-                            ? 'border-charcoal-deep bg-charcoal-deep'
-                            : 'border-sand hover:border-charcoal-deep'
-                        }`}
-                      >
-                        {approvedItems.includes(item.productId) && (
-                          <Check size={14} className="text-ivory-cream" />
-                        )}
-                      </button>
+            {/* Style Note */}
+            {gapAnalysis.style_notes && (
+              <div className="p-6 bg-charcoal-deep mb-8">
+                <p className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 mb-3">Style Note</p>
+                <p className="text-taupe text-sm leading-relaxed">{gapAnalysis.style_notes}</p>
+              </div>
+            )}
 
-                      {/* Image */}
-                      <Link
-                        href={`/product/${item.product.slug}`}
-                        className="relative w-24 h-32 lg:w-32 lg:h-40 overflow-hidden flex-shrink-0"
-                      >
-                        <Image
-                          src={item.product.images[0]?.url || ''}
-                          alt={item.product.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </Link>
+            {/* Stats + Wardrobe link */}
+            {gaps.length > 0 && (
+              <div className="mb-6 flex items-end justify-between">
+                <div>
+                  <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-2">
+                    Wardrobe Gap Analysis
+                  </span>
+                  <p className="text-stone text-sm">
+                    {gapAnalysis.gap_suggestions_count} gaps identified · {gapAnalysis.total_recommendations} products matched
+                  </p>
+                </div>
+                <Link
+                  href="/wardrobe"
+                  className="flex items-center gap-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  View Wardrobe
+                  <ChevronRight size={14} />
+                </Link>
+              </div>
+            )}
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">
-                          {item.product.brandName}
-                        </p>
-                        <Link
-                          href={`/product/${item.product.slug}`}
-                          className="font-display text-lg text-charcoal-deep hover:text-gold-muted transition-colors"
-                        >
-                          {item.product.name}
-                        </Link>
-                        <p className="text-stone mt-1">
-                          €{item.product.price.toLocaleString()}
-                        </p>
+            {/* Empty gaps (analysis ran but nothing found) */}
+            {gaps.length === 0 && (
+              <div className="text-center py-16 bg-white border border-sand">
+                <div className="w-16 h-16 mx-auto mb-6 bg-charcoal-deep/5 flex items-center justify-center">
+                  <Layers size={32} className="text-charcoal-deep" />
+                </div>
+                <h3 className="font-display text-xl text-charcoal-deep mb-3">
+                  No Gaps Found
+                </h3>
+                <p className="text-stone mb-8 max-w-md mx-auto">
+                  Your wardrobe looks well-rounded! Add more items or check back later for new recommendations.
+                </p>
+                <Link
+                  href="/discover"
+                  className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase">Browse Products</span>
+                </Link>
+              </div>
+            )}
 
-                        {/* Reason */}
-                        <div className="mt-4 p-4 bg-parchment">
-                          <p className="text-sm text-stone">{item.reason}</p>
-                          {item.occasion && (
-                            <p className="text-xs text-taupe mt-2">For: {item.occasion}</p>
-                          )}
+            {/* Recommendations Grid */}
+            {gaps.length > 0 && (
+              <div className="grid sm:grid-cols-2 gap-6">
+                {gaps.map((gap, idx) => {
+                  const p = gap.matched_product;
+
+                  // Handle null matched_product
+                  if (!p) {
+                    return (
+                      <div key={idx} className="bg-white border border-sand overflow-hidden">
+                        <div className="px-5 pt-5 pb-3 border-b border-sand/50">
+                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">
+                            {gap.suggestion.product_category}
+                          </p>
+                          <p className="text-sm font-medium text-charcoal-deep">
+                            {gap.suggestion.title}
+                          </p>
                         </div>
-
-                        {/* Confidence & Expiry */}
-                        <div className="flex items-center gap-4 mt-3 text-sm">
-                          <span className="text-stone">
-                            {item.confidence}% match confidence
-                          </span>
-                          {item.expiresAt && (
-                            <span className="flex items-center gap-1 text-taupe">
-                              <Clock size={14} />
-                              Expires {new Date(item.expiresAt).toLocaleDateString()}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* UHNI: Auto-approve indicator */}
-                        {isUHNI && autonomousSettings?.enabled && (
-                          <div className={`mt-3 flex items-center gap-2 text-xs ${
-                            item.product.price <= autonomousSettings.autoApproveThreshold
-                              ? 'text-success'
-                              : 'text-gold-muted'
-                          }`}>
-                            <Zap size={12} />
-                            {item.product.price <= autonomousSettings.autoApproveThreshold ? (
-                              <span>Eligible for auto-purchase</span>
-                            ) : (
-                              <span>Requires approval (above €{autonomousSettings.autoApproveThreshold.toLocaleString()} threshold)</span>
-                            )}
+                        <div className="flex gap-4 p-5">
+                          <div className="w-24 h-32 bg-parchment flex items-center justify-center flex-shrink-0">
+                            <Layers size={24} className="text-taupe" />
                           </div>
-                        )}
+                          <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <p className="text-sm text-stone mb-1">No matching product found</p>
+                            <p className="text-xs text-taupe">
+                              We couldn't find a product in our catalogue for this gap yet.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  const imgSrc = p.image_urls?.[0] || p.product_image;
+                  const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                  const productUrl = `/product/${slug}?productId=${p.product_id}`;
+
+                  return (
+                    <div key={idx} className="bg-white border border-sand overflow-hidden">
+                      {/* Gap Suggestion Header */}
+                      <div className="px-5 pt-5 pb-3 border-b border-sand/50">
+                        <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">
+                          {gap.suggestion.product_category}
+                        </p>
+                        <p className="text-sm font-medium text-charcoal-deep">
+                          {gap.suggestion.title}
+                        </p>
                       </div>
 
-                      {/* Actions */}
-                      <button
-                        onClick={() => handleRemove(item.productId)}
-                        className="p-2 text-stone hover:text-error transition-colors flex-shrink-0"
-                        title="Remove"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                      {/* Matched Product */}
+                      <Link href={productUrl} className="group flex gap-4 p-5">
+                        <div className="relative w-24 h-32 overflow-hidden bg-parchment flex-shrink-0">
+                          {imgSrc && (
+                            <Image
+                              src={imgSrc}
+                              alt={p.product_name}
+                              fill
+                              className="object-cover group-hover:scale-105 transition-transform duration-500"
+                            />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">
+                            {p.brand_name}
+                          </p>
+                          <p className="font-display text-lg text-charcoal-deep leading-tight mb-1 line-clamp-2 group-hover:text-gold-muted transition-colors">
+                            {p.product_name}
+                          </p>
+                          <p className="text-xs text-stone uppercase mb-3">
+                            {p.product_category}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            {p.discount_percentage > 0 && (
+                              <span className="text-xs text-taupe line-through">€{p.price.toLocaleString()}</span>
+                            )}
+                            <span className="font-display text-base text-charcoal-deep">
+                              €{(p.offer_price || p.price).toLocaleString()}
+                            </span>
+                            {p.discount_percentage > 0 && (
+                              <span className="text-xs text-success">-{p.discount_percentage}%</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-3">
+                            <span className="text-[9px] text-stone">
+                              {Math.round(gap.product_match_score * 100)}% match
+                            </span>
+                            <span className="flex items-center gap-1 text-[10px] tracking-[0.15em] uppercase text-stone group-hover:text-charcoal-deep transition-colors">
+                              View
+                              <ArrowRight size={12} className="group-hover:translate-x-1 transition-transform" />
+                            </span>
+                          </div>
+                        </div>
+                      </Link>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
-            </div>
-
-            {/* Summary */}
-            <div className="bg-white p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Selected Items Total</p>
-                  <p className="font-display text-2xl text-charcoal-deep mt-1">
-                    €{approvedTotal.toLocaleString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Full Cart Value</p>
-                  <p className="text-stone mt-1">€{cart.totalValue.toLocaleString()}</p>
-                </div>
-              </div>
-
-              {/* UHNI: Enhanced action buttons */}
-              {isUHNI && autonomousSettings?.enabled ? (
-                <>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowAutoPurchaseConfirm(true)}
-                      disabled={approvedItems.length === 0}
-                      className="flex-1 flex items-center justify-center gap-3 px-6 py-4 bg-success text-ivory-cream hover:bg-success/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Zap size={18} />
-                      <span className="text-sm tracking-[0.15em] uppercase">
-                        Approve & Auto-Purchase
-                      </span>
-                    </button>
-                    <button
-                      onClick={handleMoveToConsiderations}
-                      disabled={approvedItems.length === 0}
-                      className="flex items-center justify-center gap-2 px-6 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ShoppingBag size={16} />
-                      <span className="text-sm tracking-[0.1em] uppercase">Review First</span>
-                    </button>
-                  </div>
-
-                  <div className="flex gap-3 mt-3">
-                    <Link
-                      href="/uhni/concierge"
-                      className="flex-1 flex items-center justify-center gap-2 py-3 border border-gold-muted/30 text-gold-muted hover:border-gold-muted transition-colors"
-                    >
-                      <MessageCircle size={16} />
-                      <span className="text-sm">Escalate to {concierge?.name?.split(' ')[0] || 'Concierge'}</span>
-                    </Link>
-                    <Link
-                      href="/consideration"
-                      className="flex items-center gap-2 px-6 py-3 text-stone hover:text-charcoal-deep transition-colors text-sm"
-                    >
-                      View Considerations
-                      <ChevronRight size={16} />
-                    </Link>
-                  </div>
-
-                  <p className="text-xs text-taupe text-center mt-6">
-                    Auto-purchased items ship immediately. Escalate to your concierge for special requests.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={handleMoveToConsiderations}
-                      disabled={approvedItems.length === 0}
-                      className="flex-1 flex items-center justify-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <ShoppingBag size={18} />
-                      <span className="text-sm tracking-[0.15em] uppercase">
-                        Move to Considerations ({approvedItems.length})
-                      </span>
-                    </button>
-                    <Link
-                      href="/consideration"
-                      className="flex items-center gap-2 px-6 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.1em] uppercase"
-                    >
-                      View Considerations
-                      <ChevronRight size={16} />
-                    </Link>
-                  </div>
-
-                  <p className="text-xs text-taupe text-center mt-6">
-                    Items moved to Considerations can be reviewed before purchase
-                  </p>
-                </>
-              )}
-            </div>
+            )}
           </>
         )}
 
-        {/* Auto-Purchase Confirmation */}
-        <ConfirmModal
-          isOpen={showAutoPurchaseConfirm}
-          onClose={() => setShowAutoPurchaseConfirm(false)}
-          onConfirm={() => {
-            const purchased = JSON.parse(localStorage.getItem('moda-auto-purchased') || '[]');
-            const newPurchased = [...purchased, ...approvedItems];
-            localStorage.setItem('moda-auto-purchased', JSON.stringify(newPurchased));
-            setCart({
-              ...cart!,
-              items: cart!.items.filter(item => !approvedItems.includes(item.productId)),
-              totalValue: cart!.items
-                .filter(item => !approvedItems.includes(item.productId))
-                .reduce((sum, item) => sum + item.product.price, 0)
-            });
-            const count = approvedItems.length;
-            setApprovedItems([]);
-            showToast(`${count} item(s) approved for auto-purchase`, 'success');
-          }}
-          title="Confirm Auto-Purchase"
-          message={`Auto-purchase ${approvedItems.length} item(s) for €${approvedTotal.toLocaleString()}? This action cannot be undone.`}
-          confirmLabel="Purchase"
-        />
-
-        {/* Info Box */}
-        <div className="mt-10 flex items-start gap-4 p-6 bg-parchment border border-sand text-sm">
-          <Info size={18} className="text-stone flex-shrink-0 mt-0.5" />
-          <div className="text-stone">
-            <p className="font-medium text-charcoal-deep mb-2">About Silent Cart</p>
-            <p>
-              The Silent Cart feature observes your browsing patterns, wardrobe composition,
-              and upcoming events to prepare items you might love. It's designed to help,
-              not pressure. Items expire after 30 days and you're always in control.
-            </p>
+        {/* Info Box — always visible */}
+        {(
+          <div className="mt-10 flex items-start gap-4 p-6 bg-parchment border border-sand text-sm">
+            <Info size={18} className="text-stone flex-shrink-0 mt-0.5" />
+            <div className="text-stone">
+              <p className="font-medium text-charcoal-deep mb-2">About Silent Cart</p>
+              <p>
+                Silent Cart analyses your wardrobe to identify style gaps — missing categories,
+                fabrics, or occasions — and matches each gap with the best product from our catalogue.
+                Recommendations refresh automatically when your wardrobe changes.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

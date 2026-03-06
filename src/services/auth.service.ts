@@ -247,22 +247,34 @@ export interface UserData {
   email: string;
   role: string;
   profile_picture: string | null;
+  notifications?: {
+    new_arrivals: boolean;
+    price_changes: boolean;
+    restock_alerts: boolean;
+    style_insights: boolean;
+  };
+  language?: string;
+  currency?: string;
   occasions: string[];
   aesthetics: string[];
   minimum_budget: number | null;
   maximum_budget: number | null;
   context_set: boolean;
   is_active: boolean;
+  is_2fa_enabled?: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface UserTokenResponse {
-  access_token: string;
-  refresh_token: string;
+  access_token: string | null;
+  refresh_token: string | null;
   token_type: string;
-  context_required: boolean;
-  user: UserData;
+  context_required: boolean | null;
+  user: UserData | null;
+  requires_2fa?: boolean;
+  pre_auth_token?: string;
+  message?: string;
 }
 
 export interface UserRegisterPayload {
@@ -339,7 +351,7 @@ export async function setUserContext(
   return updated;
 }
 
-export function storeUserAuth(data: UserTokenResponse): void {
+export function storeUserAuth(data: { access_token: string; refresh_token: string; user: UserData }): void {
   localStorage.setItem('moda-user-token', data.access_token);
   localStorage.setItem('moda-user-refresh-token', data.refresh_token);
   localStorage.setItem('moda-user-data', JSON.stringify(data.user));
@@ -369,12 +381,12 @@ export function userLogout(): void {
 }
 
 // ============================================
-// Get User by ID
+// Get Current User (GET /api/v1/user/auth/me)
 // ============================================
 
-export async function getUserById(userId: string): Promise<UserData> {
+export async function getUserById(): Promise<UserData> {
   const token = localStorage.getItem('moda-user-token');
-  const res = await fetchWithTimeout(`/api/v1/user/auth/${userId}`, {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/me`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -391,6 +403,188 @@ export async function getUserById(userId: string): Promise<UserData> {
   // Keep local storage in sync with latest data
   localStorage.setItem('moda-user-data', JSON.stringify(user));
   return user;
+}
+
+// ============================================
+// Update User Profile (PATCH /api/v1/user/auth/me)
+// ============================================
+
+export interface UserProfileUpdatePayload {
+  notifications?: {
+    new_arrivals?: boolean;
+    price_changes?: boolean;
+    restock_alerts?: boolean;
+    style_insights?: boolean;
+  };
+  language?: string;
+  currency?: string;
+}
+
+export async function updateUserProfile(
+  payload: UserProfileUpdatePayload
+): Promise<UserData> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/me`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update profile' }));
+    throw new Error(err.detail || `Failed to update profile (${res.status})`);
+  }
+
+  const updated: UserData = await res.json();
+  localStorage.setItem('moda-user-data', JSON.stringify(updated));
+  return updated;
+}
+
+// ============================================
+// Delete User Account (DELETE /api/v1/user/auth/me)
+// ============================================
+
+export async function deleteUserAccount(): Promise<string> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/me`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete account' }));
+    throw new Error(err.detail || `Failed to delete account (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ============================================
+// Change Password (POST /api/v1/user/auth/change-password)
+// ============================================
+
+export async function changeUserPassword(payload: {
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}): Promise<{ message: string }> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/change-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to change password' }));
+    throw new Error(err.detail || `Failed to change password (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ============================================
+// 2FA Setup (POST /api/v1/user/auth/2fa/setup)
+// ============================================
+
+export interface TwoFASetupResponse {
+  secret: string;
+  provisioning_uri: string;
+  qr_code_url: string;
+  message: string;
+}
+
+export async function setup2FA(): Promise<TwoFASetupResponse> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/2fa/setup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: '',
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to setup 2FA' }));
+    throw new Error(err.detail || `Failed to setup 2FA (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ============================================
+// 2FA Verify Setup (POST /api/v1/user/auth/2fa/verify-setup)
+// ============================================
+
+export async function verify2FASetup(totp_code: string): Promise<{ message: string; is_2fa_enabled: boolean }> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/2fa/verify-setup`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ totp_code }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Invalid code' }));
+    throw new Error(err.detail || `Failed to verify 2FA (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ============================================
+// 2FA Disable (POST /api/v1/user/auth/2fa/disable)
+// ============================================
+
+export async function disable2FA(totp_code: string): Promise<{ message: string; is_2fa_enabled: boolean }> {
+  const token = localStorage.getItem('moda-user-token');
+  const res = await fetchWithTimeout(`/api/v1/user/auth/2fa/disable`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ totp_code }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Invalid code' }));
+    throw new Error(err.detail || `Failed to disable 2FA (${res.status})`);
+  }
+
+  return res.json();
+}
+
+// ============================================
+// 2FA Verify Login (POST /api/v1/user/auth/2fa/verify-login)
+// ============================================
+
+export async function verify2FALogin(pre_auth_token: string, totp_code: string): Promise<UserTokenResponse> {
+  const res = await fetchWithTimeout(`/api/v1/user/auth/2fa/verify-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pre_auth_token, totp_code }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Invalid code' }));
+    throw new Error(err.detail || `2FA verification failed (${res.status})`);
+  }
+
+  return res.json();
 }
 
 // ============================================
