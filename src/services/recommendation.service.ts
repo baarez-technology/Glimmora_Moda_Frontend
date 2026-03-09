@@ -94,11 +94,15 @@ function mapToBrand(raw: RecommendedBrand): Brand {
 
 /** Map API product → frontend Product type */
 function mapToProduct(raw: RecommendedProduct): Product {
-  // Flexible image extraction: try image_url, then fallback fields the backend might use
+  // Flexible image extraction: try image_url, then color_based_images_mapping, then fallback fields
   const rawAny = raw as unknown as Record<string, unknown>;
+  const colorImages = Array.isArray(rawAny['color_based_images_mapping'])
+    ? (rawAny['color_based_images_mapping'] as { images?: string[] }[]).flatMap(cm => cm.images || []).filter(Boolean)
+    : [];
   const imageUrl =
     raw.image_url ||
     (rawAny['product_image'] as string) ||
+    (colorImages.length > 0 ? colorImages[0] : '') ||
     (Array.isArray(rawAny['product_images']) && (rawAny['product_images'] as string[])[0]) ||
     '';
 
@@ -489,8 +493,9 @@ interface ApiProductDetail {
   status: string;
   tagline: string;
   product_description: string;
-  product_images: string[];
+  product_images?: string[];
   product_image: string | null;
+  product_category?: string;
   sizes?: string[];
   color_based_images_mapping?: { color: string; hex?: string | null; images?: string[] }[];
   regional_stocks: {
@@ -507,6 +512,15 @@ interface ApiProductDetail {
     purchases: number;
     conversion_rate: number;
   };
+  // New API shape: ai_data with nested fields
+  ai_data?: {
+    aesthetics?: string[];
+    occasions?: string[];
+    pattern?: string;
+    fabrics?: string;
+    climate_profile?: Record<string, unknown>;
+  };
+  // Legacy shape: ai_metadata + top-level arrays
   ai_metadata?: {
     product_category?: string;
     color?: string;
@@ -523,6 +537,14 @@ interface ApiProductDetail {
 
 function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   const slug = raw.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+  // Normalize: support both ai_data (new) and ai_metadata (legacy) shapes
+  const aiData = raw.ai_data;
+  const aiMeta = raw.ai_metadata;
+  const fabrics = aiData?.fabrics || aiMeta?.fabrics || '';
+  const productCategory = raw.product_category || aiMeta?.product_category || '';
+  const occasions = aiData?.occasions || raw.occasions || [];
+  const aesthetics = aiData?.aesthetics || raw.aesthetics || [];
 
   // Build variants from backend data
   const variants: Product['variants'] = [];
@@ -699,9 +721,13 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   if (imageUrls.length === 0 && raw.color_based_images_mapping) {
     imageUrls = raw.color_based_images_mapping.flatMap(cm => cm.images || []).filter(Boolean);
   }
+
+  // Then try product_image single field
   if (imageUrls.length === 0 && raw.product_image) {
     imageUrls = [raw.product_image];
   }
+
+  // Fallback to recommendation cache or placeholder
   if (imageUrls.length === 0) {
     const cachedImg = productImageCache.get(raw.product_id);
     if (cachedImg) {
@@ -722,7 +748,7 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     narrative: '',
     price: raw.price,
     originalPrice: undefined,
-    currency: 'INR',
+    currency: 'EUR',
     images: imageUrls.map((url, i) => ({
       id: String(i + 1),
       url,
@@ -730,8 +756,8 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
       type: i === 0 ? 'hero' as const : 'detail' as const,
     })),
     variants,
-    materials: raw.ai_metadata?.fabrics
-      ? [{ name: raw.ai_metadata.fabrics, composition: '100%', origin: '' }]
+    materials: fabrics
+      ? [{ name: fabrics, composition: '100%', origin: '' }]
       : [],
     craftsmanship: [],
     ivEnabled: false,
@@ -746,8 +772,8 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
       })),
     },
     collection: raw.collection_name,
-    category: (raw.ai_metadata?.product_category as Product['category']) || 'clothing',
-    tags: [...(Array.isArray(raw.occasions) ? raw.occasions : []), ...(Array.isArray(raw.aesthetics) ? raw.aesthetics : [])],
+    category: (productCategory as Product['category']) || 'clothing',
+    tags: [...(Array.isArray(occasions) ? occasions : []), ...(Array.isArray(aesthetics) ? aesthetics : [])],
     visibility: 'public',
     experienceMode: 'standard',
     pricingVisibility: 'visible',

@@ -177,7 +177,7 @@ export default function DeclutterAssistant({
               {actionSuggestions.map(({ product, reason, estimatedValue, tip }) => (
                 <div key={product.id} className="p-4 hover:bg-stone/5 transition-colors">
                   <div className="flex items-start gap-4">
-                    <Link href={`/product/${product.slug}`}>
+                    <Link href={`/product/${product.slug}?productId=${product.id}`}>
                       <div className="w-20 h-20 bg-stone/5 rounded-lg overflow-hidden relative flex-shrink-0">
                         <Image src={product.images[0]?.url || ''} alt={product.name} fill className="object-cover" />
                       </div>

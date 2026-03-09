@@ -300,7 +300,7 @@ export default function TripDetailPage() {
                 {recommendations.slice(0, 4).map((product) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="flex items-center gap-3 p-2 rounded-lg hover:bg-stone/5 transition-colors"
                   >
                     <div className="w-14 h-14 bg-stone/10 rounded-lg overflow-hidden relative">

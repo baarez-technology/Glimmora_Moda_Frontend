@@ -149,6 +149,15 @@ export default function ProfilePage() {
     },
   ];
 
+  // // Membership tier link
+  // const membershipItem = {
+  //   href: '/pricing-tiers',
+  //   icon: Sparkles,
+  //   title: 'Membership',
+  //   subtitle: 'View tier benefits',
+  // };
+
+
   // Settings at the end
   const settingsItem = {
     href: '/profile/settings',

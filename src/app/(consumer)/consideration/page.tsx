@@ -75,7 +75,7 @@ export default function ConsiderationPage() {
                     <div className="flex gap-6 md:gap-8">
                       {/* Image */}
                       <Link
-                        href={`/product/${item.product.slug}`}
+                        href={`/product/${item.product.slug}?productId=${item.product.id}`}
                         className="group relative w-28 md:w-36 aspect-[3/4] overflow-hidden flex-shrink-0"
                         onMouseEnter={() => setActiveHover(index)}
                         onMouseLeave={() => setActiveHover(null)}
@@ -102,7 +102,7 @@ export default function ConsiderationPage() {
                               {item.product.brandName}
                             </p>
                             <Link
-                              href={`/product/${item.product.slug}`}
+                              href={`/product/${item.product.slug}?productId=${item.product.id}`}
                               className="font-display text-xl md:text-2xl text-charcoal-deep hover:text-charcoal-warm transition-colors"
                             >
                               {item.product.name}
@@ -162,7 +162,7 @@ export default function ConsiderationPage() {
 
                         {/* View Product Link */}
                         <Link
-                          href={`/product/${item.product.slug}`}
+                          href={`/product/${item.product.slug}?productId=${item.product.id}`}
                           className="group inline-flex items-center gap-2 mt-4 text-sm tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
                         >
                           <span>View Details</span>

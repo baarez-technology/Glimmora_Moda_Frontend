@@ -163,7 +163,7 @@ export default function WardrobeGapAnalysis({ analysis }: WardrobeGapAnalysisPro
                         {gap.suggestedProducts.slice(0, 3).map((product) => (
                           <Link
                             key={product.id}
-                            href={`/product/${product.slug}`}
+                            href={`/product/${product.slug}?productId=${product.id}`}
                             className="group"
                           >
                             <div className="relative aspect-square rounded-lg overflow-hidden bg-parchment mb-2">
