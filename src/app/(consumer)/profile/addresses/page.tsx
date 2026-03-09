@@ -3,50 +3,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Plus, Edit2, Trash2, X, Check, Home } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, Edit2, Trash2, X, Home, Briefcase, Building2, Tag } from 'lucide-react';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import * as addressService from '@/services/address.service';
+import type { CustomerAddress, CreateAddressPayload, UpdateAddressPayload } from '@/services/address.service';
 
-interface SavedAddress {
-  id: string;
-  label: string;
-  fullName: string;
-  street: string;
-  city: string;
-  state: string;
-  postalCode: string;
-  country: string;
-  phone: string;
-  isDefault: boolean;
+const TAG_OPTIONS = ['Home', 'Office', 'Work', 'Other'];
+
+const TAG_ICONS: Record<string, typeof Home> = {
+  Home,
+  Office: Building2,
+  Work: Briefcase,
+};
+
+function getTagIcon(tag: string) {
+  return TAG_ICONS[tag] || Tag;
 }
 
-const STORAGE_KEY = 'moda-addresses';
-
-function loadAddresses(): SavedAddress[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveAddresses(addresses: SavedAddress[]) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(addresses));
-}
-
-const emptyForm: Omit<SavedAddress, 'id' | 'isDefault'> = {
-  label: '',
-  fullName: '',
-  street: '',
+const emptyForm = {
+  address: '',
   city: '',
-  state: '',
-  postalCode: '',
+  postal_code: '',
   country: '',
-  phone: ''
+  tag: 'Home',
 };
 
 export default function AddressesPage() {
@@ -54,14 +35,16 @@ export default function AddressesPage() {
   const { isAuthenticated, isHydrated } = useAuth();
   const { showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [addresses, setAddresses] = useState<SavedAddress[]>([]);
-  const [isHydratedLocal, setIsHydratedLocal] = useState(false);
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [isSaving, setIsSaving] = useState(false);
   const [deleteAddressId, setDeleteAddressId] = useState<string | null>(null);
-  const addressLabelRef = useRef<HTMLInputElement>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const addressInputRef = useRef<HTMLInputElement>(null);
 
   // ESC key handler for address form
   useEffect(() => {
@@ -73,9 +56,9 @@ export default function AddressesPage() {
     return () => document.removeEventListener('keydown', handleEsc);
   }, [showForm]);
 
-  // Auto-focus label input when form opens
+  // Auto-focus address input when form opens
   useEffect(() => {
-    if (showForm) addressLabelRef.current?.focus();
+    if (showForm) addressInputRef.current?.focus();
   }, [showForm]);
 
   useEffect(() => {
@@ -84,106 +67,113 @@ export default function AddressesPage() {
     }
   }, [isAuthenticated, isHydrated, router]);
 
-  useEffect(() => {
-    if (isHydrated && isAuthenticated) {
+  // Fetch addresses from API
+  const fetchAddresses = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await addressService.getAddresses();
+      setAddresses(data);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to load addresses', 'error');
+    } finally {
+      setIsLoading(false);
       setIsLoaded(true);
     }
-  }, [isHydrated, isAuthenticated]);
+  }, [showToast]);
 
   useEffect(() => {
-    setAddresses(loadAddresses());
-    setIsHydratedLocal(true);
-  }, []);
-
-  useEffect(() => {
-    if (isHydratedLocal) {
-      saveAddresses(addresses);
+    if (isHydrated && isAuthenticated) {
+      fetchAddresses();
     }
-  }, [addresses, isHydratedLocal]);
+  }, [isHydrated, isAuthenticated, fetchAddresses]);
 
-  const validateAddressForm = (): boolean => {
+  const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
-    if (!formData.street.trim()) newErrors.street = 'Street address is required';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
     if (!formData.city.trim()) newErrors.city = 'City is required';
     if (!formData.country.trim()) newErrors.country = 'Country is required';
-
-    if (formData.postalCode && (formData.postalCode.trim().length < 3 || formData.postalCode.trim().length > 12)) {
-      newErrors.postalCode = 'Postal code must be 3-12 characters';
+    if (formData.postal_code && (formData.postal_code.trim().length < 3 || formData.postal_code.trim().length > 12)) {
+      newErrors.postal_code = 'Postal code must be 3-12 characters';
     }
-
-    if (formData.phone) {
-      if (!/^[+\d][\d\s\-()]{6,20}$/.test(formData.phone.trim())) {
-        newErrors.phone = 'Enter a valid phone number (e.g. +1 234 567-8900)';
-      }
-    }
-
     setFormErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = useCallback(() => {
-    if (!validateAddressForm()) {
+  const handleSave = useCallback(async () => {
+    if (!validateForm()) {
       showToast('Please fix the errors below', 'error');
       return;
     }
 
-    if (editingId) {
-      setAddresses(prev => prev.map(a => a.id === editingId ? { ...a, ...formData } : a));
-      showToast('Address updated', 'success');
-    } else {
-      const newAddress: SavedAddress = {
-        ...formData,
-        id: `addr-${Date.now()}`,
-        isDefault: addresses.length === 0
-      };
-      setAddresses(prev => [...prev, newAddress]);
-      showToast('Address added', 'success');
+    setIsSaving(true);
+    try {
+      if (editingId) {
+        const payload: UpdateAddressPayload = {
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          postal_code: formData.postal_code.trim(),
+          country: formData.country.trim(),
+          tag: formData.tag,
+        };
+        const updated = await addressService.updateAddress(editingId, payload);
+        setAddresses(prev => prev.map(a => a.address_id === editingId ? updated : a));
+        showToast('Address updated', 'success');
+      } else {
+        const payload: CreateAddressPayload = {
+          address: formData.address.trim(),
+          city: formData.city.trim(),
+          postal_code: formData.postal_code.trim(),
+          country: formData.country.trim(),
+          tag: formData.tag,
+        };
+        const created = await addressService.createAddress(payload);
+        setAddresses(prev => [created, ...prev]);
+        showToast('Address added', 'success');
+      }
+
+      setFormData(emptyForm);
+      setEditingId(null);
+      setShowForm(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to save address', 'error');
+    } finally {
+      setIsSaving(false);
     }
+  }, [formData, editingId, showToast]);
 
-    setFormData(emptyForm);
-    setEditingId(null);
-    setShowForm(false);
-  }, [formData, editingId, addresses.length, showToast]);
-
-  const handleEdit = (address: SavedAddress) => {
+  const handleEdit = (addr: CustomerAddress) => {
     setFormData({
-      label: address.label,
-      fullName: address.fullName,
-      street: address.street,
-      city: address.city,
-      state: address.state,
-      postalCode: address.postalCode,
-      country: address.country,
-      phone: address.phone
+      address: addr.address,
+      city: addr.city,
+      postal_code: addr.postal_code,
+      country: addr.country,
+      tag: addr.tag,
     });
-    setEditingId(address.id);
+    setEditingId(addr.address_id);
+    setFormErrors({});
     setShowForm(true);
   };
 
-  const handleDelete = (id: string) => {
-    const addr = addresses.find(a => a.id === id);
-    setAddresses(prev => {
-      const filtered = prev.filter(a => a.id !== id);
-      if (addr?.isDefault && filtered.length > 0) {
-        filtered[0].isDefault = true;
-      }
-      return filtered;
-    });
-    showToast('Address deleted', 'success');
-  };
-
-  const handleSetDefault = (id: string) => {
-    setAddresses(prev => prev.map(a => ({ ...a, isDefault: a.id === id })));
-    showToast('Default address updated', 'success');
-  };
+  const handleDelete = useCallback(async (id: string) => {
+    setIsDeleting(true);
+    try {
+      await addressService.deleteAddress(id);
+      setAddresses(prev => prev.filter(a => a.address_id !== id));
+      showToast('Address deleted', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to delete address', 'error');
+    } finally {
+      setIsDeleting(false);
+      setDeleteAddressId(null);
+    }
+  }, [showToast]);
 
   if (!isHydrated || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading addresses...</p>
+          <p className="text-stone text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -203,10 +193,10 @@ export default function AddressesPage() {
           </Link>
           <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
             <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-4">
-              Shipping
+              Address Book
             </span>
             <h1 className="font-display text-[clamp(2rem,4vw,3rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
-              Addresses
+              Saved Addresses
             </h1>
           </div>
         </div>
@@ -237,142 +227,142 @@ export default function AddressesPage() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              {/* Tag selector */}
               <div className="col-span-2">
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Label</label>
-                <input
-                  ref={addressLabelRef}
-                  type="text" value={formData.label}
-                  onChange={e => setFormData({ ...formData, label: e.target.value })}
-                  placeholder="e.g. Home, Office"
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
+                <div className="flex flex-wrap gap-2">
+                  {TAG_OPTIONS.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, tag })}
+                      className={`px-4 py-2 border text-sm transition-colors flex items-center gap-2 ${
+                        formData.tag === tag
+                          ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
+                          : 'border-sand text-stone hover:border-charcoal-deep'
+                      }`}
+                    >
+                      {(() => { const Icon = getTagIcon(tag); return <Icon size={14} />; })()}
+                      {tag}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="col-span-2">
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Full Name *</label>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Address *</label>
                 <input
-                  type="text" value={formData.fullName}
-                  onChange={e => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  ref={addressInputRef}
+                  type="text" value={formData.address}
+                  onChange={e => { setFormData({ ...formData, address: e.target.value }); setFormErrors(prev => ({ ...prev, address: '' })); }}
+                  placeholder="Street address, apartment, suite"
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.address ? 'border-red-400' : 'border-sand'}`}
                 />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Street Address *</label>
-                <input
-                  type="text" value={formData.street}
-                  onChange={e => setFormData({ ...formData, street: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
+                {formErrors.address && <p className="text-xs text-red-500 mt-1">{formErrors.address}</p>}
               </div>
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">City *</label>
                 <input
                   type="text" value={formData.city}
-                  onChange={e => setFormData({ ...formData, city: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onChange={e => { setFormData({ ...formData, city: e.target.value }); setFormErrors(prev => ({ ...prev, city: '' })); }}
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.city ? 'border-red-400' : 'border-sand'}`}
                 />
-              </div>
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">State / Region</label>
-                <input
-                  type="text" value={formData.state}
-                  onChange={e => setFormData({ ...formData, state: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                />
+                {formErrors.city && <p className="text-xs text-red-500 mt-1">{formErrors.city}</p>}
               </div>
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Postal Code</label>
                 <input
-                  type="text" value={formData.postalCode}
-                  onChange={e => { setFormData({ ...formData, postalCode: e.target.value }); setFormErrors(prev => ({ ...prev, postalCode: '' })); }}
-                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.postalCode ? 'border-red-400' : 'border-sand'}`}
+                  type="text" value={formData.postal_code}
+                  onChange={e => { setFormData({ ...formData, postal_code: e.target.value }); setFormErrors(prev => ({ ...prev, postal_code: '' })); }}
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.postal_code ? 'border-red-400' : 'border-sand'}`}
                 />
-                {formErrors.postalCode && <p className="text-xs text-red-500 mt-1">{formErrors.postalCode}</p>}
+                {formErrors.postal_code && <p className="text-xs text-red-500 mt-1">{formErrors.postal_code}</p>}
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Country *</label>
                 <input
                   type="text" value={formData.country}
-                  onChange={e => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onChange={e => { setFormData({ ...formData, country: e.target.value }); setFormErrors(prev => ({ ...prev, country: '' })); }}
+                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.country ? 'border-red-400' : 'border-sand'}`}
                 />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Phone</label>
-                <input
-                  type="tel" value={formData.phone}
-                  onChange={e => { setFormData({ ...formData, phone: e.target.value }); setFormErrors(prev => ({ ...prev, phone: '' })); }}
-                  placeholder="+1 234 567 8900"
-                  className={`w-full px-4 py-3 border bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors ${formErrors.phone ? 'border-red-400' : 'border-sand'}`}
-                />
-                {formErrors.phone && <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>}
+                {formErrors.country && <p className="text-xs text-red-500 mt-1">{formErrors.country}</p>}
               </div>
             </div>
             <div className="flex gap-4 mt-6">
               <button
                 onClick={() => { setShowForm(false); setEditingId(null); }}
+                disabled={isSaving}
                 className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-wider uppercase"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase"
+                disabled={isSaving}
+                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase disabled:opacity-50"
               >
-                {editingId ? 'Update' : 'Save'} Address
+                {isSaving ? 'Saving...' : editingId ? 'Update Address' : 'Save Address'}
               </button>
             </div>
           </div>
         )}
 
+        {/* Loading state */}
+        {isLoading && (
+          <div className="space-y-4">
+            {[1, 2].map(i => (
+              <div key={i} className="bg-white p-6 border border-sand/30 animate-pulse">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-sand/30 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-sand/30 rounded w-24" />
+                    <div className="h-3 bg-sand/20 rounded w-48" />
+                    <div className="h-3 bg-sand/20 rounded w-32" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Address List */}
-        {addresses.length === 0 && !showForm ? (
+        {!isLoading && addresses.length === 0 && !showForm && (
           <div className="bg-white p-12 text-center">
             <MapPin size={40} className="text-stone/40 mx-auto mb-4" />
             <h2 className="font-display text-xl text-charcoal-deep mb-2">No saved addresses</h2>
             <p className="text-sm text-stone">Add an address to speed up checkout</p>
           </div>
-        ) : (
-          addresses.map(address => (
-            <div key={address.id} className={`bg-white p-6 border ${address.isDefault ? 'border-charcoal-deep' : 'border-sand/30'}`}>
+        )}
+
+        {!isLoading && addresses.map(addr => {
+          const TagIcon = getTagIcon(addr.tag);
+          return (
+            <div key={addr.address_id} className="bg-white p-6 border border-sand/30">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 flex items-center justify-center ${address.isDefault ? 'bg-charcoal-deep' : 'bg-charcoal-deep/5'}`}>
-                    <Home size={18} className={address.isDefault ? 'text-ivory-cream' : 'text-charcoal-deep'} />
+                  <div className="w-10 h-10 flex items-center justify-center bg-charcoal-deep/5">
+                    <TagIcon size={18} className="text-charcoal-deep" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-charcoal-deep">{address.label || 'Address'}</p>
-                      {address.isDefault && (
-                        <span className="px-2 py-0.5 bg-charcoal-deep/10 text-[10px] tracking-wider uppercase text-charcoal-deep">Default</span>
-                      )}
+                      <p className="font-medium text-charcoal-deep">{addr.tag || 'Address'}</p>
                     </div>
-                    <p className="text-sm text-stone">{address.fullName}</p>
-                    <p className="text-sm text-stone">{address.street}</p>
-                    <p className="text-sm text-stone">{address.city}{address.state ? `, ${address.state}` : ''} {address.postalCode}</p>
-                    <p className="text-sm text-stone">{address.country}</p>
-                    {address.phone && <p className="text-sm text-stone mt-1">{address.phone}</p>}
+                    <p className="text-sm text-stone">{addr.address}</p>
+                    <p className="text-sm text-stone">{addr.city}{addr.postal_code ? `, ${addr.postal_code}` : ''}</p>
+                    <p className="text-sm text-stone">{addr.country}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!address.isDefault && (
-                    <button
-                      onClick={() => handleSetDefault(address.id)}
-                      className="p-2 hover:bg-sand/20 transition-colors" title="Set as default"
-                    >
-                      <Check size={16} className="text-stone" />
-                    </button>
-                  )}
-                  <button onClick={() => handleEdit(address)} className="p-2 hover:bg-sand/20 transition-colors" title="Edit">
+                  <button onClick={() => handleEdit(addr)} className="p-2 hover:bg-sand/20 transition-colors" title="Edit">
                     <Edit2 size={16} className="text-stone" />
                   </button>
-                  <button onClick={() => setDeleteAddressId(address.id)} className="p-2 hover:bg-red-50 transition-colors" title="Delete">
+                  <button onClick={() => setDeleteAddressId(addr.address_id)} className="p-2 hover:bg-red-50 transition-colors" title="Delete">
                     <Trash2 size={16} className="text-red-600" />
                   </button>
                 </div>
               </div>
             </div>
-          ))
-        )}
+          );
+        })}
       </div>
 
       {/* Delete Address Confirmation */}
@@ -384,7 +374,7 @@ export default function AddressesPage() {
         }}
         title="Delete Address"
         message="Are you sure you want to delete this address? This action cannot be undone."
-        confirmLabel="Delete"
+        confirmLabel={isDeleting ? 'Deleting...' : 'Delete'}
         confirmVariant="danger"
       />
     </div>

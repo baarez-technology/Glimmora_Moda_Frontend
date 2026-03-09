@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Image from 'next/image';
-import { Sparkles, X, ChevronLeft, ChevronRight, User, Ruler, TrendingUp } from 'lucide-react';
+import { Sparkles, X, ChevronLeft, ChevronRight, User, Ruler, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
 import type { DigitalBodyTwin, Product } from '@/types';
+import { getImmersiveVisualization } from '@/services/immersive-visualization.service';
+import type { FitAnalysis } from '@/services/immersive-visualization.service';
 
 type Props = {
   product: Product;
@@ -13,6 +15,26 @@ type Props = {
   selectedSize: string | null;
   selectedColor: string | null;
 };
+
+interface FitPredictions {
+  productName: string;
+  measurements: { area: string; fit: string }[];
+  recommendations: string[];
+}
+
+/** Map API fit_analysis to the shape we render */
+function mapFitAnalysis(productName: string, fa: FitAnalysis): FitPredictions {
+  return {
+    productName,
+    measurements: [
+      { area: 'Shoulders', fit: fa.shoulders },
+      { area: 'Chest', fit: fa.chest },
+      { area: 'Waist', fit: fa.waist },
+      { area: 'Length', fit: fa.length },
+    ],
+    recommendations: fa.recommendations,
+  };
+}
 
 export default function ImmersiveVisualization({
   product,
@@ -25,6 +47,21 @@ export default function ImmersiveVisualization({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [viewMode, setViewMode] = useState<'product' | 'fit' | 'details'>('product');
 
+  // Fit analysis API state
+  const [fitPredictions, setFitPredictions] = useState<FitPredictions | null>(null);
+  const [fitLoading, setFitLoading] = useState(false);
+  const [fitError, setFitError] = useState(false);
+
+  const nextImage = useCallback(() => {
+    setActiveImageIndex((prev) => (prev + 1) % (product.images?.length || 1));
+  }, [product.images?.length]);
+
+  const prevImage = useCallback(() => {
+    const len = product.images?.length || 1;
+    setActiveImageIndex((prev) => (prev - 1 + len) % len);
+  }, [product.images?.length]);
+
+  // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
 
@@ -36,39 +73,39 @@ export default function ImmersiveVisualization({
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, prevImage, nextImage]);
+
+  // Fetch fit analysis from API when modal opens and body twin exists
+  useEffect(() => {
+    if (!isOpen || !bodyTwin) return;
+
+    let cancelled = false;
+    setFitLoading(true);
+    setFitError(false);
+
+    getImmersiveVisualization(product.id)
+      .then((res) => {
+        if (cancelled) return;
+        if (res) {
+          setFitPredictions(mapFitAnalysis(res.product_name, res.fit_analysis));
+        } else {
+          setFitError(true);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFitError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setFitLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [isOpen, bodyTwin, product.id]);
 
   if (!isOpen) return null;
 
   const images = product.images || [];
   const currentImage = images[activeImageIndex];
-
-  const nextImage = () => {
-    setActiveImageIndex((prev) => (prev + 1) % images.length);
-  };
-
-  const prevImage = () => {
-    setActiveImageIndex((prev) => (prev - 1 + images.length) % images.length);
-  };
-
-  // TODO: Derive fit predictions from body-twin measurements matched against product sizing data
-  // Currently shows estimated fit labels without fake confidence percentages
-  const fitPredictions = bodyTwin ? {
-    overallFit: selectedSize === 'M' ? 'Perfect Fit' : selectedSize === 'S' ? 'Snug Fit' : 'Relaxed Fit',
-    measurements: [
-      { area: 'Shoulders', fit: 'True to size' },
-      { area: 'Chest', fit: 'Slightly relaxed' },
-      { area: 'Waist', fit: 'True to size' },
-      { area: 'Length', fit: 'Estimated fit' }
-    ],
-    recommendations: [
-      'This size will provide the intended silhouette',
-      'Structured fit that defines your shape',
-      'Ideal for layering without bulk'
-    ]
-  } : null;
-
-  // Pull color variants from the product data
   const colorVariants = product.variants.filter(v => v.type === 'color');
 
   return (
@@ -183,7 +220,6 @@ export default function ImmersiveVisualization({
           </div>
 
           {/* Info Panel */}
-
           <div className="p-6 lg:p-8 overflow-y-auto max-h-[calc(90vh-120px)]">
             {/* Product View */}
             {viewMode === 'product' && (
@@ -233,54 +269,85 @@ export default function ImmersiveVisualization({
             )}
 
             {/* Fit Prediction View */}
-            {viewMode === 'fit' && fitPredictions && (
+            {viewMode === 'fit' && (
               <>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <TrendingUp size={20} className="text-emerald-600" />
+                {/* Loading state */}
+                {fitLoading && (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <Loader2 size={32} className="text-charcoal-deep animate-spin mb-4" />
+                    <p className="text-sm text-stone">Analysing fit with your Body Twin...</p>
+                    <p className="text-[10px] text-taupe mt-1 tracking-wider uppercase">Powered by GPT-4o</p>
                   </div>
-                  <div>
-                    <h3 className="font-display text-xl text-charcoal-deep">{fitPredictions.overallFit}</h3>
-                    <p className="text-xs text-stone">Estimated fit based on Body Twin</p>
-                  </div>
-                </div>
+                )}
 
-                <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-md">
-                  <div className="flex items-start gap-2">
-                    <User size={16} className="text-emerald-600 mt-0.5" />
-                    <div>
-                      <p className="text-xs text-emerald-900 font-medium">Body Twin Analysis Active</p>
-                      <p className="text-xs text-emerald-700 mt-1">
-                        Predictions based on your measurements and fit preferences
-                      </p>
+                {/* Error state */}
+                {!fitLoading && fitError && !fitPredictions && (
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                      <AlertCircle size={20} className="text-red-500" />
                     </div>
+                    <p className="text-sm text-charcoal-deep font-medium mb-1">Fit analysis unavailable</p>
+                    <p className="text-xs text-stone text-center max-w-xs">
+                      Unable to generate fit predictions right now. Please try again later.
+                    </p>
                   </div>
-                </div>
+                )}
 
-                <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Fit by Area</p>
-                <div className="space-y-3 mb-8">
-                  {fitPredictions.measurements.map((measurement, index) => (
-                    <div key={index} className="bg-white/70 border border-sand/40 rounded-md px-4 py-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm text-charcoal-deep font-medium">{measurement.area}</p>
+                {/* Loaded fit predictions */}
+                {!fitLoading && fitPredictions && (
+                  <>
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                        <TrendingUp size={20} className="text-emerald-600" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Ruler size={14} className="text-taupe" />
-                        <p className="text-xs text-stone">{measurement.fit}</p>
+                      <div>
+                        <h3 className="font-display text-xl text-charcoal-deep">Personalised Fit Analysis</h3>
+                        <p className="text-xs text-stone">AI-powered analysis based on your Body Twin</p>
                       </div>
                     </div>
-                  ))}
-                </div>
 
-                <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Recommendations</p>
-                <div className="space-y-2">
-                  {fitPredictions.recommendations.map((rec, index) => (
-                    <div key={index} className="flex items-start gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-gold-muted mt-2" />
-                      <p className="text-sm text-stone leading-relaxed">{rec}</p>
+                    <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-md">
+                      <div className="flex items-start gap-2">
+                        <User size={16} className="text-emerald-600 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-emerald-900 font-medium">Body Twin Analysis Active</p>
+                          <p className="text-xs text-emerald-700 mt-1">
+                            Predictions based on your digital body twin measurements and {fitPredictions.productName}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  ))}
-                </div>
+
+                    <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Fit by Area</p>
+                    <div className="space-y-3 mb-8">
+                      {fitPredictions.measurements.map((measurement, index) => (
+                        <div key={index} className="bg-white/70 border border-sand/40 rounded-md px-4 py-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm text-charcoal-deep font-medium">{measurement.area}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Ruler size={14} className="text-taupe" />
+                            <p className="text-xs text-stone">{measurement.fit}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {fitPredictions.recommendations.length > 0 && (
+                      <>
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Stylist Recommendations</p>
+                        <div className="space-y-2">
+                          {fitPredictions.recommendations.map((rec, index) => (
+                            <div key={index} className="flex items-start gap-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-gold-muted mt-2" />
+                              <p className="text-sm text-stone leading-relaxed">{rec}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </>
             )}
 
@@ -331,6 +398,3 @@ export default function ImmersiveVisualization({
     </div>
   );
 }
-
-
-

@@ -50,3 +50,7 @@ export * as brandIntelligenceService from './brand-intelligence.service';
 export * as uploadService from './upload.service';
 export * as recommendationService from './recommendation.service';
 export * as customerCollectionService from './customer-collection.service';
+export * as addressService from './address.service';
+export * as orderManagementService from './order-management.service';
+export * as immersiveVisualizationService from './immersive-visualization.service';
+export * as completeTheLookService from './complete-the-look.service';
