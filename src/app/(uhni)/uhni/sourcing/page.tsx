@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Crown, Search, Plus, Clock, CheckCircle, Package, MessageCircle, ChevronRight, AlertCircle, Check } from 'lucide-react';
+import { ArrowLeft, Search, Plus, Clock, CheckCircle, Package, MessageCircle, ChevronRight, AlertCircle, Check } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { getSourcingRequests, type ApiSourcingRequest } from '@/services/sourcing.service';
 
 function SourcingMessageInput({ onSend }: { onSend: (msg: string) => void }) {
   const [value, setValue] = useState('');
@@ -39,13 +40,17 @@ function SourcingMessageInput({ onSend }: { onSend: (msg: string) => void }) {
 }
 
 export default function SourcingPage() {
-  const { sourcingRequests, concierge, selectSourcingOption, addSourcingMessage } = useApp();
+  const { concierge, selectSourcingOption, addSourcingMessage } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [expandedRequest, setExpandedRequest] = useState<string | null>(null);
+  const [apiRequests, setApiRequests] = useState<ApiSourcingRequest[]>([]);
 
   useEffect(() => {
     setIsLoaded(true);
+    getSourcingRequests()
+      .then(setApiRequests)
+      .catch(() => setApiRequests([]));
   }, []);
 
   const getStatusIcon = (status: string) => {
@@ -119,7 +124,7 @@ export default function SourcingPage() {
     }
   };
 
-  const filteredRequests = sourcingRequests.filter(request => {
+  const filteredRequests = apiRequests.filter(request => {
     if (filter === 'all') return true;
     if (filter === 'active') return ['pending', 'sourcing', 'options_found', 'awaiting_approval'].includes(request.status);
     if (filter === 'completed') return ['acquired', 'delivered', 'cancelled'].includes(request.status);
@@ -155,7 +160,7 @@ export default function SourcingPage() {
                   Private Sourcing
                 </h1>
                 <p className="text-sand mt-2">
-                  {sourcingRequests.length} request{sourcingRequests.length !== 1 ? 's' : ''}
+                  {apiRequests.length} request{apiRequests.length !== 1 ? 's' : ''}
                 </p>
               </div>
             </div>
@@ -238,7 +243,7 @@ export default function SourcingPage() {
         ) : (
           <div className="space-y-4">
             {filteredRequests.map((request) => (
-              <div key={request.id} className="bg-white overflow-hidden">
+              <div key={request.sourcing_id} className="bg-white overflow-hidden">
                 <div className="p-6">
                   <div className="flex items-start justify-between gap-4 mb-4">
                     <div>
@@ -247,23 +252,24 @@ export default function SourcingPage() {
                           {getStatusIcon(request.status)}
                           <span>{getStatusLabel(request.status)}</span>
                         </span>
-                        <span className="text-[10px] tracking-[0.15em] uppercase text-taupe">
-                          {request.type.replace('_', ' ')}
-                        </span>
+                        {request.product_category && (
+                          <span className="text-[10px] tracking-[0.15em] uppercase text-taupe">
+                            {request.product_category}
+                          </span>
+                        )}
                         {request.priority && request.priority !== 'standard' && (
                           <span className={`px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getPriorityBadge(request.priority)}`}>
                             {request.priority === 'when_available' ? 'When Available' : request.priority}
                           </span>
                         )}
                       </div>
-                      <h3 className="font-display text-xl text-charcoal-deep">{request.title}</h3>
+                      <h3 className="font-display text-xl text-charcoal-deep">{request.looking_for}</h3>
                     </div>
                     {request.budget && (
                       <div className="text-right">
                         <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Budget</p>
                         <p className="font-display text-lg text-charcoal-deep">
-                          €{request.budget.max.toLocaleString()}
-                          {request.budget.flexible && <span className="text-xs text-stone ml-1">(flexible)</span>}
+                          €{Number(request.budget).toLocaleString()}
                         </p>
                       </div>
                     )}
@@ -271,19 +277,10 @@ export default function SourcingPage() {
 
                   <p className="text-stone text-sm mb-4">{request.description}</p>
 
-                  {/* Options Found Summary */}
-                  {request.foundOptions.length > 0 && expandedRequest !== request.id && (
-                    <div className="mt-4 p-4 bg-success/5 border border-success/20">
-                      <p className="text-sm text-success font-medium">
-                        {request.foundOptions.length} option{request.foundOptions.length !== 1 ? 's' : ''} found
-                      </p>
-                    </div>
-                  )}
-
                   {/* Footer */}
                   <div className="mt-4 pt-4 border-t border-sand flex items-center justify-between">
                     <div className="flex items-center gap-4 text-xs text-taupe">
-                      <span>Created {new Date(request.createdAt).toLocaleDateString()}</span>
+                      <span>Created {new Date(request.created_at).toLocaleDateString()}</span>
                       {request.deadline && (
                         <span className="flex items-center gap-1">
                           <Clock size={12} />
@@ -292,29 +289,24 @@ export default function SourcingPage() {
                       )}
                     </div>
                     <button
-                      onClick={() => setExpandedRequest(expandedRequest === request.id ? null : request.id)}
+                      onClick={() => setExpandedRequest(expandedRequest === request.sourcing_id ? null : request.sourcing_id)}
                       className="flex items-center gap-1 text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
                     >
                       <span className="tracking-[0.1em] uppercase">
-                        {expandedRequest === request.id ? 'Hide Details' : 'View Details'}
+                        {expandedRequest === request.sourcing_id ? 'Hide Details' : 'View Details'}
                       </span>
-                      <ChevronRight size={14} className={`transition-transform ${expandedRequest === request.id ? 'rotate-90' : ''}`} />
+                      <ChevronRight size={14} className={`transition-transform ${expandedRequest === request.sourcing_id ? 'rotate-90' : ''}`} />
                     </button>
                   </div>
 
                   {/* Expanded Details */}
-                  {expandedRequest === request.id && (
+                  {expandedRequest === request.sourcing_id && (
                     <div className="mt-4 pt-4 border-t border-sand space-y-4">
-                      {/* Request Metadata */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-parchment/30">
-                        <div>
-                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Type</p>
-                          <p className="text-sm text-charcoal-deep capitalize">{request.type.replace('_', ' ')}</p>
-                        </div>
-                        {request.category && (
+                        {request.product_category && (
                           <div>
                             <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Category</p>
-                            <p className="text-sm text-charcoal-deep">{request.category}</p>
+                            <p className="text-sm text-charcoal-deep capitalize">{request.product_category}</p>
                           </div>
                         )}
                         {request.specifications && (
@@ -324,161 +316,23 @@ export default function SourcingPage() {
                           </div>
                         )}
                         <div>
+                          <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Priority</p>
+                          <p className="text-sm text-charcoal-deep capitalize">{request.priority.replace('_', ' ')}</p>
+                        </div>
+                        <div>
                           <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">Last Updated</p>
-                          <p className="text-sm text-charcoal-deep">{new Date(request.updatedAt).toLocaleDateString()}</p>
+                          <p className="text-sm text-charcoal-deep">{new Date(request.updated_at).toLocaleDateString()}</p>
                         </div>
                       </div>
 
-                      {/* Timeline */}
-                      {request.timeline && request.timeline.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-sand">
-                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Progress</p>
-                          <div className="space-y-2">
-                            {request.timeline.map(event => (
-                              <div key={event.id} className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />
-                                <div>
-                                  <p className="text-sm text-charcoal-deep font-medium">
-                                    {getStatusLabel(event.status)}
-                                  </p>
-                                  <p className="text-xs text-stone">{event.note}</p>
-                                  <p className="text-xs text-taupe">
-                                    {new Date(event.createdAt).toLocaleDateString('en-US', {
-                                      month: 'short', day: 'numeric',
-                                      hour: '2-digit', minute: '2-digit'
-                                    })}
-                                  </p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Options Found */}
-                      {request.foundOptions.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-sand">
-                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
-                            Options Found — Select Your Preferred Item
-                          </p>
-                          <div className="space-y-3">
-                            {request.foundOptions.map(option => (
-                              <div
-                                key={option.id}
-                                className={`p-4 border transition-colors ${
-                                  request.selectedOptionId === option.id
-                                    ? 'border-charcoal-deep bg-parchment'
-                                    : 'border-sand hover:border-charcoal-deep/50'
-                                }`}
-                              >
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="flex-1">
-                                    <p className="font-medium text-charcoal-deep text-sm">
-                                      {option.title || option.customDescription || option.product?.name || 'Untitled Option'}
-                                    </p>
-                                    {option.brandName && (
-                                      <p className="text-xs text-gold-muted tracking-[0.1em] uppercase mt-0.5">
-                                        {option.brandName}
-                                      </p>
-                                    )}
-                                    {(option.description || option.conciergeRecommendation) && (
-                                      <p className="text-xs text-stone mt-1">
-                                        {option.description || option.conciergeRecommendation}
-                                      </p>
-                                    )}
-                                    <div className="flex items-center gap-3 mt-2">
-                                      <p className="font-display text-lg text-charcoal-deep">
-                                        €{option.price.toLocaleString()}
-                                      </p>
-                                      <span className="text-xs text-stone">
-                                        {option.sourceLocation || option.source}
-                                      </span>
-                                      {option.estimatedDelivery && (
-                                        <span className="text-xs text-stone">
-                                          Est. delivery: {option.estimatedDelivery}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {option.notes && (
-                                      <p className="text-xs text-stone italic mt-1">{option.notes}</p>
-                                    )}
-                                  </div>
-                                  {request.selectedOptionId !== option.id &&
-                                   request.status !== 'acquired' &&
-                                   request.status !== 'delivered' && (
-                                    <button
-                                      onClick={() => selectSourcingOption(request.id, option.id)}
-                                      className="flex-shrink-0 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-                                    >
-                                      Select This
-                                    </button>
-                                  )}
-                                  {request.selectedOptionId === option.id && (
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                      <Check size={16} className="text-success" />
-                                      <span className="text-xs text-success font-medium">Selected</span>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Concierge Notes (legacy) */}
-                      {request.conciergeNotes.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-sand">
-                          <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Concierge Notes</p>
-                          <div className="space-y-3">
-                            {request.conciergeNotes.map((note) => (
-                              <div key={note.id} className={`p-3 text-sm ${note.author === 'concierge' ? 'bg-parchment text-charcoal-deep' : 'bg-charcoal-deep/5 text-stone'}`}>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="text-[10px] tracking-[0.15em] uppercase font-medium">
-                                    {note.author === 'concierge' ? concierge?.name || 'Concierge' : 'You'}
-                                  </span>
-                                  <span className="text-[10px] text-taupe">
-                                    {new Date(note.timestamp).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                <p>{note.content}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Messages */}
+                      {/* Messages placeholder */}
                       <div className="mt-4 pt-4 border-t border-sand">
                         <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Messages</p>
-                        {(!request.messages || request.messages.length === 0) ? (
-                          <p className="text-sm text-stone italic mb-3">
-                            No messages yet. Your sourcing team will be in touch soon.
-                          </p>
-                        ) : (
-                          <div className="space-y-3 max-h-48 overflow-y-auto mb-3">
-                            {request.messages.map(msg => (
-                              <div
-                                key={msg.id}
-                                className={`p-3 max-w-sm text-sm ${
-                                  msg.senderRole === 'client'
-                                    ? 'ml-auto bg-charcoal-deep text-ivory-cream'
-                                    : 'bg-parchment text-charcoal-deep'
-                                }`}
-                              >
-                                <p className="text-xs font-medium mb-1 opacity-60">{msg.senderName}</p>
-                                <p>{msg.content}</p>
-                                <p className="text-xs opacity-40 mt-1">
-                                  {new Date(msg.createdAt).toLocaleTimeString('en-US', {
-                                    hour: '2-digit', minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                        <p className="text-sm text-stone italic mb-3">
+                          No messages yet. Your sourcing team will be in touch soon.
+                        </p>
                         <SourcingMessageInput
-                          onSend={(content) => addSourcingMessage(request.id, content)}
+                          onSend={(content) => addSourcingMessage(request.sourcing_id, content)}
                         />
                       </div>
                     </div>
