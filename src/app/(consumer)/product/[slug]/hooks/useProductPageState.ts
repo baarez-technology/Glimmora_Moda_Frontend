@@ -709,8 +709,9 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     };
   }, [serviceData.fabricSimulation, product]);
 
-  // Climate Suitability — service data with fallback
+  // Climate Suitability — API data takes priority, then service data, then hardcoded fallback
   const climateSuitability: ClimateSuitability = useMemo(() => {
+    if (product.climateSuitability) return product.climateSuitability;
     if (serviceData.climateSuitability) return serviceData.climateSuitability;
     return {
       productId: product.id,
@@ -722,7 +723,7 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
       indoorOutdoor: 'both',
       activityLevel: 'moderate'
     };
-  }, [serviceData.climateSuitability, product.id]);
+  }, [product.climateSuitability, serviceData.climateSuitability, product.id]);
 
   // Sustainability Score — service data with fallback (NO Math.random)
   const sustainabilityScore: SustainabilityScore = useMemo(() => {

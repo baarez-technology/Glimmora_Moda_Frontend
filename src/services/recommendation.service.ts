@@ -518,7 +518,14 @@ interface ApiProductDetail {
     occasions?: string[];
     pattern?: string;
     fabrics?: string;
-    climate_profile?: Record<string, unknown>;
+    climate_profile?: {
+      temperature_range?: { min_celsius?: number; max_celsius?: number; optimal_celsius?: number; label?: string };
+      weather_conditions?: { primary?: string[]; humidity_level?: string };
+      best_climates?: string[];
+      setting?: string;
+      activity_level?: string;
+      best_seasons?: string[];
+    };
   };
   // Legacy shape: ai_metadata + top-level arrays
   ai_metadata?: {
@@ -545,6 +552,47 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   const productCategory = raw.product_category || aiMeta?.product_category || '';
   const occasions = aiData?.occasions || raw.occasions || [];
   const aesthetics = aiData?.aesthetics || raw.aesthetics || [];
+
+  // Map climate_profile from ai_data → ClimateSuitability
+  const cp = aiData?.climate_profile;
+  const climateSuitability = cp ? {
+    productId: raw.product_id,
+    temperatureRange: {
+      min: cp.temperature_range?.min_celsius ?? 10,
+      max: cp.temperature_range?.max_celsius ?? 30,
+    },
+    humidity: (() => {
+      const h = (cp.weather_conditions?.humidity_level || '').toLowerCase();
+      if (h.includes('high')) return 'high' as const;
+      if (h.includes('low')) return 'low' as const;
+      if (h.includes('any') || h.includes('all')) return 'any' as const;
+      return 'medium' as const;
+    })(),
+    weather: (cp.weather_conditions?.primary || []).map(w => w.toLowerCase()).filter(
+      (w): w is 'sunny' | 'cloudy' | 'rainy' | 'snowy' | 'windy' =>
+        ['sunny', 'cloudy', 'rainy', 'snowy', 'windy'].includes(w)
+    ),
+    seasons: (cp.best_seasons || []).map(s => s.toLowerCase()).filter(
+      (s): s is 'spring' | 'summer' | 'autumn' | 'winter' =>
+        ['spring', 'summer', 'autumn', 'winter'].includes(s)
+    ),
+    climates: (cp.best_climates || []).map(c => c.toLowerCase()).filter(
+      (c): c is 'tropical' | 'temperate' | 'continental' | 'arid' | 'polar' =>
+        ['tropical', 'temperate', 'continental', 'arid', 'polar'].includes(c)
+    ),
+    indoorOutdoor: (() => {
+      const s = (cp.setting || '').toLowerCase();
+      if (s.includes('outdoor')) return 'outdoor' as const;
+      if (s.includes('both') || s.includes('all')) return 'both' as const;
+      return 'indoor' as const;
+    })(),
+    activityLevel: (() => {
+      const a = (cp.activity_level || '').toLowerCase();
+      if (a.includes('high')) return 'high' as const;
+      if (a.includes('moderate') || a.includes('medium')) return 'moderate' as const;
+      return 'low' as const;
+    })(),
+  } : undefined;
 
   // Build variants from backend data
   const variants: Product['variants'] = [];
@@ -781,6 +829,7 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     commerceEligible: true,
     craftTags: [],
     colorImageMap: Object.keys(colorImageMap).length > 0 ? colorImageMap : undefined,
+    climateSuitability,
   };
 }
 
