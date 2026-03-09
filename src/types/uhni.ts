@@ -197,6 +197,8 @@ export interface BespokeOrder {
   id: string;
   brandId: string;
   brandName: string;
+  /** When multiple brands are selected for a bespoke commission */
+  selectedBrands?: { id: string; name: string }[];
   type: BespokeOrderType;
   title: string;
   description: string;

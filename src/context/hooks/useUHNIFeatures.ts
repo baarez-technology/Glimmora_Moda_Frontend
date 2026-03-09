@@ -79,11 +79,15 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
     detailedSpec: BespokeDetailedSpec;
     estimatedBudget: number;
     requestedDeadline?: string;
+    selectedBrands?: { id: string; name: string }[];
   }) => {
+    const brands = orderData.selectedBrands || [];
+    const primaryBrand = brands[0];
     const newOrder: BespokeOrder = {
       id: `bespoke-${Date.now()}`,
-      brandId: 'brand-default',
-      brandName: 'ModaGlimmora Atelier',
+      brandId: primaryBrand?.id || 'brand-default',
+      brandName: primaryBrand?.name || 'ModaGlimmora Atelier',
+      selectedBrands: brands.length > 0 ? brands : undefined,
       title: orderData.title,
       type: orderData.type,
       description: orderData.description,

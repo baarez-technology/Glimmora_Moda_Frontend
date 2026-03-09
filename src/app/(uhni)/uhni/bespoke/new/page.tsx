@@ -1,16 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import {
   ArrowLeft, ArrowRight, Check, Ruler, Palette,
-  Scissors, Crown, AlertCircle
+  Scissors, Crown, AlertCircle, X, Search
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import * as brandService from '@/services/brand.service';
+import type { Brand } from '@/types';
 import type { BespokeDetailedSpec } from '@/types';
 
 type OrderType = 'made_to_measure' | 'custom_design' | 'modification';
+
+interface SelectedBrand {
+  id: string;
+  name: string;
+  logoUrl?: string;
+}
 
 interface FormData {
   title: string;
@@ -18,6 +27,7 @@ interface FormData {
   description: string;
   estimatedBudget: number;
   requestedDeadline: string;
+  selectedBrands: SelectedBrand[];
   spec: BespokeDetailedSpec;
 }
 
@@ -27,6 +37,7 @@ const initialForm: FormData = {
   description: '',
   estimatedBudget: 0,
   requestedDeadline: '',
+  selectedBrands: [],
   spec: {
     measurements: {},
     fabricPreferences: '',
@@ -43,6 +54,46 @@ export default function NewBespokeOrderPage() {
   const [formData, setFormData] = useState<FormData>(initialForm);
   const [submitted, setSubmitted] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+
+  // Brand loading state
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [brandSearch, setBrandSearch] = useState('');
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+
+  // Load brands on mount
+  useEffect(() => {
+    brandService.getAllBrands()
+      .then(res => {
+        if (res.success && res.data) {
+          setAllBrands(res.data);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setBrandsLoading(false));
+  }, []);
+
+  // Filter brands by search
+  const filteredBrands = allBrands.filter(b =>
+    b.name.toLowerCase().includes(brandSearch.toLowerCase()) &&
+    !formData.selectedBrands.some(sb => sb.id === b.id)
+  );
+
+  const addBrand = useCallback((brand: Brand) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedBrands: [...prev.selectedBrands, { id: brand.id, name: brand.name, logoUrl: brand.logoUrl }],
+    }));
+    setBrandSearch('');
+    setBrandDropdownOpen(false);
+  }, []);
+
+  const removeBrand = useCallback((brandId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedBrands: prev.selectedBrands.filter(b => b.id !== brandId),
+    }));
+  }, []);
 
   if (!isUHNI) {
     return (
@@ -62,6 +113,7 @@ export default function NewBespokeOrderPage() {
     const errs: string[] = [];
     if (!formData.title.trim()) errs.push('Title is required');
     if (!formData.type) errs.push('Please select an order type');
+    if (formData.selectedBrands.length === 0) errs.push('Please select at least one brand');
     if (formData.estimatedBudget <= 0) errs.push('Please enter an estimated budget');
     setErrors(errs);
     return errs.length === 0;
@@ -87,6 +139,7 @@ export default function NewBespokeOrderPage() {
       detailedSpec: formData.spec,
       estimatedBudget: formData.estimatedBudget,
       requestedDeadline: formData.requestedDeadline || undefined,
+      selectedBrands: formData.selectedBrands.map(b => ({ id: b.id, name: b.name })),
     });
     setSubmitted(true);
   };
@@ -131,6 +184,12 @@ export default function NewBespokeOrderPage() {
           <h2 className="font-display text-2xl text-charcoal-deep mb-3">
             Your Bespoke Request Has Been Submitted
           </h2>
+          <p className="text-stone text-sm mb-4">
+            Commission sent to {formData.selectedBrands.length === 1
+              ? formData.selectedBrands[0].name
+              : `${formData.selectedBrands.length} brands`
+            }
+          </p>
           <p className="text-stone text-sm mb-8">
             Our atelier team will review your request and contact you within 48 hours to arrange your initial consultation.
           </p>
@@ -205,6 +264,112 @@ export default function NewBespokeOrderPage() {
                 placeholder="e.g. Evening Gown for Met Gala"
                 className="w-full border border-sand px-4 py-3 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
+            </div>
+
+            {/* Brand Multi-Select */}
+            <div>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                Select Brand(s) *
+              </label>
+              <p className="text-xs text-stone mb-3">
+                Choose one or more brands for your bespoke commission
+              </p>
+
+              {/* Selected Brands Tags */}
+              {formData.selectedBrands.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {formData.selectedBrands.map(brand => (
+                    <span
+                      key={brand.id}
+                      className="inline-flex items-center gap-2 px-3 py-2 bg-charcoal-deep text-ivory-cream text-sm"
+                    >
+                      {brand.logoUrl && (
+                        <Image
+                          src={brand.logoUrl}
+                          alt={brand.name}
+                          width={16}
+                          height={16}
+                          className="rounded-full object-cover"
+                        />
+                      )}
+                      {brand.name}
+                      <button
+                        onClick={() => removeBrand(brand.id)}
+                        className="ml-1 hover:text-gold-soft transition-colors"
+                        aria-label={`Remove ${brand.name}`}
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Search Input */}
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-taupe" />
+                <input
+                  type="text"
+                  value={brandSearch}
+                  onChange={e => {
+                    setBrandSearch(e.target.value);
+                    setBrandDropdownOpen(true);
+                  }}
+                  onFocus={() => setBrandDropdownOpen(true)}
+                  placeholder={brandsLoading ? 'Loading brands...' : 'Search brands...'}
+                  disabled={brandsLoading}
+                  className="w-full border border-sand pl-10 pr-4 py-3 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+
+                {/* Dropdown */}
+                {brandDropdownOpen && !brandsLoading && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-sand shadow-lg max-h-60 overflow-y-auto">
+                    {filteredBrands.length === 0 ? (
+                      <div className="px-4 py-3 text-sm text-taupe">
+                        {brandSearch ? 'No matching brands' : 'All brands selected'}
+                      </div>
+                    ) : (
+                      filteredBrands.map(brand => (
+                        <button
+                          key={brand.id}
+                          onClick={() => addBrand(brand)}
+                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-parchment transition-colors text-left"
+                        >
+                          {brand.logoUrl ? (
+                            <Image
+                              src={brand.logoUrl}
+                              alt={brand.name}
+                              width={28}
+                              height={28}
+                              className="rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-7 h-7 rounded-full bg-sand flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs text-stone font-medium">
+                                {brand.name.charAt(0)}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <p className="text-sm text-charcoal-deep font-medium">{brand.name}</p>
+                            {brand.tagline && (
+                              <p className="text-[10px] text-taupe truncate max-w-[300px]">{brand.tagline}</p>
+                            )}
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Click-away to close dropdown */}
+              {brandDropdownOpen && (
+                <div
+                  className="fixed inset-0 z-10"
+                  onClick={() => setBrandDropdownOpen(false)}
+                />
+              )}
             </div>
 
             <div>
@@ -404,6 +569,33 @@ export default function NewBespokeOrderPage() {
                 <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Title</p>
                 <p className="text-charcoal-deep font-medium">{formData.title}</p>
               </div>
+
+              {/* Selected Brands Summary */}
+              <div>
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
+                  {formData.selectedBrands.length === 1 ? 'Brand' : 'Brands'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {formData.selectedBrands.map(brand => (
+                    <span
+                      key={brand.id}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-parchment text-sm text-charcoal-deep"
+                    >
+                      {brand.logoUrl && (
+                        <Image
+                          src={brand.logoUrl}
+                          alt={brand.name}
+                          width={16}
+                          height={16}
+                          className="rounded-full object-cover"
+                        />
+                      )}
+                      {brand.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
               {formData.description && (
                 <div>
                   <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Description</p>
