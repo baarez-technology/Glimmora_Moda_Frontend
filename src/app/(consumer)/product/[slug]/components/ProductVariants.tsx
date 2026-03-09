@@ -33,9 +33,14 @@ export default function ProductVariants({
       {/* Size Selection */}
       {sizeVariants.length > 0 && (
         <div className="mb-8">
-          <p className={`text-[11px] tracking-[0.3em] uppercase mb-4 ${sizeError ? 'text-error' : 'text-taupe'}`}>
-            Select Size {sizeError && <span className="text-error">*</span>}
-          </p>
+          <div className="flex justify-between items-center mb-4">
+            <p className={`text-[11px] tracking-[0.3em] uppercase ${sizeError ? 'text-error' : 'text-taupe'}`}>
+              Select Size {sizeError && <span className="text-error">*</span>}
+            </p>
+            {/* <button className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors">
+              Size Guide
+            </button> */}
+          </div>
           <div className="flex flex-wrap gap-2">
             {sizeVariants.map((variant) => (
               <button

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Sparkles, ChevronRight, Heart, Check, ShoppingBag, Loader2 } from 'lucide-react';
+import { Sparkles, ChevronRight, Check } from 'lucide-react';
 import type { CompleteOutfit, Product } from '@/types';
 import { getCompleteTheLook } from '@/services/complete-the-look.service';
 import type { CompleteTheLookResponse, CompleteTheLookProduct } from '@/services/complete-the-look.service';
@@ -214,6 +215,11 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
 
   // ── Fallback: Legacy mock-based rendering ────────────────────────────────
   if (outfits.length === 0) return null;
+  const matchedOutfits = outfits.filter(o => o.compatibilityScore > 0);
+  const [selectedOutfit, setSelectedOutfit] = useState<string | null>(matchedOutfits[0]?.id || null);
+  const activeOutfit = matchedOutfits.find(o => o.id === selectedOutfit);
+
+  if (matchedOutfits.length === 0) return null;
 
   return (
     <section className="py-16 lg:py-24 bg-champagne/30">
@@ -236,7 +242,7 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
 
         {/* Outfit Selector Tabs */}
         <div className="flex gap-3 mb-8 overflow-x-auto pb-2">
-          {outfits.map((outfit) => (
+          {matchedOutfits.map((outfit) => (
             <button
               key={outfit.id}
               onClick={() => setSelectedOutfit(outfit.id)}
@@ -301,32 +307,10 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
                       </div>
                       <p className="text-xs text-greige uppercase tracking-wider">{item.category}</p>
                       <p className="text-sm font-medium text-charcoal-deep truncate">{item.product.name}</p>
-                      <p className="text-sm text-stone">
-                        €{item.product.price.toLocaleString()}
-                      </p>
                     </div>
                   ))}
                 </div>
 
-                {/* Total Price */}
-                <div className="mt-6 pt-6 border-t border-sand flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-greige">Complete Look Total</p>
-                    <p className="font-display text-xl text-charcoal-deep">
-                      €{activeOutfit.totalPrice.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button className="btn-secondary">
-                      <Heart size={16} />
-                      Save Look
-                    </button>
-                    <button className="btn-primary">
-                      <ShoppingBag size={16} />
-                      Add All to Considerations
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {/* AGI Reasoning */}

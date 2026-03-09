@@ -250,7 +250,7 @@ export default function HomePage() {
             {/* Left - Large Featured Product */}
             {featuredProducts[0] && (
               <Link
-                href={`/product/${featuredProducts[0].slug}?productId=${featuredProducts[0].id}&img=${encodeURIComponent(featuredProducts[0].images[0]?.url || '')}`}
+                href={`/product/${featuredProducts[0].slug}?productId=${featuredProducts[0].id}`}
                 className="group"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-5">
@@ -283,7 +283,7 @@ export default function HomePage() {
               {featuredProducts.slice(1, 5).map((product) => (
                 <Link
                   key={product.id}
-                  href={`/product/${product.slug}?productId=${product.id}&img=${encodeURIComponent(product.images[0]?.url || '')}`}
+                  href={`/product/${product.slug}?productId=${product.id}`}
                   className="group"
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-3">

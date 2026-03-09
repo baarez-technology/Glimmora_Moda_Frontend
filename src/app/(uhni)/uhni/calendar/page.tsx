@@ -372,7 +372,7 @@ export default function UHNICalendarPage() {
                               >
                                 <div className="flex gap-4">
                                   <Link
-                                    href={`/product/${item.product.slug}`}
+                                    href={`/product/${item.product.slug}?productId=${item.product.id}`}
                                     className="group relative w-20 h-28 overflow-hidden flex-shrink-0 bg-parchment"
                                     onMouseEnter={() => setActiveHover(idx)}
                                     onMouseLeave={() => setActiveHover(null)}
@@ -393,7 +393,7 @@ export default function UHNICalendarPage() {
                                       )}
                                     </div>
                                     <p className="text-[10px] tracking-[0.25em] uppercase text-stone mb-1">{item.product.brandName}</p>
-                                    <Link href={`/product/${item.product.slug}`}>
+                                    <Link href={`/product/${item.product.slug}?productId=${item.product.id}`}>
                                       <h5 className="font-display text-sm text-charcoal-deep hover:text-stone transition-colors line-clamp-1">
                                         {item.product.name}
                                       </h5>

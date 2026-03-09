@@ -491,19 +491,7 @@ export default function CalendarPage() {
                           const p = item.suitable_product;
 
                           // No matching product found
-                          if (!p) {
-                            return (
-                              <div
-                                key={idx}
-                                className="bg-parchment border border-sand p-6 flex flex-col items-center justify-center text-center"
-                              >
-                                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                                  {item.product_category}
-                                </p>
-                                <p className="text-stone text-sm">No match found</p>
-                              </div>
-                            );
-                          }
+                          if (!p) return null;
 
                           const imgSrc = p.image_urls?.[0] || p.product_image;
                           const slug = p.product_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -544,11 +532,8 @@ export default function CalendarPage() {
                                 </p>
                                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-sand/50">
                                   <div className="flex items-center gap-2">
-                                    {p.discount_percentage > 0 && (
-                                      <span className="text-xs text-taupe line-through">€{p.price.toLocaleString()}</span>
-                                    )}
                                     <span className="font-display text-base text-charcoal-deep">
-                                      €{(p.offer_price || p.price).toLocaleString()}
+                                      €{p.price.toLocaleString()}
                                     </span>
                                   </div>
                                   <span className="flex items-center gap-1 text-[10px] tracking-[0.15em] uppercase text-stone group-hover:text-charcoal-deep transition-colors">

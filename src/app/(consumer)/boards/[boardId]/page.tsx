@@ -330,7 +330,7 @@ export default function BoardDetailPage() {
               >
                 <div className="bg-white rounded-xl border border-stone/20 overflow-hidden hover:shadow-lg transition-all">
                   {/* Product Image */}
-                  <Link href={`/product/${item.product!.slug}`}>
+                  <Link href={`/product/${item.product!.slug}?productId=${item.product!.id}`}>
                     <div className="aspect-square bg-stone/5 relative overflow-hidden">
                       <Image
                         src={item.product!.images[0]?.url || ''}
@@ -362,7 +362,7 @@ export default function BoardDetailPage() {
                         ${item.product!.price.toLocaleString()}
                       </p>
                       <Link
-                        href={`/product/${item.product!.slug}`}
+                        href={`/product/${item.product!.slug}?productId=${item.product!.id}`}
                         className="text-gold-soft hover:underline text-xs flex items-center gap-1"
                       >
                         View <ExternalLink className="w-3 h-3" />
