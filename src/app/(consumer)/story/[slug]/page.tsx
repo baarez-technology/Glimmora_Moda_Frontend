@@ -297,7 +297,7 @@ export default function StoryPage({ params }: StoryPageProps) {
               {relatedProducts.map((product, index) => (
                 <Link
                   key={product.id}
-                  href={`/product/${product.slug}`}
+                  href={`/product/${product.slug}?productId=${product.id}`}
                   className="group"
                   onMouseEnter={() => setActiveHover(index)}
                   onMouseLeave={() => setActiveHover(null)}

@@ -108,4 +108,5 @@ export interface Product {
   craftTags: string[];
   media?: ProductMedia;
   colorImageMap?: Record<string, ProductImage[]>;
+  climateSuitability?: import('./sustainability').ClimateSuitability;
 }

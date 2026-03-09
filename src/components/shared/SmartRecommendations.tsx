@@ -140,7 +140,7 @@ export default function SmartRecommendations({
         <div className={`grid ${variant === 'grid' ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-x-6 gap-y-12`}>
           {recommendations.map(({ product, reasons }) => (
             <div key={product.id} className="group">
-              <Link href={`/product/${product.slug}`} className="block">
+              <Link href={`/product/${product.slug}?productId=${product.id}`} className="block">
                 {/* Image */}
                 <div className="relative aspect-[3/4] overflow-hidden bg-parchment mb-4">
                   <Image

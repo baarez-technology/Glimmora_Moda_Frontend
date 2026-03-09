@@ -241,7 +241,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                 {displayProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}${isRealApi ? `?productId=${product.id}` : ''}`}
+                    href={`/product/${product.slug}?productId=${product.id}`}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
