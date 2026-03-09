@@ -1,26 +1,28 @@
 'use client';
 
-import { use, useState, useEffect, useMemo } from 'react';
+import { use, useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, MessageCircle, FileText } from 'lucide-react';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 import { useApp } from '@/context/AppContext';
-import { notFound, useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+import * as orderManagementService from '@/services/order-management.service';
+import type { CustomerOrder } from '@/services/order-management.service';
 
 interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
-
-// Generate timeline based on order status
-function generateTimeline(order: { status: string; createdAt: string; estimatedDelivery: string }) {
-  const orderDate = new Date(order.createdAt);
+// Generate timeline based on delivery status
+function generateTimeline(order: CustomerOrder) {
+  const orderDate = new Date(order.order_date);
   const formatDate = (date: Date) => date.toISOString().split('T')[0];
   const formatTime = (date: Date) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  const statusOrder = ['confirmed', 'processing', 'shipped', 'delivered'];
-  const currentIndex = statusOrder.indexOf(order.status);
+  const statusOrder = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+  const currentIndex = statusOrder.indexOf(order.delivery_status);
 
   const timeline = [
     {
@@ -33,31 +35,31 @@ function generateTimeline(order: { status: string; createdAt: string; estimatedD
       status: 'Payment Confirmed',
       date: formatDate(orderDate),
       time: formatTime(new Date(orderDate.getTime() + 2 * 60000)),
-      completed: currentIndex >= 0
+      completed: order.payment_status === 'paid' || order.payment_status === 'completed' || currentIndex >= 1
     },
     {
       status: 'Processing',
-      date: currentIndex >= 1 ? formatDate(new Date(orderDate.getTime() + 24 * 60 * 60000)) : '',
-      time: currentIndex >= 1 ? '09:00' : '',
-      completed: currentIndex >= 1
-    },
-    {
-      status: 'Shipped',
-      date: currentIndex >= 2 ? formatDate(new Date(orderDate.getTime() + 2 * 24 * 60 * 60000)) : '',
-      time: currentIndex >= 2 ? '14:30' : '',
+      date: currentIndex >= 2 ? formatDate(new Date(orderDate.getTime() + 24 * 60 * 60000)) : '',
+      time: currentIndex >= 2 ? '09:00' : '',
       completed: currentIndex >= 2
     },
     {
-      status: 'Out for Delivery',
-      date: currentIndex >= 3 ? formatDate(new Date(order.estimatedDelivery)) : '',
-      time: currentIndex >= 3 ? '08:00' : '',
+      status: 'Shipped',
+      date: currentIndex >= 3 ? formatDate(new Date(orderDate.getTime() + 2 * 24 * 60 * 60000)) : '',
+      time: currentIndex >= 3 ? '14:30' : '',
       completed: currentIndex >= 3
     },
     {
+      status: 'Out for Delivery',
+      date: currentIndex >= 4 && order.delivery_date ? formatDate(new Date(order.delivery_date)) : '',
+      time: currentIndex >= 4 ? '08:00' : '',
+      completed: currentIndex >= 4
+    },
+    {
       status: 'Delivered',
-      date: currentIndex >= 3 ? formatDate(new Date(order.estimatedDelivery)) : '',
-      time: currentIndex >= 3 ? '14:15' : '',
-      completed: currentIndex >= 3
+      date: currentIndex >= 4 && order.delivery_date ? formatDate(new Date(order.delivery_date)) : '',
+      time: currentIndex >= 4 ? '14:15' : '',
+      completed: currentIndex >= 4
     }
   ];
 
@@ -67,33 +69,35 @@ function generateTimeline(order: { status: string; createdAt: string; estimatedD
 export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const { id } = use(params);
   const router = useRouter();
-  const { orders, showToast } = useApp();
-  const order = orders.find(o => o.id === id);
+  const { showToast } = useApp();
+  const { isAuthenticated, isHydrated } = useAuth();
+  const [order, setOrder] = useState<CustomerOrder | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [showTracking, setShowTracking] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [selectedReturnItems, setSelectedReturnItems] = useState<string[]>([]);
-  const [trackingNumber, setTrackingNumber] = useState<string>('');
 
-  useEffect(() => {
-    setIsLoaded(true);
-  }, []);
-
-  // Persist tracking number in localStorage
-  useEffect(() => {
-    if (!id) return;
-    const storageKey = `moda-tracking-${id}`;
-    const stored = localStorage.getItem(storageKey);
-    if (stored) {
-      setTrackingNumber(stored);
-    } else {
-      const generated = `DHL${id.replace('MG-', '').replace('-', '')}FR`;
-      localStorage.setItem(storageKey, generated);
-      setTrackingNumber(generated);
+  const fetchOrder = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await orderManagementService.getOrderById(id);
+      setOrder(data);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to load order', 'error');
+    } finally {
+      setIsLoading(false);
+      setIsLoaded(true);
     }
-  }, [id]);
+  }, [id, showToast]);
+
+  useEffect(() => {
+    if (isHydrated && isAuthenticated) {
+      fetchOrder();
+    }
+  }, [isHydrated, isAuthenticated, fetchOrder]);
 
   // ESC key handler to close whichever modal is open
   useEffect(() => {
@@ -111,23 +115,13 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     }
   }, [showTracking, showInvoice, showReturnModal, showSupportModal]);
 
-  // Generate timeline based on order status
   const timeline = useMemo(() => {
     if (!order) return [];
     return generateTimeline(order);
   }, [order]);
 
-  // Calculate order totals
-  const subtotal = order?.total || 0;
-  const shipping = 0; // Complimentary
-  const tax = 0; // Included
-
-  if (!order) {
-    notFound();
-  }
-
-  // Format date for display
   const formatDisplayDate = (dateStr: string) => {
+    if (!dateStr) return '';
     return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
@@ -135,29 +129,56 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     });
   };
 
+  const formatCurrency = (amount: number, currency: string) => {
+    const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+    return `${symbol}${amount.toLocaleString()}`;
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'delivered':
-        return 'text-success bg-success/10';
-      case 'shipped':
-        return 'text-charcoal-deep bg-charcoal-deep/10';
-      case 'processing':
-        return 'text-gold-muted bg-gold-muted/10';
-      default:
-        return 'text-stone bg-parchment';
+      case 'delivered': return 'text-success bg-success/10';
+      case 'shipped': return 'text-charcoal-deep bg-charcoal-deep/10';
+      case 'processing': return 'text-gold-muted bg-gold-muted/10';
+      default: return 'text-stone bg-parchment';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'delivered':
-        return <Check size={18} />;
-      case 'shipped':
-        return <Truck size={18} />;
-      default:
-        return <Package size={18} />;
+      case 'delivered': return <Check size={18} />;
+      case 'shipped': return <Truck size={18} />;
+      default: return <Package size={18} />;
     }
   };
+
+  // Loading state
+  if (!isHydrated || !isAuthenticated || isLoading) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-stone text-sm">Loading order...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+        <div className="text-center">
+          <Package size={48} className="text-stone/40 mx-auto mb-4" />
+          <h2 className="font-display text-xl text-charcoal-deep mb-2">Order not found</h2>
+          <p className="text-sm text-stone mb-6">This order doesn't exist or doesn't belong to you.</p>
+          <Link href="/profile/orders" className="text-sm tracking-[0.1em] uppercase text-charcoal-deep hover:text-gold-muted transition-colors">
+            Back to Orders
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const currency = order.payment_currency || 'USD';
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -178,13 +199,13 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 Order Details
               </span>
               <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
-                #{order.id}
+                #{order.order_id}
               </h1>
-              <p className="text-sand mt-3">Placed on {formatDisplayDate(order.createdAt)}</p>
+              <p className="text-sand mt-3">Placed on {formatDisplayDate(order.order_date)}</p>
             </div>
-            <div className={`flex items-center gap-2 px-5 py-3 ${getStatusColor(order.status)}`}>
-              {getStatusIcon(order.status)}
-              <span className="font-medium capitalize text-sm tracking-[0.1em] uppercase">{order.status}</span>
+            <div className={`flex items-center gap-2 px-5 py-3 ${getStatusColor(order.delivery_status)}`}>
+              {getStatusIcon(order.delivery_status)}
+              <span className="font-medium capitalize text-sm tracking-[0.1em] uppercase">{order.delivery_status}</span>
             </div>
           </div>
         </div>
@@ -226,13 +247,13 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 ))}
               </div>
 
-              {(order.status === 'shipped' || order.status === 'delivered') && (
+              {order.delivery_tracking_number && (
                 <div className="mt-8 pt-8 border-t border-sand">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Tracking Number</p>
                       <p className="font-mono text-charcoal-deep mt-1">
-                        {order.trackingNumber || trackingNumber}
+                        {order.delivery_tracking_number}
                       </p>
                     </div>
                     <button
@@ -250,36 +271,36 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             <div className="bg-white p-8">
               <h2 className="font-display text-xl text-charcoal-deep mb-8">Items</h2>
               <div className="space-y-6">
-                {order.items.map((item) => (
-                  <div key={item.id} className="flex gap-4">
-                    <Link
-                      href={`/product/${item.product.slug}`}
-                      className="relative w-24 h-32 overflow-hidden flex-shrink-0"
-                    >
-                      <Image
-                        src={item.product.images[0]?.url || ''}
-                        alt={item.product.name}
-                        fill
-                        className="object-cover hover:scale-105 transition-transform duration-300"
-                      />
-                    </Link>
+                {order.products.map((product, idx) => (
+                  <div key={`${product.product_id}-${idx}`} className="flex gap-4">
+                    <div className="relative w-24 h-32 overflow-hidden flex-shrink-0 bg-parchment">
+                      {product.product_image ? (
+                        <Image
+                          src={product.product_image}
+                          alt={product.product_name}
+                          fill
+                          className="object-cover hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Package size={24} className="text-stone/40" />
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1">
                       <p className="text-[10px] tracking-[0.15em] uppercase text-taupe">
-                        {item.product.brandName}
+                        {product.sku}
                       </p>
-                      <Link
-                        href={`/product/${item.product.slug}`}
-                        className="font-display text-lg text-charcoal-deep hover:text-gold-muted transition-colors"
-                      >
-                        {item.product.name}
-                      </Link>
+                      <p className="font-display text-lg text-charcoal-deep">
+                        {product.product_name}
+                      </p>
                       <div className="flex gap-4 mt-2 text-sm text-stone">
-                        {item.selectedVariants?.size && <span>Size: {item.selectedVariants.size}</span>}
-                        {item.selectedVariants?.color && <span>Color: {item.selectedVariants.color}</span>}
-                        <span>Qty: 1</span>
+                        {product.size && <span>Size: {product.size}</span>}
+                        {product.color && <span>Color: {product.color}</span>}
+                        <span>Qty: {product.quantity}</span>
                       </div>
                       <p className="mt-2 text-charcoal-deep font-medium">
-                        €{item.product.price.toLocaleString()}
+                        {formatCurrency(product.product_price, currency)}
                       </p>
                     </div>
                   </div>
@@ -300,7 +321,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 </button>
                 <button
                   onClick={() => {
-                    if (order.status === 'delivered') {
+                    if (order.delivery_status === 'delivered') {
                       setShowReturnModal(true);
                     } else {
                       showToast('Returns available after delivery', 'info');
@@ -330,19 +351,27 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               <div className="space-y-4 text-sm">
                 <div className="flex justify-between">
                   <span className="text-stone">Subtotal</span>
-                  <span className="text-charcoal-deep">€{subtotal.toLocaleString()}</span>
+                  <span className="text-charcoal-deep">
+                    {formatCurrency(order.payment_amount - order.payment_tax - order.payment_shipping, currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-stone">Shipping</span>
-                  <span className="text-charcoal-deep">{shipping === 0 ? 'Complimentary' : `€${shipping}`}</span>
+                  <span className="text-charcoal-deep">
+                    {order.payment_shipping === 0 ? 'Complimentary' : formatCurrency(order.payment_shipping, currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-stone">Tax</span>
-                  <span className="text-charcoal-deep">{tax === 0 ? 'Included' : `€${tax}`}</span>
+                  <span className="text-charcoal-deep">
+                    {order.payment_tax === 0 ? 'Included' : formatCurrency(order.payment_tax, currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between pt-4 border-t border-sand">
                   <span className="font-medium text-charcoal-deep">Total</span>
-                  <span className="font-display text-xl text-charcoal-deep">€{order.total.toLocaleString()}</span>
+                  <span className="font-display text-xl text-charcoal-deep">
+                    {formatCurrency(order.payment_amount, currency)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -353,35 +382,43 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 <MapPin size={18} className="text-stone" />
                 <h2 className="font-display text-lg text-charcoal-deep">Shipping Address</h2>
               </div>
-              <p className="text-sm text-stone">Address on file</p>
-              <Link href="/profile/addresses" className="text-xs text-charcoal-deep hover:text-gold-muted transition-colors mt-2 inline-block tracking-[0.1em] uppercase">
-                Manage Addresses
-              </Link>
+              {order.delivery_tag && (
+                <p className="text-xs tracking-[0.1em] uppercase text-taupe mb-2">{order.delivery_tag}</p>
+              )}
+              <p className="text-sm text-stone">{order.delivery_address}</p>
+              <p className="text-sm text-stone">{order.delivery_city}{order.delivery_postal_code ? `, ${order.delivery_postal_code}` : ''}</p>
+              <p className="text-sm text-stone">{order.delivery_country}</p>
             </div>
 
             {/* Payment Method */}
             <div className="bg-white p-8">
               <div className="flex items-center gap-2 mb-6">
                 <CreditCard size={18} className="text-stone" />
-                <h2 className="font-display text-lg text-charcoal-deep">Payment Method</h2>
+                <h2 className="font-display text-lg text-charcoal-deep">Payment</h2>
               </div>
-              <p className="text-sm text-stone">Payment method on file</p>
+              <p className="text-sm text-stone capitalize">{order.payment_method || 'Card'}</p>
+              <p className="text-sm text-stone mt-1">
+                Status: <span className="capitalize">{order.payment_status}</span>
+              </p>
+              {order.payment_date && (
+                <p className="text-sm text-stone mt-1">
+                  Paid on {formatDisplayDate(order.payment_date)}
+                </p>
+              )}
             </div>
 
             {/* Delivery Info */}
-            {order.status !== 'delivered' && order.estimatedDelivery && (
-              <div className="bg-parchment p-8 border border-sand">
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Estimated Delivery</p>
-                <p className="font-display text-lg text-charcoal-deep">{formatDisplayDate(order.estimatedDelivery)}</p>
-              </div>
-            )}
-
-            {order.status === 'delivered' && (
+            {order.delivery_status === 'delivered' && order.delivery_date ? (
               <div className="bg-success/5 p-8 border border-success/20">
                 <p className="text-[10px] tracking-[0.2em] uppercase text-success mb-2">Delivered On</p>
-                <p className="font-display text-lg text-charcoal-deep">{formatDisplayDate(order.estimatedDelivery)}</p>
+                <p className="font-display text-lg text-charcoal-deep">{formatDisplayDate(order.delivery_date)}</p>
               </div>
-            )}
+            ) : order.delivery_method ? (
+              <div className="bg-parchment p-8 border border-sand">
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Delivery Method</p>
+                <p className="font-display text-lg text-charcoal-deep capitalize">{order.delivery_method}</p>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -398,7 +435,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             </div>
             <div className="mb-4 p-4 bg-parchment">
               <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Tracking Number</p>
-              <p className="font-mono text-charcoal-deep">{order.trackingNumber || trackingNumber}</p>
+              <p className="font-mono text-charcoal-deep">{order.delivery_tracking_number}</p>
             </div>
             <div className="space-y-0">
               {timeline.map((step, index) => (
@@ -432,31 +469,30 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             </div>
 
             <InvoiceDocument
-              invoiceNumber={generateInvoiceNumber(order.id, order.createdAt)}
-              invoiceDate={order.createdAt}
+              invoiceNumber={generateInvoiceNumber(order.order_id, order.order_date)}
+              invoiceDate={order.order_date}
               orderType="standard"
-              brandName={order.items[0]?.product.brandName || 'ModaGlimmora'}
-              buyerName="Valued Client"
-              buyerEmail=""
-              buyerAddress=""
-              items={order.items.map(item => ({
-                description: item.product.name,
+              brandName="ModaGlimmora"
+              buyerName={order.customer_name}
+              buyerEmail={order.customer_email}
+              buyerAddress={`${order.delivery_address}, ${order.delivery_city}, ${order.delivery_country}`}
+              items={order.products.map(product => ({
+                description: product.product_name,
                 detail: [
-                  item.selectedVariants?.size ? `Size: ${item.selectedVariants.size}` : '',
-                  item.selectedVariants?.color ? `Color: ${item.selectedVariants.color}` : '',
+                  product.size ? `Size: ${product.size}` : '',
+                  product.color ? `Color: ${product.color}` : '',
                 ].filter(Boolean).join(' · '),
-                quantity: item.quantity || 1,
-                unitPrice: item.product.price,
-                currency: 'EUR',
+                quantity: product.quantity,
+                unitPrice: product.product_price,
+                currency: currency,
               }))}
-              // TODO: fetch brand commerce settings via API when available
-              subtotal={order.total}
-              shippingAmount={0}
-              taxRate={0.20}
-              taxAmount={Math.round(order.total * 0.20 / 1.20)}
-              total={order.total}
-              currency="EUR"
-              paymentStatus="paid"
+              subtotal={order.payment_amount - order.payment_tax - order.payment_shipping}
+              shippingAmount={order.payment_shipping}
+              taxRate={order.payment_tax > 0 ? 0.20 : 0}
+              taxAmount={order.payment_tax}
+              total={order.payment_amount}
+              currency={currency}
+              paymentStatus={order.payment_status === 'paid' || order.payment_status === 'completed' ? 'paid' : 'pending'}
             />
 
             <div className="flex gap-3 mt-6">
@@ -496,24 +532,27 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               Select items you would like to return. Returns are accepted within 30 days of delivery.
             </p>
             <div className="space-y-3 mb-6">
-              {order.items.map(item => (
-                <label key={item.id} className={`flex items-center gap-3 p-3 border cursor-pointer hover:border-charcoal-deep transition-colors ${selectedReturnItems.includes(item.id) ? 'border-charcoal-deep bg-parchment' : 'border-sand'}`}>
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 accent-charcoal-deep"
-                    checked={selectedReturnItems.includes(item.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedReturnItems(prev => [...prev, item.id]);
-                      } else {
-                        setSelectedReturnItems(prev => prev.filter(id => id !== item.id));
-                      }
-                    }}
-                  />
-                  <span className="text-sm text-charcoal-deep">{item.product.name}</span>
-                  <span className="text-xs text-stone ml-auto">EUR {item.product.price.toLocaleString()}</span>
-                </label>
-              ))}
+              {order.products.map((product, idx) => {
+                const itemKey = `${product.product_id}-${idx}`;
+                return (
+                  <label key={itemKey} className={`flex items-center gap-3 p-3 border cursor-pointer hover:border-charcoal-deep transition-colors ${selectedReturnItems.includes(itemKey) ? 'border-charcoal-deep bg-parchment' : 'border-sand'}`}>
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-charcoal-deep"
+                      checked={selectedReturnItems.includes(itemKey)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedReturnItems(prev => [...prev, itemKey]);
+                        } else {
+                          setSelectedReturnItems(prev => prev.filter(k => k !== itemKey));
+                        }
+                      }}
+                    />
+                    <span className="text-sm text-charcoal-deep">{product.product_name}</span>
+                    <span className="text-xs text-stone ml-auto">{formatCurrency(product.product_price, currency)}</span>
+                  </label>
+                );
+              })}
             </div>
             <button
               onClick={() => {
@@ -546,7 +585,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               </button>
             </div>
             <p className="text-stone text-sm mb-6">
-              How can we help you with order #{order.id}?
+              How can we help you with order #{order.order_id}?
             </p>
             <div className="space-y-3">
               <button
@@ -566,7 +605,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 onClick={() => {
                   setShowSupportModal(false);
                   const ticketId = `TK-${Date.now().toString(36).toUpperCase()}`;
-                  showToast(`Support ticket ${ticketId} created for order #${order.id}. We'll respond within 24 hours.`, 'success');
+                  showToast(`Support ticket ${ticketId} created for order #${order.order_id}. We'll respond within 24 hours.`, 'success');
                 }}
                 className="w-full flex items-center gap-3 p-4 border border-sand hover:border-charcoal-deep transition-colors text-left"
               >
