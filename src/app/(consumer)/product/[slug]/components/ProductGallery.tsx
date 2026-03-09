@@ -2,12 +2,13 @@
 
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { Product } from '@/types';
+import type { Product, ProductImage } from '@/types';
 
 const PLACEHOLDER_IMAGE = 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image';
 
 interface ProductGalleryProps {
   product: Product;
+  images?: ProductImage[];
   activeImage: number;
   setActiveImage: (index: number) => void;
   onPrev: () => void;
@@ -17,18 +18,21 @@ interface ProductGalleryProps {
 
 export default function ProductGallery({
   product,
+  images,
   activeImage,
   setActiveImage,
   onPrev,
   onNext,
   isLoaded
 }: ProductGalleryProps) {
+  const displayImages = images || product.images;
+
   return (
     <div className={`space-y-4 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
       {/* Main Image */}
       <div className="relative aspect-[3/4] overflow-hidden bg-parchment group">
         <Image
-          src={product.images[activeImage]?.url || PLACEHOLDER_IMAGE}
+          src={displayImages[activeImage]?.url || PLACEHOLDER_IMAGE}
           alt={product.name}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
@@ -46,7 +50,7 @@ export default function ProductGallery({
         )}
 
         {/* Image Navigation */}
-        {product.images.length > 1 && (
+        {displayImages.length > 1 && (
           <>
             <button
               onClick={onPrev}
@@ -68,19 +72,19 @@ export default function ProductGallery({
         {/* Image Counter */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2">
           <span className="text-[10px] tracking-[0.3em] uppercase text-charcoal-deep bg-ivory-cream/90 px-4 py-2">
-            {activeImage + 1} / {product.images.length}
+            {activeImage + 1} / {displayImages.length}
           </span>
         </div>
       </div>
 
       {/* Thumbnails */}
-      {product.images.length > 1 && (
-        <div className="grid grid-cols-4 gap-3">
-          {product.images.slice(0, 4).map((image, index) => (
+      {displayImages.length > 1 && (
+        <div className="flex gap-3 overflow-x-auto pb-2">
+          {displayImages.map((image, index) => (
             <button
               key={image.id}
               onClick={() => setActiveImage(index)}
-              className={`relative aspect-square overflow-hidden transition-all duration-300 ${
+              className={`relative w-[calc(25%-9px)] min-w-[80px] flex-shrink-0 aspect-square overflow-hidden transition-all duration-300 ${
                 activeImage === index
                   ? 'ring-1 ring-charcoal-deep'
                   : 'opacity-60 hover:opacity-100'

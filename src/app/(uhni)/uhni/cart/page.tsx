@@ -301,7 +301,7 @@ export default function UHNICartPage() {
                     </Link>
 
                     <Link
-                      href="/uhni/private-shopping"
+                      href="/uhni/events?tab=shopping"
                       className="group w-full py-4 px-6 border border-sand/50 text-stone flex items-center justify-center gap-3 transition-all duration-300 hover:border-charcoal-deep hover:text-charcoal-deep"
                     >
                       <span className="text-sm tracking-[0.15em] uppercase">Private Shopping</span>

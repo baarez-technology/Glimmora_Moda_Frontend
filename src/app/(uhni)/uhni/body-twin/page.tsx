@@ -206,7 +206,7 @@ export default function UHNIBodyTwinPage() {
     { title: 'Silhouette', description: 'Your overall body type' },
     { title: 'Proportions', description: 'Your body proportions' },
     { title: 'Fit Preferences', description: 'How you like clothes to fit' },
-    { title: 'Measurements', description: 'Optional precise measurements' },
+    { title: 'Measurements', description: 'Your precise measurements' },
   ];
 
   const measurementRanges: Record<string, { min: number; max: number; label: string }> = {
@@ -220,16 +220,14 @@ export default function UHNIBodyTwinPage() {
   const validateMeasurements = (): boolean => {
     const errors: Record<string, string> = {};
     const m = bodyTwin.measurements;
-    if (m) {
-      Object.entries(measurementRanges).forEach(([key, range]) => {
-        const value = m[key as keyof typeof m];
-        if (value !== undefined && value !== null) {
-          if (value < range.min || value > range.max) {
-            errors[key] = `${range.label} must be ${range.min}-${range.max} cm`;
-          }
-        }
-      });
-    }
+    Object.entries(measurementRanges).forEach(([key, range]) => {
+      const value = m?.[key as keyof typeof m];
+      if (value === undefined || value === null) {
+        errors[key] = `${range.label} is required`;
+      } else if (value < range.min || value > range.max) {
+        errors[key] = `${range.label} must be ${range.min}-${range.max} cm`;
+      }
+    });
     setMeasurementErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -244,7 +242,7 @@ export default function UHNIBodyTwinPage() {
 
   const handleSave = async () => {
     if (!validateMeasurements()) {
-      showToast('Please fix measurement errors before saving', 'error');
+      showToast('Please fill in all required measurements', 'error');
       return;
     }
     setSaving(true);
@@ -473,8 +471,8 @@ export default function UHNIBodyTwinPage() {
 
               {activeStep === 3 && (
                 <div>
-                  <h2 className="font-display text-xl text-charcoal-deep mb-3">Measurements (Optional)</h2>
-                  <p className="text-taupe mb-8">Add precise measurements for even more accurate fit predictions</p>
+                  <h2 className="font-display text-xl text-charcoal-deep mb-3">Measurements</h2>
+                  <p className="text-taupe mb-8">Enter your measurements for accurate fit predictions</p>
                   <div className="grid grid-cols-2 gap-4">
                     {Object.entries(measurementRanges).map(([key, range]) => (
                       <div key={key}>

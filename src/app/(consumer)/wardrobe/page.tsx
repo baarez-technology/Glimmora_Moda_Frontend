@@ -83,72 +83,7 @@ export default function WardrobePage() {
       return new Date(b.addedAt || 0).getTime() - new Date(a.addedAt || 0).getTime();
     });
 
-  // Generate outfit suggestions dynamically from actual wardrobe items
-  const suggestedOutfits = (() => {
-    if (wardrobe.length < 2) return [];
-
-    const byCategory: Record<string, typeof wardrobe> = {};
-    wardrobe.forEach(item => {
-      const cat = item.product.category || 'other';
-      if (!byCategory[cat]) byCategory[cat] = [];
-      byCategory[cat].push(item);
-    });
-
-    const categories = Object.keys(byCategory);
-    const outfits: { name: string; pieces: string[]; occasion: string }[] = [];
-
-    // Strategy 1: Pick one item from each available category for a "Complete Look"
-    if (categories.length >= 2) {
-      const pieces = categories
-        .slice(0, 3)
-        .map(cat => byCategory[cat][0])
-        .filter(Boolean);
-      if (pieces.length >= 2) {
-        // Determine occasion from tags
-        const allTags = pieces.flatMap(p => p.product.tags.map(t => t.toLowerCase()));
-        const occasion = allTags.includes('formal') || allTags.includes('evening') ? 'Evening'
-          : allTags.includes('casual') || allTags.includes('everyday') ? 'Casual'
-          : allTags.includes('work') || allTags.includes('professional') ? 'Professional'
-          : 'Versatile';
-        outfits.push({
-          name: 'Complete Look',
-          pieces: pieces.map(p => p.product.name),
-          occasion,
-        });
-      }
-    }
-
-    // Strategy 2: Same-brand pairing
-    const brandGroups: Record<string, typeof wardrobe> = {};
-    wardrobe.forEach(item => {
-      const brand = item.product.brandName || 'Unknown';
-      if (!brandGroups[brand]) brandGroups[brand] = [];
-      brandGroups[brand].push(item);
-    });
-    const multiBrand = Object.entries(brandGroups).find(([, items]) => items.length >= 2);
-    if (multiBrand) {
-      const [brandName, items] = multiBrand;
-      outfits.push({
-        name: `${brandName} Ensemble`,
-        pieces: items.slice(0, 3).map(i => i.product.name),
-        occasion: 'Curated',
-      });
-    }
-
-    // Strategy 3: Mix from most-worn items
-    const mostWorn = [...wardrobe].sort((a, b) => b.wearCount - a.wearCount).slice(0, 3);
-    if (mostWorn.length >= 2 && outfits.length < 3) {
-      outfits.push({
-        name: 'Wardrobe Favourites',
-        pieces: mostWorn.map(i => i.product.name),
-        occasion: 'Go-To',
-      });
-    }
-
-    return outfits.slice(0, 3);
-  })();
-
-  // Gap analysis data from API (replaces hardcoded category-based gaps)
+  // Gap analysis data from API
 
   if (isUHNI) return null;
 
@@ -561,8 +496,23 @@ export default function WardrobePage() {
                   )}
                 </div> */}
 
-                {/* Silent Cart link — at the bottom */}
-                
+                {/* Silent Cart */}
+                <Link
+                  href="/profile/silent-cart"
+                  className="group block bg-charcoal-deep p-6 hover:bg-noir transition-colors"
+                >
+                  <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/50 block mb-3">
+                    AI Curated
+                  </span>
+                  <h4 className="font-display text-lg text-ivory-cream mb-2">Silent Cart</h4>
+                  <p className="text-sm text-taupe leading-relaxed mb-4">
+                    Items quietly prepared based on your style and preferences.
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-sm tracking-[0.1em] uppercase text-gold-soft group-hover:text-ivory-cream transition-colors">
+                    <span>View Cart</span>
+                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </span>
+                </Link>
               </div>
             </div>
           ) : (
