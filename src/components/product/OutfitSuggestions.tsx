@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Sparkles, ChevronRight, Heart, Check, ShoppingBag, Loader2 } from 'lucide-react';
-import { Sparkles, ChevronRight, Check } from 'lucide-react';
 import type { CompleteOutfit, Product } from '@/types';
 import { getCompleteTheLook } from '@/services/complete-the-look.service';
 import type { CompleteTheLookResponse, CompleteTheLookProduct } from '@/services/complete-the-look.service';
@@ -30,9 +29,10 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
   const [selectedEvent, setSelectedEvent] = useState<string>(EVENT_OPTIONS[0].title);
   const [hasCalledApi, setHasCalledApi] = useState(false);
 
-  // Legacy mock-based state
+  // Legacy mock-based state — all hooks MUST be called before any conditional returns
+  const matchedOutfits = useMemo(() => outfits.filter(o => o.compatibilityScore > 0), [outfits]);
   const [selectedOutfit, setSelectedOutfit] = useState<string | null>(outfits[0]?.id || null);
-  const activeOutfit = outfits.find(o => o.id === selectedOutfit);
+  const activeOutfit = matchedOutfits.find(o => o.id === selectedOutfit);
 
   const fetchCompleteTheLook = useCallback(async (eventTitle: string) => {
     setIsLoadingApi(true);
@@ -52,7 +52,7 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
   // Fetch on mount
   useEffect(() => {
     fetchCompleteTheLook(selectedEvent);
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleEventChange = (eventTitle: string) => {
     setSelectedEvent(eventTitle);
@@ -214,11 +214,6 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
   }
 
   // ── Fallback: Legacy mock-based rendering ────────────────────────────────
-  if (outfits.length === 0) return null;
-  const matchedOutfits = outfits.filter(o => o.compatibilityScore > 0);
-  const [selectedOutfit, setSelectedOutfit] = useState<string | null>(matchedOutfits[0]?.id || null);
-  const activeOutfit = matchedOutfits.find(o => o.id === selectedOutfit);
-
   if (matchedOutfits.length === 0) return null;
 
   return (
@@ -310,7 +305,6 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
                     </div>
                   ))}
                 </div>
-
               </div>
 
               {/* AGI Reasoning */}
