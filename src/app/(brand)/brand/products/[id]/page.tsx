@@ -50,6 +50,7 @@ export default function ProductDetailPage() {
     sku: '',
     price: '',
     collection_name: '',
+    product_category: '',
     product_description: '',
     tagline: '',
     narrative: '',
@@ -114,6 +115,7 @@ export default function ProductDetailPage() {
         sku: data.sku,
         price: data.price.toString(),
         collection_name: data.collection_name,
+        product_category: data.product_category || '',
         product_description: data.product_description,
         tagline: data.tagline,
         narrative: '',
@@ -185,9 +187,11 @@ export default function ProductDetailPage() {
         sku: formData.sku,
         price: parseFloat(formData.price) || product.price,
         collection_name: formData.collection_name,
+        product_category: formData.product_category || undefined,
         product_description: formData.product_description,
         tagline: formData.tagline,
         status: formData.status,
+        product_image: productImages[0] || undefined,
         product_images: productImages,
         sizes,
         colors,
@@ -496,6 +500,19 @@ export default function ProductDetailPage() {
                       <option key={col.collection_id} value={col.collection_name}>{col.collection_name}</option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                    Product Category
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.product_category}
+                    onChange={(e) => handleChange('product_category', e.target.value)}
+                    className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    placeholder="e.g., Handbags, Clothing, Shoes"
+                  />
                 </div>
 
                 <div>

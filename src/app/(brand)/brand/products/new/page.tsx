@@ -51,6 +51,7 @@ export default function NewProductPage() {
     sku: '',
     price: '',
     collection_name: '',
+    product_category: '',
     product_description: '',
     tagline: '',
     status: 'draft' as BrandProductStatus,
@@ -159,9 +160,11 @@ export default function NewProductPage() {
         sku: formData.sku.trim(),
         price: parseFloat(formData.price) || 0,
         collection_name: formData.collection_name,
+        product_category: formData.product_category || undefined,
         status: formData.status,
         tagline: formData.tagline,
         product_description: formData.product_description,
+        product_image: productImages[0] || undefined,
         product_images: productImages,
         ...(sizes.length > 0 ? { sizes } : {}),
         ...(colors.length > 0 ? { colors } : {}),
@@ -269,6 +272,19 @@ export default function NewProductPage() {
                     <option key={col.collection_id} value={col.collection_name}>{col.collection_name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                  Product Category
+                </label>
+                <input
+                  type="text"
+                  value={formData.product_category}
+                  onChange={(e) => updateField('product_category', e.target.value)}
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  placeholder="e.g., Handbags, Clothing, Shoes"
+                />
               </div>
 
               <div>
