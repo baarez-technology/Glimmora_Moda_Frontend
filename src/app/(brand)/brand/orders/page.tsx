@@ -1,193 +1,195 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ChevronRight, ChevronLeft, Search, Package, Clock, Truck, CheckCircle, XCircle, AlertCircle, ArrowUpDown } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import {
+  ChevronRight, ChevronLeft, Search, Package, Truck, CheckCircle,
+  XCircle, AlertCircle, Clock, Loader2, Download, ChevronDown,
+  FileJson, FileText, FileSpreadsheet
+} from 'lucide-react';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
-import type { OrderStatus } from '@/types/brand-portal';
-import ExportButton from '@/components/brand/ExportButton';
-import { convertToCSV, downloadCSV, buildFilename } from '@/lib/export-utils';
+import {
+  fetchBrandOrders, exportBrandOrders,
+  type ApiBrandOrder
+} from '@/services/brand-order.service';
 
-const ORDERS_PER_PAGE = 20;
+type DeliveryStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'pending':    return 'bg-warning/10 text-warning';
+    case 'processing': return 'bg-gold-soft/20 text-gold-deep';
+    case 'shipped':    return 'bg-info/10 text-info';
+    case 'delivered':  return 'bg-success/10 text-success';
+    case 'cancelled':  return 'bg-error/10 text-error';
+    default:           return 'bg-taupe/20 text-stone';
+  }
+}
+
+function getPaymentStatusBadge(status: string) {
+  switch (status) {
+    case 'paid':     return 'bg-success/10 text-success';
+    case 'pending':  return 'bg-warning/10 text-warning';
+    case 'refunded': return 'bg-info/10 text-info';
+    case 'failed':   return 'bg-error/10 text-error';
+    default:         return 'bg-taupe/20 text-stone';
+  }
+}
+
+function StatusIcon({ status }: { status: string }) {
+  const cls = 'w-3 h-3';
+  switch (status) {
+    case 'pending':    return <AlertCircle className={cls} />;
+    case 'processing': return <Package className={cls} />;
+    case 'shipped':    return <Truck className={cls} />;
+    case 'delivered':  return <CheckCircle className={cls} />;
+    case 'cancelled':  return <XCircle className={cls} />;
+    default:           return <Clock className={cls} />;
+  }
+}
+
+function formatDate(ts: string) {
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const STATUS_TABS: { value: 'all' | DeliveryStatus; label: string }[] = [
+  { value: 'all',        label: 'All' },
+  { value: 'pending',    label: 'Pending' },
+  { value: 'processing', label: 'Processing' },
+  { value: 'shipped',    label: 'Shipped' },
+  { value: 'delivered',  label: 'Delivered' },
+  { value: 'cancelled',  label: 'Cancelled' },
+];
 
 export default function OrdersPage() {
-  const { orders } = useBrand();
-  const [filter, setFilter] = useState<'all' | OrderStatus>('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortDateAsc, setSortDateAsc] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [orders, setOrders] = useState<ApiBrandOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredAndSortedOrders = useMemo(() => {
-    const filtered = orders.filter(order => {
-      const matchesFilter = filter === 'all' || order.status === filter;
-      const matchesSearch = searchQuery === '' ||
-        order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        order.customer.name.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesFilter && matchesSearch;
-    });
+  // Server-side pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
 
-    return [...filtered].sort((a, b) => {
-      const dateA = new Date(a.createdAt).getTime();
-      const dateB = new Date(b.createdAt).getTime();
-      return sortDateAsc ? dateA - dateB : dateB - dateA;
-    });
-  }, [orders, filter, searchQuery, sortDateAsc]);
+  // Client-side filters (applied on current page)
+  const [statusFilter, setStatusFilter] = useState<'all' | DeliveryStatus>('all');
+  const [search, setSearch] = useState('');
 
-  // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredAndSortedOrders.length / ORDERS_PER_PAGE));
-  const paginatedOrders = filteredAndSortedOrders.slice(
-    (currentPage - 1) * ORDERS_PER_PAGE,
-    currentPage * ORDERS_PER_PAGE
+  // Export
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | 'excel' | null>(null);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
+  const loadOrders = async (p = page) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetchBrandOrders(p);
+      setOrders(res.orders);
+      setTotalPages(res.total_pages);
+      setTotalOrders(res.total_orders);
+      setPageSize(res.page_size);
+      setPage(res.page);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load orders');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { loadOrders(1); }, []);
+
+  const handlePageChange = (p: number) => loadOrders(p);
+
+  const handleExport = async (format: 'json' | 'csv' | 'excel') => {
+    setShowExportMenu(false);
+    setExportingFormat(format);
+    try {
+      await exportBrandOrders(format);
+      setExportToast(`Exported orders as ${format.toUpperCase()}`);
+      setTimeout(() => setExportToast(null), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
+  // Client-side filter on the current page's data
+  const displayed = orders.filter(o => {
+    const productStatus = o.products[0]?.delivery_status || 'pending';
+    const matchesStatus = statusFilter === 'all' || productStatus === statusFilter;
+    const matchesSearch = search === '' ||
+      o.order_id.toLowerCase().includes(search.toLowerCase()) ||
+      o.customer_name.toLowerCase().includes(search.toLowerCase()) ||
+      o.customer_email.toLowerCase().includes(search.toLowerCase());
+    return matchesStatus && matchesSearch;
+  });
+
+  const headerActions = (
+    <div className="relative" ref={exportMenuRef}>
+      <button
+        onClick={() => !exportingFormat && setShowExportMenu(v => !v)}
+        disabled={!!exportingFormat}
+        className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {exportingFormat ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+        {exportingFormat ? 'Exporting…' : 'Export'}
+        {!exportingFormat && <ChevronDown size={13} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />}
+      </button>
+      {showExportMenu && (
+        <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-30">
+          <div className="px-4 py-2 border-b border-sand/40">
+            <p className="text-[10px] tracking-[0.1em] uppercase text-taupe">Via backend · S3</p>
+          </div>
+          <button onClick={() => handleExport('json')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+            <FileJson size={14} className="text-gold-muted" /> Export as JSON
+          </button>
+          <button onClick={() => handleExport('csv')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+            <FileText size={14} className="text-info" /> Export as CSV
+          </button>
+          <button onClick={() => handleExport('excel')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+            <FileSpreadsheet size={14} className="text-success" /> Export as Excel
+          </button>
+        </div>
+      )}
+    </div>
   );
-
-  // Reset to page 1 when filter/search changes
-  const handleFilterChange = (value: 'all' | OrderStatus) => {
-    setFilter(value);
-    setCurrentPage(1);
-  };
-
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setCurrentPage(1);
-  };
-
-  const formatCurrency = (value: number) => {
-    return `€${value.toLocaleString()}`;
-  };
-
-  const formatDate = (timestamp: string) => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusIcon = (status: OrderStatus) => {
-    switch (status) {
-      case 'pending': return AlertCircle;
-      case 'confirmed': return Clock;
-      case 'processing': return Package;
-      case 'shipped': return Truck;
-      case 'delivered': return CheckCircle;
-      case 'cancelled': return XCircle;
-      default: return Package;
-    }
-  };
-
-  const getStatusBadge = (status: OrderStatus) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-warning/10 text-warning';
-      case 'confirmed':
-        return 'bg-info/10 text-info';
-      case 'processing':
-        return 'bg-gold-soft/20 text-gold-deep';
-      case 'shipped':
-        return 'bg-info/10 text-info';
-      case 'delivered':
-        return 'bg-success/10 text-success';
-      case 'cancelled':
-        return 'bg-error/10 text-error';
-      default:
-        return 'bg-taupe/20 text-stone';
-    }
-  };
-
-  const getPaymentStatusBadge = (status: string) => {
-    switch (status) {
-      case 'paid':
-        return 'bg-success/10 text-success';
-      case 'pending':
-        return 'bg-warning/10 text-warning';
-      case 'refunded':
-        return 'bg-info/10 text-info';
-      case 'failed':
-        return 'bg-error/10 text-error';
-      default:
-        return 'bg-taupe/20 text-stone';
-    }
-  };
-
-  const getTierBadge = (tier?: string) => {
-    switch (tier) {
-      case 'uhni':
-        return 'bg-gold-soft/20 text-gold-deep';
-      case 'preferred':
-        return 'bg-champagne/30 text-gold-muted';
-      default:
-        return 'bg-parchment text-stone';
-    }
-  };
-
-  const exportOrdersCSV = () => {
-    const rows = filteredAndSortedOrders.map(order => ({
-      'Order #': order.orderNumber,
-      Customer: order.customer.name,
-      Email: order.customer.email,
-      Items: order.items.length,
-      Boutique: order.boutique,
-      Region: order.region,
-      Total: order.total,
-      Currency: order.currency,
-      Payment: order.paymentStatus,
-      Status: order.status,
-      'Shipping Address': order.shippingInfo.address,
-      'Created At': order.createdAt,
-    }));
-    const csv = convertToCSV(rows);
-    downloadCSV(buildFilename('orders', filter === 'all' ? 'all' : filter), csv);
-  };
-
-  const statusCounts = {
-    all: orders.length,
-    pending: orders.filter(o => o.status === 'pending').length,
-    confirmed: orders.filter(o => o.status === 'confirmed').length,
-    processing: orders.filter(o => o.status === 'processing').length,
-    shipped: orders.filter(o => o.status === 'shipped').length,
-    delivered: orders.filter(o => o.status === 'delivered').length,
-    cancelled: orders.filter(o => o.status === 'cancelled').length
-  };
 
   return (
     <div>
       <BrandPageHeader
         title="Orders"
-        subtitle={`${filteredAndSortedOrders.length} order${filteredAndSortedOrders.length !== 1 ? 's' : ''}`}
-        actions={
-          <ExportButton options={[
-            { label: 'Export Orders (CSV)', onClick: exportOrdersCSV },
-          ]} />
-        }
+        subtitle={isLoading ? 'Loading…' : `${totalOrders} order${totalOrders !== 1 ? 's' : ''}`}
+        actions={headerActions}
       />
 
       <div className="p-8 space-y-6">
-        {/* Filter Tabs */}
+        {/* Status filter tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
-          {[
-            { value: 'all' as const, label: 'All' },
-            { value: 'pending' as const, label: 'Pending' },
-            { value: 'confirmed' as const, label: 'Confirmed' },
-            { value: 'processing' as const, label: 'Processing' },
-            { value: 'shipped' as const, label: 'Shipped' },
-            { value: 'delivered' as const, label: 'Delivered' },
-            { value: 'cancelled' as const, label: 'Cancelled' }
-          ].map(tab => (
+          {STATUS_TABS.map(tab => (
             <button
               key={tab.value}
-              onClick={() => handleFilterChange(tab.value)}
-              className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors flex items-center gap-2 whitespace-nowrap ${
-                filter === tab.value
+              onClick={() => setStatusFilter(tab.value)}
+              className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors whitespace-nowrap ${
+                statusFilter === tab.value
                   ? 'bg-white text-charcoal-deep'
                   : 'text-stone hover:text-charcoal-deep'
               }`}
             >
               {tab.label}
-              <span className={`text-[10px] ${filter === tab.value ? 'text-taupe' : 'text-taupe/60'}`}>
-                {statusCounts[tab.value]}
-              </span>
             </button>
           ))}
         </div>
@@ -197,15 +199,27 @@ export default function OrdersPage() {
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-taupe" />
           <input
             type="text"
-            placeholder="Search by order number or customer..."
-            value={searchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder="Search by order ID or customer..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             className="w-full pl-11 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
           />
         </div>
 
-        {/* Orders List */}
-        {filteredAndSortedOrders.length === 0 ? (
+        {/* Error */}
+        {error && (
+          <div className="p-4 bg-error/10 text-error text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => loadOrders(page)} className="underline text-xs">Retry</button>
+          </div>
+        )}
+
+        {/* Loading */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={24} className="animate-spin text-taupe" />
+          </div>
+        ) : displayed.length === 0 ? (
           <div className="bg-white border border-sand/50 p-12 text-center">
             <p className="text-stone">No orders found</p>
           </div>
@@ -215,57 +229,36 @@ export default function OrdersPage() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-sand/30">
-                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      <button
-                        onClick={() => setSortDateAsc(prev => !prev)}
-                        className="inline-flex items-center gap-1.5 hover:text-charcoal-deep transition-colors"
-                      >
-                        Order
-                        <ArrowUpDown size={12} className={sortDateAsc ? 'text-charcoal-deep' : 'text-taupe'} />
-                      </button>
-                    </th>
-                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Customer
-                    </th>
-                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Items
-                    </th>
-                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Boutique
-                    </th>
-                    <th className="text-right px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Total
-                    </th>
-                    <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Payment
-                    </th>
-                    <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">
-                      Status
-                    </th>
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">Order</th>
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">Customer</th>
+                    <th className="text-left px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">Items</th>
+                    <th className="text-right px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">Total</th>
+                    <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">Payment</th>
+                    <th className="text-center px-6 py-4 text-[10px] tracking-[0.1em] uppercase text-stone font-medium">Status</th>
                     <th className="px-6 py-4"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-sand/30">
-                  {paginatedOrders.map(order => {
-                    const StatusIcon = getStatusIcon(order.status);
+                  {displayed.map(order => {
+                    const deliveryStatus = order.products[0]?.delivery_status || 'pending';
                     return (
-                      <tr key={order.id} className="hover:bg-parchment/30 transition-colors">
+                      <tr key={order.order_id} className="hover:bg-parchment/30 transition-colors">
                         <td className="px-6 py-4">
-                          <div>
-                            <p className="text-sm font-medium text-charcoal-deep">#{order.orderNumber}</p>
-                            <p className="text-xs text-taupe">{formatDate(order.createdAt)}</p>
-                          </div>
+                          <p className="text-sm font-medium text-charcoal-deep font-mono">
+                            {order.order_id.slice(-8).toUpperCase()}
+                          </p>
+                          <p className="text-xs text-taupe">{formatDate(order.order_date)}</p>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-parchment rounded-full flex items-center justify-center text-xs text-stone">
-                              {order.customer.name.charAt(0)}
+                            <div className="w-8 h-8 bg-parchment rounded-full flex items-center justify-center text-xs text-stone flex-shrink-0">
+                              {order.customer_name ? order.customer_name.charAt(0).toUpperCase() : '?'}
                             </div>
                             <div>
-                              <p className="text-sm text-charcoal-deep">{order.customer.name}</p>
-                              {order.customer.tier && (
-                                <span className={`text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 ${getTierBadge(order.customer.tier)}`}>
-                                  {order.customer.tier}
+                              <p className="text-sm text-charcoal-deep">{order.customer_name || '—'}</p>
+                              {order.customer_type && (
+                                <span className="text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 bg-gold-soft/20 text-gold-deep">
+                                  {order.customer_type}
                                 </span>
                               )}
                             </div>
@@ -273,39 +266,36 @@ export default function OrdersPage() {
                         </td>
                         <td className="px-6 py-4">
                           <p className="text-sm text-charcoal-deep">
-                            {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                            {order.products.length} item{order.products.length !== 1 ? 's' : ''}
                           </p>
                           <p className="text-xs text-taupe truncate max-w-[200px]">
-                            {order.items.map(i => i.productName).join(', ')}
+                            {order.products.map(p => p.product_name).join(', ')}
                           </p>
-                        </td>
-                        <td className="px-6 py-4">
-                          <p className="text-sm text-charcoal-deep">{order.boutique}</p>
-                          <p className="text-xs text-taupe">{order.region}</p>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <p className="text-sm font-medium text-charcoal-deep">
-                            {formatCurrency(order.total)}
+                            {order.payment_currency} {order.payment_amount.toLocaleString()}
                           </p>
+                          <p className="text-xs text-taupe">{order.payment_method}</p>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex justify-center">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getPaymentStatusBadge(order.paymentStatus)}`}>
-                              {order.paymentStatus}
+                            <span className={`inline-flex items-center px-2.5 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getPaymentStatusBadge(order.payment_status)}`}>
+                              {order.payment_status}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex justify-center">
-                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(order.status)}`}>
-                              <StatusIcon size={12} />
-                              {order.status}
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 text-[10px] tracking-[0.1em] uppercase ${getStatusBadge(deliveryStatus)}`}>
+                              <StatusIcon status={deliveryStatus} />
+                              {deliveryStatus}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right">
                           <Link
-                            href={`/brand/orders/${order.id}`}
+                            href={`/brand/orders/${order.order_id}`}
                             className="inline-flex items-center gap-1 text-xs text-stone hover:text-charcoal-deep transition-colors"
                           >
                             View <ChevronRight size={14} />
@@ -322,32 +312,36 @@ export default function OrdersPage() {
             {totalPages > 1 && (
               <div className="px-6 py-4 border-t border-sand/30 flex items-center justify-between">
                 <p className="text-xs text-taupe">
-                  Showing {(currentPage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(currentPage * ORDERS_PER_PAGE, filteredAndSortedOrders.length)} of {filteredAndSortedOrders.length}
+                  Page {page} of {totalPages} · {totalOrders} orders
                 </p>
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page === 1}
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     <ChevronLeft size={14} /> Previous
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-8 h-8 text-xs transition-colors ${
-                        currentPage === page
-                          ? 'bg-charcoal-deep text-ivory-cream'
-                          : 'text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                    const p = totalPages <= 7 ? i + 1 : (page <= 4 ? i + 1 : page - 3 + i);
+                    if (p < 1 || p > totalPages) return null;
+                    return (
+                      <button
+                        key={p}
+                        onClick={() => handlePageChange(p)}
+                        className={`w-8 h-8 text-xs transition-colors ${
+                          page === p
+                            ? 'bg-charcoal-deep text-ivory-cream'
+                            : 'text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    );
+                  })}
                   <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page === totalPages}
                     className="inline-flex items-center gap-1 px-3 py-1.5 text-xs text-stone hover:text-charcoal-deep border border-sand hover:border-charcoal-deep transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     Next <ChevronRight size={14} />
@@ -358,6 +352,14 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Export success toast */}
+      {exportToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 bg-success/10 border border-success/30 text-success shadow-lg">
+          <span>{exportToast}</span>
+          <button onClick={() => setExportToast(null)} className="text-success/60 hover:text-success transition-colors text-lg leading-none">×</button>
+        </div>
+      )}
     </div>
   );
 }
