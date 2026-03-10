@@ -75,10 +75,16 @@ export function ProductImageUpload({
 
       setIsUploading(true);
       try {
-        const urls = await Promise.all(valid.map((f) => uploadImage(f)));
-        onChange([...images, ...urls]);
-      } catch {
-        setError('Failed to upload images. Please try again.');
+        // Upload one file at a time sequentially
+        let currentImages = [...images];
+        for (const file of valid) {
+          const url = await uploadImage(file);
+          currentImages = [...currentImages, url];
+          onChange(currentImages);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Upload failed';
+        setError(`Failed to upload image: ${msg}`);
       } finally {
         setIsUploading(false);
       }
@@ -238,7 +244,6 @@ export function ProductImageUpload({
       <input
         ref={fileInputRef}
         type="file"
-        multiple
         accept={ACCEPTED_TYPES.join(',')}
         onChange={handleInputChange}
         className="hidden"
