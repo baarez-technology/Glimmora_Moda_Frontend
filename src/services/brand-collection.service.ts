@@ -174,3 +174,115 @@ export async function restoreCollection(collectionId: string): Promise<Collectio
 
   return res.json();
 }
+
+// ─── Export / Import / Sample ───────────────────────────────────────────────
+
+const FILE_TYPE_EXT: Record<string, string> = { json: 'json', csv: 'csv', excel: 'xlsx' };
+
+async function blobDownload(url: string, filename: string): Promise<void> {
+  const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
+  const response = await fetch(proxyUrl);
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+export interface CollectionExportResult {
+  file_url: string;
+  file_type: string;
+  record_count?: number;
+}
+
+export interface CollectionImportResult {
+  message?: string;
+  imported_count?: number;
+  collection_ids?: string[];
+}
+
+/**
+ * GET /api/v1/collection/export?file_type=json|csv|excel
+ * Response: { file_url, file_type, record_count }
+ */
+export async function exportCollectionsFromBackend(
+  fileType: 'json' | 'csv' | 'excel'
+): Promise<CollectionExportResult> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/v1/collection/export?file_type=${fileType}`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Export failed' }));
+    throw new Error(err.detail || `Export failed (${res.status})`);
+  }
+
+  const result: CollectionExportResult = await res.json();
+  if (!result.file_url) throw new Error('Export response did not contain a download URL.');
+
+  const ext = FILE_TYPE_EXT[fileType] ?? fileType;
+  await blobDownload(result.file_url, `collections-export.${ext}`);
+
+  return result;
+}
+
+/**
+ * GET /api/v1/collection/sample?file_type=json|csv|excel
+ * Response: { url, file_type }
+ */
+export async function downloadCollectionSample(
+  fileType: 'json' | 'csv' | 'excel'
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  const token = getToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/v1/collection/sample?file_type=${fileType}`, { headers });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to download sample' }));
+    throw new Error(err.detail || `Failed to download sample (${res.status})`);
+  }
+
+  const result: { url: string; file_type: string } = await res.json();
+  if (!result.url) throw new Error('Sample response did not contain a download URL.');
+
+  const ext = FILE_TYPE_EXT[fileType] ?? fileType;
+  await blobDownload(result.url, `collections-sample.${ext}`);
+}
+
+/**
+ * POST /api/v1/collection/import  (multipart/form-data)
+ * Fields: file, type (json|csv|excel)
+ * Response: { message, imported_count, collection_ids }
+ */
+export async function uploadMultipleCollections(file: File): Promise<CollectionImportResult> {
+  const token = getToken();
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+  const fileType = ext === 'json' ? 'json' : ext === 'csv' ? 'csv' : 'excel';
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('type', fileType);  // API expects 'type', not 'file_type'
+
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`/api/v1/collection/import`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to import collections' }));
+    throw new Error(err.detail || `Failed to import collections (${res.status})`);
+  }
+
+  return res.json();
+}

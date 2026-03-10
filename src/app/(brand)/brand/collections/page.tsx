@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus, ChevronRight, Package, Loader2 } from 'lucide-react';
+import { Plus, ChevronRight, Package, Loader2, Download, Upload, ChevronDown, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import { fetchCollections } from '@/services/brand-collection.service';
+import { fetchCollections, exportCollectionsFromBackend } from '@/services/brand-collection.service';
 import type { CollectionResponse } from '@/services/brand-collection.service';
+import CollectionBulkUploadModal from '@/components/brand/CollectionBulkUploadModal';
 
 type FilterTab = 'all' | 'published' | 'draft' | 'deleted';
 
@@ -15,6 +16,11 @@ export default function CollectionsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterTab>('all');
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | 'excel' | null>(null);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadCollections();
@@ -30,6 +36,20 @@ export default function CollectionsPage() {
       setError(err instanceof Error ? err.message : 'Failed to load collections');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleExport = async (format: 'json' | 'csv' | 'excel') => {
+    setShowExportMenu(false);
+    setExportingFormat(format);
+    try {
+      const result = await exportCollectionsFromBackend(format);
+      setExportToast(`Exported${result.record_count !== undefined ? ` ${result.record_count}` : ''} collection${result.record_count !== 1 ? 's' : ''} as ${format.toUpperCase()}`);
+      setTimeout(() => setExportToast(null), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportingFormat(null);
     }
   };
 
@@ -65,17 +85,58 @@ export default function CollectionsPage() {
     }
   };
 
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      {/* Export dropdown */}
+      <div className="relative" ref={exportMenuRef}>
+        <button
+          onClick={() => !exportingFormat && setShowExportMenu(v => !v)}
+          disabled={!!exportingFormat}
+          className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {exportingFormat ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+          {exportingFormat ? 'Exporting…' : 'Export'}
+          {!exportingFormat && <ChevronDown size={13} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />}
+        </button>
+        {showExportMenu && (
+          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-30">
+            <div className="px-4 py-2 border-b border-sand/40">
+              <p className="text-[10px] tracking-[0.1em] uppercase text-taupe">Via backend · S3</p>
+            </div>
+            <button onClick={() => handleExport('json')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+              <FileJson size={14} className="text-gold-muted" /> Export as JSON
+            </button>
+            <button onClick={() => handleExport('csv')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+              <FileText size={14} className="text-info" /> Export as CSV
+            </button>
+            <button onClick={() => handleExport('excel')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+              <FileSpreadsheet size={14} className="text-success" /> Export as Excel
+            </button>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => setShowUploadModal(true)}
+        className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide"
+      >
+        <Upload size={15} />
+        Import Collections
+      </button>
+
+      <PrimaryButton href="/brand/collections/new" icon={Plus}>
+        Create Collection
+      </PrimaryButton>
+    </div>
+  );
+
   if (isLoading) {
     return (
       <div>
         <BrandPageHeader
           title="Collections"
           subtitle="Loading..."
-          actions={
-            <PrimaryButton href="/brand/collections/new" icon={Plus}>
-              Create Collection
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-taupe" />
@@ -90,11 +151,7 @@ export default function CollectionsPage() {
         <BrandPageHeader
           title="Collections"
           subtitle="Error"
-          actions={
-            <PrimaryButton href="/brand/collections/new" icon={Plus}>
-              Create Collection
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="p-8 text-center">
           <p className="text-error mb-4">{error}</p>
@@ -114,11 +171,7 @@ export default function CollectionsPage() {
       <BrandPageHeader
         title="Collections"
         subtitle={`${filteredCollections.length} collection${filteredCollections.length !== 1 ? 's' : ''}`}
-        actions={
-          <PrimaryButton href="/brand/collections/new" icon={Plus}>
-            Create Collection
-          </PrimaryButton>
-        }
+        actions={headerActions}
       />
 
       <div className="p-8 space-y-6">
@@ -197,6 +250,22 @@ export default function CollectionsPage() {
           </div>
         )}
       </div>
+
+      {/* Export success toast */}
+      {exportToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 bg-success/10 border border-success/30 text-success shadow-lg">
+          <span>{exportToast}</span>
+          <button onClick={() => setExportToast(null)} className="text-success/60 hover:text-success transition-colors text-lg leading-none">×</button>
+        </div>
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showUploadModal && (
+        <CollectionBulkUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => { setShowUploadModal(false); loadCollections(); }}
+        />
+      )}
     </div>
   );
 }
