@@ -6,8 +6,6 @@
 import type { PrivateCollection, PrivateCollectionAccess } from '@/types/uhni';
 import type { Product } from '@/types/product';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 function getToken(): string | null {
   try {
     return localStorage.getItem('moda-brand-token');
@@ -25,7 +23,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(path, {
     ...init,
     headers: { ...authHeaders(), ...(init?.headers || {}) },
   });
