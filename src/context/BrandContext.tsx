@@ -32,6 +32,7 @@ import type {
   UHNIPriceOffer
 } from '@/types/uhni';
 import * as brandPortalService from '@/services/brand-portal.service';
+import * as privateCollectionService from '@/services/private-collection.service';
 import { addSharedOffer } from '@/lib/shared-store';
 import { getSharedSessions, addSharedSession as addSessionToStore, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
 import type { BrandLoginResponse } from '@/services/auth.service';
@@ -325,7 +326,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setRecentActivity(d.recentActivity);
         setBespokeOrders(d.bespokeOrders);
         setPriceNegotiations(d.priceNegotiations);
-        setPrivateCollections(d.privateCollections);
+        // Try to load real private collections; fall back to mock if unavailable
+        try {
+          const realCollections = await privateCollectionService.fetchPrivateCollections();
+          setPrivateCollections(realCollections);
+        } catch {
+          setPrivateCollections(d.privateCollections);
+        }
         setSourcingRequests(d.sourcingRequests);
         setHeritageEvents(d.heritageEvents);
         setBrandStories(d.brandStories);
@@ -614,23 +621,47 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   }, [privateCollections]);
 
   const createPrivateCollection = useCallback((collection: Omit<PrivateCollection, 'id'>): PrivateCollection => {
-    const newCollection: PrivateCollection = {
+    const optimistic: PrivateCollection = {
       ...collection,
       id: `priv-col-${Date.now()}`
     };
-    setPrivateCollections(prev => [newCollection, ...prev]);
-    brandPortalService.createPrivateCollection(collection).catch(console.error);
-    return newCollection;
+    setPrivateCollections(prev => [optimistic, ...prev]);
+
+    // Call real API; on success replace the optimistic entry with the real one
+    privateCollectionService.createPrivateCollection({
+      private_collection_name: collection.name,
+      description: collection.description,
+      image_url: collection.heroImage,
+      access_level: collection.accessLevel,
+      preview_date: collection.previewDate || null,
+      release_date: collection.releaseDate || null,
+      products: collection.products.map(p => p.id),
+    }).then(real => {
+      setPrivateCollections(prev => [real, ...prev.filter(c => c.id !== optimistic.id)]);
+    }).catch(() => {
+      // keep optimistic entry on failure
+    });
+
+    return optimistic;
   }, []);
 
   const updatePrivateCollection = useCallback((id: string, updates: Partial<PrivateCollection>) => {
     setPrivateCollections(prev => prev.map(c =>
       c.id === id ? { ...c, ...updates } : c
     ));
-    brandPortalService.updatePrivateCollection(id, updates).catch(console.error);
+    const apiPayload: Parameters<typeof privateCollectionService.updatePrivateCollection>[1] = {};
+    if (updates.name !== undefined) apiPayload.private_collection_name = updates.name;
+    if (updates.description !== undefined) apiPayload.description = updates.description;
+    if (updates.heroImage !== undefined) apiPayload.image_url = updates.heroImage;
+    if (updates.accessLevel !== undefined) apiPayload.access_level = updates.accessLevel;
+    if (updates.previewDate !== undefined) apiPayload.preview_date = updates.previewDate;
+    if (updates.releaseDate !== undefined) apiPayload.release_date = updates.releaseDate;
+    if (updates.products !== undefined) apiPayload.products = updates.products.map(p => p.id);
+    privateCollectionService.updatePrivateCollection(id, apiPayload).catch(console.error);
   }, []);
 
   const deletePrivateCollection = useCallback((collectionId: string) => {
+    // Remove from local state only — soft-delete (PATCH is_active=false) is handled by the caller
     setPrivateCollections(prev => prev.filter(col => col.id !== collectionId));
   }, []);
 

@@ -1,12 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Lock, Sparkles, Users, Calendar, Package, Edit, Send, Check, Crown, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, Lock, Sparkles, Users, Calendar, Package, Edit, Send, Check, Crown, Clock, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { PrivateCollectionAccess, CollectionAccessRequest } from '@/types/uhni';
+import { fetchBrandProducts, type mapApiProduct } from '@/services/private-collection.service';
+
+type ApiProductItem = ReturnType<typeof mapApiProduct>;
 
 const mockUHNIClients = [
   { id: 'uhni-001', name: 'Arabella Montclair', tier: 'uhni', email: 'arabella@example.com' },
@@ -64,9 +68,10 @@ function AccessRequestActions({ request, onApprove, onDeny }: {
 
 export default function PrivateCollectionDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const {
     getPrivateCollectionById,
-    products,
+    deletePrivateCollection,
     sendCollectionInvitation,
     approveAccessRequest,
     denyAccessRequest
@@ -75,9 +80,39 @@ export default function PrivateCollectionDetailPage() {
   const [showInvitePanel, setShowInvitePanel] = useState(false);
   const [inviteMessage, setInviteMessage] = useState('');
   const [selectedClients, setSelectedClients] = useState<string[]>([]);
+  const [resolvedProducts, setResolvedProducts] = useState<Map<string, ApiProductItem>>(new Map());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const collectionId = params.id as string;
   const collection = getPrivateCollectionById(collectionId);
+
+  // Fetch all brand products and build a lookup map to resolve product IDs → name + image
+  useEffect(() => {
+    fetchBrandProducts({ page_size: 100 })
+      .then(res => {
+        const map = new Map<string, ApiProductItem>();
+        res.items.forEach(p => map.set(p.id, p));
+        setResolvedProducts(map);
+      })
+      .catch(() => {/* keep empty map, will show stubs */});
+  }, []);
+
+  const handleDelete = async () => {
+    if (!collection) return;
+    setIsDeleting(true);
+    try {
+      // Soft-delete via PATCH is_active=false, then remove from local state
+      await import('@/services/private-collection.service').then(svc =>
+        svc.updatePrivateCollection(collection.id, { is_active: false })
+      );
+    } catch {
+      // proceed with local removal even if API fails
+    } finally {
+      deletePrivateCollection(collection.id);
+      router.push('/brand/private-collections');
+    }
+  };
 
   if (!collection) {
     return (
@@ -166,6 +201,13 @@ export default function PrivateCollectionDetailPage() {
             <SecondaryButton href="/brand/private-collections" icon={ArrowLeft}>
               Back
             </SecondaryButton>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 border border-red-200 text-red-600 text-sm tracking-wide hover:bg-red-50 transition-colors"
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
             <PrimaryButton href={`/brand/private-collections/${collection.id}/edit`} icon={Edit}>
               Edit Collection
             </PrimaryButton>
@@ -176,11 +218,14 @@ export default function PrivateCollectionDetailPage() {
       <div className="p-8 space-y-6">
         {/* Hero Section */}
         <div className="relative aspect-[21/9] bg-parchment overflow-hidden">
-          <img
-            src={collection.heroImage}
-            alt={collection.name}
-            className="w-full h-full object-cover"
-          />
+          {collection.heroImage ? (
+            <img
+              src={collection.heroImage}
+              alt={collection.name}
+              className="w-full h-full object-cover"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+            />
+          ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-noir/60 to-transparent" />
           <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between">
             <div>
@@ -216,24 +261,33 @@ export default function PrivateCollectionDetailPage() {
                 </div>
               ) : (
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {collection.products.map(product => (
-                    <div key={product.id} className="flex items-center gap-4 p-4 border border-sand/50">
-                      <div className="w-16 h-16 bg-parchment flex-shrink-0">
-                        {product.images[0] && (
-                          <img
-                            src={product.images[0].url}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        )}
+                  {collection.products.map(product => {
+                    const resolved = resolvedProducts.get(product.id);
+                    const name = resolved?.name || product.name || product.id;
+                    const imageUrl = resolved?.imageUrl || (product.images?.[0]?.url) || '';
+                    const category = resolved?.category || product.category || '';
+                    return (
+                      <div key={product.id} className="flex items-center gap-4 p-4 border border-sand/50">
+                        <div className="w-16 h-16 bg-parchment flex-shrink-0">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package size={20} className="text-taupe/40" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-charcoal-deep truncate">{name}</p>
+                          {category && <p className="text-xs text-taupe">{category}</p>}
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-charcoal-deep truncate">{product.name}</p>
-                        <p className="text-xs text-taupe">{product.category}</p>
-                        <p className="text-sm text-charcoal-deep mt-1">€{product.price.toLocaleString()}</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -498,6 +552,46 @@ export default function PrivateCollectionDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowDeleteConfirm(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-collection-title"
+            className="relative bg-white border border-sand p-8 max-w-md w-full mx-4"
+          >
+            <h3 id="delete-collection-title" className="font-display text-xl text-charcoal-deep mb-3">Delete Collection</h3>
+            <p className="text-stone text-sm leading-relaxed mb-2">
+              Are you sure you want to delete <span className="font-medium text-charcoal-deep">{collection.name}</span>?
+            </p>
+            <p className="text-taupe text-xs mb-6">
+              This collection will be soft-deleted and set as inactive.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-5 py-2.5 text-sm text-stone hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-5 py-2.5 text-sm bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Collection'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
