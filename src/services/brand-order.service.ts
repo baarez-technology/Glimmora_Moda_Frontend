@@ -3,8 +3,6 @@
  * Direct calls to /api/v1/brand/orders/* (brand-scoped, JWT required)
  */
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
 function getToken(): string | null {
   try { return localStorage.getItem('moda-brand-token'); } catch { return null; }
 }
@@ -18,7 +16,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(path, {
     ...init,
     headers: { ...authHeaders(), ...(init?.headers || {}) },
   });
