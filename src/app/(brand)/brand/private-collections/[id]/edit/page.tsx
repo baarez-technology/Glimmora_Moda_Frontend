@@ -7,12 +7,15 @@ import { ArrowLeft, Lock, Sparkles, Users } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import type { PrivateCollectionAccess } from '@/types/uhni';
+import { fetchBrandProducts, type mapApiProduct } from '@/services/private-collection.service';
+
+type ApiProductItem = ReturnType<typeof mapApiProduct>;
 
 export default function EditPrivateCollectionPage() {
   const router = useRouter();
   const params = useParams();
   const collectionId = params.id as string;
-  const { products, getPrivateCollectionById, updatePrivateCollection, partner } = useBrand();
+  const { getPrivateCollectionById, updatePrivateCollection, partner } = useBrand();
 
   const collection = getPrivateCollectionById(collectionId);
 
@@ -28,6 +31,18 @@ export default function EditPrivateCollectionPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Products fetched from real API
+  const [apiProducts, setApiProducts] = useState<ApiProductItem[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  const totalPages = Math.ceil(totalProducts / pageSize);
+
   // Pre-fill form with existing collection data
   useEffect(() => {
     if (collection) {
@@ -38,10 +53,26 @@ export default function EditPrivateCollectionPage() {
         accessLevel: collection.accessLevel,
         previewDate: collection.previewDate ? new Date(collection.previewDate).toISOString().split('T')[0] : '',
         releaseDate: collection.releaseDate ? new Date(collection.releaseDate).toISOString().split('T')[0] : '',
+        // product IDs already stored on the collection
         selectedProducts: collection.products.map(p => p.id)
       });
     }
   }, [collection]);
+
+  // Fetch products from real API, re-fetch when filters/page change
+  useEffect(() => {
+    setProductsLoading(true);
+    fetchBrandProducts({
+      search: productSearch,
+      min_price: minPrice ? Number(minPrice) : undefined,
+      max_price: maxPrice ? Number(maxPrice) : undefined,
+      page_number: pageNumber,
+      page_size: pageSize,
+    })
+      .then(res => { setApiProducts(res.items); setTotalProducts(res.total); })
+      .catch(() => { setApiProducts([]); setTotalProducts(0); })
+      .finally(() => setProductsLoading(false));
+  }, [productSearch, minPrice, maxPrice, pageNumber, pageSize]);
 
   if (!collection) {
     return (
@@ -63,14 +94,16 @@ export default function EditPrivateCollectionPage() {
 
     setIsSubmitting(true);
 
-    const selectedProductObjects = products.filter(p => formData.selectedProducts.includes(p.id));
+    // Store only product IDs as stubs — backend receives product_ids, detail page resolves names/images
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const selectedProductStubs = formData.selectedProducts.map(pid => ({ id: pid })) as any[];
 
     updatePrivateCollection(collectionId, {
       name: formData.name,
       description: formData.description,
       heroImage: formData.heroImage,
       accessLevel: formData.accessLevel,
-      products: selectedProductObjects,
+      products: selectedProductStubs,
       previewDate: new Date(formData.previewDate).toISOString(),
       releaseDate: new Date(formData.releaseDate).toISOString(),
       invitationRequired: formData.accessLevel === 'invitation'
@@ -244,11 +277,39 @@ export default function EditPrivateCollectionPage() {
             <span className="text-sm text-taupe">{formData.selectedProducts.length} selected</span>
           </div>
           <div className="p-6">
-            {products.length === 0 ? (
+            {/* Filters */}
+            <div className="flex gap-3 mb-4">
+              <input
+                type="text"
+                value={productSearch}
+                onChange={e => { setProductSearch(e.target.value); setPageNumber(1); }}
+                placeholder="Search products..."
+                className="flex-1 px-4 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+              <input
+                type="number"
+                value={minPrice}
+                onChange={e => { setMinPrice(e.target.value); setPageNumber(1); }}
+                placeholder="Min price"
+                min={0}
+                className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={e => { setMaxPrice(e.target.value); setPageNumber(1); }}
+                placeholder="Max price"
+                min={0}
+                className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+            </div>
+            {productsLoading ? (
+              <p className="text-sm text-taupe text-center py-8">Loading products...</p>
+            ) : apiProducts.length === 0 ? (
               <p className="text-sm text-taupe text-center py-8">No products available</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                {products.filter(p => p.status === 'published').map(product => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {apiProducts.map(product => {
                   const isSelected = formData.selectedProducts.includes(product.id);
                   return (
                     <button
@@ -262,15 +323,21 @@ export default function EditPrivateCollectionPage() {
                       }`}
                     >
                       <div className="w-12 h-12 bg-parchment flex-shrink-0">
-                        {product.images[0] && (
-                          <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" />
+                        {product.imageUrl && (
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className={`text-sm font-medium truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
                           {product.name}
                         </p>
-                        <p className="text-xs text-taupe">&euro;{product.price.toLocaleString()}</p>
+                        {product.price !== undefined && (
+                          <p className="text-xs text-taupe">&euro;{product.price.toLocaleString()}</p>
+                        )}
                       </div>
                       <div className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 ${
                         isSelected ? 'border-charcoal-deep bg-charcoal-deep' : 'border-taupe'
@@ -284,6 +351,32 @@ export default function EditPrivateCollectionPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-sand/50">
+                <p className="text-xs text-taupe">
+                  Page {pageNumber} of {totalPages} &middot; {totalProducts} products
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+                    disabled={pageNumber === 1}
+                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageNumber(p => Math.min(totalPages, p + 1))}
+                    disabled={pageNumber === totalPages}
+                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>

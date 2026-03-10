@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Lock, Sparkles, Users, Image } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { PrivateCollectionAccess } from '@/types/uhni';
+import { fetchBrandProducts, type mapApiProduct } from '@/services/private-collection.service';
+
+type ApiProductItem = ReturnType<typeof mapApiProduct>;
 
 export default function NewPrivateCollectionPage() {
   const router = useRouter();
-  const { products, createPrivateCollection, partner } = useBrand();
+  const { createPrivateCollection, partner } = useBrand();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -24,13 +27,41 @@ export default function NewPrivateCollectionPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Products fetched from real API
+  const [apiProducts, setApiProducts] = useState<ApiProductItem[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalProducts, setTotalProducts] = useState(0);
+
+  useEffect(() => {
+    setProductsLoading(true);
+    fetchBrandProducts({
+      search: productSearch,
+      min_price: minPrice ? Number(minPrice) : undefined,
+      max_price: maxPrice ? Number(maxPrice) : undefined,
+      page_number: pageNumber,
+      page_size: pageSize,
+    })
+      .then(res => { setApiProducts(res.items); setTotalProducts(res.total); })
+      .catch(() => { setApiProducts([]); setTotalProducts(0); })
+      .finally(() => setProductsLoading(false));
+  }, [productSearch, minPrice, maxPrice, pageNumber, pageSize]);
+
+  const totalPages = Math.ceil(totalProducts / pageSize);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!partner) return;
 
     setIsSubmitting(true);
 
-    const selectedProductObjects = products.filter(p => formData.selectedProducts.includes(p.id));
+    // Store only IDs — names/images are resolved from the API in the detail page
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const selectedProductStubs = formData.selectedProducts.map(pid => ({ id: pid })) as any[];
 
     createPrivateCollection({
       name: formData.name,
@@ -39,7 +70,7 @@ export default function NewPrivateCollectionPage() {
       description: formData.description,
       heroImage: formData.heroImage || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
       accessLevel: formData.accessLevel,
-      products: selectedProductObjects,
+      products: selectedProductStubs,
       previewDate: new Date(formData.previewDate).toISOString(),
       releaseDate: new Date(formData.releaseDate).toISOString(),
       invitationRequired: formData.accessLevel === 'invitation',
@@ -219,11 +250,39 @@ export default function NewPrivateCollectionPage() {
             </span>
           </div>
           <div className="p-6">
-            {products.length === 0 ? (
+            {/* Filters */}
+            <div className="flex gap-3 mb-4">
+              <input
+                type="text"
+                value={productSearch}
+                onChange={e => { setProductSearch(e.target.value); setPageNumber(1); }}
+                placeholder="Search products..."
+                className="flex-1 px-4 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+              <input
+                type="number"
+                value={minPrice}
+                onChange={e => { setMinPrice(e.target.value); setPageNumber(1); }}
+                placeholder="Min price"
+                min={0}
+                className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+              <input
+                type="number"
+                value={maxPrice}
+                onChange={e => { setMaxPrice(e.target.value); setPageNumber(1); }}
+                placeholder="Max price"
+                min={0}
+                className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
+            </div>
+            {productsLoading ? (
+              <p className="text-sm text-taupe text-center py-8">Loading products...</p>
+            ) : apiProducts.length === 0 ? (
               <p className="text-sm text-taupe text-center py-8">No products available</p>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                {products.filter(p => p.status === 'published').map(product => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {apiProducts.map(product => {
                   const isSelected = formData.selectedProducts.includes(product.id);
                   return (
                     <button
@@ -237,9 +296,9 @@ export default function NewPrivateCollectionPage() {
                       }`}
                     >
                       <div className="w-12 h-12 bg-parchment flex-shrink-0">
-                        {product.images[0] && (
+                        {product.imageUrl && (
                           <img
-                            src={product.images[0].url}
+                            src={product.imageUrl}
                             alt={product.name}
                             className="w-full h-full object-cover"
                           />
@@ -249,7 +308,9 @@ export default function NewPrivateCollectionPage() {
                         <p className={`text-sm font-medium truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
                           {product.name}
                         </p>
-                        <p className="text-xs text-taupe">€{product.price.toLocaleString()}</p>
+                        {product.price !== undefined && (
+                          <p className="text-xs text-taupe">&euro;{product.price.toLocaleString()}</p>
+                        )}
                       </div>
                       <div className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 ${
                         isSelected ? 'border-charcoal-deep bg-charcoal-deep' : 'border-taupe'
@@ -263,6 +324,32 @@ export default function NewPrivateCollectionPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-sand/50">
+                <p className="text-xs text-taupe">
+                  Page {pageNumber} of {totalPages} &middot; {totalProducts} products
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+                    disabled={pageNumber === 1}
+                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPageNumber(p => Math.min(totalPages, p + 1))}
+                    disabled={pageNumber === totalPages}
+                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
             )}
           </div>
