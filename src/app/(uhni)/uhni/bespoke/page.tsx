@@ -188,7 +188,11 @@ export default function BespokeOrdersPage() {
                         </span>
                       </div>
                       <h3 className="font-display text-xl text-charcoal-deep">{order.title}</h3>
-                      <p className="text-sm text-taupe mt-1">{order.brandName}</p>
+                      <p className="text-sm text-taupe mt-1">
+                        {order.selectedBrands && order.selectedBrands.length > 1
+                          ? order.selectedBrands.map(b => b.name).join(' · ')
+                          : order.brandName}
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-display text-2xl text-charcoal-deep">€{order.price.toLocaleString()}</p>

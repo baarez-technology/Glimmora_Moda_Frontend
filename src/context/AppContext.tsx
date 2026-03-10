@@ -129,6 +129,7 @@ interface AppContextType {
     detailedSpec: BespokeDetailedSpec;
     estimatedBudget: number;
     requestedDeadline?: string;
+    selectedBrands?: { id: string; name: string }[];
   }) => BespokeOrder;
   addMessageToBespokeOrder: (orderId: string, content: string, role: 'client' | 'brand') => void;
   approveBespokeDesign: (orderId: string) => void;
