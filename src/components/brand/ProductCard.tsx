@@ -4,7 +4,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronRight, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import type { BrandProduct } from '@/types/brand-portal';
-import type { BackendProduct } from '@/services/brand-product.service';
+import { computeTotalUnits, type BackendProduct } from '@/services/brand-product.service';
+
+function computeDemandScore(product: BackendProduct): number {
+  return product.performance_metrics?.demand_score ?? 0;
+}
 
 // ─── Cards for BackendProduct (real API data) ────────────────────────────────
 
@@ -14,10 +18,10 @@ interface ApiProductCardProps {
 }
 
 export function ApiProductCard({ product, showMetrics = true }: ApiProductCardProps) {
-  const totalUnits = product.performance_metrics.total_units;
-  const isLowStock = product.is_low_stock;
+  const totalUnits = computeTotalUnits(product);
+  const isLowStock = product.is_low_stock || (totalUnits > 0 && totalUnits <= 10);
   const isOutOfStock = totalUnits === 0;
-  const demandScore = product.performance_metrics.demand_score;
+  const demandScore = computeDemandScore(product);
 
   const getStatusBadge = () => {
     if (!product.is_active) {
@@ -138,8 +142,8 @@ export function ApiProductCard({ product, showMetrics = true }: ApiProductCardPr
 }
 
 export function ApiProductGridCard({ product }: { product: BackendProduct }) {
-  const totalUnits = product.performance_metrics.total_units;
-  const demandScore = product.performance_metrics.demand_score;
+  const totalUnits = computeTotalUnits(product);
+  const demandScore = computeDemandScore(product);
 
   const getStatusBadge = () => {
     if (!product.is_active) return 'bg-red-100 text-red-600';
@@ -192,8 +196,8 @@ export function ApiProductGridCard({ product }: { product: BackendProduct }) {
           <span className="text-sm font-medium text-charcoal-deep">
             ${product.price.toLocaleString()}
           </span>
-          <span className="text-xs text-stone">
-            {totalUnits} units
+          <span className={`text-xs ${totalUnits === 0 ? 'text-error' : totalUnits <= 10 ? 'text-warning' : 'text-stone'}`}>
+            {totalUnits === 0 ? 'Out of stock' : `${totalUnits} units`}
           </span>
         </div>
 

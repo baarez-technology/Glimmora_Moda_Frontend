@@ -6,11 +6,10 @@ import { ArrowLeft, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { ProductImageUpload } from '@/components/brand/ProductImageUpload';
-import { createProduct, fetchCollectionNames, type CollectionNameItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
+import { CoverImageUpload } from '@/components/brand/CoverImageUpload';
+import { createProduct, addColorImages, setRegionalStocks, fetchCollectionNames, type CollectionNameItem, type ColorOption, type ColorImages, type RegionalStockAddPayload } from '@/services/brand-product.service';
 import { useBrand } from '@/context/BrandContext';
 
-type FormErrors = Record<string, string>;
-type ProductImage = { id: string; url: string; alt: string; type: string };
 type BrandProductStatus = 'draft' | 'active' | 'archived';
 
 export default function NewProductPage() {
@@ -19,8 +18,15 @@ export default function NewProductPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const [productImages, setProductImages] = useState<string[]>([]);
   const [collectionNames, setCollectionNames] = useState<CollectionNameItem[]>([]);
+
+  // Cover image state (single)
+  const [coverImage, setCoverImage] = useState<string | null>(null);
+
+  // Stock state (initial stocks for new product)
+  const [stockRows, setStockRows] = useState<RegionalStockAddPayload[]>([]);
+  const [showStockForm, setShowStockForm] = useState(false);
+  const [newStock, setNewStock] = useState({ city: '', country: '', units: 0, threshold: 5 });
 
   // Sizes state
   const [sizes, setSizes] = useState<string[]>([]);
@@ -34,11 +40,6 @@ export default function NewProductPage() {
   // Per-color images state
   const [colorImages, setColorImages] = useState<ColorImages>({});
   const [activeColorTab, setActiveColorTab] = useState<string | null>(null);
-  const [errors, setErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Set<string>>(new Set());
-  const [products, setProducts] = useState<{ slug: string }[]>([]);
-  const [imageUrl, setImageUrl] = useState('');
-  const [images, setImages] = useState<ProductImage[]>([]);
 
   useEffect(() => {
     fetchCollectionNames()
@@ -72,11 +73,6 @@ export default function NewProductPage() {
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
-
-  const handleImagesChange = (images: string[]) => {
-    setProductImages(images);
-    setIsDirty(true);
-  };
 
   // ── Sizes ──────────────────────────────────────────────
   const handleAddSize = () => {
@@ -138,6 +134,25 @@ export default function NewProductPage() {
     }
   };
 
+  // ── Stocks ───────────────────────────────────────────────
+  const handleAddStock = () => {
+    if (!newStock.city.trim() || !newStock.country.trim()) return;
+    setStockRows(prev => [...prev, {
+      city: newStock.city.trim(),
+      country: newStock.country.trim(),
+      units: Math.max(0, newStock.units),
+      threshold: Math.max(0, newStock.threshold),
+    }]);
+    setNewStock({ city: '', country: '', units: 0, threshold: 5 });
+    setShowStockForm(false);
+    setIsDirty(true);
+  };
+
+  const handleRemoveStock = (index: number) => {
+    setStockRows(prev => prev.filter((_, i) => i !== index));
+    setIsDirty(true);
+  };
+
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,15 +176,32 @@ export default function NewProductPage() {
         price: parseFloat(formData.price) || 0,
         collection_name: formData.collection_name,
         product_category: formData.product_category || undefined,
-        status: formData.status,
         tagline: formData.tagline,
         product_description: formData.product_description,
-        product_image: productImages[0] || undefined,
-        product_images: productImages,
         ...(sizes.length > 0 ? { sizes } : {}),
-        ...(colors.length > 0 ? { colors } : {}),
-        ...(Object.keys(colorImages).length > 0 ? { color_images: colorImages } : {}),
+        ...(coverImage ? { product_image: coverImage } : {}),
       });
+
+      // Add color images via separate API calls after product creation
+      for (const color of colors) {
+        const imgs = colorImages[color.name];
+        if (imgs && imgs.length > 0) {
+          try {
+            await addColorImages(created.product_id, { color: color.name, images: imgs });
+          } catch {
+            // Color images are non-critical, continue
+          }
+        }
+      }
+
+      // Set initial regional stocks if any were added
+      if (stockRows.length > 0) {
+        try {
+          await setRegionalStocks(created.product_id, stockRows);
+        } catch {
+          // Non-critical, continue
+        }
+      }
 
       setIsDirty(false);
       router.push(`/brand/products/${created.product_id}`);
@@ -199,12 +231,16 @@ export default function NewProductPage() {
       />
 
       <form onSubmit={handleSubmit} className="p-8">
-        <div className="max-w-3xl space-y-8">
+        <div className="max-w-4xl">
           {error && (
-            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600">
+            <div className="bg-red-50 border border-red-200 p-4 text-sm text-red-600 mb-8">
               {error}
             </div>
           )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Content — left 2 cols */}
+            <div className="lg:col-span-2 space-y-8">
 
           {/* Basic Information */}
           <section className="bg-white border border-sand/50 p-6 space-y-6">
@@ -489,20 +525,130 @@ export default function NewProductPage() {
             </div>
           </section>
 
-          {/* Images */}
-          <section className="bg-white border border-sand/50 p-6 space-y-6">
+          {/* Regional Stock (Initial) */}
+          <section className="bg-white border border-sand/50 p-6 space-y-4">
             <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-              Images
+              Regional Stock
             </h2>
 
-            <ProductImageUpload
-              images={productImages}
-              onChange={handleImagesChange}
-            />
+            {stockRows.length > 0 && (
+              <div className="space-y-0">
+                <div className="grid grid-cols-[1fr_1fr_80px_80px_32px] gap-3 pb-2 border-b border-sand/50">
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-stone">City</span>
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Country</span>
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Units</span>
+                  <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Threshold</span>
+                  <span />
+                </div>
+                {stockRows.map((s, idx) => (
+                  <div key={`${s.city}-${idx}`} className="grid grid-cols-[1fr_1fr_80px_80px_32px] gap-3 py-2.5 border-b border-sand/20 items-center group">
+                    <span className="text-sm text-charcoal-deep">{s.city}</span>
+                    <span className="text-sm text-charcoal-deep">{s.country}</span>
+                    <span className="text-sm text-charcoal-deep text-center">{s.units}</span>
+                    <span className="text-sm text-stone text-center">{s.threshold}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveStock(idx)}
+                      className="p-1 text-taupe hover:text-error opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showStockForm ? (
+              <div className="p-4 border border-sand/50 bg-parchment/30 space-y-4">
+                <p className="text-[10px] tracking-[0.15em] uppercase text-stone">Add Location</p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">City</label>
+                    <input
+                      type="text"
+                      value={newStock.city}
+                      onChange={(e) => setNewStock(prev => ({ ...prev, city: e.target.value }))}
+                      placeholder="e.g. Paris"
+                      className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Country</label>
+                    <input
+                      type="text"
+                      value={newStock.country}
+                      onChange={(e) => setNewStock(prev => ({ ...prev, country: e.target.value }))}
+                      placeholder="e.g. France"
+                      className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Units</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newStock.units}
+                      onChange={(e) => setNewStock(prev => ({ ...prev, units: parseInt(e.target.value, 10) || 0 }))}
+                      className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Threshold</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={newStock.threshold}
+                      onChange={(e) => setNewStock(prev => ({ ...prev, threshold: parseInt(e.target.value, 10) || 0 }))}
+                      className="w-full px-3 py-2 bg-white border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleAddStock}
+                    disabled={!newStock.city.trim() || !newStock.country.trim()}
+                    className="inline-flex items-center gap-2 px-5 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={14} /> Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowStockForm(false)}
+                    className="px-5 py-2 text-xs tracking-wider uppercase text-stone hover:text-charcoal-deep transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowStockForm(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 border border-dashed border-sand text-xs tracking-[0.15em] uppercase text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors w-full justify-center"
+              >
+                <Plus size={14} /> Add Stock Location
+              </button>
+            )}
           </section>
 
+            </div>{/* end lg:col-span-2 */}
+
+            {/* Sidebar — right col */}
+            <div className="space-y-6">
+              {/* Cover Image */}
+              <div className="bg-white border border-sand/50 p-6">
+                <h3 className="text-sm font-medium text-charcoal-deep mb-4">Cover Image</h3>
+                <CoverImageUpload
+                  image={coverImage}
+                  onChange={(url) => { setCoverImage(url); setIsDirty(true); }}
+                />
+              </div>
+            </div>
+          </div>{/* end grid */}
+
           {/* Actions */}
-          <div className="flex items-center justify-end gap-4 pt-4">
+          <div className="flex items-center justify-end gap-4 pt-8">
             <SecondaryButton href="/brand/products">
               Cancel
             </SecondaryButton>

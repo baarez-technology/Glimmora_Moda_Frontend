@@ -19,11 +19,11 @@ import {
   X,
   Check,
   Minus,
-    ImageIcon,
     TrendingUp
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload, type ColorOption, type ColorImages } from '@/services/brand-product.service';
+import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, addColorImages, restockProduct, fetchRestockHistory, parseColorMapping, parseRegionalStocks, computeTotalUnits, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload, type RestockPayload, type RestockHistoryItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
+import { CoverImageUpload } from '@/components/brand/CoverImageUpload';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
 import type { ProductImage, ProductVariant, Material, ProductVisibility, ExperienceMode, PricingVisibility, CommerceAction } from '@/types';
@@ -75,6 +75,14 @@ export default function ProductDetailPage() {
   const [colorHexInput, setColorHexInput] = useState('#000000');
   const [colorImages, setColorImages] = useState<ColorImages>({});
   const [activeColorTab, setActiveColorTab] = useState<string | null>(null);
+
+  // Parsed regional stocks (from JSON string[])
+  const [parsedStocks, setParsedStocks] = useState<RegionalStockItem[]>([]);
+  // Restock
+  const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
+  const [restockHistory, setRestockHistory] = useState<RestockHistoryItem[]>([]);
+  // Cover image
+  const [coverImage, setCoverImage] = useState<string | null>(null);
 
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -131,13 +139,21 @@ export default function ProductDetailPage() {
       setVariants([]);
       setMaterials([]);
       setCraftsmanship([]);
-      // Load sizes, colors, color_images from backend
+      // Load sizes from backend
       setSizes(data.sizes || []);
-      setColors(data.colors || []);
-      const loadedColorImages = data.color_images || {};
-      setColorImages(loadedColorImages);
-      const colorNames = (data.colors || []).map(c => c.name);
-      setActiveColorTab(colorNames.length > 0 ? colorNames[0] : null);
+      // Parse color_based_images_mapping JSON strings into ColorOption[] and ColorImages
+      const { colors: parsedColors, colorImages: parsedColorImages } = parseColorMapping(data.color_based_images_mapping || []);
+      setColors(parsedColors);
+      setColorImages(parsedColorImages);
+      setActiveColorTab(parsedColors.length > 0 ? parsedColors[0].name : null);
+      // Parse regional_stocks JSON strings into RegionalStockItem[]
+      setParsedStocks(parseRegionalStocks(data.regional_stocks));
+      // Set cover image
+      setCoverImage(data.product_image || null);
+      // Load restock history
+      fetchRestockHistory(productId)
+        .then(setRestockHistory)
+        .catch(() => {});
     } catch (err) {
       console.error('Failed to load product:', err);
       setError(err instanceof Error ? err.message : 'Failed to load product');
@@ -182,6 +198,11 @@ export default function ProductDetailPage() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
+      // Convert colors + colorImages back to color_based_images_mapping JSON strings
+      const colorMapping = colors.map(c =>
+        JSON.stringify({ color: c.name, hex: c.hex, images: colorImages[c.name] || [] })
+      );
+
       const updated = await updateProduct(productId, {
         product_name: formData.product_name,
         sku: formData.sku,
@@ -191,13 +212,17 @@ export default function ProductDetailPage() {
         product_description: formData.product_description,
         tagline: formData.tagline,
         status: formData.status,
-        product_image: productImages[0] || undefined,
+        product_image: coverImage || undefined,
         product_images: productImages,
         sizes,
-        colors,
-        color_images: colorImages,
+        color_based_images_mapping: colorMapping,
       });
       setProduct(updated);
+      // Re-parse after save
+      setParsedStocks(parseRegionalStocks(updated.regional_stocks));
+      const { colors: newColors, colorImages: newColorImages } = parseColorMapping(updated.color_based_images_mapping || []);
+      setColors(newColors);
+      setColorImages(newColorImages);
       setHasChanges(false);
     } catch (err) {
       console.error('Failed to save:', err);
@@ -211,11 +236,6 @@ export default function ProductDetailPage() {
     setHasChanges(true);
   };
 
-  const handleImagesChange = (images: string[]) => {
-    setProductImages(images);
-    setHasChanges(true);
-  };
-
   const handleStockSave = async (stocks: RegionalStockAddPayload[]) => {
     try {
       await setRegionalStocks(productId, stocks);
@@ -226,11 +246,21 @@ export default function ProductDetailPage() {
     setToastMessage('Stock updated successfully');
   };
 
+  const handleRestock = async (payload: RestockPayload) => {
+    try {
+      await restockProduct(payload);
+      await loadProduct();
+      setToastMessage('Restock successful');
+    } catch (err) {
+      console.error('Failed to restock:', err);
+    }
+  };
+
   // ============================================
   // DELETE
   // ============================================
 
-  const computedTotalStock = product.regional_stocks.reduce((sum, s) => sum + s.units, 0);
+  const computedTotalStock = parsedStocks.reduce((sum, s) => sum + s.units, 0);
   const isDeleteDangerous = product.status === 'published' && computedTotalStock > 0;
 
   const handleDelete = () => {
@@ -403,8 +433,13 @@ export default function ProductDetailPage() {
     }).format(value);
   };
 
-  const totalUnits = product.performance_metrics.total_units;
-  const isLowStock = product.is_low_stock;
+  const metrics = product.performance_metrics ?? {
+    views: 0, add_to_cart: 0, purchases: 0, conversion_rate: 0,
+    avg_decision_time: 0, demand_score: 0, total_revenue: 0, total_units: 0,
+  };
+  const stockFromRegional = parsedStocks.reduce((sum, s) => sum + (s.units ?? 0), 0);
+  const totalUnits = stockFromRegional > 0 ? stockFromRegional : metrics.total_units;
+  const isLowStock = product.is_low_stock || (totalUnits > 0 && totalUnits <= 10);
 
   return (
     <div>
@@ -720,15 +755,25 @@ export default function ProductDetailPage() {
             <section className="bg-white border border-sand/50 p-6">
               <div className="flex items-center justify-between border-b border-sand/50 pb-4 mb-6">
                 <h2 className="font-medium text-charcoal-deep">Regional Stock</h2>
-                <button
-                  onClick={() => setIsStockModalOpen(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 border border-sand text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:bg-parchment transition-colors"
-                >
-                  <Plus size={14} /> Manage Stock
-                </button>
+                <div className="flex items-center gap-2">
+                  {parsedStocks.length > 0 && (
+                    <button
+                      onClick={() => setIsRestockModalOpen(true)}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                    >
+                      <Plus size={14} /> Restock
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setIsStockModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-sand text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+                  >
+                    <Plus size={14} /> {parsedStocks.length > 0 ? 'Manage' : 'Add Stock'}
+                  </button>
+                </div>
               </div>
 
-              {product.regional_stocks.length === 0 ? (
+              {parsedStocks.length === 0 ? (
                 <div className="text-center py-8">
                   <MapPin size={28} className="text-taupe mx-auto mb-3" />
                   <p className="text-sm text-stone">No stock locations configured</p>
@@ -741,7 +786,7 @@ export default function ProductDetailPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {product.regional_stocks.map((stock) => (
+                  {parsedStocks.map((stock) => (
                     <div
                       key={stock.stock_id}
                       className="flex items-center justify-between py-3 border-b border-sand/30 last:border-0"
@@ -769,17 +814,37 @@ export default function ProductDetailPage() {
                   ))}
                 </div>
               )}
+
+              {/* Restock History */}
+              {restockHistory.length > 0 && (
+                <div className="mt-6 pt-4 border-t border-sand/50">
+                  <h3 className="text-xs tracking-[0.15em] uppercase text-stone mb-3">Restock History</h3>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {restockHistory.map((entry) => (
+                      <div key={entry.restock_id} className="flex items-center justify-between py-2 text-xs border-b border-sand/20 last:border-0">
+                        <div>
+                          <span className="text-charcoal-deep">{entry.city}, {entry.country}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-success font-medium">+{entry.units} units</span>
+                          <span className="text-taupe">{new Date(entry.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Product Images */}
+            {/* Cover Image */}
             <div className="bg-white border border-sand/50 p-6">
-              <h3 className="text-sm font-medium text-charcoal-deep mb-4">Images</h3>
-              <ProductImageUpload
-                images={productImages}
-                onChange={handleImagesChange}
+              <h3 className="text-sm font-medium text-charcoal-deep mb-4">Cover Image</h3>
+              <CoverImageUpload
+                image={coverImage}
+                onChange={(url) => { setCoverImage(url); setHasChanges(true); }}
               />
             </div>
 
@@ -792,7 +857,7 @@ export default function ProductDetailPage() {
                     <Eye size={14} /> Views
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performance_metrics.views.toLocaleString()}
+                    {metrics.views.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -800,7 +865,7 @@ export default function ProductDetailPage() {
                     <ShoppingCart size={14} /> Add to Cart
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performance_metrics.add_to_cart.toLocaleString()}
+                    {metrics.add_to_cart.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -808,7 +873,7 @@ export default function ProductDetailPage() {
                     <DollarSign size={14} /> Purchases
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performance_metrics.purchases.toLocaleString()}
+                    {metrics.purchases.toLocaleString()}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -816,7 +881,7 @@ export default function ProductDetailPage() {
                     <TrendingUp size={14} /> Conversion
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performance_metrics.conversion_rate.toFixed(2)}%
+                    {metrics.conversion_rate.toFixed(2)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -824,7 +889,7 @@ export default function ProductDetailPage() {
                     <Clock size={14} /> Avg Decision Time
                   </span>
                   <span className="text-sm text-charcoal-deep">
-                    {product.performance_metrics.avg_decision_time}h
+                    {metrics.avg_decision_time}h
                   </span>
                 </div>
               </div>
@@ -833,21 +898,21 @@ export default function ProductDetailPage() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-stone">Demand Score</span>
                   <span className={`text-sm font-medium ${
-                    product.performance_metrics.demand_score >= 80 ? 'text-success' :
-                    product.performance_metrics.demand_score >= 50 ? 'text-charcoal-deep' :
+                    metrics.demand_score >= 80 ? 'text-success' :
+                    metrics.demand_score >= 50 ? 'text-charcoal-deep' :
                     'text-warning'
                   }`}>
-                    {product.performance_metrics.demand_score}/100
+                    {metrics.demand_score}/100
                   </span>
                 </div>
                 <div className="h-2 bg-parchment overflow-hidden">
                   <div
                     className={`h-full transition-all ${
-                      product.performance_metrics.demand_score >= 80 ? 'bg-success' :
-                      product.performance_metrics.demand_score >= 50 ? 'bg-gold-muted' :
+                      metrics.demand_score >= 80 ? 'bg-success' :
+                      metrics.demand_score >= 50 ? 'bg-gold-muted' :
                       'bg-warning'
                     }`}
-                    style={{ width: `${product.performance_metrics.demand_score}%` }}
+                    style={{ width: `${metrics.demand_score}%` }}
                   />
                 </div>
               </div>
@@ -871,7 +936,7 @@ export default function ProductDetailPage() {
               <div className="mt-4 pt-4 border-t border-sand/50">
                 <p className="text-xs text-stone mb-2">Revenue (All Time)</p>
                 <p className="text-xl font-display text-charcoal-deep">
-                  ${product.performance_metrics.total_revenue.toLocaleString()}
+                  ${metrics.total_revenue.toLocaleString()}
                 </p>
               </div>
             </div>
@@ -932,9 +997,20 @@ export default function ProductDetailPage() {
       {isStockModalOpen && (
         <StockModal
           productName={product.product_name}
-          existingStocks={product.regional_stocks}
+          existingStocks={parsedStocks}
           onClose={() => setIsStockModalOpen(false)}
           onSave={handleStockSave}
+        />
+      )}
+
+      {/* Restock Modal */}
+      {isRestockModalOpen && (
+        <RestockModal
+          productId={productId}
+          productName={product.product_name}
+          existingStocks={parsedStocks}
+          onClose={() => setIsRestockModalOpen(false)}
+          onRestock={handleRestock}
         />
       )}
     </div>
@@ -1202,6 +1278,162 @@ function StockModal({
           >
             <Check size={14} />
             {isSaving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Restock Modal ────────────────────────────────────────────────────────────
+
+function RestockModal({
+  productId,
+  productName,
+  existingStocks,
+  onClose,
+  onRestock,
+}: {
+  productId: string;
+  productName: string;
+  existingStocks: RegionalStockItem[];
+  onClose: () => void;
+  onRestock: (payload: RestockPayload) => Promise<void>;
+}) {
+  const [city, setCity] = useState(existingStocks[0]?.city || '');
+  const [country, setCountry] = useState(existingStocks[0]?.country || '');
+  const [units, setUnits] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [useExisting, setUseExisting] = useState(existingStocks.length > 0);
+
+  const handleSelectLocation = (stock: RegionalStockItem) => {
+    setCity(stock.city);
+    setCountry(stock.country);
+  };
+
+  const handleSubmit = async () => {
+    if (!city.trim() || !country.trim() || units <= 0) return;
+    setIsSaving(true);
+    try {
+      await onRestock({
+        product_id: productId,
+        city: city.trim(),
+        country: country.trim(),
+        units,
+      });
+      onClose();
+    } catch {
+      // error handled by parent
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-charcoal-deep/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white w-full max-w-md shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-sand/50">
+          <div>
+            <h2 className="font-display text-xl text-charcoal-deep">Restock</h2>
+            <p className="text-xs text-stone mt-1">{productName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-parchment transition-colors">
+            <X size={18} className="text-stone" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Existing locations quick-select */}
+          {existingStocks.length > 0 && (
+            <div>
+              <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-2">Select Location</label>
+              <div className="flex flex-wrap gap-2">
+                {existingStocks.map((s) => (
+                  <button
+                    key={s.stock_id}
+                    type="button"
+                    onClick={() => handleSelectLocation(s)}
+                    className={`px-3 py-1.5 text-xs border transition-colors ${
+                      city === s.city && country === s.country
+                        ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
+                        : 'border-sand text-stone hover:border-charcoal-deep'
+                    }`}
+                  >
+                    {s.city}, {s.country} ({s.units} units)
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => { setUseExisting(false); setCity(''); setCountry(''); }}
+                  className={`px-3 py-1.5 text-xs border transition-colors ${
+                    !useExisting
+                      ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
+                      : 'border-sand text-stone hover:border-charcoal-deep'
+                  }`}
+                >
+                  + New Location
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* City / Country (editable if new location) */}
+          {(!useExisting || existingStocks.length === 0) && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">City</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="e.g. Paris"
+                  className="w-full px-3 py-2 bg-transparent border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Country</label>
+                <input
+                  type="text"
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value)}
+                  placeholder="e.g. France"
+                  className="w-full px-3 py-2 bg-transparent border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Units */}
+          <div>
+            <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1.5">Units to Add</label>
+            <input
+              type="number"
+              min="1"
+              value={units || ''}
+              onChange={(e) => setUnits(parseInt(e.target.value, 10) || 0)}
+              placeholder="0"
+              className="w-full px-3 py-2 bg-transparent border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep"
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-sand/50 flex items-center justify-between">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 text-xs tracking-wider uppercase text-stone hover:text-charcoal-deep transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isSaving || !city.trim() || !country.trim() || units <= 0}
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Check size={14} />
+            {isSaving ? 'Restocking...' : 'Restock'}
           </button>
         </div>
       </div>

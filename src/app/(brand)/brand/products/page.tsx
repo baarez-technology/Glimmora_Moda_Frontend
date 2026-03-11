@@ -1,25 +1,23 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Plus, Search, Grid, List, Filter, Loader2 } from 'lucide-react';
+import { Plus, Search, Grid, List, Filter, Loader2, Download, Upload, ChevronDown, ChevronLeft, ChevronRight, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { ApiProductCard, ApiProductGridCard } from '@/components/brand/ProductCard';
-import { fetchProducts } from '@/services/brand-product.service';
+import { fetchProducts, exportProductsFromBackend, computeTotalUnits } from '@/services/brand-product.service';
 import type { BackendProduct } from '@/services/brand-product.service';
-import ExportButton from '@/components/brand/ExportButton';
-import { convertToCSV, downloadCSV, buildFilename } from '@/lib/export-utils';
+import ProductBulkUploadModal from '@/components/brand/ProductBulkUploadModal';
 
 type FilterTab = 'all' | 'published' | 'draft' | 'low-stock' | 'out-of-stock' | 'archived' | 'deleted';
 type ViewMode = 'list' | 'grid';
 type SortField = 'name' | 'price' | 'totalStock' | 'demandScore';
 type SortDir = 'asc' | 'desc';
 
-const getTotalStock = (p: BackendProduct): number =>
-  (p.regional_stocks ?? []).reduce((sum, s) => sum + s.units, 0);
+const getTotalStock = (p: BackendProduct): number => computeTotalUnits(p);
 
 const getDemandScore = (p: BackendProduct): number =>
-  (p.performance_metrics?.conversion_rate ?? 0) * 100;
+  p.performance_metrics?.demand_score ?? 0;
 
 const ITEMS_PER_PAGE = 20;
 
@@ -37,6 +35,36 @@ export default function ProductsPage() {
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [page, setPage] = useState(1);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'json' | 'csv' | 'excel' | null>(null);
+  const [exportToast, setExportToast] = useState<string | null>(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  const handleExport = async (format: 'json' | 'csv' | 'excel') => {
+    setShowExportMenu(false);
+    setExportingFormat(format);
+    try {
+      const result = await exportProductsFromBackend(format);
+      setExportToast(`Exported${result.record_count !== undefined ? ` ${result.record_count}` : ''} product${result.record_count !== 1 ? 's' : ''} as ${format.toUpperCase()}`);
+      setTimeout(() => setExportToast(null), 4000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExportingFormat(null);
+    }
+  };
+
+  // Close export menu on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setShowExportMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     loadProducts();
@@ -161,20 +189,50 @@ export default function ProductsPage() {
     setPage(1);
   };
 
-  const exportProductsCSV = () => {
-    const rows = filteredAndSortedProducts.map(p => ({
-      Name: p.product_name,
-      SKU: p.sku,
-      Price: p.price,
-      Collection: p.collection_name,
-      Status: p.status,
-      'Total Stock': getTotalStock(p),
-      'Demand Score': getDemandScore(p).toFixed(1),
-      'Created At': p.created_at,
-    }));
-    const csv = convertToCSV(rows);
-    downloadCSV(buildFilename('products', filter === 'all' ? 'all' : filter), csv);
-  };
+  const headerActions = (
+    <div className="flex items-center gap-3">
+      {/* Export dropdown */}
+      <div className="relative" ref={exportMenuRef}>
+        <button
+          onClick={() => !exportingFormat && setShowExportMenu(v => !v)}
+          disabled={!!exportingFormat}
+          className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {exportingFormat ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+          {exportingFormat ? 'Exporting…' : 'Export'}
+          {!exportingFormat && <ChevronDown size={13} className={`transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />}
+        </button>
+        {showExportMenu && (
+          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-30">
+            <div className="px-4 py-2 border-b border-sand/40">
+              <p className="text-[10px] tracking-[0.1em] uppercase text-taupe">Via backend · S3</p>
+            </div>
+            <button onClick={() => handleExport('json')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+              <FileJson size={14} className="text-gold-muted" /> Export as JSON
+            </button>
+            <button onClick={() => handleExport('csv')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+              <FileText size={14} className="text-info" /> Export as CSV
+            </button>
+            <button onClick={() => handleExport('excel')} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-stone hover:bg-parchment hover:text-charcoal-deep transition-colors text-left">
+              <FileSpreadsheet size={14} className="text-success" /> Export as Excel
+            </button>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={() => setShowUploadModal(true)}
+        className="inline-flex items-center gap-2 px-4 py-2.5 border border-sand text-sm text-stone hover:text-charcoal-deep hover:border-charcoal-deep/40 transition-colors tracking-wide"
+      >
+        <Download size={15} />
+        Import Products
+      </button>
+
+      <PrimaryButton href="/brand/products/new" icon={Plus}>
+        Add Product
+      </PrimaryButton>
+    </div>
+  );
 
   if (isLoading) {
     return (
@@ -182,11 +240,7 @@ export default function ProductsPage() {
         <BrandPageHeader
           title="Products"
           subtitle="Loading..."
-          actions={
-            <PrimaryButton href="/brand/products/new" icon={Plus}>
-              Add Product
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-taupe" />
@@ -201,11 +255,7 @@ export default function ProductsPage() {
         <BrandPageHeader
           title="Products"
           subtitle="Error"
-          actions={
-            <PrimaryButton href="/brand/products/new" icon={Plus}>
-              Add Product
-            </PrimaryButton>
-          }
+          actions={headerActions}
         />
         <div className="p-8 text-center">
           <p className="text-error mb-4">{error}</p>
@@ -225,16 +275,7 @@ export default function ProductsPage() {
       <BrandPageHeader
         title="Products"
         subtitle={`${filteredProducts.length} product${filteredProducts.length !== 1 ? 's' : ''}`}
-        actions={
-          <div className="flex items-center gap-3">
-            <ExportButton options={[
-              { label: 'Export Products (CSV)', onClick: exportProductsCSV },
-            ]} />
-            <PrimaryButton href="/brand/products/new" icon={Plus}>
-              Add Product
-            </PrimaryButton>
-          </div>
-        }
+        actions={headerActions}
       />
 
       <div className="p-8 space-y-6">
@@ -326,18 +367,83 @@ export default function ProductsPage() {
           </div>
         ) : viewMode === 'list' ? (
           <div className="space-y-3">
-            {filteredProducts.map(product => (
+            {paginatedProducts.map(product => (
               <ApiProductCard key={product.product_id} product={product} />
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredProducts.map(product => (
+            {paginatedProducts.map(product => (
               <ApiProductGridCard key={product.product_id} product={product} />
             ))}
           </div>
         )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-4">
+            <p className="text-xs text-stone">
+              Showing {(safeCurrentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(safeCurrentPage * ITEMS_PER_PAGE, filteredAndSortedProducts.length)} of {filteredAndSortedProducts.length} products
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={safeCurrentPage === 1}
+                className="p-2 border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - safeCurrentPage) <= 1)
+                .reduce<(number | 'ellipsis')[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && p - (arr[idx - 1]) > 1) acc.push('ellipsis');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((item, idx) =>
+                  item === 'ellipsis' ? (
+                    <span key={`e-${idx}`} className="px-2 text-xs text-taupe">…</span>
+                  ) : (
+                    <button
+                      key={item}
+                      onClick={() => setPage(item)}
+                      className={`w-9 h-9 text-xs transition-colors ${
+                        item === safeCurrentPage
+                          ? 'bg-charcoal-deep text-ivory-cream'
+                          : 'border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  )
+                )}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={safeCurrentPage === totalPages}
+                className="p-2 border border-sand text-stone hover:text-charcoal-deep hover:border-charcoal-deep transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Export success toast */}
+      {exportToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3 bg-success/10 border border-success/30 text-success shadow-lg">
+          <span>{exportToast}</span>
+          <button onClick={() => setExportToast(null)} className="text-success/60 hover:text-success transition-colors text-lg leading-none">×</button>
+        </div>
+      )}
+
+      {/* Bulk Upload Modal */}
+      {showUploadModal && (
+        <ProductBulkUploadModal
+          onClose={() => setShowUploadModal(false)}
+          onSuccess={() => { setShowUploadModal(false); loadProducts(); }}
+        />
+      )}
     </div>
   );
 }
