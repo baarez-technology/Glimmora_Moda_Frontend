@@ -52,14 +52,8 @@ function formatDate(ts: string) {
   return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const STATUS_TABS: { value: 'all' | DeliveryStatus; label: string }[] = [
-  { value: 'all',        label: 'All' },
-  { value: 'pending',    label: 'Pending' },
-  { value: 'processing', label: 'Processing' },
-  { value: 'shipped',    label: 'Shipped' },
-  { value: 'delivered',  label: 'Delivered' },
-  { value: 'cancelled',  label: 'Cancelled' },
-];
+const STATUS_TAB_VALUES: ('all' | DeliveryStatus)[] = ['all', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'];
+const STATUS_TAB_LABELS: Record<string, string> = { all: 'All', pending: 'Pending', processing: 'Processing', shipped: 'Shipped', delivered: 'Delivered', cancelled: 'Cancelled' };
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<ApiBrandOrder[]>([]);
@@ -127,6 +121,13 @@ export default function OrdersPage() {
     }
   };
 
+  // Count per status from loaded orders
+  const statusCounts = orders.reduce<Record<string, number>>((acc, o) => {
+    const s = o.products[0]?.delivery_status || 'pending';
+    acc[s] = (acc[s] || 0) + 1;
+    return acc;
+  }, {});
+
   // Client-side filter on the current page's data
   const displayed = orders.filter(o => {
     const productStatus = o.products[0]?.delivery_status || 'pending';
@@ -179,19 +180,25 @@ export default function OrdersPage() {
       <div className="p-8 space-y-6">
         {/* Status filter tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
-          {STATUS_TABS.map(tab => (
-            <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
-              className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors whitespace-nowrap ${
-                statusFilter === tab.value
-                  ? 'bg-white text-charcoal-deep'
-                  : 'text-stone hover:text-charcoal-deep'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {STATUS_TAB_VALUES.map(value => {
+            const count = value === 'all' ? orders.length : (statusCounts[value] || 0);
+            return (
+              <button
+                key={value}
+                onClick={() => setStatusFilter(value)}
+                className={`px-4 py-2 text-xs tracking-[0.1em] uppercase transition-colors whitespace-nowrap flex items-center gap-2 ${
+                  statusFilter === value
+                    ? 'bg-white text-charcoal-deep'
+                    : 'text-stone hover:text-charcoal-deep'
+                }`}
+              >
+                {STATUS_TAB_LABELS[value]}
+                <span className={`text-[10px] font-medium ${statusFilter === value ? 'text-charcoal-deep' : 'text-taupe'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Search */}
@@ -309,7 +316,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {(
               <div className="px-6 py-4 border-t border-sand/30 flex items-center justify-between">
                 <p className="text-xs text-taupe">
                   Page {page} of {totalPages} · {totalOrders} orders
