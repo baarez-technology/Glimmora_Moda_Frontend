@@ -54,7 +54,7 @@ export default function EditCollectionPage() {
         description: data.collection_description,
         season: data.season,
         year: data.year,
-        status: data.collection_status,
+        status: data.collection_status?.toLowerCase() || 'draft',
       });
       if (data.collection_image) {
         setHeroPreview(data.collection_image);

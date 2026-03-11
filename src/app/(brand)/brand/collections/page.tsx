@@ -56,24 +56,26 @@ export default function CollectionsPage() {
   const activeCollections = useMemo(() => collections.filter(c => c.is_active), [collections]);
   const deletedCollections = useMemo(() => collections.filter(c => !c.is_active), [collections]);
 
+  const normalizeStatus = (s: string) => s?.toLowerCase();
+
   const filteredCollections = useMemo(() => {
     if (filter === 'deleted') return deletedCollections;
     return activeCollections.filter(c => {
       if (filter === 'all') return true;
-      return c.status === filter;
+      return normalizeStatus(c.status) === filter;
     });
   }, [activeCollections, deletedCollections, filter]);
 
   const filterTabs: { value: FilterTab; label: string; count: number }[] = [
     { value: 'all', label: 'All', count: activeCollections.length },
-    { value: 'published', label: 'Published', count: activeCollections.filter(c => c.status === 'published').length },
-    { value: 'draft', label: 'Draft', count: activeCollections.filter(c => c.status === 'draft').length },
+    { value: 'published', label: 'Published', count: activeCollections.filter(c => normalizeStatus(c.status) === 'published').length },
+    { value: 'draft', label: 'Draft', count: activeCollections.filter(c => normalizeStatus(c.status) === 'draft').length },
     { value: 'deleted', label: 'Deleted', count: deletedCollections.length },
   ];
 
   const getStatusBadge = (status: string, isActive: boolean) => {
     if (!isActive) return 'bg-red-100 text-red-600';
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'published':
         return 'bg-success/10 text-success';
       case 'draft':
@@ -188,7 +190,7 @@ export default function CollectionsPage() {
               }`}
             >
               {tab.label}
-              <span className={`text-[10px] ${filter === tab.value ? 'text-taupe' : 'text-taupe/60'}`}>
+              <span className={`text-[10px] font-medium ${filter === tab.value ? 'text-charcoal-deep' : 'text-taupe'}`}>
                 {tab.count}
               </span>
             </button>
