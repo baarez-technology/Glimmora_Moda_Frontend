@@ -1579,7 +1579,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2024-02-01T00:00:00Z',
     releaseDate: '2024-02-15T00:00:00Z',
     invitationRequired: false,
-    hasAccess: true
+    hasAccess: true,
+    customer_ids: [],
+    requested_customers: [],
   },
   {
     id: 'priv-col-002',
@@ -1593,7 +1595,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2024-03-01T00:00:00Z',
     releaseDate: '2024-03-15T00:00:00Z',
     invitationRequired: true,
-    hasAccess: false
+    hasAccess: false,
+    customer_ids: [],
+    requested_customers: [],
   },
   {
     id: 'priv-col-003',
@@ -1607,7 +1611,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2024-04-01T00:00:00Z',
     releaseDate: '2024-04-20T00:00:00Z',
     invitationRequired: false,
-    hasAccess: false
+    hasAccess: false,
+    customer_ids: [],
+    requested_customers: [],
   }
 ];
 

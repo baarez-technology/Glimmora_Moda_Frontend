@@ -229,6 +229,23 @@ export interface BespokeOrder {
 
 export type PrivateCollectionAccess = 'invitation' | 'request' | 'uhni_only';
 
+export interface RequestedCustomer {
+  customer_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  first_name: string;
+  last_name: string;
+  notes?: string;
+}
+
+export interface UhniCustomer {
+  customer_id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  profile_picture?: string;
+  phone?: string;
+}
+
 export interface PrivateCollection {
   id: string;
   name: string;
@@ -242,8 +259,13 @@ export interface PrivateCollection {
   releaseDate: string;
   invitationRequired: boolean;
   hasAccess: boolean;
-  accessRequests?: CollectionAccessRequest[];
+  notes?: string;
+  customer_ids: string[];
+  requested_customers: RequestedCustomer[];
+  /** @deprecated use customer_ids */
   invitedClients?: string[];
+  /** @deprecated use requested_customers */
+  accessRequests?: CollectionAccessRequest[];
   deletedAt?: string;
 }
 
