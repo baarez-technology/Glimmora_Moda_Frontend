@@ -1,9 +1,18 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Search, CheckCircle } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowLeft, Search, CheckCircle, X, ChevronDown } from 'lucide-react';
 import { getProductCategories, createSourcingRequest } from '@/services/sourcing.service';
+import * as brandService from '@/services/brand.service';
+import type { Brand } from '@/types';
+
+interface SelectedBrand {
+  id: string;
+  name: string;
+  logoUrl?: string;
+}
 
 export default function NewSourcingRequestPage() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -11,6 +20,13 @@ export default function NewSourcingRequestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
+
+  // Brand multi-select state
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(true);
+  const [brandSearch, setBrandSearch] = useState('');
+  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+  const brandRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     looking_for: '',
@@ -20,6 +36,7 @@ export default function NewSourcingRequestPage() {
     priority: 'standard' as 'standard' | 'urgent' | 'when_available',
     deadline: '',
     specifications: '',
+    selectedBrands: [] as SelectedBrand[],
   });
 
   useEffect(() => {
@@ -27,11 +44,53 @@ export default function NewSourcingRequestPage() {
     getProductCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
+    brandService.getAllBrands()
+      .then(res => {
+        if (res.success && res.data) setAllBrands(res.data);
+      })
+      .catch(() => {})
+      .finally(() => setBrandsLoading(false));
   }, []);
+
+  // Close brand dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (brandRef.current && !brandRef.current.contains(e.target as Node)) {
+        setBrandDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filteredBrands = allBrands.filter(b =>
+    b.name.toLowerCase().includes(brandSearch.toLowerCase()) &&
+    !formData.selectedBrands.some(sb => sb.id === b.id)
+  );
+
+  const addBrand = (brand: Brand) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedBrands: [...prev.selectedBrands, { id: brand.id, name: brand.name, logoUrl: brand.logoUrl }],
+    }));
+    setBrandSearch('');
+    setBrandDropdownOpen(false);
+  };
+
+  const removeBrand = (brandId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      selectedBrands: prev.selectedBrands.filter(b => b.id !== brandId),
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.looking_for || !formData.product_category || !formData.description || !formData.budget) return;
+    if (formData.selectedBrands.length === 0) {
+      setError('Please select at least one brand partner to send the request to.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -43,6 +102,7 @@ export default function NewSourcingRequestPage() {
         priority: formData.priority,
         deadline: formData.deadline || new Date().toISOString().split('T')[0],
         specifications: formData.specifications,
+        brand_ids: formData.selectedBrands.map(b => b.id),
       });
       setSubmitted(true);
     } catch {
@@ -76,9 +136,21 @@ export default function NewSourcingRequestPage() {
             <h2 className="font-display text-2xl text-charcoal-deep mb-3">
               Sourcing Request Submitted
             </h2>
-            <p className="text-stone max-w-md mx-auto mb-10">
-              Our global network is now searching for your item.
-              You will be notified when options are found — typically within 24-72 hours.
+            <p className="text-stone max-w-md mx-auto mb-4">
+              Your request has been sent to {formData.selectedBrands.length} brand partner{formData.selectedBrands.length !== 1 ? 's' : ''}.
+            </p>
+            <div className="flex items-center justify-center gap-2 mb-10 flex-wrap">
+              {formData.selectedBrands.map(b => (
+                <span key={b.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep">
+                  {b.logoUrl && (
+                    <Image src={b.logoUrl} alt={b.name} width={16} height={16} className="object-contain" />
+                  )}
+                  {b.name}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-taupe mb-10">
+              Brand partners will review your request and submit sourcing options — typically within 24-72 hours.
             </p>
             <div className="flex items-center justify-center gap-4">
               <Link
@@ -123,7 +195,7 @@ export default function NewSourcingRequestPage() {
             <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
               New Sourcing Request
             </h1>
-            <p className="text-sand mt-3">Tell us what you&apos;re looking for</p>
+            <p className="text-sand mt-3">Tell us what you&apos;re looking for and select the brand partners to source from</p>
           </div>
         </div>
       </div>
@@ -149,6 +221,96 @@ export default function NewSourcingRequestPage() {
               className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               required
             />
+          </div>
+
+          {/* Brand Partners — Multi-select */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Send Request To (Brand Partners) *
+            </label>
+            <p className="text-xs text-stone mb-3">
+              Select which brand partners should receive this sourcing request. They will review and submit options for you.
+            </p>
+
+            {/* Selected brands as tags */}
+            {formData.selectedBrands.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {formData.selectedBrands.map(brand => (
+                  <span
+                    key={brand.id}
+                    className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 bg-charcoal-deep text-ivory-cream text-sm"
+                  >
+                    {brand.logoUrl && (
+                      <Image src={brand.logoUrl} alt={brand.name} width={14} height={14} className="object-contain brightness-0 invert" />
+                    )}
+                    {brand.name}
+                    <button
+                      type="button"
+                      onClick={() => removeBrand(brand.id)}
+                      className="p-0.5 hover:bg-ivory-cream/20 transition-colors rounded-sm"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Brand search dropdown */}
+            <div ref={brandRef} className="relative">
+              <div
+                className="flex items-center bg-white border border-sand focus-within:border-charcoal-deep transition-colors cursor-text"
+                onClick={() => setBrandDropdownOpen(true)}
+              >
+                <Search size={16} className="text-taupe ml-5 flex-shrink-0" />
+                <input
+                  type="text"
+                  value={brandSearch}
+                  onChange={(e) => {
+                    setBrandSearch(e.target.value);
+                    setBrandDropdownOpen(true);
+                  }}
+                  onFocus={() => setBrandDropdownOpen(true)}
+                  placeholder={brandsLoading ? 'Loading brands...' : 'Search brand partners...'}
+                  disabled={brandsLoading}
+                  className="w-full px-3 py-4 bg-transparent text-charcoal-deep placeholder:text-taupe focus:outline-none"
+                />
+                <ChevronDown size={16} className={`text-taupe mr-5 flex-shrink-0 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+
+              {brandDropdownOpen && (
+                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-sand shadow-lg max-h-[280px] overflow-y-auto">
+                  {filteredBrands.length === 0 ? (
+                    <div className="px-5 py-4 text-sm text-stone">
+                      {brandSearch ? 'No matching brands found' : 'All brands selected'}
+                    </div>
+                  ) : (
+                    filteredBrands.map(brand => (
+                      <button
+                        key={brand.id}
+                        type="button"
+                        onClick={() => addBrand(brand)}
+                        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-parchment transition-colors text-left"
+                      >
+                        {brand.logoUrl ? (
+                          <Image src={brand.logoUrl} alt={brand.name} width={24} height={24} className="object-contain flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 bg-parchment flex items-center justify-center flex-shrink-0 text-[10px] font-medium text-stone">
+                            {brand.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-charcoal-deep font-medium">{brand.name}</p>
+                          {brand.heritage?.origin && (
+                            <p className="text-[10px] text-taupe">{brand.heritage.origin}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Category — from API */}
@@ -179,7 +341,7 @@ export default function NewSourcingRequestPage() {
             <textarea
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Describe the item in detail — brand, style, era, condition..."
+              placeholder="Describe the item in detail — style, era, condition..."
               rows={4}
               className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
               required
@@ -192,7 +354,7 @@ export default function NewSourcingRequestPage() {
               Budget *
             </label>
             <div className="relative">
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-stone">€</span>
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-stone">&euro;</span>
               <input
                 type="number"
                 value={formData.budget}
@@ -262,13 +424,23 @@ export default function NewSourcingRequestPage() {
 
           {/* Submit */}
           <div className="pt-8 border-t border-sand">
-            <button
-              type="submit"
-              disabled={submitting || !formData.looking_for || !formData.product_category || !formData.description || !formData.budget}
-              className="px-8 py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {submitting ? 'Submitting...' : 'Submit Request'}
-            </button>
+            <div className="flex items-center justify-between">
+              <div>
+                {formData.selectedBrands.length > 0 && (
+                  <p className="text-xs text-stone">
+                    Sending to {formData.selectedBrands.length} brand{formData.selectedBrands.length !== 1 ? 's' : ''}:{' '}
+                    {formData.selectedBrands.map(b => b.name).join(', ')}
+                  </p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={submitting || !formData.looking_for || !formData.product_category || !formData.description || !formData.budget || formData.selectedBrands.length === 0}
+                className="px-8 py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
