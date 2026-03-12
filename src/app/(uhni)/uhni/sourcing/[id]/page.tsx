@@ -19,6 +19,10 @@ import {
   User,
   Check,
   Shield,
+  ArrowRight,
+  Tag,
+  XCircle,
+  DollarSign,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
@@ -27,6 +31,7 @@ import {
   type EnrichedSourcingRequest,
   type SourcingChatMessage,
   type SourcingOptionItem,
+  type NegotiationStatus,
 } from '@/services/sourcing.service';
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -92,6 +97,21 @@ function getStatusIcon(status: string) {
   }
 }
 
+function getNegotiationBadge(status?: NegotiationStatus) {
+  switch (status) {
+    case 'negotiating':
+      return { label: 'Negotiation Pending', className: 'bg-gold-muted/10 text-gold-muted animate-pulse', icon: Tag };
+    case 'counter_offered':
+      return { label: 'Counter Offer', className: 'bg-gold-soft/15 text-gold-muted', icon: ArrowRight };
+    case 'accepted':
+      return { label: 'Price Agreed', className: 'bg-success/10 text-success', icon: CheckCircle };
+    case 'declined':
+      return { label: 'Negotiation Declined', className: 'bg-stone/10 text-stone', icon: XCircle };
+    default:
+      return null;
+  }
+}
+
 // ── Status Timeline ───────────────────────────────────────────────────
 
 function StatusTimeline({ timeline }: { timeline: EnrichedSourcingRequest['timeline'] }) {
@@ -147,54 +167,275 @@ function StatusTimeline({ timeline }: { timeline: EnrichedSourcingRequest['timel
 
 // ── Option Card ───────────────────────────────────────────────────────
 
-function OptionCard({ option, onSelect, canSelect }: { option: SourcingOptionItem; onSelect?: () => void; canSelect: boolean }) {
+function OptionCard({
+  option,
+  onSelect,
+  canSelect,
+  onNegotiate,
+  onAcceptCounter,
+  onDeclineCounter,
+  negotiatingId,
+  setNegotiatingId,
+}: {
+  option: SourcingOptionItem;
+  onSelect?: () => void;
+  canSelect: boolean;
+  onNegotiate?: (proposedPrice: number, note: string) => void;
+  onAcceptCounter?: () => void;
+  onDeclineCounter?: () => void;
+  negotiatingId: string | null;
+  setNegotiatingId: (id: string | null) => void;
+}) {
+  const [proposedPrice, setProposedPrice] = useState('');
+  const [negotiationNote, setNegotiationNote] = useState('');
+  const showForm = negotiatingId === option.id;
+  const negBadge = getNegotiationBadge(option.negotiationStatus);
+  const hasActiveNegotiation = option.negotiationStatus === 'negotiating' || option.negotiationStatus === 'counter_offered';
+  const discount = proposedPrice ? Math.round((1 - Number(proposedPrice) / option.price) * 100) : 0;
+
+  const handleSubmitNegotiation = () => {
+    const price = Number(proposedPrice);
+    if (price > 0 && price < option.price && onNegotiate) {
+      onNegotiate(price, negotiationNote);
+      setProposedPrice('');
+      setNegotiationNote('');
+      setNegotiatingId(null);
+    }
+  };
+
   return (
-    <div className={`border p-5 transition-all ${option.selected ? 'border-gold-soft bg-gold-soft/5' : 'border-sand/50 bg-white hover:border-sand'}`}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            {option.selected && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gold-soft/20 text-gold-muted text-[10px] tracking-[0.1em] uppercase">
-                <Star size={10} /> Selected
+    <div className={`border transition-all ${
+      option.selected ? 'border-gold-soft bg-gold-soft/5' :
+      option.negotiationStatus === 'counter_offered' ? 'border-gold-soft/60 bg-gold-soft/5' :
+      'border-sand/50 bg-white hover:border-sand'
+    }`}>
+      <div className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              {option.selected && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gold-soft/20 text-gold-muted text-[10px] tracking-[0.1em] uppercase">
+                  <Star size={10} /> Selected
+                </span>
+              )}
+              <span className={`inline-flex items-center px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${conditionColor(option.condition)}`}>
+                {conditionLabel(option.condition)}
               </span>
-            )}
-            <span className={`inline-flex items-center px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${conditionColor(option.condition)}`}>
-              {conditionLabel(option.condition)}
-            </span>
-          </div>
-          <h4 className="font-medium text-charcoal-deep text-sm mb-1">{option.title}</h4>
-          <div className="flex items-center gap-3 text-xs text-stone mb-3 flex-wrap">
-            {option.brandName && (
-              <>
-                <span className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-charcoal-deep/5 text-charcoal-deep font-medium">{option.brandName}</span>
-                <span className="text-taupe">|</span>
-              </>
-            )}
-            <span className="flex items-center gap-1"><MapPin size={11} />{option.source}</span>
-            <span className="text-taupe">|</span>
-            <span>{option.sourceLocation}</span>
-          </div>
-          {option.conciergeNote && (
-            <div className="bg-parchment/50 border-l-2 border-gold-soft/40 px-3 py-2 mb-3">
-              <p className="text-xs text-stone italic">&ldquo;{option.conciergeNote}&rdquo;</p>
+              {negBadge && (
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${negBadge.className}`}>
+                  <negBadge.icon size={10} /> {negBadge.label}
+                </span>
+              )}
             </div>
-          )}
-          <div className="flex items-center gap-4 text-xs text-taupe">
-            <span className="flex items-center gap-1"><Truck size={11} />{option.estimatedDelivery}</span>
+            <h4 className="font-medium text-charcoal-deep text-sm mb-1">{option.title}</h4>
+            <div className="flex items-center gap-3 text-xs text-stone mb-3 flex-wrap">
+              {option.brandName && (
+                <>
+                  <span className="text-[10px] tracking-[0.1em] uppercase px-2 py-0.5 bg-charcoal-deep/5 text-charcoal-deep font-medium">{option.brandName}</span>
+                  <span className="text-taupe">|</span>
+                </>
+              )}
+              <span className="flex items-center gap-1"><MapPin size={11} />{option.source}</span>
+              <span className="text-taupe">|</span>
+              <span>{option.sourceLocation}</span>
+            </div>
+            {option.conciergeNote && (
+              <div className="bg-parchment/50 border-l-2 border-gold-soft/40 px-3 py-2 mb-3">
+                <p className="text-xs text-stone italic">&ldquo;{option.conciergeNote}&rdquo;</p>
+              </div>
+            )}
+            <div className="flex items-center gap-4 text-xs text-taupe">
+              <span className="flex items-center gap-1"><Truck size={11} />{option.estimatedDelivery}</span>
+            </div>
           </div>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="font-display text-lg text-charcoal-deep">&euro;{option.price.toLocaleString()}</p>
-          {option.originalPrice && option.originalPrice > option.price && (
-            <p className="text-xs text-taupe line-through">&euro;{option.originalPrice.toLocaleString()}</p>
-          )}
-          {canSelect && !option.selected && (
-            <button onClick={onSelect} className="mt-3 px-4 py-2 bg-charcoal-deep text-ivory-cream text-[10px] tracking-[0.15em] uppercase hover:bg-noir transition-colors">
-              Select Option
-            </button>
-          )}
+          <div className="text-right flex-shrink-0">
+            <p className="font-display text-lg text-charcoal-deep">&euro;{option.price.toLocaleString()}</p>
+            {option.originalPrice && option.originalPrice > option.price && (
+              <p className="text-xs text-taupe line-through">&euro;{option.originalPrice.toLocaleString()}</p>
+            )}
+            {/* Show agreed price for accepted negotiations */}
+            {option.negotiationStatus === 'accepted' && option.proposedPrice && (
+              <p className="text-xs text-success mt-1">Agreed: &euro;{option.proposedPrice.toLocaleString()}</p>
+            )}
+            {/* Action buttons */}
+            {canSelect && !option.selected && !hasActiveNegotiation && (
+              <div className="mt-3 space-y-2">
+                <button onClick={onSelect} className="w-full px-4 py-2 bg-charcoal-deep text-ivory-cream text-[10px] tracking-[0.15em] uppercase hover:bg-noir transition-colors">
+                  Select Option
+                </button>
+                {option.negotiationStatus !== 'declined' && (
+                  <button
+                    onClick={() => setNegotiatingId(showForm ? null : option.id)}
+                    className="w-full px-4 py-2 border border-gold-soft/40 text-gold-muted text-[10px] tracking-[0.15em] uppercase hover:bg-gold-soft/5 transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-1.5"><DollarSign size={11} /> Negotiate Price</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* ── Negotiation Pending Note (client's own proposal, waiting for brand) ── */}
+      {option.negotiationStatus === 'negotiating' && option.proposedPrice && (
+        <div className="px-5 pb-5 border-t border-sand/30 pt-4">
+          <div className="bg-gold-muted/5 border border-gold-muted/20 p-4">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-gold-muted mb-3">Your Negotiation</p>
+            <div className="flex items-center gap-4 mb-3">
+              <div className="text-center">
+                <p className="text-[9px] tracking-[0.1em] uppercase text-taupe mb-1">Listed</p>
+                <p className="font-display text-sm text-charcoal-deep">&euro;{option.price.toLocaleString()}</p>
+              </div>
+              <ArrowRight size={16} className="text-taupe" />
+              <div className="text-center">
+                <p className="text-[9px] tracking-[0.1em] uppercase text-gold-muted mb-1">Your Offer</p>
+                <p className="font-display text-sm text-gold-muted">&euro;{option.proposedPrice.toLocaleString()}</p>
+              </div>
+              <span className="text-[10px] text-taupe">({Math.round((1 - option.proposedPrice / option.price) * 100)}% off)</span>
+            </div>
+            {option.negotiationNote && (
+              <p className="text-xs text-stone italic">&ldquo;{option.negotiationNote}&rdquo;</p>
+            )}
+            <p className="text-[10px] text-taupe mt-2">Awaiting response from {option.brandName || 'brand partner'}...</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Counter Offer Received ── */}
+      {option.negotiationStatus === 'counter_offered' && option.counterPrice && (
+        <div className="px-5 pb-5 border-t border-gold-soft/30 pt-4">
+          <div className="bg-gold-soft/5 border border-gold-soft/30 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertCircle size={14} className="text-gold-muted" />
+              <p className="text-[10px] tracking-[0.2em] uppercase text-gold-muted">Counter Offer Received</p>
+            </div>
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+              <div className="text-center">
+                <p className="text-[9px] tracking-[0.1em] uppercase text-taupe mb-1">Listed</p>
+                <p className="font-display text-sm text-stone">&euro;{option.price.toLocaleString()}</p>
+              </div>
+              <ArrowRight size={14} className="text-taupe" />
+              <div className="text-center">
+                <p className="text-[9px] tracking-[0.1em] uppercase text-taupe mb-1">Your Offer</p>
+                <p className="font-display text-sm text-stone line-through">&euro;{option.proposedPrice?.toLocaleString()}</p>
+              </div>
+              <ArrowRight size={14} className="text-gold-muted" />
+              <div className="text-center">
+                <p className="text-[9px] tracking-[0.1em] uppercase text-gold-muted mb-1">Counter</p>
+                <p className="font-display text-lg text-gold-muted">&euro;{option.counterPrice.toLocaleString()}</p>
+              </div>
+              <span className="text-[10px] text-success">({Math.round((1 - option.counterPrice / option.price) * 100)}% off listed)</span>
+            </div>
+            {option.counterNote && (
+              <div className="bg-parchment/50 border-l-2 border-gold-soft/40 px-3 py-2 mb-4">
+                <p className="text-xs text-stone italic">&ldquo;{option.counterNote}&rdquo;</p>
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={onAcceptCounter}
+                className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-[10px] tracking-[0.15em] uppercase hover:bg-noir transition-colors"
+              >
+                <span className="inline-flex items-center gap-1.5"><CheckCircle size={12} /> Accept &euro;{option.counterPrice.toLocaleString()}</span>
+              </button>
+              <button
+                onClick={onDeclineCounter}
+                className="px-5 py-2.5 border border-sand text-stone text-[10px] tracking-[0.15em] uppercase hover:bg-parchment/50 transition-colors"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Accepted Negotiation Summary ── */}
+      {option.negotiationStatus === 'accepted' && option.proposedPrice && (
+        <div className="px-5 pb-5 border-t border-success/20 pt-4">
+          <div className="bg-success/5 border border-success/20 p-4">
+            <div className="flex items-center gap-3">
+              <CheckCircle size={16} className="text-success" />
+              <div>
+                <p className="text-xs text-charcoal-deep font-medium">
+                  Price agreed at &euro;{option.proposedPrice.toLocaleString()}
+                  <span className="text-taupe font-normal ml-2">(was &euro;{option.price.toLocaleString()} — {Math.round((1 - option.proposedPrice / option.price) * 100)}% savings)</span>
+                </p>
+                {option.counterNote && <p className="text-[10px] text-stone italic mt-1">&ldquo;{option.counterNote}&rdquo;</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Declined Negotiation Note ── */}
+      {option.negotiationStatus === 'declined' && (
+        <div className="px-5 pb-5 border-t border-sand/30 pt-4">
+          <div className="bg-parchment/30 p-3 flex items-center gap-2">
+            <XCircle size={14} className="text-stone" />
+            <p className="text-xs text-stone">Previous negotiation was declined. You may select at listed price or try a new offer.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Negotiate Form (inline, expands below) ── */}
+      {showForm && (
+        <div className="px-5 pb-5 border-t border-gold-soft/30 pt-4">
+          <div className="bg-parchment/30 p-4">
+            <p className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-4">Propose Your Price</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Your Offer *</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">&euro;</span>
+                  <input
+                    type="number"
+                    value={proposedPrice}
+                    onChange={(e) => setProposedPrice(e.target.value)}
+                    placeholder={`Max ${option.price.toLocaleString()}`}
+                    className="w-full pl-8 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  />
+                </div>
+                {proposedPrice && Number(proposedPrice) > 0 && Number(proposedPrice) < option.price && (
+                  <p className="text-[10px] text-gold-muted mt-1">{discount}% below listed price</p>
+                )}
+                {proposedPrice && Number(proposedPrice) >= option.price && (
+                  <p className="text-[10px] text-error mt-1">Must be below listed price</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Listed Price</label>
+                <p className="py-3 text-charcoal-deep font-display">&euro;{option.price.toLocaleString()}</p>
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Message (optional)</label>
+              <textarea
+                rows={2}
+                value={negotiationNote}
+                onChange={(e) => setNegotiationNote(e.target.value)}
+                placeholder="Explain your offer to the brand partner..."
+                className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSubmitNegotiation}
+                disabled={!proposedPrice || Number(proposedPrice) <= 0 || Number(proposedPrice) >= option.price}
+                className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-[10px] tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Submit Offer
+              </button>
+              <button
+                onClick={() => { setNegotiatingId(null); setProposedPrice(''); setNegotiationNote(''); }}
+                className="px-5 py-2.5 text-stone text-[10px] tracking-[0.15em] uppercase hover:text-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -287,6 +528,7 @@ export default function SourcingDetailPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [request, setRequest] = useState<EnrichedSourcingRequest | null>(null);
   const [activeSection, setActiveSection] = useState<'timeline' | 'options' | 'messages'>('timeline');
+  const [negotiatingId, setNegotiatingId] = useState<string | null>(null);
 
   useEffect(() => {
     getSourcingRequests()
@@ -327,6 +569,81 @@ export default function SourcingDetailPage() {
       ],
     });
     setActiveSection('messages');
+  };
+
+  const handleNegotiate = (optionId: string, proposedPrice: number, note: string) => {
+    if (!request) return;
+    setRequest({
+      ...request,
+      options: request.options.map((o) =>
+        o.id === optionId
+          ? { ...o, negotiationStatus: 'negotiating' as const, proposedPrice, negotiationNote: note }
+          : o,
+      ),
+      messages: [
+        ...request.messages,
+        {
+          id: `msg-${Date.now()}`,
+          sender: 'system' as const,
+          senderName: 'System',
+          content: `Price negotiation submitted for "${request.options.find((o) => o.id === optionId)?.title}" — proposed €${proposedPrice.toLocaleString()}.`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
+  };
+
+  const handleAcceptCounter = (optionId: string) => {
+    if (!request) return;
+    const option = request.options.find((o) => o.id === optionId);
+    if (!option?.counterPrice) return;
+    setRequest({
+      ...request,
+      status: 'awaiting_approval',
+      options: request.options.map((o) =>
+        o.id === optionId
+          ? { ...o, negotiationStatus: 'accepted' as const, selected: true, proposedPrice: o.counterPrice }
+          : { ...o, selected: false },
+      ),
+      timeline: request.timeline.map((s) => {
+        if (s.status === 'awaiting_approval') return { ...s, active: true, completed: false, date: new Date().toISOString().split('T')[0] };
+        if (s.status === 'options_found') return { ...s, completed: true, active: false };
+        return s;
+      }),
+      messages: [
+        ...request.messages,
+        {
+          id: `msg-${Date.now()}`,
+          sender: 'system' as const,
+          senderName: 'System',
+          content: `Counter offer of €${option.counterPrice.toLocaleString()} accepted for "${option.title}". Awaiting final confirmation.`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
+    setActiveSection('messages');
+  };
+
+  const handleDeclineCounter = (optionId: string) => {
+    if (!request) return;
+    setRequest({
+      ...request,
+      options: request.options.map((o) =>
+        o.id === optionId
+          ? { ...o, negotiationStatus: 'declined' as const, proposedPrice: undefined, counterPrice: undefined, negotiationNote: undefined, counterNote: undefined }
+          : o,
+      ),
+      messages: [
+        ...request.messages,
+        {
+          id: `msg-${Date.now()}`,
+          sender: 'system' as const,
+          senderName: 'System',
+          content: `Counter offer declined for "${request.options.find((o) => o.id === optionId)?.title}".`,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    });
   };
 
   // Loading / Not found
@@ -559,6 +876,11 @@ export default function SourcingDetailPage() {
                     option={option}
                     canSelect={canSelectOption}
                     onSelect={() => handleSelectOption(option.id)}
+                    onNegotiate={(price, note) => handleNegotiate(option.id, price, note)}
+                    onAcceptCounter={() => handleAcceptCounter(option.id)}
+                    onDeclineCounter={() => handleDeclineCounter(option.id)}
+                    negotiatingId={negotiatingId}
+                    setNegotiatingId={setNegotiatingId}
                   />
                 ))}
               </div>
@@ -569,20 +891,34 @@ export default function SourcingDetailPage() {
               <div className="bg-white border border-sand/50 p-6">
                 <h2 className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-4">Price Comparison</h2>
                 <div className="space-y-2">
-                  {request.options.map((opt) => (
-                    <div key={opt.id} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        {opt.selected && <Star size={12} className="text-gold-muted" />}
-                        <span className={opt.selected ? 'text-charcoal-deep font-medium' : 'text-stone'}>
-                          {opt.source}
-                        </span>
-                        <span className={`text-[10px] px-1.5 py-0.5 ${conditionColor(opt.condition)}`}>
-                          {conditionLabel(opt.condition)}
-                        </span>
+                  {request.options.map((opt) => {
+                    const negBadge = getNegotiationBadge(opt.negotiationStatus);
+                    const effectivePrice = opt.negotiationStatus === 'accepted' && opt.proposedPrice ? opt.proposedPrice : opt.price;
+                    return (
+                      <div key={opt.id} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          {opt.selected && <Star size={12} className="text-gold-muted" />}
+                          <span className={opt.selected ? 'text-charcoal-deep font-medium' : 'text-stone'}>
+                            {opt.source}
+                          </span>
+                          <span className={`text-[10px] px-1.5 py-0.5 ${conditionColor(opt.condition)}`}>
+                            {conditionLabel(opt.condition)}
+                          </span>
+                          {negBadge && (
+                            <span className={`text-[9px] px-1.5 py-0.5 ${negBadge.className}`}>
+                              {negBadge.label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {opt.negotiationStatus === 'accepted' && opt.proposedPrice && opt.proposedPrice < opt.price && (
+                            <span className="text-xs text-taupe line-through">&euro;{opt.price.toLocaleString()}</span>
+                          )}
+                          <span className="font-display text-charcoal-deep">&euro;{effectivePrice.toLocaleString()}</span>
+                        </div>
                       </div>
-                      <span className="font-display text-charcoal-deep">&euro;{opt.price.toLocaleString()}</span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

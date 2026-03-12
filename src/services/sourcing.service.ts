@@ -61,6 +61,8 @@ export interface SourcingTimelineStep {
   active: boolean;
 }
 
+export type NegotiationStatus = 'none' | 'negotiating' | 'counter_offered' | 'accepted' | 'declined';
+
 export interface SourcingOptionItem {
   id: string;
   title: string;
@@ -74,6 +76,11 @@ export interface SourcingOptionItem {
   estimatedDelivery: string;
   conciergeNote?: string;
   selected?: boolean;
+  negotiationStatus?: NegotiationStatus;
+  proposedPrice?: number;
+  counterPrice?: number;
+  negotiationNote?: string;
+  counterNote?: string;
 }
 
 export interface SourcingChatMessage {
@@ -464,6 +471,9 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
         estimatedDelivery: '3-5 business days (insured)',
         conciergeNote:
           'Full set with box, papers, and original receipt dated Sept 2021. Excellent condition — worn sparingly. Our top recommendation.',
+        negotiationStatus: 'negotiating',
+        proposedPrice: 165000,
+        negotiationNote: 'Would you consider €165K for the 2021 full set? I believe this is a fair price given the current market for 5711s.',
       },
       {
         id: 'opt-003-b',
@@ -477,6 +487,11 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
         estimatedDelivery: '5-7 business days (insured)',
         conciergeNote:
           'From a private collector in Geneva. 2020 production, full set. Slight bracelet stretch typical of regular wear. Serviced by Patek in 2024.',
+        negotiationStatus: 'counter_offered',
+        proposedPrice: 155000,
+        counterPrice: 163000,
+        negotiationNote: 'Interested at €155K — the bracelet stretch is a consideration.',
+        counterNote: 'We can offer €163K which reflects the recent Patek service and full set provenance. This is our best price for this piece.',
       },
       {
         id: 'opt-003-c',
@@ -612,6 +627,10 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
         conciergeNote:
           'A stunning 1930s Malle Courrier professionally restored by the Louis Vuitton heritage workshop. Monogram canvas in excellent condition, brass hardware re-polished, interior fully reconditioned.',
         selected: true,
+        negotiationStatus: 'accepted',
+        proposedPrice: 35000,
+        negotiationNote: 'Would you consider €35K for the vintage piece?',
+        counterNote: 'We accept €35,000 — a wonderful choice. This piece has extraordinary provenance.',
       },
       {
         id: 'opt-005-b',

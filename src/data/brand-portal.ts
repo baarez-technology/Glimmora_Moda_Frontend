@@ -1639,13 +1639,16 @@ export const mockBrandSourcingRequests: SourcingRequest[] = [
         id: 'opt-001',
         customDescription: 'Vintage Lady Dior Medium (1998), Black Cannage Lambskin',
         source: 'Verified Vintage Partner - Paris',
-        condition: 'excellent',
+        condition: 'excellent' as const,
         price: 12500,
         originalPrice: 2800,
         provenance: 'Original purchase from Avenue Montaigne boutique',
         availableUntil: '2024-02-15T00:00:00Z',
         conciergeRecommendation: 'Highly recommend - excellent provenance and condition',
-        images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80']
+        images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=400&q=80'],
+        negotiationStatus: 'negotiating' as const,
+        proposedPrice: 10500,
+        negotiationNote: 'Lovely piece — would you consider €10,500 given the age? Happy to proceed quickly.',
       }
     ],
     createdAt: '2024-01-20T10:00:00Z',
