@@ -16,12 +16,29 @@ import {
   Palette,
   CheckCircle,
   Users,
+  Loader2,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { uhniService } from '@/services';
-import type { PrivateShoppingEvent, ExclusiveEvent, ExclusiveEventType } from '@/types/uhni';
+import {
+  getExclusiveEvents,
+  joinExclusiveEvent,
+  getPrivateShoppingEvents,
+  joinPrivateShoppingEvent,
+  type ApiExclusiveEvent,
+  type ApiEventType,
+  type ApiPrivateShoppingEvent,
+  type ApiPrivateShoppingStatus,
+} from '@/services/exclusive-events.service';
 
 type Tab = 'exclusive' | 'shopping';
+
+const EVENT_TYPE_LABELS: Record<ApiEventType, string> = {
+  exhibitions: 'Exhibition',
+  galas: 'Gala',
+  masterclasses: 'Masterclass',
+  launches: 'Launch',
+  experiences: 'Experience',
+};
 
 export default function EventsPage() {
   const searchParams = useSearchParams();
@@ -31,21 +48,19 @@ export default function EventsPage() {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
 
   // Exclusive events state
-  const [exclusiveEvents, setExclusiveEvents] = useState<ExclusiveEvent[]>([]);
-  const [exclusiveFilter, setExclusiveFilter] = useState<'all' | ExclusiveEventType>('all');
+  const [exclusiveEvents, setExclusiveEvents] = useState<ApiExclusiveEvent[]>([]);
+  const [exclusiveFilter, setExclusiveFilter] = useState<'all' | ApiEventType>('all');
+  const [joiningId, setJoiningId] = useState<string | null>(null);
 
   // Private shopping state
-  const [shoppingEvents, setShoppingEvents] = useState<PrivateShoppingEvent[]>([]);
-  const [shoppingFilter, setShoppingFilter] = useState<'all' | 'upcoming' | 'confirmed' | 'completed'>('all');
+  const [shoppingEvents, setShoppingEvents] = useState<ApiPrivateShoppingEvent[]>([]);
+  const [shoppingFilter, setShoppingFilter] = useState<'all' | ApiPrivateShoppingStatus>('all');
+  const [joiningShoppingId, setJoiningShoppingId] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
-      uhniService.getExclusiveEvents().then(res => {
-        if (res.data) setExclusiveEvents(res.data);
-      }),
-      uhniService.getPrivateShopping().then(res => {
-        if (res.data) setShoppingEvents(res.data);
-      }),
+      getExclusiveEvents().then(events => setExclusiveEvents(events)),
+      getPrivateShoppingEvents().then(events => setShoppingEvents(events)),
     ]).catch(() => {
       showToast('Failed to load events', 'error');
     }).finally(() => {
@@ -56,90 +71,81 @@ export default function EventsPage() {
   // ─── Exclusive Events helpers ───
   const filteredExclusive = exclusiveEvents.filter(event => {
     if (exclusiveFilter === 'all') return true;
-    return event.type === exclusiveFilter;
+    return event.event_type === exclusiveFilter;
   });
 
-  const getTypeIcon = (type: ExclusiveEventType) => {
+  const getTypeIcon = (type: ApiEventType) => {
     switch (type) {
-      case 'exhibition': return Palette;
-      case 'gala': return Star;
-      case 'masterclass': return Sparkles;
-      case 'launch': return Gem;
-      case 'experience': return Crown;
+      case 'exhibitions': return Palette;
+      case 'galas': return Star;
+      case 'masterclasses': return Sparkles;
+      case 'launches': return Gem;
+      case 'experiences': return Crown;
     }
   };
 
-  const getTypeBadge = (type: ExclusiveEventType) => {
+  const getTypeBadge = (type: ApiEventType) => {
     switch (type) {
-      case 'exhibition': return 'bg-info/10 text-info';
-      case 'gala': return 'bg-gold-soft/20 text-gold-deep';
-      case 'masterclass': return 'bg-purple-100 text-purple-700';
-      case 'launch': return 'bg-green-100 text-green-700';
-      case 'experience': return 'bg-champagne/30 text-gold-muted';
+      case 'exhibitions': return 'bg-info/10 text-info';
+      case 'galas': return 'bg-gold-soft/20 text-gold-deep';
+      case 'masterclasses': return 'bg-purple-100 text-purple-700';
+      case 'launches': return 'bg-green-100 text-green-700';
+      case 'experiences': return 'bg-champagne/30 text-gold-muted';
     }
   };
 
-  const getRegStatusBadge = (status: ExclusiveEvent['registrationStatus']) => {
-    switch (status) {
-      case 'open': return 'bg-success/10 text-success';
-      case 'registered': return 'bg-info/10 text-info';
-      case 'waitlist': return 'bg-warning/10 text-warning';
-      case 'closed': return 'bg-stone/10 text-stone';
+  const handleJoin = async (event: ApiExclusiveEvent) => {
+    if (event.is_already_joined || event.spots === 0 || joiningId) return;
+    setJoiningId(event.uhni_exclusive_event_id);
+    try {
+      const updated = await joinExclusiveEvent(event.uhni_exclusive_event_id);
+      setExclusiveEvents(prev =>
+        prev.map(e => e.uhni_exclusive_event_id === updated.uhni_exclusive_event_id ? updated : e)
+      );
+      showToast(`You've joined "${event.title}"`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to join event';
+      showToast(msg, 'error');
+    } finally {
+      setJoiningId(null);
     }
-  };
-
-  const getRegStatusLabel = (status: ExclusiveEvent['registrationStatus']) => {
-    switch (status) {
-      case 'open': return 'Registration Open';
-      case 'registered': return 'You\'re Registered';
-      case 'waitlist': return 'Waitlist';
-      case 'closed': return 'Closed';
-    }
-  };
-
-  const handleRegister = (event: ExclusiveEvent) => {
-    setExclusiveEvents(prev => prev.map(e =>
-      e.id === event.id
-        ? { ...e, registrationStatus: 'registered' as const, spotsLeft: Math.max(0, e.spotsLeft - 1) }
-        : e
-    ));
-    showToast(`Registration confirmed for ${event.title}`, 'success');
   };
 
   // ─── Private Shopping helpers ───
   const filteredShopping = shoppingEvents.filter(event => {
     if (shoppingFilter === 'all') return true;
-    if (shoppingFilter === 'upcoming') return event.status === 'upcoming' || event.status === 'invite_only';
-    if (shoppingFilter === 'confirmed') return event.status === 'rsvp_confirmed';
-    if (shoppingFilter === 'completed') return event.status === 'completed';
-    return true;
+    return event.private_shopping_status === shoppingFilter;
   });
 
-  const getShoppingStatusBadge = (status: PrivateShoppingEvent['status']) => {
+  const getShoppingStatusBadge = (status: ApiPrivateShoppingStatus) => {
     switch (status) {
       case 'upcoming': return 'bg-info/10 text-info';
-      case 'rsvp_confirmed': return 'bg-success/10 text-success';
       case 'completed': return 'bg-stone/10 text-stone';
-      case 'invite_only': return 'bg-gold-soft/20 text-gold-deep';
     }
   };
 
-  const getShoppingStatusLabel = (status: PrivateShoppingEvent['status']) => {
+  const getShoppingStatusLabel = (status: ApiPrivateShoppingStatus) => {
     switch (status) {
       case 'upcoming': return 'Upcoming';
-      case 'rsvp_confirmed': return 'RSVP Confirmed';
       case 'completed': return 'Completed';
-      case 'invite_only': return 'Invite Only';
     }
   };
 
-  const handleRSVP = (event: PrivateShoppingEvent) => {
-    setShoppingEvents(prev => prev.map(e =>
-      e.id === event.id
-        ? { ...e, status: 'rsvp_confirmed' as const, guestsConfirmed: e.guestsConfirmed + 1 }
-        : e
-    ));
-    showToast(`RSVP confirmed for ${event.title}`, 'success');
+  const handleJoinShopping = async (event: ApiPrivateShoppingEvent) => {
+    if (event.is_already_joined || event.spots === 0 || joiningShoppingId) return;
+    setJoiningShoppingId(event.private_shopping_event_id);
+    try {
+      const updated = await joinPrivateShoppingEvent(event.private_shopping_event_id);
+      setShoppingEvents(prev =>
+        prev.map(e => e.private_shopping_event_id === updated.private_shopping_event_id ? updated : e)
+      );
+      showToast(`You've joined "${event.title}"`, 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to join event';
+      showToast(msg, 'error');
+    } finally {
+      setJoiningShoppingId(null);
+    }
   };
 
   // ─── Shared ───
@@ -152,13 +158,13 @@ export default function EventsPage() {
     });
   };
 
-  const exclusiveTypeFilters: { value: 'all' | ExclusiveEventType; label: string }[] = [
+  const exclusiveTypeFilters: { value: 'all' | ApiEventType; label: string }[] = [
     { value: 'all', label: 'All Events' },
-    { value: 'exhibition', label: 'Exhibitions' },
-    { value: 'gala', label: 'Galas' },
-    { value: 'masterclass', label: 'Masterclasses' },
-    { value: 'launch', label: 'Launches' },
-    { value: 'experience', label: 'Experiences' },
+    { value: 'exhibitions', label: 'Exhibitions' },
+    { value: 'galas', label: 'Galas' },
+    { value: 'masterclasses', label: 'Masterclasses' },
+    { value: 'launches', label: 'Launches' },
+    { value: 'experiences', label: 'Experiences' },
   ];
 
   const tabs: { key: Tab; label: string; count: number }[] = [
@@ -245,30 +251,42 @@ export default function EventsPage() {
             {/* Events list */}
             <div className="space-y-6">
               {filteredExclusive.map(event => {
-                const TypeIcon = getTypeIcon(event.type);
+                const TypeIcon = getTypeIcon(event.event_type);
+                const isJoining = joiningId === event.uhni_exclusive_event_id;
+                const noSpots = event.spots === 0;
                 return (
-                  <div key={event.id} className="bg-white border border-sand/30">
+                  <div key={event.uhni_exclusive_event_id} className="bg-white border border-sand/30">
                     <div className="p-8">
                       <div className="flex items-start justify-between mb-6">
                         <div>
                           <div className="flex items-center gap-3 mb-3">
-                            <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getTypeBadge(event.type)}`}>
+                            <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getTypeBadge(event.event_type)}`}>
                               <TypeIcon size={12} className="inline mr-1" />
-                              {event.type}
+                              {EVENT_TYPE_LABELS[event.event_type]}
                             </span>
-                            <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getRegStatusBadge(event.registrationStatus)}`}>
-                              {getRegStatusLabel(event.registrationStatus)}
-                            </span>
+                            {event.is_already_joined && (
+                              <span className="px-3 py-1 text-[10px] tracking-[0.15em] uppercase bg-success/10 text-success flex items-center gap-1">
+                                <CheckCircle size={11} />
+                                Joined
+                              </span>
+                            )}
+                            {noSpots && !event.is_already_joined && (
+                              <span className="px-3 py-1 text-[10px] tracking-[0.15em] uppercase bg-stone/10 text-stone">
+                                Full
+                              </span>
+                            )}
                           </div>
                           <h3 className="font-display text-2xl text-charcoal-deep mb-1">{event.title}</h3>
-                          <p className="text-sm text-stone">Hosted by {event.host}</p>
+                          <p className="text-sm text-stone italic">{event.tagline}</p>
                         </div>
-                        {event.registrationStatus === 'open' && (
+                        {!event.is_already_joined && !noSpots && (
                           <button
-                            onClick={() => handleRegister(event)}
-                            className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase flex-shrink-0"
+                            onClick={() => handleJoin(event)}
+                            disabled={isJoining}
+                            className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase flex-shrink-0 flex items-center gap-2 disabled:opacity-60"
                           >
-                            Register
+                            {isJoining && <Loader2 size={14} className="animate-spin" />}
+                            Join
                           </button>
                         )}
                       </div>
@@ -280,7 +298,7 @@ export default function EventsPage() {
                           <Calendar size={16} className="text-stone" />
                           <div>
                             <p className="text-xs text-stone">Date</p>
-                            <p className="text-sm text-charcoal-deep">{formatDate(event.date)}</p>
+                            <p className="text-sm text-charcoal-deep">{event.date_day}, {formatDate(event.date)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -294,14 +312,16 @@ export default function EventsPage() {
                           <MapPin size={16} className="text-stone" />
                           <div>
                             <p className="text-xs text-stone">Location</p>
-                            <p className="text-sm text-charcoal-deep">{event.venue}, {event.city}</p>
+                            <p className="text-sm text-charcoal-deep">{event.location}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Users size={16} className="text-stone" />
                           <div>
                             <p className="text-xs text-stone">Availability</p>
-                            <p className="text-sm text-charcoal-deep">{event.spotsLeft} spots left</p>
+                            <p className={`text-sm ${noSpots ? 'text-error' : 'text-charcoal-deep'}`}>
+                              {noSpots ? 'No spots left' : `${event.spots} spots left`}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -338,7 +358,7 @@ export default function EventsPage() {
           <>
             {/* Filters */}
             <div className="flex items-center gap-2 mb-8">
-              {(['all', 'upcoming', 'confirmed', 'completed'] as const).map(f => (
+              {(['all', 'upcoming', 'completed'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setShoppingFilter(f)}
@@ -353,32 +373,43 @@ export default function EventsPage() {
 
             {/* Shopping events list */}
             <div className="space-y-6">
-              {filteredShopping.map(event => (
-                <div key={event.id} className="bg-white border border-sand/30">
+              {filteredShopping.map(event => {
+                const isJoiningThis = joiningShoppingId === event.private_shopping_event_id;
+                const noSpots = event.spots === 0;
+                const isCompleted = event.private_shopping_status === 'completed';
+                return (
+                <div key={event.private_shopping_event_id} className="bg-white border border-sand/30">
                   <div className="p-8">
                     <div className="flex items-start justify-between mb-6">
                       <div>
                         <div className="flex items-center gap-3 mb-2">
-                          <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getShoppingStatusBadge(event.status)}`}>
-                            {getShoppingStatusLabel(event.status)}
+                          <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getShoppingStatusBadge(event.private_shopping_status)}`}>
+                            {getShoppingStatusLabel(event.private_shopping_status)}
                           </span>
-                          <span className="text-xs text-stone">{event.designer}</span>
+                          {event.is_already_joined && (
+                            <span className="px-3 py-1 text-[10px] tracking-[0.15em] uppercase bg-success/10 text-success flex items-center gap-1">
+                              <CheckCircle size={11} />
+                              Joined
+                            </span>
+                          )}
+                          {noSpots && !event.is_already_joined && (
+                            <span className="px-3 py-1 text-[10px] tracking-[0.15em] uppercase bg-stone/10 text-stone">
+                              Full
+                            </span>
+                          )}
                         </div>
-                        <h3 className="font-display text-2xl text-charcoal-deep">{event.title}</h3>
+                        <h3 className="font-display text-2xl text-charcoal-deep mb-1">{event.title}</h3>
+                        <p className="text-sm text-stone italic">{event.tagline}</p>
                       </div>
-                      {event.status !== 'completed' && event.status !== 'rsvp_confirmed' && (
+                      {!isCompleted && !event.is_already_joined && !noSpots && (
                         <button
-                          onClick={() => handleRSVP(event)}
-                          className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase"
+                          onClick={() => handleJoinShopping(event)}
+                          disabled={isJoiningThis}
+                          className="px-6 py-3 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase flex-shrink-0 flex items-center gap-2 disabled:opacity-60"
                         >
-                          RSVP
+                          {isJoiningThis && <Loader2 size={14} className="animate-spin" />}
+                          Join
                         </button>
-                      )}
-                      {event.status === 'rsvp_confirmed' && (
-                        <span className="flex items-center gap-2 text-sm text-success">
-                          <CheckCircle size={16} />
-                          Confirmed
-                        </span>
                       )}
                     </div>
 
@@ -389,51 +420,54 @@ export default function EventsPage() {
                         <Calendar size={16} className="text-stone" />
                         <div>
                           <p className="text-xs text-stone">Date</p>
-                          <p className="text-sm text-charcoal-deep">{formatDate(event.date)}</p>
+                          <p className="text-sm text-charcoal-deep">{event.date_day}, {formatDate(event.date)}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Clock size={16} className="text-stone" />
                         <div>
                           <p className="text-xs text-stone">Time</p>
-                          <p className="text-sm text-charcoal-deep">{event.time} ({event.duration})</p>
+                          <p className="text-sm text-charcoal-deep">{event.time}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <MapPin size={16} className="text-stone" />
                         <div>
-                          <p className="text-xs text-stone">Venue</p>
-                          <p className="text-sm text-charcoal-deep">{event.venue}, {event.city}</p>
+                          <p className="text-xs text-stone">Location</p>
+                          <p className="text-sm text-charcoal-deep">{event.location}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Users size={16} className="text-stone" />
                         <div>
-                          <p className="text-xs text-stone">Guests</p>
-                          <p className="text-sm text-charcoal-deep">{event.guestsConfirmed}/{event.maxGuests} confirmed</p>
+                          <p className="text-xs text-stone">Availability</p>
+                          <p className={`text-sm ${noSpots ? 'text-error' : 'text-charcoal-deep'}`}>
+                            {noSpots ? 'No spots left' : `${event.spots} spots left`}
+                          </p>
                         </div>
                       </div>
                     </div>
 
-                    {event.dressCode && (
+                    {event.dress_code && (
                       <p className="text-xs text-stone mb-4">
-                        <span className="tracking-wider uppercase">Dress Code:</span> {event.dressCode}
+                        <span className="tracking-wider uppercase">Dress Code:</span> {event.dress_code}
                       </p>
                     )}
 
                     <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Perks</p>
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Highlights</p>
                       <div className="flex flex-wrap gap-2">
-                        {event.perks.map(perk => (
-                          <span key={perk} className="px-3 py-1.5 bg-parchment text-xs text-charcoal-deep">
-                            {perk}
+                        {event.highlights.map(h => (
+                          <span key={h} className="px-3 py-1.5 bg-parchment text-xs text-charcoal-deep">
+                            {h}
                           </span>
                         ))}
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
 
             {filteredShopping.length === 0 && isLoaded && (
