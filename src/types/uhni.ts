@@ -84,6 +84,11 @@ export interface SourcingOption {
   estimatedDelivery?: string;
   notes?: string;
   addedAt?: string;
+  negotiationStatus?: 'none' | 'negotiating' | 'counter_offered' | 'accepted' | 'declined';
+  proposedPrice?: number;
+  counterPrice?: number;
+  negotiationNote?: string;
+  counterNote?: string;
 }
 
 export interface SourcingMessage {

@@ -61,6 +61,8 @@ export interface SourcingTimelineStep {
   active: boolean;
 }
 
+export type NegotiationStatus = 'none' | 'negotiating' | 'counter_offered' | 'accepted' | 'declined';
+
 export interface SourcingOptionItem {
   id: string;
   title: string;
@@ -74,6 +76,11 @@ export interface SourcingOptionItem {
   estimatedDelivery: string;
   conciergeNote?: string;
   selected?: boolean;
+  negotiationStatus?: NegotiationStatus;
+  proposedPrice?: number;
+  counterPrice?: number;
+  negotiationNote?: string;
+  counterNote?: string;
 }
 
 export interface SourcingChatMessage {
@@ -225,6 +232,41 @@ const MOCK_REQUESTS: ApiSourcingRequest[] = [
     updated_at: '2026-03-11T15:00:00Z',
     brand_ids: ['hermes', 'dior'],
     brand_names: ['Hermès', 'Dior'],
+  },
+  {
+    sourcing_id: 'SR-007',
+    consumer_id: 'uhni-user',
+    looking_for: 'Van Cleef & Arpels Alhambra Necklace',
+    product_category: 'Jewelry',
+    description:
+      'Vintage Alhambra long necklace, 20 motifs, yellow gold with mother-of-pearl. New from boutique preferred.',
+    budget: '32000',
+    priority: 'standard',
+    deadline: '2026-05-01',
+    specifications:
+      'Vintage Alhambra, 20 motifs, Yellow gold, Mother-of-pearl, New with box & papers',
+    status: 'options_found',
+    created_at: '2026-02-20T09:00:00Z',
+    updated_at: '2026-03-10T14:00:00Z',
+    brand_ids: ['hermes', 'bottega-veneta'],
+    brand_names: ['Hermès', 'Bottega Veneta'],
+  },
+  {
+    sourcing_id: 'SR-008',
+    consumer_id: 'uhni-user',
+    looking_for: 'Loro Piana Cashmere Overcoat',
+    product_category: 'Ready-to-Wear',
+    description:
+      'Seeking a Loro Piana baby cashmere overcoat in camel. Was available last season but sold out before I could purchase.',
+    budget: '15000',
+    priority: 'standard',
+    deadline: '2026-04-15',
+    specifications: 'Baby cashmere, Camel colour, Size 50 IT, Double-breasted preferred',
+    status: 'cancelled',
+    created_at: '2026-01-05T10:00:00Z',
+    updated_at: '2026-02-15T09:00:00Z',
+    brand_ids: ['bottega-veneta'],
+    brand_names: ['Bottega Veneta'],
   },
 ];
 
@@ -464,6 +506,9 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
         estimatedDelivery: '3-5 business days (insured)',
         conciergeNote:
           'Full set with box, papers, and original receipt dated Sept 2021. Excellent condition — worn sparingly. Our top recommendation.',
+        negotiationStatus: 'negotiating',
+        proposedPrice: 165000,
+        negotiationNote: 'Would you consider €165K for the 2021 full set? I believe this is a fair price given the current market for 5711s.',
       },
       {
         id: 'opt-003-b',
@@ -477,6 +522,11 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
         estimatedDelivery: '5-7 business days (insured)',
         conciergeNote:
           'From a private collector in Geneva. 2020 production, full set. Slight bracelet stretch typical of regular wear. Serviced by Patek in 2024.',
+        negotiationStatus: 'counter_offered',
+        proposedPrice: 155000,
+        counterPrice: 163000,
+        negotiationNote: 'Interested at €155K — the bracelet stretch is a consideration.',
+        counterNote: 'We can offer €163K which reflects the recent Patek service and full set provenance. This is our best price for this piece.',
       },
       {
         id: 'opt-003-c',
@@ -612,6 +662,10 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
         conciergeNote:
           'A stunning 1930s Malle Courrier professionally restored by the Louis Vuitton heritage workshop. Monogram canvas in excellent condition, brass hardware re-polished, interior fully reconditioned.',
         selected: true,
+        negotiationStatus: 'accepted',
+        proposedPrice: 35000,
+        negotiationNote: 'Would you consider €35K for the vintage piece?',
+        counterNote: 'We accept €35,000 — a wonderful choice. This piece has extraordinary provenance.',
       },
       {
         id: 'opt-005-b',
@@ -693,6 +747,144 @@ const MOCK_ENRICHMENT: Record<string, MockEnrichment> = {
       },
     ],
   },
+  'SR-007': {
+    conciergeAssigned: 'Isabella Martinez',
+    timeline_dates: {
+      pending: '2026-02-20',
+      sourcing: '2026-02-22',
+      options_found: '2026-03-10',
+    },
+    options: [
+      {
+        id: 'opt-007-a',
+        title: 'Vintage Alhambra 20 Motifs — Boutique Stock',
+        brandName: 'Hermès',
+        source: 'Van Cleef & Arpels — Place Vendôme',
+        sourceLocation: 'Paris, France',
+        condition: 'new',
+        price: 30800,
+        currency: 'EUR',
+        estimatedDelivery: '5-7 business days',
+        conciergeNote:
+          'Current boutique stock, brand new with full packaging. Classic mother-of-pearl on yellow gold.',
+        // No negotiation — clean option to select or negotiate
+      },
+      {
+        id: 'opt-007-b',
+        title: 'Vintage Alhambra 20 Motifs — Pre-owned Mint',
+        brandName: 'Bottega Veneta',
+        source: 'Collector Boutique',
+        sourceLocation: 'Geneva, Switzerland',
+        condition: 'like_new',
+        price: 26500,
+        currency: 'EUR',
+        estimatedDelivery: '3-5 business days',
+        conciergeNote:
+          'Purchased in 2024, worn once. Complete set with box, papers, and original receipt.',
+        // Declined negotiation — client tried too low, brand rejected
+        negotiationStatus: 'declined',
+        proposedPrice: 20000,
+        negotiationNote: 'Could you do €20K? That seems fair for pre-owned.',
+        counterNote: 'We cannot accommodate this discount on a near-new piece. The piece is priced competitively already at 14% below retail.',
+      },
+    ],
+    messages: [
+      {
+        id: 'm007-1',
+        sender: 'system',
+        senderName: 'System',
+        content: 'Sourcing request submitted for Van Cleef & Arpels Alhambra Necklace.',
+        timestamp: '2026-02-20T09:00:00Z',
+      },
+      {
+        id: 'm007-2',
+        sender: 'concierge',
+        senderName: 'Isabella Martinez',
+        content:
+          "Beautiful choice! The Vintage Alhambra is one of Van Cleef's most iconic pieces. I'll check boutique availability and our pre-owned network.",
+        timestamp: '2026-02-20T12:00:00Z',
+      },
+      {
+        id: 'm007-3',
+        sender: 'client',
+        senderName: 'You',
+        content:
+          "I'd prefer new from boutique if possible, but happy to consider pre-owned if the price is right.",
+        timestamp: '2026-02-21T10:00:00Z',
+      },
+      {
+        id: 'm007-4',
+        sender: 'concierge',
+        senderName: 'Isabella Martinez',
+        content:
+          "I've found two options — one new from the Place Vendôme boutique and a near-mint pre-owned from Geneva. The pre-owned piece is a great value at €26,500 vs the €30,800 retail. Please review!",
+        timestamp: '2026-03-10T14:00:00Z',
+      },
+      {
+        id: 'm007-5',
+        sender: 'system',
+        senderName: 'System',
+        content: 'Price negotiation for "Vintage Alhambra 20 Motifs — Pre-owned Mint" was declined by the brand.',
+        timestamp: '2026-03-11T09:00:00Z',
+      },
+      {
+        id: 'm007-6',
+        sender: 'concierge',
+        senderName: 'Isabella Martinez',
+        content:
+          "The Geneva seller couldn't go lower than €26,500 — it's already well below retail. You still have the boutique option at full retail, or you can select the pre-owned at the listed price. What would you prefer?",
+        timestamp: '2026-03-11T10:00:00Z',
+      },
+    ],
+  },
+  'SR-008': {
+    conciergeAssigned: 'Isabella Martinez',
+    timeline_dates: {
+      pending: '2026-01-05',
+      sourcing: '2026-01-08',
+    },
+    options: [],
+    messages: [
+      {
+        id: 'm008-1',
+        sender: 'system',
+        senderName: 'System',
+        content: 'Sourcing request submitted for Loro Piana Cashmere Overcoat.',
+        timestamp: '2026-01-05T10:00:00Z',
+      },
+      {
+        id: 'm008-2',
+        sender: 'concierge',
+        senderName: 'Isabella Martinez',
+        content:
+          "I'll reach out to Loro Piana directly. The baby cashmere overcoat in camel was indeed a popular piece last season.",
+        timestamp: '2026-01-05T14:00:00Z',
+      },
+      {
+        id: 'm008-3',
+        sender: 'concierge',
+        senderName: 'Isabella Martinez',
+        content:
+          "Unfortunately, Loro Piana confirms the camel baby cashmere overcoat is completely sold out worldwide with no restock planned. However, they're releasing a very similar piece in their Fall 2026 collection. Would you like me to secure a pre-order?",
+        timestamp: '2026-02-10T11:00:00Z',
+      },
+      {
+        id: 'm008-4',
+        sender: 'client',
+        senderName: 'You',
+        content:
+          "That's disappointing. I'll wait for the Fall collection then. Please cancel this request for now.",
+        timestamp: '2026-02-15T09:00:00Z',
+      },
+      {
+        id: 'm008-5',
+        sender: 'system',
+        senderName: 'System',
+        content: 'Sourcing request cancelled by client.',
+        timestamp: '2026-02-15T09:00:00Z',
+      },
+    ],
+  },
 };
 
 // ── Enrich a request with timeline, options, messages ──────────────────
@@ -718,16 +910,92 @@ export function enrichSourcingRequest(
   };
 }
 
+// ── localStorage helpers (demo persistence) ─────────────────────────
+
+const LS_CREATED_KEY = 'moda-sourcing-created';
+const LS_ENRICHMENT_KEY = 'moda-sourcing-enrichment';
+
+function getLocalRequests(): ApiSourcingRequest[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem(LS_CREATED_KEY) || '[]');
+  } catch { return []; }
+}
+
+function saveLocalRequests(requests: ApiSourcingRequest[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LS_CREATED_KEY, JSON.stringify(requests));
+}
+
+function getLocalEnrichment(): Record<string, MockEnrichment> {
+  if (typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(localStorage.getItem(LS_ENRICHMENT_KEY) || '{}');
+  } catch { return {}; }
+}
+
+function saveLocalEnrichment(data: Record<string, MockEnrichment>) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LS_ENRICHMENT_KEY, JSON.stringify(data));
+}
+
+/** Save the full enriched state of a request (for detail page persistence) */
+export function saveSourcingState(req: EnrichedSourcingRequest) {
+  // Update the base request in local storage
+  const localReqs = getLocalRequests();
+  const idx = localReqs.findIndex(r => r.sourcing_id === req.sourcing_id);
+  const base: ApiSourcingRequest = {
+    sourcing_id: req.sourcing_id,
+    consumer_id: req.consumer_id,
+    looking_for: req.looking_for,
+    product_category: req.product_category,
+    description: req.description,
+    budget: req.budget,
+    priority: req.priority,
+    deadline: req.deadline,
+    specifications: req.specifications,
+    status: req.status,
+    created_at: req.created_at,
+    updated_at: new Date().toISOString(),
+    brand_ids: req.brand_ids,
+    brand_names: req.brand_names,
+  };
+  if (idx >= 0) {
+    localReqs[idx] = base;
+  } else {
+    // Also check if it's a mock request that was modified
+    localReqs.push(base);
+  }
+  saveLocalRequests(localReqs);
+
+  // Save enrichment
+  const enrichments = getLocalEnrichment();
+  enrichments[req.sourcing_id] = {
+    conciergeAssigned: req.conciergeAssigned || 'Isabella Martinez',
+    timeline_dates: Object.fromEntries(
+      req.timeline.filter(s => s.date).map(s => [s.status, s.date!]),
+    ),
+    options: req.options,
+    messages: req.messages,
+  };
+  saveLocalEnrichment(enrichments);
+}
+
 // ── API Functions ─────────────────────────────────────────────────────
 
 export async function getProductCategories(): Promise<string[]> {
-  const res = await fetch(
-    '/api/v1/consumer/sourcing-requests/product-categories',
-    { headers: authHeaders() },
-  );
-  if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`);
-  const data = await res.json();
-  return data.product_categories as string[];
+  try {
+    const res = await fetch(
+      '/api/v1/consumer/sourcing-requests/product-categories',
+      { headers: authHeaders() },
+    );
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    return data.product_categories as string[];
+  } catch {
+    // Fallback categories for demo
+    return ['Handbags', 'Ready-to-Wear', 'Watches', 'Jewelry', 'Shoes', 'Accessories', 'Trunks & Travel', 'Complete Looks', 'Fine Art', 'Home & Living'];
+  }
 }
 
 export async function getSourcingRequests(): Promise<ApiSourcingRequest[]> {
@@ -739,20 +1007,106 @@ export async function getSourcingRequests(): Promise<ApiSourcingRequest[]> {
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) return data;
   } catch {
-    // API unavailable — fall back to mock data
+    // API unavailable — fall back to mock + local data
   }
-  return [...MOCK_REQUESTS];
+  // Merge mock data with locally created/modified requests
+  const local = getLocalRequests();
+  const mockCopy = [...MOCK_REQUESTS];
+  // Local overrides mock (for modified mock requests) and adds new ones
+  for (const lr of local) {
+    const idx = mockCopy.findIndex(m => m.sourcing_id === lr.sourcing_id);
+    if (idx >= 0) {
+      mockCopy[idx] = lr; // override mock with local changes
+    } else {
+      mockCopy.unshift(lr); // new request at top
+    }
+  }
+  return mockCopy;
+}
+
+/** Override enrichment: local enrichment takes priority over built-in mock */
+export function enrichSourcingRequestWithLocal(
+  req: ApiSourcingRequest,
+): EnrichedSourcingRequest {
+  const localEnrichments = getLocalEnrichment();
+  const local = localEnrichments[req.sourcing_id];
+  if (local) {
+    return {
+      ...req,
+      timeline: buildTimeline(req.status, local.timeline_dates),
+      options: local.options,
+      messages: local.messages,
+      conciergeAssigned: local.conciergeAssigned,
+    };
+  }
+  return enrichSourcingRequest(req);
 }
 
 export async function createSourcingRequest(
   payload: CreateSourcingRequestPayload,
 ): Promise<ApiSourcingRequest> {
-  const res = await fetch('/api/v1/consumer/sourcing-requests', {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok)
-    throw new Error(`Failed to create sourcing request: ${res.status}`);
-  return res.json();
+  try {
+    const res = await fetch('/api/v1/consumer/sourcing-requests', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return res.json();
+  } catch {
+    // API unavailable — create locally for demo
+    const now = new Date().toISOString();
+    const id = `SR-${String(Date.now()).slice(-6)}`;
+    const newReq: ApiSourcingRequest = {
+      sourcing_id: id,
+      consumer_id: 'uhni-user',
+      looking_for: payload.looking_for,
+      product_category: payload.product_category,
+      description: payload.description,
+      budget: payload.budget,
+      priority: payload.priority,
+      deadline: payload.deadline,
+      specifications: payload.specifications,
+      status: 'pending',
+      created_at: now,
+      updated_at: now,
+      brand_ids: payload.brand_ids,
+      brand_names: payload.brand_ids?.map(bid => {
+        const nameMap: Record<string, string> = {
+          dior: 'Dior', gucci: 'Gucci', hermes: 'Hermès',
+          'louis-vuitton': 'Louis Vuitton', 'bottega-veneta': 'Bottega Veneta',
+        };
+        return nameMap[bid] || bid;
+      }),
+    };
+    // Save to localStorage
+    const existing = getLocalRequests();
+    existing.unshift(newReq);
+    saveLocalRequests(existing);
+    // Save initial enrichment with welcome message
+    const enrichments = getLocalEnrichment();
+    enrichments[id] = {
+      conciergeAssigned: 'Isabella Martinez',
+      timeline_dates: { pending: now.split('T')[0] },
+      options: [],
+      messages: [
+        {
+          id: `msg-${Date.now()}-1`,
+          sender: 'system',
+          senderName: 'System',
+          content: `Sourcing request submitted for ${payload.looking_for}.`,
+          timestamp: now,
+        },
+        {
+          id: `msg-${Date.now()}-2`,
+          sender: 'concierge',
+          senderName: 'Isabella Martinez',
+          content: `Thank you for your request! I'll begin reaching out to our brand partners to source "${payload.looking_for}" for you. I'll have an initial update within 48 hours.`,
+          timestamp: new Date(Date.now() + 60000).toISOString(),
+        },
+      ],
+    };
+    saveLocalEnrichment(enrichments);
+    return newReq;
+  }
 }

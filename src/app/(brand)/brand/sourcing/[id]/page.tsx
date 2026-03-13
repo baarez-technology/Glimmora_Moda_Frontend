@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { writeBrandNegotiationResponse } from '@/lib/shared-sourcing-store';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -17,7 +18,11 @@ import {
   Trash2,
   Plus,
   Check,
-  Send
+  Send,
+  Tag,
+  ArrowRight,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
@@ -72,6 +77,7 @@ export default function SourcingRequestDetailPage() {
     submitSourcingOption,
     updateSourcingStatus,
     addSourcingOption,
+    updateSourcingOption,
     removeSourcingOption,
     sendSourcingMessage,
   } = useBrand();
@@ -79,6 +85,9 @@ export default function SourcingRequestDetailPage() {
   const [showSubmitForm, setShowSubmitForm] = useState(false);
   const [showAddOptionForm, setShowAddOptionForm] = useState(false);
   const [statusNote, setStatusNote] = useState('');
+  const [counterFormId, setCounterFormId] = useState<string | null>(null);
+  const [counterPrice, setCounterPrice] = useState('');
+  const [counterMessage, setCounterMessage] = useState('');
 
   // Legacy submit form
   const [legacyForm, setLegacyForm] = useState({
@@ -198,6 +207,44 @@ export default function SourcingRequestDetailPage() {
   const handleStatusUpdate = (newStatus: string) => {
     updateSourcingStatus(requestId, newStatus as SourcingRequestStatus, statusNote || `Status updated to ${getStatusLabel(newStatus)}`);
     setStatusNote('');
+  };
+
+  const handleAcceptNegotiation = (optionId: string) => {
+    const option = request.foundOptions.find(o => o.id === optionId);
+    if (!option) return;
+    updateSourcingOption(requestId, optionId, {
+      negotiationStatus: 'accepted',
+      counterNote: 'We accept your proposed price. A pleasure doing business.',
+    });
+    sendSourcingMessage(requestId, `Negotiation accepted for "${option.title || option.customDescription}" at €${option.proposedPrice?.toLocaleString()}.`);
+    writeBrandNegotiationResponse(requestId, optionId, 'accept');
+  };
+
+  const handleSubmitCounter = (optionId: string) => {
+    const price = Number(counterPrice);
+    if (!price || price <= 0) return;
+    const option = request.foundOptions.find(o => o.id === optionId);
+    if (!option) return;
+    updateSourcingOption(requestId, optionId, {
+      negotiationStatus: 'counter_offered',
+      counterPrice: price,
+      counterNote: counterMessage || undefined,
+    });
+    sendSourcingMessage(requestId, `Counter offer of €${price.toLocaleString()} submitted for "${option.title || option.customDescription}".`);
+    writeBrandNegotiationResponse(requestId, optionId, 'counter', price, counterMessage || undefined);
+    setCounterFormId(null);
+    setCounterPrice('');
+    setCounterMessage('');
+  };
+
+  const handleDeclineNegotiation = (optionId: string) => {
+    const option = request.foundOptions.find(o => o.id === optionId);
+    if (!option) return;
+    updateSourcingOption(requestId, optionId, {
+      negotiationStatus: 'declined',
+    });
+    sendSourcingMessage(requestId, `Negotiation declined for "${option.title || option.customDescription}".`);
+    writeBrandNegotiationResponse(requestId, optionId, 'decline');
   };
 
   return (
@@ -459,58 +506,203 @@ export default function SourcingRequestDetailPage() {
                 {request.foundOptions.length > 0 && (
                   <div className="divide-y divide-sand/30">
                     {request.foundOptions.map(option => (
-                      <div key={option.id} className="p-6 flex items-start gap-4">
-                        {(option.imageUrl || (option.images && option.images.length > 0)) ? (
-                          <div className="w-20 h-20 bg-parchment flex-shrink-0">
-                            <img
-                              src={option.imageUrl || option.images[0]}
-                              alt={option.title || option.customDescription || 'Option'}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-20 h-20 bg-parchment flex-shrink-0 flex items-center justify-center">
-                            <ImageIcon size={24} className="text-taupe/40" />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-charcoal-deep">
-                                {option.title || option.customDescription || option.product?.name}
-                              </p>
-                              {option.brandName && (
-                                <p className="text-xs text-gold-muted tracking-[0.1em] uppercase">{option.brandName}</p>
-                              )}
-                              {(option.description || option.conciergeRecommendation) && (
-                                <p className="text-xs text-stone mt-1">{option.description || option.conciergeRecommendation}</p>
+                      <div key={option.id}>
+                        <div className="p-6 flex items-start gap-4">
+                          {(option.imageUrl || (option.images && option.images.length > 0)) ? (
+                            <div className="w-20 h-20 bg-parchment flex-shrink-0">
+                              <img
+                                src={option.imageUrl || option.images[0]}
+                                alt={option.title || option.customDescription || 'Option'}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-20 h-20 bg-parchment flex-shrink-0 flex items-center justify-center">
+                              <ImageIcon size={24} className="text-taupe/40" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <p className="text-sm font-medium text-charcoal-deep">
+                                    {option.title || option.customDescription || option.product?.name}
+                                  </p>
+                                  {option.negotiationStatus === 'negotiating' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gold-muted/10 text-gold-muted text-[10px] tracking-[0.1em] uppercase animate-pulse">
+                                      <Tag size={10} /> Negotiation Pending
+                                    </span>
+                                  )}
+                                  {option.negotiationStatus === 'counter_offered' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gold-soft/15 text-gold-muted text-[10px] tracking-[0.1em] uppercase">
+                                      <ArrowRight size={10} /> Counter Sent
+                                    </span>
+                                  )}
+                                  {option.negotiationStatus === 'accepted' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success text-[10px] tracking-[0.1em] uppercase">
+                                      <CheckCircle size={10} /> Price Agreed
+                                    </span>
+                                  )}
+                                  {option.negotiationStatus === 'declined' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-stone/10 text-stone text-[10px] tracking-[0.1em] uppercase">
+                                      <XCircle size={10} /> Declined
+                                    </span>
+                                  )}
+                                </div>
+                                {option.brandName && (
+                                  <p className="text-xs text-gold-muted tracking-[0.1em] uppercase">{option.brandName}</p>
+                                )}
+                                {(option.description || option.conciergeRecommendation) && (
+                                  <p className="text-xs text-stone mt-1">{option.description || option.conciergeRecommendation}</p>
+                                )}
+                              </div>
+                              {request.selectedOptionId === option.id ? (
+                                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-success/10 text-success text-[10px] tracking-[0.1em] uppercase">
+                                  <Check size={12} />
+                                  Client Selected
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => removeSourcingOption(requestId, option.id)}
+                                  className="text-taupe hover:text-error transition-colors"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
                               )}
                             </div>
-                            {request.selectedOptionId === option.id ? (
-                              <span className="flex items-center gap-1.5 px-2 py-0.5 bg-success/10 text-success text-[10px] tracking-[0.1em] uppercase">
-                                <Check size={12} />
-                                Client Selected
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => removeSourcingOption(requestId, option.id)}
-                                className="text-taupe hover:text-error transition-colors"
-                              >
-                                <Trash2 size={16} />
-                              </button>
+                            <div className="flex items-center gap-3 mt-2">
+                              <p className="text-lg font-medium text-charcoal-deep">{formatCurrency(option.price)}</p>
+                              {option.negotiationStatus === 'accepted' && option.proposedPrice && (
+                                <span className="text-xs text-success">Agreed: {formatCurrency(option.proposedPrice)}</span>
+                              )}
+                              <span className="text-xs text-stone">{option.sourceLocation || option.source}</span>
+                              {option.estimatedDelivery && (
+                                <span className="text-xs text-stone">Est: {option.estimatedDelivery}</span>
+                              )}
+                            </div>
+                            {option.notes && (
+                              <p className="text-xs text-stone italic mt-1">{option.notes}</p>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 mt-2">
-                            <p className="text-lg font-medium text-charcoal-deep">{formatCurrency(option.price)}</p>
-                            <span className="text-xs text-stone">{option.sourceLocation || option.source}</span>
-                            {option.estimatedDelivery && (
-                              <span className="text-xs text-stone">Est: {option.estimatedDelivery}</span>
-                            )}
-                          </div>
-                          {option.notes && (
-                            <p className="text-xs text-stone italic mt-1">{option.notes}</p>
-                          )}
                         </div>
+
+                        {/* Negotiation Response Panel */}
+                        {option.negotiationStatus === 'negotiating' && (
+                          <div className="mx-6 mb-6 border border-gold-muted/30 bg-gold-muted/5 p-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <AlertCircle size={14} className="text-gold-muted" />
+                              <p className="text-[10px] tracking-[0.2em] uppercase text-gold-muted">Client Price Negotiation</p>
+                            </div>
+                            <div className="flex items-center gap-4 mb-3">
+                              <div className="text-center">
+                                <p className="text-[9px] tracking-[0.1em] uppercase text-taupe mb-1">Listed</p>
+                                <p className="font-display text-sm text-charcoal-deep">{formatCurrency(option.price)}</p>
+                              </div>
+                              <ArrowRight size={16} className="text-taupe" />
+                              <div className="text-center">
+                                <p className="text-[9px] tracking-[0.1em] uppercase text-gold-muted mb-1">Client Offer</p>
+                                <p className="font-display text-sm text-gold-muted">{formatCurrency(option.proposedPrice || 0)}</p>
+                              </div>
+                              {option.proposedPrice && (
+                                <span className="text-[10px] text-stone">({Math.round((1 - option.proposedPrice / option.price) * 100)}% off)</span>
+                              )}
+                            </div>
+                            {option.negotiationNote && (
+                              <div className="bg-parchment/50 border-l-2 border-gold-soft/40 px-3 py-2 mb-4">
+                                <p className="text-xs text-stone italic">&ldquo;{option.negotiationNote}&rdquo;</p>
+                                <p className="text-[9px] text-taupe mt-1">— Client</p>
+                              </div>
+                            )}
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <button
+                                onClick={() => handleAcceptNegotiation(option.id)}
+                                className="px-4 py-2 bg-success/10 text-success text-[10px] tracking-[0.15em] uppercase hover:bg-success/20 transition-colors"
+                              >
+                                <span className="inline-flex items-center gap-1.5"><CheckCircle size={12} /> Accept {formatCurrency(option.proposedPrice || 0)}</span>
+                              </button>
+                              <button
+                                onClick={() => setCounterFormId(counterFormId === option.id ? null : option.id)}
+                                className="px-4 py-2 bg-gold-muted/10 text-gold-muted text-[10px] tracking-[0.15em] uppercase hover:bg-gold-muted/20 transition-colors"
+                              >
+                                <span className="inline-flex items-center gap-1.5"><Tag size={12} /> Counter Offer</span>
+                              </button>
+                              <button
+                                onClick={() => handleDeclineNegotiation(option.id)}
+                                className="px-4 py-2 bg-error/10 text-error text-[10px] tracking-[0.15em] uppercase hover:bg-error/20 transition-colors"
+                              >
+                                <span className="inline-flex items-center gap-1.5"><XCircle size={12} /> Decline</span>
+                              </button>
+                            </div>
+
+                            {/* Counter offer form */}
+                            {counterFormId === option.id && (
+                              <div className="mt-4 pt-4 border-t border-gold-muted/20 space-y-3">
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Counter Price *</label>
+                                    <div className="relative">
+                                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                                      <input
+                                        type="number"
+                                        value={counterPrice}
+                                        onChange={e => setCounterPrice(e.target.value)}
+                                        placeholder="0"
+                                        className="w-full pl-8 pr-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                                      />
+                                    </div>
+                                    {counterPrice && Number(counterPrice) > 0 && option.proposedPrice && (
+                                      <p className="text-[10px] text-taupe mt-1">
+                                        Between client&apos;s {formatCurrency(option.proposedPrice)} and listed {formatCurrency(option.price)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div>
+                                    <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Message (optional)</label>
+                                    <input
+                                      type="text"
+                                      value={counterMessage}
+                                      onChange={e => setCounterMessage(e.target.value)}
+                                      placeholder="Explain your counter..."
+                                      className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                                    />
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleSubmitCounter(option.id)}
+                                  disabled={!counterPrice || Number(counterPrice) <= 0}
+                                  className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-[10px] tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                  Submit Counter Offer
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Counter sent confirmation */}
+                        {option.negotiationStatus === 'counter_offered' && (
+                          <div className="mx-6 mb-6 bg-parchment/30 p-4 flex items-center gap-3">
+                            <ArrowRight size={14} className="text-gold-muted" />
+                            <div>
+                              <p className="text-xs text-charcoal-deep">
+                                Counter offer of <span className="font-medium">{formatCurrency(option.counterPrice || 0)}</span> sent to client.
+                              </p>
+                              {option.counterNote && <p className="text-[10px] text-stone italic mt-0.5">&ldquo;{option.counterNote}&rdquo;</p>}
+                              <p className="text-[10px] text-taupe mt-1">Awaiting client response...</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Accepted negotiation summary */}
+                        {option.negotiationStatus === 'accepted' && option.proposedPrice && (
+                          <div className="mx-6 mb-6 bg-success/5 border border-success/20 p-4 flex items-center gap-3">
+                            <CheckCircle size={14} className="text-success" />
+                            <p className="text-xs text-charcoal-deep">
+                              Price agreed at <span className="font-medium">{formatCurrency(option.proposedPrice)}</span>
+                              <span className="text-taupe ml-1">(listed: {formatCurrency(option.price)})</span>
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
