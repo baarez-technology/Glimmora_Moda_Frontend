@@ -11,6 +11,7 @@ import {
   getPricingTiers,
   getPricingSummary,
   acceptNegotiation,
+  declineNegotiation,
 } from '@/services/uhni.service';
 import type { NegotiationStatus, PriceNegotiation, UHNIPriceAlert, UHNIPricingTier, UHNIPricingSummary } from '@/types';
 import type { UHNIPriceOffer } from '@/types/uhni';
@@ -115,9 +116,14 @@ export default function PricingPage() {
     }
   };
 
-  const handleRejectOffer = (id: string) => {
-    respondToCounterOffer(id, 'reject');
-    setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status: 'declined' as NegotiationStatus } : n));
+  const handleRejectOffer = async (id: string) => {
+    try {
+      respondToCounterOffer(id, 'reject');
+      await declineNegotiation(id);
+      setNegotiations(prev => prev.map(n => n.id === id ? { ...n, status: 'declined' as NegotiationStatus } : n));
+    } catch {
+      showToast('Failed to decline offer', 'error');
+    }
   };
 
   // Offer helpers

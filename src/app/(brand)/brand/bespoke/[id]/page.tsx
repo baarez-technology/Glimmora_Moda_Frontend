@@ -28,7 +28,7 @@ import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/componen
 
 export default function BespokeOrderDetailPage() {
   const params = useParams();
-  const { getBespokeOrderById, updateBespokeOrderStatus, updateBespokeStatus, sendBespokeMessage, updateBespokePrice, partner } = useBrand();
+  const { getBespokeOrderById, updateBespokeOrderStatus, updateBespokeStatus, sendBespokeMessage, updateBespokePrice, updateBespokeTimelineDates, partner } = useBrand();
   const { showToast } = useApp();
   const [isUpdating, setIsUpdating] = useState(false);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
@@ -39,6 +39,9 @@ export default function BespokeOrderDetailPage() {
   const [priceInput, setPriceInput] = useState('');
   const [depositPctInput, setDepositPctInput] = useState('50');
   const [statusSuccess, setStatusSuccess] = useState(false);
+  const [editingTimeline, setEditingTimeline] = useState(false);
+  const [timelineDateEdits, setTimelineDateEdits] = useState<Record<string, string>>({});
+  const [completionDateInput, setCompletionDateInput] = useState('');
 
   const orderId = params.id as string;
   const order = getBespokeOrderById(orderId);
@@ -153,9 +156,13 @@ export default function BespokeOrderDetailPage() {
     if (priceInput && Number(priceInput) > 0) {
       updateBespokePrice(order.id, Number(priceInput), Number(depositPctInput) || 50);
     }
+    if (completionDateInput) {
+      updateBespokeTimelineDates(order.id, {}, completionDateInput);
+    }
     setSelectedNextStatus(null);
     setStatusNote('');
     setPriceInput('');
+    setCompletionDateInput('');
     setStatusSuccess(true);
     setTimeout(() => setStatusSuccess(false), 3000);
   };
@@ -217,30 +224,73 @@ export default function BespokeOrderDetailPage() {
             <div className="bg-white border border-sand/50">
               <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
                 <h2 className="font-medium text-charcoal-deep">Order Timeline</h2>
-                {/* Status Update Dropdown */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                    disabled={isUpdating}
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
-                  >
-                    Update Status <ChevronDown size={14} />
-                  </button>
-                  {showStatusDropdown && (
-                    <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-10">
-                      {statusOptions.map(status => (
-                        <button
-                          key={status}
-                          onClick={() => handleStatusUpdate(status)}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-parchment transition-colors ${
-                            order.status === status ? 'bg-parchment text-charcoal-deep' : 'text-stone'
-                          }`}
-                        >
-                          {getStatusLabel(status)}
-                        </button>
-                      ))}
-                    </div>
+                <div className="flex items-center gap-2">
+                  {/* Edit Dates Toggle */}
+                  {order.status !== 'complete' && (
+                    <button
+                      onClick={() => {
+                        if (editingTimeline) {
+                          // Save — send edits to context
+                          const hasEdits = Object.keys(timelineDateEdits).length > 0;
+                          if (hasEdits) {
+                            updateBespokeTimelineDates(order.id, timelineDateEdits);
+                            showToast('Timeline dates updated', 'success');
+                          }
+                          setTimelineDateEdits({});
+                        } else {
+                          // Prefill with current dates
+                          const current: Record<string, string> = {};
+                          order.timeline.forEach(step => {
+                            if (step.status !== 'completed' && step.estimatedDate) {
+                              current[step.id] = step.estimatedDate.split('T')[0];
+                            }
+                          });
+                          setTimelineDateEdits(current);
+                        }
+                        setEditingTimeline(!editingTimeline);
+                      }}
+                      className={`px-3 py-1.5 text-xs tracking-wide transition-colors ${
+                        editingTimeline
+                          ? 'bg-success/10 text-success hover:bg-success/20'
+                          : 'border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep'
+                      }`}
+                    >
+                      {editingTimeline ? 'Save Dates' : 'Edit Dates'}
+                    </button>
                   )}
+                  {editingTimeline && (
+                    <button
+                      onClick={() => { setEditingTimeline(false); setTimelineDateEdits({}); }}
+                      className="px-3 py-1.5 text-xs tracking-wide border border-sand text-stone hover:text-charcoal-deep transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                  {/* Status Update Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                      disabled={isUpdating}
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+                    >
+                      Update Status <ChevronDown size={14} />
+                    </button>
+                    {showStatusDropdown && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-sand shadow-lg z-10">
+                        {statusOptions.map(status => (
+                          <button
+                            key={status}
+                            onClick={() => handleStatusUpdate(status)}
+                            className={`w-full text-left px-4 py-2 text-sm hover:bg-parchment transition-colors ${
+                              order.status === status ? 'bg-parchment text-charcoal-deep' : 'text-stone'
+                            }`}
+                          >
+                            {getStatusLabel(status)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="p-6">
@@ -262,13 +312,28 @@ export default function BespokeOrderDetailPage() {
                           {step.title}
                         </p>
                         <p className="text-xs text-taupe mt-0.5">{step.description}</p>
-                        <p className="text-xs text-taupe mt-1">
-                          {step.completedAt
-                            ? `Completed: ${formatDate(step.completedAt)}`
-                            : step.estimatedDate
-                            ? `Estimated: ${formatDate(step.estimatedDate)}`
-                            : ''}
-                        </p>
+                        {/* Date display / edit */}
+                        {step.status === 'completed' ? (
+                          <p className="text-xs text-success mt-1">
+                            Completed: {formatDate(step.completedAt!)}
+                          </p>
+                        ) : editingTimeline ? (
+                          <div className="mt-1.5">
+                            <label className="text-[10px] text-taupe uppercase tracking-wider">Estimated Date</label>
+                            <input
+                              type="date"
+                              value={timelineDateEdits[step.id] || (step.estimatedDate ? step.estimatedDate.split('T')[0] : '')}
+                              onChange={e => setTimelineDateEdits(prev => ({ ...prev, [step.id]: e.target.value }))}
+                              className="block w-48 mt-0.5 border border-sand px-2 py-1 text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                            />
+                          </div>
+                        ) : step.estimatedDate ? (
+                          <p className="text-xs text-taupe mt-1">
+                            Estimated: {formatDate(step.estimatedDate)}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-taupe/50 mt-1 italic">No date set</p>
+                        )}
                         {step.notes && (
                           <p className="text-xs text-stone mt-1 italic">{step.notes}</p>
                         )}
@@ -504,6 +569,18 @@ export default function BespokeOrderDetailPage() {
                       </div>
                     </div>
                   )}
+                  <div>
+                    <p className="text-xs text-taupe mb-1">Estimated Completion</p>
+                    <input
+                      type="date"
+                      value={completionDateInput}
+                      onChange={e => setCompletionDateInput(e.target.value)}
+                      className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                    />
+                    <p className="text-[10px] text-taupe mt-1">
+                      Current: {formatDate(order.estimatedCompletion)}
+                    </p>
+                  </div>
                   <button
                     onClick={handleAdvancedStatusUpdate}
                     disabled={!selectedNextStatus}

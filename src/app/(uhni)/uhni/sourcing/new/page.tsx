@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Search, CheckCircle, X, ChevronDown } from 'lucide-react';
 import { getProductCategories, createSourcingRequest } from '@/services/sourcing.service';
-import * as brandService from '@/services/brand.service';
+import { getAllBrands } from '@/services/recommendation.service';
 import type { Brand } from '@/types';
 
 interface SelectedBrand {
@@ -44,11 +44,9 @@ export default function NewSourcingRequestPage() {
     getProductCategories()
       .then(setCategories)
       .catch(() => setCategories([]));
-    brandService.getAllBrands()
-      .then(res => {
-        if (res.success && res.data) setAllBrands(res.data);
-      })
-      .catch(() => {})
+    getAllBrands()
+      .then(brands => setAllBrands(brands))
+      .catch(() => setAllBrands([]))
       .finally(() => setBrandsLoading(false));
   }, []);
 
@@ -84,6 +82,8 @@ export default function NewSourcingRequestPage() {
     }));
   };
 
+  const [createdId, setCreatedId] = useState<string | null>(null);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.looking_for || !formData.product_category || !formData.description || !formData.budget) return;
@@ -94,7 +94,7 @@ export default function NewSourcingRequestPage() {
     setSubmitting(true);
     setError(null);
     try {
-      await createSourcingRequest({
+      const result = await createSourcingRequest({
         looking_for: formData.looking_for,
         product_category: formData.product_category,
         description: formData.description,
@@ -104,6 +104,7 @@ export default function NewSourcingRequestPage() {
         specifications: formData.specifications,
         brand_ids: formData.selectedBrands.map(b => b.id),
       });
+      setCreatedId(result.sourcing_id);
       setSubmitted(true);
     } catch {
       setError('Failed to submit request. Please try again.');
@@ -153,17 +154,19 @@ export default function NewSourcingRequestPage() {
               Brand partners will review your request and submit sourcing options — typically within 24-72 hours.
             </p>
             <div className="flex items-center justify-center gap-4">
+              {createdId && (
+                <Link
+                  href={`/uhni/sourcing/${createdId}`}
+                  className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                >
+                  View Request
+                </Link>
+              )}
               <Link
                 href="/uhni/sourcing"
-                className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                className={`px-6 py-3 text-sm tracking-[0.1em] uppercase transition-colors ${createdId ? 'border border-sand text-charcoal-deep hover:border-charcoal-deep' : 'bg-charcoal-deep text-ivory-cream hover:bg-noir'}`}
               >
-                View My Requests
-              </Link>
-              <Link
-                href="/uhni"
-                className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
-              >
-                Return to Dashboard
+                All Requests
               </Link>
             </div>
           </div>

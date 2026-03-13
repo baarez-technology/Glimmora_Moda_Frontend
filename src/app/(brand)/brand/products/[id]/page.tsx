@@ -755,22 +755,21 @@ export default function ProductDetailPage() {
             <section className="bg-white border border-sand/50 p-6">
               <div className="flex items-center justify-between border-b border-sand/50 pb-4 mb-6">
                 <h2 className="font-medium text-charcoal-deep">Regional Stock</h2>
-                <div className="flex items-center gap-2">
-                  {parsedStocks.length > 0 && (
-                    <button
-                      onClick={() => setIsRestockModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-                    >
-                      <Plus size={14} /> Restock
-                    </button>
-                  )}
+                {parsedStocks.length > 0 ? (
+                  <button
+                    onClick={() => setIsRestockModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                  >
+                    <Plus size={14} /> Restock
+                  </button>
+                ) : (
                   <button
                     onClick={() => setIsStockModalOpen(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-sand text-xs tracking-[0.1em] uppercase text-charcoal-deep hover:bg-parchment transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
                   >
-                    <Plus size={14} /> {parsedStocks.length > 0 ? 'Manage' : 'Add Stock'}
+                    <Plus size={14} /> Manage Stock
                   </button>
-                </div>
+                )}
               </div>
 
               {parsedStocks.length === 0 ? (
@@ -781,7 +780,7 @@ export default function ProductDetailPage() {
                     onClick={() => setIsStockModalOpen(true)}
                     className="mt-3 text-xs tracking-wider uppercase text-charcoal-deep hover:text-gold-muted transition-colors"
                   >
-                    + Add stock locations
+                    + Manage Stock
                   </button>
                 </div>
               ) : (
@@ -1000,6 +999,7 @@ export default function ProductDetailPage() {
           existingStocks={parsedStocks}
           onClose={() => setIsStockModalOpen(false)}
           onSave={handleStockSave}
+          isEditing={parsedStocks.length > 0}
         />
       )}
 
@@ -1024,11 +1024,13 @@ function StockModal({
   existingStocks,
   onClose,
   onSave,
+  isEditing,
 }: {
   productName: string;
   existingStocks: RegionalStockItem[];
   onClose: () => void;
   onSave: (stocks: RegionalStockAddPayload[]) => Promise<void>;
+  isEditing: boolean;
 }) {
   const [rows, setRows] = useState<RegionalStockAddPayload[]>(() =>
     existingStocks.map(s => ({
@@ -1095,7 +1097,7 @@ function StockModal({
         {/* Header */}
         <div className="flex items-center justify-between px-8 py-5 border-b border-sand/50">
           <div>
-            <h2 className="font-display text-xl text-charcoal-deep">Manage Stock</h2>
+            <h2 className="font-display text-xl text-charcoal-deep">{isEditing ? 'Edit Stock' : 'Manage Stock'}</h2>
             <p className="text-xs text-stone mt-1">{productName}</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-parchment transition-colors">
@@ -1277,7 +1279,7 @@ function StockModal({
             className="inline-flex items-center gap-2 px-6 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Check size={14} />
-            {isSaving ? 'Saving...' : 'Save Changes'}
+            {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Set Stock'}
           </button>
         </div>
       </div>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight, Crown, AlertTriangle, RefreshCw } from 'lucide-react';
-import { getRecommendedBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
+import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 function DiscoverContent() {
@@ -48,7 +48,7 @@ function DiscoverContent() {
     async function loadBrandsAndStories() {
       try {
         const [brandsResult, storiesResult] = await Promise.allSettled([
-          getRecommendedBrands(),
+          getAllBrands(),
           searchStories(),
         ]);
         setBrands(brandsResult.status === 'fulfilled' ? brandsResult.value : []);
@@ -216,7 +216,7 @@ function DiscoverContent() {
         <div className="max-w-[1400px] mx-auto px-8 md:px-16 lg:px-24">
           <div className="flex items-center gap-2 mb-4">
             <Crown size={14} className="text-gold-soft" />
-            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">Private Access</span>
+            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">Curated For You</span>
           </div>
           <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-6">
             Discover

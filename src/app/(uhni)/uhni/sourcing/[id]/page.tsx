@@ -27,7 +27,8 @@ import {
 import { useApp } from '@/context/AppContext';
 import {
   getSourcingRequests,
-  enrichSourcingRequest,
+  enrichSourcingRequestWithLocal,
+  saveSourcingState,
   type EnrichedSourcingRequest,
   type SourcingChatMessage,
   type SourcingOptionItem,
@@ -534,10 +535,35 @@ export default function SourcingDetailPage() {
     getSourcingRequests()
       .then((raw) => {
         const found = raw.find((r) => r.sourcing_id === id);
-        if (found) setRequest(enrichSourcingRequest(found));
+        if (found) setRequest(enrichSourcingRequestWithLocal(found));
       })
       .catch(() => {})
       .finally(() => setIsLoaded(true));
+  }, [id]);
+
+  // Persist all state changes to localStorage for demo flow
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    if (request) saveSourcingState(request);
+  }, [request]);
+
+  // Listen for brand-side localStorage changes (cross-tab sync)
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === 'moda-sourcing-enrichment' && id) {
+        // Re-load from localStorage to pick up brand-side changes (options, negotiations, messages)
+        getSourcingRequests().then((raw) => {
+          const found = raw.find((r) => r.sourcing_id === id);
+          if (found) {
+            isFirstRender.current = true; // prevent save loop
+            setRequest(enrichSourcingRequestWithLocal(found));
+          }
+        });
+      }
+    };
+    window.addEventListener('storage', handler);
+    return () => window.removeEventListener('storage', handler);
   }, [id]);
 
   const handleSendMessage = (content: string) => {
@@ -644,6 +670,120 @@ export default function SourcingDetailPage() {
         },
       ],
     });
+  };
+
+  // ── Simulate lifecycle progression (demo only) ──────────────────────
+  const simulateNext = () => {
+    if (!request) return;
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+
+    if (request.status === 'pending') {
+      setRequest({
+        ...request,
+        status: 'sourcing',
+        updated_at: now,
+        timeline: request.timeline.map((s) => {
+          if (s.status === 'pending') return { ...s, completed: true, active: false, date: s.date || today };
+          if (s.status === 'sourcing') return { ...s, active: true, date: today };
+          return s;
+        }),
+        messages: [
+          ...request.messages,
+          { id: `sim-${Date.now()}`, sender: 'system' as const, senderName: 'System', content: 'Brand partners are now actively sourcing your request.', timestamp: now },
+          { id: `sim-${Date.now() + 1}`, sender: 'concierge' as const, senderName: 'Isabella Martinez', content: "I've contacted our brand partners and they've begun searching. I'll keep you updated on their progress.", timestamp: new Date(Date.now() + 2000).toISOString() },
+        ],
+      });
+    } else if (request.status === 'sourcing') {
+      const brandNames = request.brand_names || ['Partner'];
+      setRequest({
+        ...request,
+        status: 'options_found',
+        updated_at: now,
+        timeline: request.timeline.map((s) => {
+          if (s.status === 'sourcing') return { ...s, completed: true, active: false, date: s.date || today };
+          if (s.status === 'options_found') return { ...s, active: true, date: today };
+          return s;
+        }),
+        options: [
+          {
+            id: `opt-new-1`,
+            title: `${request.looking_for} — Option A`,
+            brandName: brandNames[0],
+            source: `${brandNames[0]} Boutique`,
+            sourceLocation: 'Paris, France',
+            condition: 'new' as const,
+            price: Math.round(Number(request.budget) * 0.9),
+            currency: 'EUR',
+            estimatedDelivery: '5-7 business days',
+            conciergeNote: 'Excellent condition, direct from boutique. Our top recommendation.',
+          },
+          {
+            id: `opt-new-2`,
+            title: `${request.looking_for} — Option B`,
+            brandName: brandNames[brandNames.length > 1 ? 1 : 0],
+            source: 'Verified Pre-owned',
+            sourceLocation: 'London, UK',
+            condition: 'like_new' as const,
+            price: Math.round(Number(request.budget) * 0.75),
+            originalPrice: Math.round(Number(request.budget) * 0.9),
+            currency: 'EUR',
+            estimatedDelivery: '3-5 business days',
+            conciergeNote: 'Pre-owned in excellent condition. Great value option.',
+          },
+        ],
+        messages: [
+          ...request.messages,
+          { id: `sim-${Date.now()}`, sender: 'concierge' as const, senderName: 'Isabella Martinez', content: `Great news! Our brand partners have found 2 options for "${request.looking_for}". Please review them in the Options tab.`, timestamp: now },
+          { id: `sim-${Date.now() + 1}`, sender: 'system' as const, senderName: 'System', content: '2 sourcing options are now available for review.', timestamp: now },
+        ],
+      });
+      setActiveSection('options');
+    } else if (request.status === 'awaiting_approval') {
+      setRequest({
+        ...request,
+        status: 'acquired',
+        updated_at: now,
+        timeline: request.timeline.map((s) => {
+          if (s.status === 'awaiting_approval') return { ...s, completed: true, active: false, date: s.date || today };
+          if (s.status === 'acquired') return { ...s, active: true, date: today };
+          return s;
+        }),
+        messages: [
+          ...request.messages,
+          { id: `sim-${Date.now()}`, sender: 'system' as const, senderName: 'System', content: 'Item has been acquired! Preparing for delivery.', timestamp: now },
+          { id: `sim-${Date.now() + 1}`, sender: 'concierge' as const, senderName: 'Isabella Martinez', content: "Your item has been secured and is being prepared for white-glove delivery. I'll notify you with tracking details shortly.", timestamp: new Date(Date.now() + 2000).toISOString() },
+        ],
+      });
+      setActiveSection('messages');
+    } else if (request.status === 'acquired') {
+      setRequest({
+        ...request,
+        status: 'delivered',
+        updated_at: now,
+        timeline: request.timeline.map((s) => {
+          if (s.status === 'acquired') return { ...s, completed: true, active: false, date: s.date || today };
+          if (s.status === 'delivered') return { ...s, active: true, date: today };
+          return s;
+        }),
+        messages: [
+          ...request.messages,
+          { id: `sim-${Date.now()}`, sender: 'system' as const, senderName: 'System', content: 'Item delivered successfully. Sourcing request completed.', timestamp: now },
+          { id: `sim-${Date.now() + 1}`, sender: 'concierge' as const, senderName: 'Isabella Martinez', content: "Your item has been delivered! I hope you're delighted with it. Please don't hesitate to reach out if you need anything else.", timestamp: new Date(Date.now() + 2000).toISOString() },
+        ],
+      });
+      setActiveSection('messages');
+    }
+  };
+
+  const SIMULATE_LABELS: Record<string, string> = {
+    pending: 'Simulate: Brands Start Sourcing',
+    sourcing: 'Simulate: Options Found',
+    options_found: '',
+    awaiting_approval: 'Simulate: Item Acquired',
+    acquired: 'Simulate: Item Delivered',
+    delivered: '',
+    cancelled: '',
   };
 
   // Loading / Not found
@@ -850,6 +990,24 @@ export default function SourcingDetailPage() {
                   <MessageCircle size={16} />
                   <span className="hidden sm:inline">Send Message</span>
                 </button>
+              </section>
+            )}
+
+            {/* Demo: Simulate Lifecycle Progression */}
+            {SIMULATE_LABELS[request.status] && (
+              <section className="border-2 border-dashed border-gold-soft/30 p-5 bg-gold-soft/5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-gold-muted mb-1">Demo Controls</p>
+                    <p className="text-xs text-stone">Simulate the next step in the sourcing lifecycle to walk through the full flow.</p>
+                  </div>
+                  <button
+                    onClick={simulateNext}
+                    className="px-5 py-2.5 bg-gold-soft/20 border border-gold-soft/40 text-gold-muted text-[10px] tracking-[0.15em] uppercase hover:bg-gold-soft/30 transition-colors flex-shrink-0"
+                  >
+                    {SIMULATE_LABELS[request.status]}
+                  </button>
+                </div>
               </section>
             )}
           </div>

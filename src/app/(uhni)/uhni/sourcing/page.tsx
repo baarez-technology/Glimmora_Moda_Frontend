@@ -17,7 +17,7 @@ import {
 import { useApp } from '@/context/AppContext';
 import {
   getSourcingRequests,
-  enrichSourcingRequest,
+  enrichSourcingRequestWithLocal,
   type EnrichedSourcingRequest,
 } from '@/services/sourcing.service';
 
@@ -96,7 +96,7 @@ export default function SourcingPage() {
   useEffect(() => {
     setIsLoaded(true);
     getSourcingRequests()
-      .then((raw) => setRequests(raw.map(enrichSourcingRequest)))
+      .then((raw) => setRequests(raw.map(enrichSourcingRequestWithLocal)))
       .catch(() => setRequests([]));
   }, []);
 

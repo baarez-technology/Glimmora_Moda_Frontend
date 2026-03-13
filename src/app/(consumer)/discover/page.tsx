@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
-import { getRecommendedBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
+import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import { useApp } from '@/context/AppContext';
 import type { Product, Brand, BrandStory } from '@/types';
 
@@ -63,7 +63,7 @@ function DiscoverContent() {
     async function loadBrandsAndStories() {
       try {
         const [brandsResult, storiesResult] = await Promise.allSettled([
-          getRecommendedBrands(),
+          getAllBrands(),
           searchStories(),
         ]);
 

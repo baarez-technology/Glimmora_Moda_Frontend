@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { writeBrandNegotiationResponse } from '@/lib/shared-sourcing-store';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -76,6 +77,7 @@ export default function SourcingRequestDetailPage() {
     submitSourcingOption,
     updateSourcingStatus,
     addSourcingOption,
+    updateSourcingOption,
     removeSourcingOption,
     sendSourcingMessage,
   } = useBrand();
@@ -210,9 +212,12 @@ export default function SourcingRequestDetailPage() {
   const handleAcceptNegotiation = (optionId: string) => {
     const option = request.foundOptions.find(o => o.id === optionId);
     if (!option) return;
-    option.negotiationStatus = 'accepted';
-    option.counterNote = 'We accept your proposed price. A pleasure doing business.';
+    updateSourcingOption(requestId, optionId, {
+      negotiationStatus: 'accepted',
+      counterNote: 'We accept your proposed price. A pleasure doing business.',
+    });
     sendSourcingMessage(requestId, `Negotiation accepted for "${option.title || option.customDescription}" at €${option.proposedPrice?.toLocaleString()}.`);
+    writeBrandNegotiationResponse(requestId, optionId, 'accept');
   };
 
   const handleSubmitCounter = (optionId: string) => {
@@ -220,10 +225,13 @@ export default function SourcingRequestDetailPage() {
     if (!price || price <= 0) return;
     const option = request.foundOptions.find(o => o.id === optionId);
     if (!option) return;
-    option.negotiationStatus = 'counter_offered';
-    option.counterPrice = price;
-    option.counterNote = counterMessage || undefined;
+    updateSourcingOption(requestId, optionId, {
+      negotiationStatus: 'counter_offered',
+      counterPrice: price,
+      counterNote: counterMessage || undefined,
+    });
     sendSourcingMessage(requestId, `Counter offer of €${price.toLocaleString()} submitted for "${option.title || option.customDescription}".`);
+    writeBrandNegotiationResponse(requestId, optionId, 'counter', price, counterMessage || undefined);
     setCounterFormId(null);
     setCounterPrice('');
     setCounterMessage('');
@@ -232,8 +240,11 @@ export default function SourcingRequestDetailPage() {
   const handleDeclineNegotiation = (optionId: string) => {
     const option = request.foundOptions.find(o => o.id === optionId);
     if (!option) return;
-    option.negotiationStatus = 'declined';
+    updateSourcingOption(requestId, optionId, {
+      negotiationStatus: 'declined',
+    });
     sendSourcingMessage(requestId, `Negotiation declined for "${option.title || option.customDescription}".`);
+    writeBrandNegotiationResponse(requestId, optionId, 'decline');
   };
 
   return (

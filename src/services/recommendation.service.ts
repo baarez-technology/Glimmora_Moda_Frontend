@@ -178,6 +178,75 @@ export async function getRecommendedBrands(): Promise<Brand[]> {
   }
 }
 
+/**
+ * Returns ALL brands by combining the recommendations API with brands
+ * extracted from the product catalog.
+ *
+ * The brands/recommendations endpoint filters by customer preferences,
+ * which may return fewer brands for users with preferences set.
+ * To show ALL brands, we also fetch a large page of products and extract
+ * unique brands from them, then merge both lists.
+ */
+export async function getAllBrands(): Promise<Brand[]> {
+  try {
+    return await cachedFetch('brands-all', async () => {
+      // Fetch recommended brands + a large page of products in parallel
+      const [brandsRes, productsRes] = await Promise.allSettled([
+        fetchWithTimeout(`/api/v1/brands/recommendations`, {
+          method: 'GET',
+          headers: authHeaders(),
+        }),
+        fetchWithTimeout(`/api/v1/products/recommendations`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ page_size: 100, page_number: 1 }),
+        }),
+      ]);
+
+      const brandMap = new Map<string, Brand>();
+
+      // Add brands from recommendations API
+      if (brandsRes.status === 'fulfilled' && brandsRes.value.ok) {
+        const data: RecommendedBrand[] = await brandsRes.value.json();
+        data.forEach(b => brandMap.set(b.brand_id, mapToBrand(b)));
+      }
+
+      // Extract additional brands from product results
+      if (productsRes.status === 'fulfilled' && productsRes.value.ok) {
+        const data = await productsRes.value.json();
+        const products: RecommendedProduct[] = data.products_data || [];
+        for (const p of products) {
+          if (p.brand_id && !brandMap.has(p.brand_id)) {
+            const slug = p.brand_name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const brandImage = p.image_url
+              || `https://placehold.co/800x600/1A1A1A/C9A962?text=${encodeURIComponent(p.brand_name)}`;
+            brandMap.set(p.brand_id, {
+              id: p.brand_id,
+              name: p.brand_name,
+              slug,
+              tagline: '',
+              description: '',
+              heroImage: brandImage,
+              logoUrl: brandImage,
+              heritage: { founded: 0, founder: '', origin: '', story: '' },
+              collections: [],
+              stories: [],
+            });
+          }
+        }
+      }
+
+      const allBrands = Array.from(brandMap.values());
+      console.log(`[brands-all] Loaded ${allBrands.length} brands (merged)`);
+      return allBrands;
+    }, BRANDS_TTL);
+  } catch (err) {
+    console.log('[brands-all] Error:', err);
+    // Final fallback: try the basic recommendations call
+    return getRecommendedBrands();
+  }
+}
+
 // ============================================
 // Product Recommendations
 // ============================================

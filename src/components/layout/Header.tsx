@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { User, Heart, ShoppingBag, Menu, X, LogOut, Settings, Sparkles } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { getRecommendedBrands } from '@/services/recommendation.service';
+import { getAllBrands } from '@/services/recommendation.service';
 import { TierBadge } from '@/components/shared/TierBadge';
 import type { Brand } from '@/types';
 
@@ -23,7 +23,7 @@ export default function Header() {
 
   // Load brands from recommendation API on mount
   useEffect(() => {
-    getRecommendedBrands()
+    getAllBrands()
       .then(setBrands)
       .catch(() => { /* silently fail — dropdown will be empty */ });
   }, []);
