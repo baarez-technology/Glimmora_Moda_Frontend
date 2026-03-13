@@ -3,11 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Lock, Sparkles, Users } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { ArrowLeft, Lock, Sparkles, Users, Crown, Loader2, UserX } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import type { PrivateCollectionAccess } from '@/types/uhni';
-import { fetchBrandProducts, type mapApiProduct } from '@/services/private-collection.service';
+import type { PrivateCollectionAccess, UhniCustomer } from '@/types/uhni';
+import {
+  fetchPrivateCollection,
+  updatePrivateCollection,
+  fetchBrandProducts,
+  fetchUhniCustomers,
+  type mapApiProduct,
+} from '@/services/private-collection.service';
 
 type ApiProductItem = ReturnType<typeof mapApiProduct>;
 
@@ -15,9 +20,6 @@ export default function EditPrivateCollectionPage() {
   const router = useRouter();
   const params = useParams();
   const collectionId = params.id as string;
-  const { getPrivateCollectionById, updatePrivateCollection, partner } = useBrand();
-
-  const collection = getPrivateCollectionById(collectionId);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -26,12 +28,17 @@ export default function EditPrivateCollectionPage() {
     accessLevel: 'uhni_only' as PrivateCollectionAccess,
     previewDate: '',
     releaseDate: '',
-    selectedProducts: [] as string[]
+    notes: '',
+    selectedProducts: [] as string[],
+    selectedCustomers: [] as string[],
   });
 
+  const [pageLoading, setPageLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
 
-  // Products fetched from real API
+  // Products
   const [apiProducts, setApiProducts] = useState<ApiProductItem[]>([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [productSearch, setProductSearch] = useState('');
@@ -41,25 +48,32 @@ export default function EditPrivateCollectionPage() {
   const [pageSize] = useState(10);
   const [totalProducts, setTotalProducts] = useState(0);
 
-  const totalPages = Math.ceil(totalProducts / pageSize);
+  // UHNI customers
+  const [uhniCustomers, setUhniCustomers] = useState<UhniCustomer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(false);
 
-  // Pre-fill form with existing collection data
+  // Load the collection and pre-fill the form
   useEffect(() => {
-    if (collection) {
-      setFormData({
-        name: collection.name,
-        description: collection.description,
-        heroImage: collection.heroImage,
-        accessLevel: collection.accessLevel,
-        previewDate: collection.previewDate ? new Date(collection.previewDate).toISOString().split('T')[0] : '',
-        releaseDate: collection.releaseDate ? new Date(collection.releaseDate).toISOString().split('T')[0] : '',
-        // product IDs already stored on the collection
-        selectedProducts: collection.products.map(p => p.id)
-      });
-    }
-  }, [collection]);
+    setPageLoading(true);
+    fetchPrivateCollection(collectionId)
+      .then(col => {
+        setFormData({
+          name: col.name,
+          description: col.description,
+          heroImage: col.heroImage,
+          accessLevel: col.accessLevel,
+          previewDate: col.previewDate ? new Date(col.previewDate).toISOString().split('T')[0] : '',
+          releaseDate: col.releaseDate ? new Date(col.releaseDate).toISOString().split('T')[0] : '',
+          notes: col.notes || '',
+          selectedProducts: col.products.map(p => p.id),
+          selectedCustomers: col.customer_ids,
+        });
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setPageLoading(false));
+  }, [collectionId]);
 
-  // Fetch products from real API, re-fetch when filters/page change
+  // Products
   useEffect(() => {
     setProductsLoading(true);
     fetchBrandProducts({
@@ -74,60 +88,85 @@ export default function EditPrivateCollectionPage() {
       .finally(() => setProductsLoading(false));
   }, [productSearch, minPrice, maxPrice, pageNumber, pageSize]);
 
-  if (!collection) {
+  // UHNI customers for invitation access level
+  useEffect(() => {
+    if (formData.accessLevel !== 'invitation') return;
+    setCustomersLoading(true);
+    fetchUhniCustomers()
+      .then(setUhniCustomers)
+      .catch(() => setUhniCustomers([]))
+      .finally(() => setCustomersLoading(false));
+  }, [formData.accessLevel]);
+
+  const totalPages = Math.ceil(totalProducts / pageSize);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await updatePrivateCollection(collectionId, {
+        private_collection_name: formData.name,
+        description: formData.description,
+        image_url: formData.heroImage,
+        access_level: formData.accessLevel,
+        preview_date: formData.previewDate ? new Date(formData.previewDate).toISOString() : null,
+        release_date: formData.releaseDate ? new Date(formData.releaseDate).toISOString() : null,
+        products: formData.selectedProducts,
+        customer_ids: formData.accessLevel === 'invitation' ? formData.selectedCustomers : undefined,
+        notes: formData.notes || undefined,
+      });
+      router.push(`/brand/private-collections/${collectionId}`);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Failed to update collection');
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleProduct = (productId: string) =>
+    setFormData(prev => ({
+      ...prev,
+      selectedProducts: prev.selectedProducts.includes(productId)
+        ? prev.selectedProducts.filter(id => id !== productId)
+        : [...prev.selectedProducts, productId],
+    }));
+
+  const toggleCustomer = (customerId: string) =>
+    setFormData(prev => ({
+      ...prev,
+      selectedCustomers: prev.selectedCustomers.includes(customerId)
+        ? prev.selectedCustomers.filter(id => id !== customerId)
+        : [...prev.selectedCustomers, customerId],
+    }));
+
+  const accessLevels: { value: PrivateCollectionAccess; label: string; description: string; icon: React.ElementType }[] = [
+    { value: 'uhni_only', label: 'UHNI Only', description: 'All UHNI members get automatic access', icon: Sparkles },
+    { value: 'invitation', label: 'Invitation Only', description: 'Personally invite selected clients', icon: Lock },
+    { value: 'request', label: 'Request Access', description: 'Clients can request access', icon: Users },
+  ];
+
+  if (pageLoading) {
+    return (
+      <div>
+        <BrandPageHeader title="Edit Private Collection" subtitle="Loading..." />
+        <div className="flex items-center justify-center py-24">
+          <Loader2 size={28} className="animate-spin text-taupe" />
+        </div>
+      </div>
+    );
+  }
+
+  if (notFound) {
     return (
       <div className="p-8 text-center">
         <p className="text-stone">Private collection not found</p>
-        <Link
-          href="/brand/private-collections"
-          className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted"
-        >
+        <Link href="/brand/private-collections"
+          className="mt-4 inline-flex items-center gap-2 text-sm text-charcoal-deep hover:text-gold-muted">
           <ArrowLeft size={16} /> Back to Private Collections
         </Link>
       </div>
     );
   }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!partner) return;
-
-    setIsSubmitting(true);
-
-    // Store only product IDs as stubs — backend receives product_ids, detail page resolves names/images
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const selectedProductStubs = formData.selectedProducts.map(pid => ({ id: pid })) as any[];
-
-    updatePrivateCollection(collectionId, {
-      name: formData.name,
-      description: formData.description,
-      heroImage: formData.heroImage,
-      accessLevel: formData.accessLevel,
-      products: selectedProductStubs,
-      previewDate: new Date(formData.previewDate).toISOString(),
-      releaseDate: new Date(formData.releaseDate).toISOString(),
-      invitationRequired: formData.accessLevel === 'invitation'
-    });
-
-    setTimeout(() => {
-      router.push(`/brand/private-collections/${collectionId}`);
-    }, 500);
-  };
-
-  const toggleProduct = (productId: string) => {
-    setFormData(prev => ({
-      ...prev,
-      selectedProducts: prev.selectedProducts.includes(productId)
-        ? prev.selectedProducts.filter(id => id !== productId)
-        : [...prev.selectedProducts, productId]
-    }));
-  };
-
-  const accessLevels: { value: PrivateCollectionAccess; label: string; description: string; icon: React.ElementType }[] = [
-    { value: 'uhni_only', label: 'UHNI Only', description: 'Exclusively for UHNI tier members', icon: Sparkles },
-    { value: 'invitation', label: 'Invitation', description: 'Requires personal invitation', icon: Lock },
-    { value: 'request', label: 'Request Access', description: 'Members can request access', icon: Users }
-  ];
 
   return (
     <div>
@@ -135,8 +174,8 @@ export default function EditPrivateCollectionPage() {
         title="Edit Private Collection"
         breadcrumbs={[
           { label: 'Private Collections', href: '/brand/private-collections' },
-          { label: collection.name, href: `/brand/private-collections/${collectionId}` },
-          { label: 'Edit' }
+          { label: formData.name || '…', href: `/brand/private-collections/${collectionId}` },
+          { label: 'Edit' },
         ]}
         actions={
           <SecondaryButton href={`/brand/private-collections/${collectionId}`} icon={ArrowLeft}>
@@ -146,60 +185,62 @@ export default function EditPrivateCollectionPage() {
       />
 
       <form onSubmit={handleSubmit} className="p-8 space-y-6 max-w-4xl">
-        {/* Basic Information */}
+
+        {submitError && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">{submitError}</div>
+        )}
+
+        {/* Basic Info */}
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50">
             <h2 className="font-medium text-charcoal-deep">Collection Details</h2>
           </div>
           <div className="p-6 space-y-6">
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Collection Name *
-              </label>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Collection Name *</label>
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={e => setFormData({ ...formData, name: e.target.value })}
                 required
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
             </div>
-
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Description *
-              </label>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Description *</label>
               <textarea
                 value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
-                rows={4}
+                onChange={e => setFormData({ ...formData, description: e.target.value })}
+                required rows={4}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
               />
             </div>
-
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Hero Image URL
-              </label>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Hero Image URL</label>
               <div className="flex gap-4">
                 <input
                   type="url"
                   value={formData.heroImage}
-                  onChange={(e) => setFormData({ ...formData, heroImage: e.target.value })}
+                  onChange={e => setFormData({ ...formData, heroImage: e.target.value })}
                   placeholder="https://..."
                   className="flex-1 px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
                 {formData.heroImage && (
                   <div className="w-20 h-12 bg-parchment flex-shrink-0">
-                    <img
-                      src={formData.heroImage}
-                      alt="Preview"
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={formData.heroImage} alt="Preview" className="w-full h-full object-cover" />
                   </div>
                 )}
               </div>
+            </div>
+            <div>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Notes (Optional)</label>
+              <input
+                type="text"
+                value={formData.notes}
+                onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="Internal notes about this collection..."
+                className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              />
             </div>
           </div>
         </div>
@@ -220,9 +261,7 @@ export default function EditPrivateCollectionPage() {
                     type="button"
                     onClick={() => setFormData({ ...formData, accessLevel: level.value })}
                     className={`p-4 border text-left transition-colors ${
-                      isSelected
-                        ? 'border-charcoal-deep bg-parchment'
-                        : 'border-sand hover:border-charcoal-deep/50'
+                      isSelected ? 'border-charcoal-deep bg-parchment' : 'border-sand hover:border-charcoal-deep/50'
                     }`}
                   >
                     <Icon size={20} className={isSelected ? 'text-charcoal-deep' : 'text-taupe'} />
@@ -237,6 +276,66 @@ export default function EditPrivateCollectionPage() {
           </div>
         </div>
 
+        {/* Customer Management — invitation only */}
+        {formData.accessLevel === 'invitation' && (
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
+              <div>
+                <h2 className="font-medium text-charcoal-deep">Invited Clients</h2>
+                <p className="text-xs text-taupe mt-0.5">
+                  Check to invite, uncheck to remove. This replaces the current invite list on save.
+                </p>
+              </div>
+              <span className="text-sm text-taupe">{formData.selectedCustomers.length} selected</span>
+            </div>
+            <div className="p-6">
+              {customersLoading ? (
+                <div className="flex items-center justify-center py-8 gap-2 text-taupe text-sm">
+                  <Loader2 size={16} className="animate-spin" /> Loading clients…
+                </div>
+              ) : uhniCustomers.length === 0 ? (
+                <p className="text-sm text-stone text-center py-8">No UHNI customers found</p>
+              ) : (
+                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                  {uhniCustomers.map(c => {
+                    const name = [c.first_name, c.last_name].filter(Boolean).join(' ') || c.customer_id;
+                    const checked = formData.selectedCustomers.includes(c.customer_id);
+                    return (
+                      <label
+                        key={c.customer_id}
+                        className={`flex items-center gap-3 p-3 border cursor-pointer transition-colors ${
+                          checked ? 'border-charcoal-deep bg-parchment' : 'border-sand/50 hover:border-charcoal-deep/30'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleCustomer(c.customer_id)}
+                          className="accent-charcoal-deep"
+                        />
+                        {c.profile_picture ? (
+                          <img src={c.profile_picture} alt={name} className="w-8 h-8 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-parchment flex items-center justify-center">
+                            <Crown size={13} className="text-taupe" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-charcoal-deep">{name}</p>
+                          <p className="text-xs text-taupe">{c.email}</p>
+                        </div>
+                        {!checked && formData.selectedCustomers.length > 0 && (
+                          <UserX size={13} className="text-taupe/40" />
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Dates */}
         <div className="bg-white border border-sand/50">
           <div className="px-6 py-4 border-b border-sand/50">
@@ -244,26 +343,16 @@ export default function EditPrivateCollectionPage() {
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Preview Date *
-              </label>
-              <input
-                type="date"
-                value={formData.previewDate}
-                onChange={(e) => setFormData({ ...formData, previewDate: e.target.value })}
-                required
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Preview Date</label>
+              <input type="date" value={formData.previewDate}
+                onChange={e => setFormData({ ...formData, previewDate: e.target.value })}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
               />
             </div>
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Release Date *
-              </label>
-              <input
-                type="date"
-                value={formData.releaseDate}
-                onChange={(e) => setFormData({ ...formData, releaseDate: e.target.value })}
-                required
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Release Date</label>
+              <input type="date" value={formData.releaseDate}
+                onChange={e => setFormData({ ...formData, releaseDate: e.target.value })}
                 className="w-full px-4 py-3 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
               />
             </div>
@@ -277,7 +366,6 @@ export default function EditPrivateCollectionPage() {
             <span className="text-sm text-taupe">{formData.selectedProducts.length} selected</span>
           </div>
           <div className="p-6">
-            {/* Filters */}
             <div className="flex gap-3 mb-4">
               <input
                 type="text"
@@ -286,20 +374,14 @@ export default function EditPrivateCollectionPage() {
                 placeholder="Search products..."
                 className="flex-1 px-4 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
-              <input
-                type="number"
-                value={minPrice}
+              <input type="number" value={minPrice}
                 onChange={e => { setMinPrice(e.target.value); setPageNumber(1); }}
-                placeholder="Min price"
-                min={0}
+                placeholder="Min price" min={0}
                 className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
-              <input
-                type="number"
-                value={maxPrice}
+              <input type="number" value={maxPrice}
                 onChange={e => { setMaxPrice(e.target.value); setPageNumber(1); }}
-                placeholder="Max price"
-                min={0}
+                placeholder="Max price" min={0}
                 className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
               />
             </div>
@@ -317,18 +399,12 @@ export default function EditPrivateCollectionPage() {
                       type="button"
                       onClick={() => toggleProduct(product.id)}
                       className={`flex items-center gap-4 p-4 border text-left transition-colors ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-parchment'
-                          : 'border-sand hover:border-charcoal-deep/50'
+                        isSelected ? 'border-charcoal-deep bg-parchment' : 'border-sand hover:border-charcoal-deep/50'
                       }`}
                     >
                       <div className="w-12 h-12 bg-parchment flex-shrink-0">
                         {product.imageUrl && (
-                          <img
-                            src={product.imageUrl}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
+                          <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -353,27 +429,16 @@ export default function EditPrivateCollectionPage() {
                 })}
               </div>
             )}
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between mt-4 pt-4 border-t border-sand/50">
-                <p className="text-xs text-taupe">
-                  Page {pageNumber} of {totalPages} &middot; {totalProducts} products
-                </p>
+                <p className="text-xs text-taupe">Page {pageNumber} of {totalPages} · {totalProducts} products</p>
                 <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPageNumber(p => Math.max(1, p - 1))}
-                    disabled={pageNumber === 1}
-                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40"
-                  >
+                  <button type="button" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber === 1}
+                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40">
                     Previous
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setPageNumber(p => Math.min(totalPages, p + 1))}
-                    disabled={pageNumber === totalPages}
-                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40"
-                  >
+                  <button type="button" onClick={() => setPageNumber(p => Math.min(totalPages, p + 1))} disabled={pageNumber === totalPages}
+                    className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40">
                     Next
                   </button>
                 </div>
@@ -384,17 +449,16 @@ export default function EditPrivateCollectionPage() {
 
         {/* Submit */}
         <div className="flex items-center justify-end gap-4">
-          <Link
-            href={`/brand/private-collections/${collectionId}`}
-            className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-wide hover:bg-parchment transition-colors"
-          >
+          <Link href={`/brand/private-collections/${collectionId}`}
+            className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-wide hover:bg-parchment transition-colors">
             Cancel
           </Link>
           <button
             type="submit"
-            disabled={isSubmitting || !formData.name || !formData.description || !formData.previewDate || !formData.releaseDate}
-            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
+            disabled={isSubmitting || !formData.name || !formData.description}
+            className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50 flex items-center gap-2"
           >
+            {isSubmitting && <Loader2 size={14} className="animate-spin" />}
             {isSubmitting ? 'Saving...' : 'Update Collection'}
           </button>
         </div>

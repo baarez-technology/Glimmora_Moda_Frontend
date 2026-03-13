@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Package, FolderOpen, Building, Percent, DollarSign, Plus, X } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { createUhniOffer } from '@/services/uhni-offers.service';
+import { fetchUhniOffer, updateUhniOffer } from '@/services/uhni-offers.service';
 import { fetchProducts, type BackendProduct } from '@/services/brand-product.service';
 import { fetchCollections, type CollectionResponse } from '@/services/brand-collection.service';
 import { useApp } from '@/context/AppContext';
@@ -24,13 +24,18 @@ const discountTypes: { value: DiscountType; label: string; icon: React.ElementTy
   { value: 'fixed', label: 'Fixed Amount Off', icon: DollarSign },
 ];
 
-export default function NewOfferPage() {
+function toDateInput(iso: string) {
+  return iso ? iso.split('T')[0] : '';
+}
+
+export default function EditOfferPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { showToast } = useApp();
 
   const [products, setProducts] = useState<BackendProduct[]>([]);
   const [collections, setCollections] = useState<CollectionResponse[]>([]);
-  const [isLoadingTargets, setIsLoadingTargets] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const [formData, setFormData] = useState({
     offerType: 'products' as OfferType,
@@ -38,31 +43,42 @@ export default function NewOfferPage() {
     selectedCollections: [] as string[],
     discountType: 'percentage' as DiscountType,
     discountValue: 10,
-    validFrom: new Date().toISOString().split('T')[0],
-    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    validFrom: '',
+    validUntil: '',
     conditions: [] as string[],
     newCondition: '',
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load products and collections from real API
   useEffect(() => {
-    setIsLoadingTargets(true);
     Promise.all([
+      fetchUhniOffer(id),
       fetchProducts().catch(() => []),
       fetchCollections().catch(() => []),
-    ]).then(([prods, cols]) => {
+    ]).then(([offer, prods, cols]) => {
       setProducts(prods);
       setCollections(cols);
-    }).finally(() => setIsLoadingTargets(false));
-  }, []);
+      setFormData({
+        offerType: (offer.offer_type as OfferType) || 'products',
+        selectedProducts: offer.offer_products ?? [],
+        selectedCollections: offer.offer_collections ?? [],
+        discountType: offer.discount_type,
+        discountValue: offer.discount_value,
+        validFrom: toDateInput(offer.valid_from),
+        validUntil: toDateInput(offer.valid_until),
+        conditions: offer.conditions ?? [],
+        newCondition: '',
+      });
+    }).catch(() => showToast('Failed to load offer', 'error'))
+      .finally(() => setIsLoadingData(false));
+  }, [id]);
 
   const toggleProduct = (productId: string) => {
     setFormData(prev => ({
       ...prev,
       selectedProducts: prev.selectedProducts.includes(productId)
-        ? prev.selectedProducts.filter(id => id !== productId)
+        ? prev.selectedProducts.filter(i => i !== productId)
         : [...prev.selectedProducts, productId],
     }));
   };
@@ -71,7 +87,7 @@ export default function NewOfferPage() {
     setFormData(prev => ({
       ...prev,
       selectedCollections: prev.selectedCollections.includes(collectionId)
-        ? prev.selectedCollections.filter(id => id !== collectionId)
+        ? prev.selectedCollections.filter(i => i !== collectionId)
         : [...prev.selectedCollections, collectionId],
     }));
   };
@@ -106,7 +122,7 @@ export default function NewOfferPage() {
 
     setIsSubmitting(true);
     try {
-      await createUhniOffer({
+      await updateUhniOffer(id, {
         offer_type: formData.offerType,
         ...(formData.offerType === 'products' && { offer_products: formData.selectedProducts }),
         ...(formData.offerType === 'collections' && { offer_collections: formData.selectedCollections }),
@@ -114,27 +130,37 @@ export default function NewOfferPage() {
         discount_value: formData.discountValue,
         valid_from: new Date(formData.validFrom).toISOString(),
         valid_until: new Date(formData.validUntil).toISOString(),
-        ...(formData.conditions.length > 0 && { conditions: formData.conditions }),
+        conditions: formData.conditions,
       });
-      showToast('Offer created', 'success');
-      router.push('/brand/offers');
+      showToast('Offer updated', 'success');
+      router.push(`/brand/offers/${id}`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to create offer';
+      const msg = err instanceof Error ? err.message : 'Failed to update offer';
       showToast(msg, 'error');
       setIsSubmitting(false);
     }
   };
 
+  if (isLoadingData) {
+    return (
+      <div>
+        <BrandPageHeader title="Edit Offer" breadcrumbs={[{ label: 'UHNI Offers', href: '/brand/offers' }, { label: 'Edit' }]} />
+        <div className="p-8 text-center text-stone">Loading...</div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <BrandPageHeader
-        title="Create UHNI Offer"
+        title="Edit Offer"
         breadcrumbs={[
           { label: 'UHNI Offers', href: '/brand/offers' },
-          { label: 'New Offer' },
+          { label: id.slice(-8), href: `/brand/offers/${id}` },
+          { label: 'Edit' },
         ]}
         actions={
-          <SecondaryButton href="/brand/offers" icon={ArrowLeft}>
+          <SecondaryButton href={`/brand/offers/${id}`} icon={ArrowLeft}>
             Cancel
           </SecondaryButton>
         }
@@ -192,9 +218,7 @@ export default function NewOfferPage() {
               )}
             </div>
             <div className="p-6">
-              {isLoadingTargets ? (
-                <p className="text-sm text-taupe text-center py-4">Loading...</p>
-              ) : formData.offerType === 'products' ? (
+              {formData.offerType === 'products' ? (
                 products.length === 0 ? (
                   <p className="text-sm text-taupe text-center py-4">No products available</p>
                 ) : (
@@ -269,11 +293,8 @@ export default function NewOfferPage() {
             <h2 className="font-medium text-charcoal-deep">Discount Details</h2>
           </div>
           <div className="p-6 space-y-6">
-            {/* Discount Type */}
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Discount Type
-              </label>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Discount Type</label>
               <div className="flex gap-4">
                 {discountTypes.map(type => {
                   const Icon = type.icon;
@@ -297,11 +318,8 @@ export default function NewOfferPage() {
               </div>
             </div>
 
-            {/* Discount Value */}
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Discount Value *
-              </label>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Discount Value *</label>
               <div className="relative max-w-xs">
                 <input
                   type="number"
@@ -318,12 +336,9 @@ export default function NewOfferPage() {
               </div>
             </div>
 
-            {/* Validity Period */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                  Valid From *
-                </label>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Valid From *</label>
                 <input
                   type="date"
                   value={formData.validFrom}
@@ -333,9 +348,7 @@ export default function NewOfferPage() {
                 />
               </div>
               <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                  Valid Until *
-                </label>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Valid Until *</label>
                 <input
                   type="date"
                   value={formData.validUntil}
@@ -401,7 +414,7 @@ export default function NewOfferPage() {
         {/* Submit */}
         <div className="flex items-center justify-end gap-4">
           <Link
-            href="/brand/offers"
+            href={`/brand/offers/${id}`}
             className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-wide hover:bg-parchment transition-colors"
           >
             Cancel
@@ -411,7 +424,7 @@ export default function NewOfferPage() {
             disabled={isSubmitting || !isTargetValid() || !formData.discountValue}
             className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors disabled:opacity-50"
           >
-            {isSubmitting ? 'Creating...' : 'Create Offer'}
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
           </button>
         </div>
       </form>

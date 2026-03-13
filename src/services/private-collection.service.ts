@@ -3,8 +3,9 @@
  * Direct calls to /api/v1/private-collection/* (brand-scoped, JWT required)
  */
 
-import type { PrivateCollection, PrivateCollectionAccess } from '@/types/uhni';
-import type { Product } from '@/types/product';
+import type { PrivateCollection, PrivateCollectionAccess, RequestedCustomer, UhniCustomer } from '@/types/uhni';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 function getToken(): string | null {
   try {
@@ -23,7 +24,7 @@ function authHeaders(): Record<string, string> {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: { ...authHeaders(), ...(init?.headers || {}) },
   });
@@ -34,7 +35,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ─── Types matching backend response ─────────────────────────────────────────
+// ─── Backend Response Types ───────────────────────────────────────────────────
+
+export interface ApiRequestedCustomer {
+  customer_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  first_name: string;
+  last_name: string;
+  notes?: string;
+}
 
 export interface ApiPrivateCollection {
   private_collection_id: string;
@@ -45,7 +54,10 @@ export interface ApiPrivateCollection {
   access_level: string;
   preview_date?: string | null;
   release_date?: string | null;
-  products: string[]; // product_ids
+  products: string[];
+  customer_ids: string[];
+  requested_customers: ApiRequestedCustomer[];
+  notes?: string;
   status: string;
   is_active: boolean;
   created_at: string;
@@ -77,14 +89,17 @@ export interface ApiProductsResponse {
 
 // ─── Mappers ─────────────────────────────────────────────────────────────────
 
-/**
- * Map backend API collection to frontend PrivateCollection.
- * Products are returned as stub objects (id only) — resolve them with resolveProductIds().
- */
 export function mapApiCollection(doc: ApiPrivateCollection): PrivateCollection {
-  // Store only the product ID — names/images are resolved separately in the UI via fetchBrandProducts
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const productStubs = (doc.products || []).map(pid => ({ id: pid })) as any[];
+
+  const requestedCustomers: RequestedCustomer[] = (doc.requested_customers || []).map(rc => ({
+    customer_id: rc.customer_id,
+    status: rc.status,
+    first_name: rc.first_name || '',
+    last_name: rc.last_name || '',
+    notes: rc.notes,
+  }));
 
   return {
     id: doc.private_collection_id,
@@ -99,6 +114,9 @@ export function mapApiCollection(doc: ApiPrivateCollection): PrivateCollection {
     releaseDate: doc.release_date || new Date().toISOString(),
     invitationRequired: doc.access_level === 'invitation',
     hasAccess: false,
+    notes: doc.notes,
+    customer_ids: doc.customer_ids || [],
+    requested_customers: requestedCustomers,
   };
 }
 
@@ -112,15 +130,21 @@ export function mapApiProduct(p: ApiProduct): { id: string; name: string; imageU
   };
 }
 
-// ─── API Functions ────────────────────────────────────────────────────────────
+// ─── Collection CRUD ──────────────────────────────────────────────────────────
 
-/** GET /api/v1/private-collection — all active collections for the authenticated brand */
+/** GET /api/v1/private-collection */
 export async function fetchPrivateCollections(): Promise<PrivateCollection[]> {
   const docs = await apiFetch<ApiPrivateCollection[]>('/api/v1/private-collection');
   return docs.filter(doc => doc.is_active).map(mapApiCollection);
 }
 
-/** POST /api/v1/private-collection — create a new collection */
+/** GET /api/v1/private-collection/{id} */
+export async function fetchPrivateCollection(id: string): Promise<PrivateCollection> {
+  const doc = await apiFetch<ApiPrivateCollection>(`/api/v1/private-collection/${id}`);
+  return mapApiCollection(doc);
+}
+
+/** POST /api/v1/private-collection */
 export async function createPrivateCollection(payload: {
   private_collection_name: string;
   description: string;
@@ -129,6 +153,8 @@ export async function createPrivateCollection(payload: {
   preview_date?: string | null;
   release_date?: string | null;
   products: string[];
+  customer_ids?: string[];
+  notes?: string;
 }): Promise<PrivateCollection> {
   const doc = await apiFetch<ApiPrivateCollection>('/api/v1/private-collection', {
     method: 'POST',
@@ -137,7 +163,7 @@ export async function createPrivateCollection(payload: {
   return mapApiCollection(doc);
 }
 
-/** PATCH /api/v1/private-collection/{id} — partial update */
+/** PATCH /api/v1/private-collection/{id} */
 export async function updatePrivateCollection(
   id: string,
   payload: Partial<{
@@ -148,6 +174,8 @@ export async function updatePrivateCollection(
     preview_date: string | null;
     release_date: string | null;
     products: string[];
+    customer_ids: string[];
+    notes: string;
     is_active: boolean;
   }>
 ): Promise<PrivateCollection> {
@@ -158,9 +186,9 @@ export async function updatePrivateCollection(
   return mapApiCollection(doc);
 }
 
-/** DELETE /api/v1/private-collection/{id} — soft delete */
-export async function deletePrivateCollection(id: string): Promise<void> {
-  await apiFetch<unknown>(`/api/v1/private-collection/${id}`, { method: 'DELETE' });
+/** DELETE /api/v1/private-collection/{id} */
+export async function deletePrivateCollection(id: string): Promise<{ message: string }> {
+  return apiFetch<{ message: string }>(`/api/v1/private-collection/${id}`, { method: 'DELETE' });
 }
 
 /** PATCH /api/v1/private-collection/{id}/status */
@@ -175,9 +203,54 @@ export async function updatePrivateCollectionStatus(
   return mapApiCollection(doc);
 }
 
+// ─── Customer Management ──────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/private-collection/uhni-customers
+ * Returns all UHNI customers for the brand.
+ */
+export async function fetchUhniCustomers(): Promise<UhniCustomer[]> {
+  return apiFetch<UhniCustomer[]>('/api/v1/private-collection/uhni-customers');
+}
+
+/**
+ * PATCH /api/v1/private-collection/{id}/customer-ids
+ * Appends customer_ids to the collection (deduplicates server-side).
+ */
+export async function appendCustomerIds(
+  id: string,
+  payload: { customer_ids: string[]; notes?: string }
+): Promise<PrivateCollection> {
+  const doc = await apiFetch<ApiPrivateCollection>(`/api/v1/private-collection/${id}/customer-ids`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+  return mapApiCollection(doc);
+}
+
+/**
+ * PATCH /api/v1/private-collection/{id}/requested-customers/status
+ * Updates the status of a single entry in requested_customers.
+ */
+export async function updateRequestedCustomerStatus(
+  id: string,
+  payload: { customer_id: string; status: 'pending' | 'accepted' | 'rejected'; notes?: string }
+): Promise<PrivateCollection> {
+  const doc = await apiFetch<ApiPrivateCollection>(
+    `/api/v1/private-collection/${id}/requested-customers/status`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }
+  );
+  return mapApiCollection(doc);
+}
+
+// ─── Products ─────────────────────────────────────────────────────────────────
+
 /**
  * GET /api/v1/private-collection/products
- * Returns paginated products for the brand (for product selection in create/edit forms).
+ * Returns paginated products for the brand.
  */
 export async function fetchBrandProducts(params?: {
   search?: string;
@@ -197,8 +270,7 @@ export async function fetchBrandProducts(params?: {
     `/api/v1/private-collection/products?${qs.toString()}`
   );
 
-  const rawItems: ApiProduct[] =
-    raw.products || raw.items || raw.data || raw.hits || [];
+  const rawItems: ApiProduct[] = raw.products || raw.items || raw.data || raw.hits || [];
 
   return {
     items: rawItems.map(mapApiProduct),

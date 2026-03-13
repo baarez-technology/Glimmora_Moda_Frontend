@@ -567,7 +567,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2025-01-20',
     releaseDate: '2025-03-15',
     invitationRequired: false,
-    hasAccess: true
+    hasAccess: true,
+    customer_ids: [],
+    requested_customers: [],
   },
   {
     id: 'hermes-invitation',
@@ -581,7 +583,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2025-02-01',
     releaseDate: '2025-04-01',
     invitationRequired: true,
-    hasAccess: true
+    hasAccess: true,
+    customer_ids: [],
+    requested_customers: [],
   },
   {
     id: 'chanel-limited',
@@ -595,7 +599,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2025-02-15',
     releaseDate: '2025-05-05',
     invitationRequired: false,
-    hasAccess: false
+    hasAccess: false,
+    customer_ids: [],
+    requested_customers: [],
   },
   {
     id: 'bottega-archive',
@@ -609,7 +615,9 @@ export const mockPrivateCollections: PrivateCollection[] = [
     previewDate: '2025-01-10',
     releaseDate: '2025-02-28',
     invitationRequired: false,
-    hasAccess: true
+    hasAccess: true,
+    customer_ids: [],
+    requested_customers: [],
   }
 ];
 

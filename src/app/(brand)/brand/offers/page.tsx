@@ -1,81 +1,100 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Gift, Tag, Percent, Calendar, CheckCircle, Clock, Package, FolderOpen, Building, Users } from 'lucide-react';
-import { useBrand } from '@/context/BrandContext';
+import { Plus, Gift, Tag, Percent, Calendar, Package, FolderOpen, Building, Users } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
-import type { UHNIPriceOffer } from '@/types/brand-portal';
+import { fetchUhniOffers, type ApiOffer } from '@/services/uhni-offers.service';
+import { fetchProducts, type BackendProduct } from '@/services/brand-product.service';
+import { fetchCollections, type CollectionResponse } from '@/services/brand-collection.service';
+import { useApp } from '@/context/AppContext';
 
 type FilterTab = 'all' | 'active' | 'upcoming' | 'expired';
 
+function getOfferStatus(offer: ApiOffer): 'active' | 'upcoming' | 'expired' {
+  const now = new Date();
+  const from = new Date(offer.valid_from);
+  const until = new Date(offer.valid_until);
+  if (now < from) return 'upcoming';
+  if (now > until || offer.is_expired) return 'expired';
+  return 'active';
+}
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+function getOfferLabel(
+  offer: ApiOffer,
+  products: BackendProduct[],
+  collections: CollectionResponse[],
+): string {
+  if (offer.offer_type === 'products' && offer.offer_products.length > 0) {
+    return offer.offer_products
+      .map(id => products.find(p => p.product_id === id)?.product_name ?? id)
+      .join(', ');
+  }
+  if (offer.offer_type === 'collections' && offer.offer_collections.length > 0) {
+    return offer.offer_collections
+      .map(id => collections.find(c => c.collection_id === id)?.collection_name ?? id)
+      .join(', ');
+  }
+  return 'Brand-wide';
+}
+
+const STATUS_BADGE: Record<'active' | 'upcoming' | 'expired', string> = {
+  active: 'bg-success/10 text-success',
+  upcoming: 'bg-info/10 text-info',
+  expired: 'bg-taupe/20 text-stone',
+};
+
+const TYPE_INFO: Record<string, { bg: string; icon: React.ElementType }> = {
+  products: { bg: 'bg-gold-soft/20 text-gold-deep', icon: Package },
+  collections: { bg: 'bg-champagne/30 text-gold-muted', icon: FolderOpen },
+  brand: { bg: 'bg-parchment text-charcoal-deep', icon: Building },
+};
+
+const filterTabs: { value: FilterTab; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'active', label: 'Active' },
+  { value: 'upcoming', label: 'Upcoming' },
+  { value: 'expired', label: 'Expired' },
+];
+
 export default function UHNIOffersPage() {
-  const { uhniOffers } = useBrand();
+  const { showToast } = useApp();
+  const [offers, setOffers] = useState<ApiOffer[]>([]);
+  const [products, setProducts] = useState<BackendProduct[]>([]);
+  const [collections, setCollections] = useState<CollectionResponse[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('all');
 
-  const now = new Date();
+  useEffect(() => {
+    Promise.all([
+      fetchUhniOffers(),
+      fetchProducts().catch(() => []),
+      fetchCollections().catch(() => []),
+    ]).then(([offersData, prods, cols]) => {
+      setOffers(offersData);
+      setProducts(prods);
+      setCollections(cols);
+    }).catch(() => showToast('Failed to load offers', 'error'))
+      .finally(() => setIsLoading(false));
+  }, []);
 
-  const getOfferStatus = (offer: UHNIPriceOffer): 'active' | 'upcoming' | 'expired' => {
-    const validFrom = new Date(offer.validFrom);
-    const validUntil = new Date(offer.validUntil);
-
-    if (now < validFrom) return 'upcoming';
-    if (now > validUntil) return 'expired';
-    return 'active';
-  };
-
-  const filteredOffers = uhniOffers.filter(offer => {
+  const filteredOffers = offers.filter(offer => {
     if (filter === 'all') return true;
     return getOfferStatus(offer) === filter;
   });
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getStatusBadge = (status: 'active' | 'upcoming' | 'expired') => {
-    switch (status) {
-      case 'active':
-        return 'bg-success/10 text-success';
-      case 'upcoming':
-        return 'bg-info/10 text-info';
-      case 'expired':
-        return 'bg-taupe/20 text-stone';
-      default:
-        return 'bg-taupe/20 text-stone';
-    }
-  };
-
-  const getTypeBadge = (type: UHNIPriceOffer['type']) => {
-    switch (type) {
-      case 'product':
-        return { bg: 'bg-gold-soft/20 text-gold-deep', icon: Package };
-      case 'collection':
-        return { bg: 'bg-champagne/30 text-gold-muted', icon: FolderOpen };
-      case 'brand':
-        return { bg: 'bg-parchment text-charcoal-deep', icon: Building };
-      default:
-        return { bg: 'bg-taupe/20 text-stone', icon: Tag };
-    }
-  };
-
   const statusCounts = {
-    all: uhniOffers.length,
-    active: uhniOffers.filter(o => getOfferStatus(o) === 'active').length,
-    upcoming: uhniOffers.filter(o => getOfferStatus(o) === 'upcoming').length,
-    expired: uhniOffers.filter(o => getOfferStatus(o) === 'expired').length
+    all: offers.length,
+    active: offers.filter(o => getOfferStatus(o) === 'active').length,
+    upcoming: offers.filter(o => getOfferStatus(o) === 'upcoming').length,
+    expired: offers.filter(o => getOfferStatus(o) === 'expired').length,
   };
-
-  const filterTabs: { value: FilterTab; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'active', label: 'Active' },
-    { value: 'upcoming', label: 'Upcoming' },
-    { value: 'expired', label: 'Expired' }
-  ];
 
   return (
     <div>
@@ -111,7 +130,11 @@ export default function UHNIOffersPage() {
         </div>
 
         {/* Offers Grid */}
-        {filteredOffers.length === 0 ? (
+        {isLoading ? (
+          <div className="bg-white border border-sand/50 p-12 text-center">
+            <p className="text-stone">Loading offers...</p>
+          </div>
+        ) : filteredOffers.length === 0 ? (
           <div className="bg-white border border-sand/50 p-12 text-center">
             <Gift size={48} className="mx-auto text-taupe/40 mb-4" />
             <p className="text-stone">No offers found</p>
@@ -126,44 +149,37 @@ export default function UHNIOffersPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredOffers.map(offer => {
               const status = getOfferStatus(offer);
-              const typeInfo = getTypeBadge(offer.type);
+              const typeKey = offer.offer_type in TYPE_INFO ? offer.offer_type : 'brand';
+              const typeInfo = TYPE_INFO[typeKey];
               const TypeIcon = typeInfo.icon;
+              const label = getOfferLabel(offer, products, collections);
 
               return (
-                <div
-                  key={offer.id}
-                  className="bg-white border border-sand/50 hover:border-sand transition-colors"
+                <Link
+                  key={offer.offer_id}
+                  href={`/brand/offers/${offer.offer_id}`}
+                  className="bg-white border border-sand/50 hover:border-sand transition-colors block"
                 >
-                  {/* Header with image */}
-                  <div className="aspect-[16/9] bg-parchment relative overflow-hidden">
-                    {offer.targetImage ? (
-                      <img
-                        src={offer.targetImage}
-                        alt={offer.targetName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <TypeIcon size={48} className="text-taupe/30" />
-                      </div>
-                    )}
+                  {/* Header */}
+                  <div className="aspect-[16/9] bg-parchment relative overflow-hidden flex items-center justify-center">
+                    <TypeIcon size={48} className="text-taupe/30" />
                     {/* Discount badge */}
                     <div className="absolute top-3 right-3 bg-gold-deep text-ivory-cream px-3 py-1.5 flex items-center gap-1.5">
-                      {offer.discountType === 'percentage' ? (
+                      {offer.discount_type === 'percentage' ? (
                         <>
                           <Percent size={14} />
-                          <span className="text-sm font-medium">{offer.discountValue}% OFF</span>
+                          <span className="text-sm font-medium">{offer.discount_value}% OFF</span>
                         </>
                       ) : (
                         <>
                           <Tag size={14} />
-                          <span className="text-sm font-medium">${offer.discountValue.toLocaleString()} OFF</span>
+                          <span className="text-sm font-medium">${offer.discount_value.toLocaleString()} OFF</span>
                         </>
                       )}
                     </div>
                     {/* Status badge */}
                     <div className="absolute top-3 left-3">
-                      <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${getStatusBadge(status)}`}>
+                      <span className={`px-2 py-1 text-[9px] tracking-[0.1em] uppercase ${STATUS_BADGE[status]}`}>
                         {status}
                       </span>
                     </div>
@@ -174,52 +190,35 @@ export default function UHNIOffersPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${typeInfo.bg}`}>
                         <TypeIcon size={10} />
-                        {offer.type}
+                        {offer.offer_type}
                       </span>
                     </div>
-                    <h3 className="font-medium text-charcoal-deep">
-                      {offer.targetName}
-                    </h3>
+                    <h3 className="font-medium text-charcoal-deep truncate">{label}</h3>
 
                     {/* Validity Period */}
                     <div className="mt-4 pt-4 border-t border-sand/30 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-1 text-taupe">
-                          <Calendar size={12} />
-                          <span>Valid Period</span>
-                        </div>
+                      <div className="flex items-center gap-1 text-xs text-taupe">
+                        <Calendar size={12} />
+                        <span>Valid Period</span>
                       </div>
                       <div className="flex items-center justify-between text-xs text-stone">
-                        <span>{formatDate(offer.validFrom)}</span>
+                        <span>{formatDate(offer.valid_from)}</span>
                         <span className="text-taupe">to</span>
-                        <span>{formatDate(offer.validUntil)}</span>
+                        <span>{formatDate(offer.valid_until)}</span>
                       </div>
                     </div>
 
-                    {/* Claim count & status */}
-                    <div className="mt-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs text-stone">
-                          <Users size={14} />
-                          <span>
-                            {offer.claimedCount || 0} claimed
-                            {offer.maxClaims && offer.maxClaims > 0 ? ` of ${offer.maxClaims}` : ''}
-                          </span>
-                        </div>
-                        {offer.isPrivate && (
-                          <span className="text-[10px] px-2 py-0.5 bg-gold-soft/20 text-gold-deep tracking-[0.1em] uppercase">
-                            Private
-                          </span>
-                        )}
-                      </div>
-                      {offer.conditions && offer.conditions.length > 0 && (
-                        <p className="text-[10px] text-taupe">
-                          {offer.conditions.length} condition{offer.conditions.length !== 1 ? 's' : ''}
-                        </p>
+                    {/* Conditions count */}
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-stone">
+                      <Users size={14} />
+                      {offer.conditions.length > 0 ? (
+                        <span>{offer.conditions.length} condition{offer.conditions.length !== 1 ? 's' : ''}</span>
+                      ) : (
+                        <span>No conditions</span>
                       )}
                     </div>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
