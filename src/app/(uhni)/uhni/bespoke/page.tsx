@@ -189,16 +189,24 @@ export default function BespokeOrdersPage() {
                       </div>
                       <h3 className="font-display text-xl text-charcoal-deep">{order.title}</h3>
                       <p className="text-sm text-taupe mt-1">
-                        {order.selectedBrands && order.selectedBrands.length > 1
-                          ? order.selectedBrands.map(b => b.name).join(' · ')
-                          : order.brandName}
+                        {order.selectedBrands && order.selectedBrands.length > 0
+                          ? order.selectedBrands.map(b => b.name || b.id).filter(Boolean).join(' · ')
+                          : order.brandName || 'Bespoke Commission'}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-display text-2xl text-charcoal-deep">€{order.price.toLocaleString()}</p>
-                      <p className="text-xs text-taupe mt-1">
-                        Deposit: €{order.depositPaid.toLocaleString()} ({order.depositPercentage}%)
-                      </p>
+                      {order.price > 0 ? (
+                        <>
+                          <p className="font-display text-2xl text-charcoal-deep">€{order.price.toLocaleString()}</p>
+                          <p className="text-xs text-taupe mt-1">
+                            {order.depositPaid > 0
+                              ? `Deposit: €${order.depositPaid.toLocaleString()} (${order.depositPercentage}%)`
+                              : 'Deposit pending'}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-sm text-taupe italic">Price pending</p>
+                      )}
                     </div>
                   </div>
 
@@ -207,7 +215,9 @@ export default function BespokeOrdersPage() {
                   <div className="flex items-center gap-6 mt-4 text-sm">
                     <div className="flex items-center gap-2 text-taupe">
                       <Calendar size={14} />
-                      <span>Est. completion: {new Date(order.estimatedCompletion).toLocaleDateString()}</span>
+                      <span>Est. completion: {order.estimatedCompletion
+                        ? new Date(order.estimatedCompletion).toLocaleDateString()
+                        : 'To be determined'}</span>
                     </div>
                   </div>
                 </div>

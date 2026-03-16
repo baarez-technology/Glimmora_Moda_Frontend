@@ -32,6 +32,7 @@ import type {
   UHNIPriceOffer
 } from '@/types/uhni';
 import * as brandPortalService from '@/services/brand-portal.service';
+import * as bespokeService from '@/services/bespoke.service';
 import * as privateCollectionService from '@/services/private-collection.service';
 import { addSharedOffer } from '@/lib/shared-store';
 import { getSharedSessions, addSharedSession as addSessionToStore, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
@@ -358,7 +359,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setInventory(d.inventory);
         setAnalytics(d.analytics);
         setRecentActivity(d.recentActivity);
-        setBespokeOrders(d.bespokeOrders);
+        // Try to load real bespoke orders; fall back to mock if unavailable
+        try {
+          const realBespoke = await bespokeService.fetchBrandBespokeOrders();
+          setBespokeOrders(realBespoke);
+        } catch {
+          setBespokeOrders(d.bespokeOrders);
+        }
         setPriceNegotiations(d.priceNegotiations);
         // Try to load real private collections; fall back to mock if unavailable
         try {
@@ -542,6 +549,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   }, [bespokeOrders]);
 
   const updateBespokeOrderStatus = useCallback((id: string, status: BespokeOrderStatus) => {
+    // Optimistic local update
     setBespokeOrders(prev => prev.map(order => {
       if (order.id !== id) return order;
       const updatedTimeline = order.timeline.map(step => {
@@ -558,10 +566,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       });
       return { ...order, status, timeline: updatedTimeline, updatedAt: new Date().toISOString() };
     }));
-    brandPortalService.updateBespokeOrderStatus(id, status).catch(console.error);
+    // Real API call
+    bespokeService.updateBrandBespokeStatus(id, status)
+      .then(updatedOrder => {
+        setBespokeOrders(prev => prev.map(o => o.id === id ? updatedOrder : o));
+      })
+      .catch(console.error);
   }, []);
 
   const updateBespokeStatus = useCallback((orderId: string, newStatus: BespokeOrderStatus, note: string) => {
+    // Optimistic local update
     setBespokeOrders(prev =>
       prev.map(order => {
         if (order.id !== orderId) return order;
@@ -572,7 +586,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           updatedBy: 'brand',
           createdAt: new Date().toISOString(),
         };
-        // Also update the existing BespokeTimelineStep[] for visual timeline
         const statusOrder: BespokeOrderStatus[] = ['consultation', 'design_approval', 'production', 'fitting', 'final_adjustments', 'complete'];
         const newStatusIndex = statusOrder.indexOf(newStatus);
         const updatedTimeline = order.timeline.map(step => {
@@ -595,9 +608,16 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         };
       })
     );
+    // Real API call
+    bespokeService.updateBrandBespokeStatus(orderId, newStatus, note)
+      .then(updatedOrder => {
+        setBespokeOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+      })
+      .catch(console.error);
   }, []);
 
   const sendBespokeMessage = useCallback((orderId: string, content: string) => {
+    // Optimistic local update
     const newMessage: BespokeMessage = {
       id: `msg-${Date.now()}`,
       senderId: 'brand-user',
@@ -613,19 +633,39 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           : order
       )
     );
+    // Real API call
+    bespokeService.addBrandMessage(orderId, content)
+      .then(updatedOrder => {
+        setBespokeOrders(prev =>
+          prev.map(o => o.id === orderId ? { ...o, messages: updatedOrder.messages } : o)
+        );
+      })
+      .catch(console.error);
   }, []);
 
-  const updateBespokePrice = useCallback((orderId: string, price: number, depositPercentage: number) => {
+  const updateBespokePrice = useCallback((orderId: string, price: number, deposit: number) => {
+    // Optimistic local update
+    const depositPercentage = price > 0 ? Math.round((deposit / price) * 100) : 0;
     setBespokeOrders(prev =>
       prev.map(order =>
         order.id === orderId
-          ? { ...order, price, depositPercentage, updatedAt: new Date().toISOString() }
+          ? { ...order, price, depositPaid: deposit, depositPercentage, updatedAt: new Date().toISOString() }
           : order
       )
     );
+    // Real API call — PATCH /api/v1/brand/bespoke-orders/{id}
+    bespokeService.updateBrandBespokeOrder(orderId, {
+      price,
+      deposite: deposit,
+    })
+      .then(updatedOrder => {
+        setBespokeOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+      })
+      .catch(console.error);
   }, []);
 
   const updateBespokeTimelineDates = useCallback((orderId: string, stepDates: Record<string, string>, estimatedCompletion?: string) => {
+    // Optimistic local update
     setBespokeOrders(prev =>
       prev.map(order => {
         if (order.id !== orderId) return order;
@@ -640,7 +680,27 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         return { ...order, timeline: updatedTimeline, estimatedCompletion: newCompletion, updatedAt: new Date().toISOString() };
       })
     );
-  }, []);
+    // Real API call — convert step IDs to stage statuses for the backend
+    const order = bespokeOrders.find(o => o.id === orderId);
+    if (order) {
+      const timelinePayload = order.timeline
+        .filter(step => stepDates[step.id])
+        .map(step => ({ status: step.stage, estimated_date: stepDates[step.id] }));
+      if (timelinePayload.length > 0) {
+        bespokeService.updateBrandBespokeTimelineDates(orderId, timelinePayload)
+          .then(updatedOrder => {
+            setBespokeOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+          })
+          .catch(console.error);
+      }
+    }
+    // Also update estimated completion if provided
+    if (estimatedCompletion) {
+      bespokeService.updateBrandBespokeOrder(orderId, {
+        estimate_completation: estimatedCompletion,
+      }).catch(console.error);
+    }
+  }, [bespokeOrders]);
 
   const getNegotiationById = useCallback((id: string): PriceNegotiation | undefined => {
     return priceNegotiations.find(n => n.id === id);
