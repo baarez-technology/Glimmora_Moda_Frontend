@@ -8,12 +8,11 @@ import { useApp } from '@/context/AppContext';
 import {
   getPriceNegotiations,
   getPriceAlerts,
-  getPricingTiers,
   getPricingSummary,
   acceptNegotiation,
   declineNegotiation,
 } from '@/services/uhni.service';
-import type { NegotiationStatus, PriceNegotiation, UHNIPriceAlert, UHNIPricingTier, UHNIPricingSummary } from '@/types';
+import type { NegotiationStatus, PriceNegotiation, UHNIPriceAlert, UHNIPricingSummary } from '@/types';
 import type { UHNIPriceOffer } from '@/types/uhni';
 import type { PriceAlert } from '@/types/pricing-tiers';
 
@@ -29,7 +28,6 @@ export default function PricingPage() {
 
   const [negotiations, setNegotiations] = useState<PriceNegotiation[]>([]);
   const [alerts, setAlerts] = useState<UHNIPriceAlert[]>([]);
-  const [tiers, setTiers] = useState<UHNIPricingTier[]>([]);
   const [summary, setSummary] = useState<UHNIPricingSummary | null>(null);
   const [isDataLoading, setIsDataLoading] = useState(true);
 
@@ -45,10 +43,9 @@ export default function PricingPage() {
     const loadData = async () => {
       setIsDataLoading(true);
       try {
-        const [negRes, alertRes, tierRes, sumRes] = await Promise.all([
+        const [negRes, alertRes, sumRes] = await Promise.all([
           getPriceNegotiations(),
           getPriceAlerts(),
-          getPricingTiers(),
           getPricingSummary(),
         ]);
         setNegotiations(() => {
@@ -57,7 +54,6 @@ export default function PricingPage() {
           return [...contextOnly, ...negRes.data];
         });
         setAlerts(alertRes.data);
-        setTiers(tierRes.data);
         setSummary(sumRes.data);
       } catch {
         showToast('Failed to load pricing data', 'error');
@@ -234,50 +230,6 @@ export default function PricingPage() {
           </div>
         </div>
 
-        {/* Pricing Tiers */}
-        <div className="mb-12">
-          <h2 className="font-display text-xl text-charcoal-deep mb-6">Your Pricing Tier</h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            {tiers.map((tier) => {
-              const isCurrentTier = tier.tier === 'uhni';
-              return (
-                <div
-                  key={tier.tier}
-                  className={`p-6 ${isCurrentTier ? 'bg-charcoal-deep' : 'bg-white'} relative`}
-                >
-                  {isCurrentTier && (
-                    <div className="absolute top-0 right-0 px-3 py-1 bg-gold-soft text-noir text-[10px] tracking-[0.1em] uppercase">
-                      Your Tier
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 mb-3">
-                    {isCurrentTier && <Crown size={16} className="text-gold-soft" />}
-                    <h3 className={`font-display text-lg ${isCurrentTier ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
-                      {tier.label}
-                    </h3>
-                  </div>
-                  <p className={`text-sm mb-4 ${isCurrentTier ? 'text-sand' : 'text-stone'}`}>
-                    {tier.description}
-                  </p>
-                  {tier.averageDiscount && (
-                    <p className={`text-sm font-medium mb-4 ${isCurrentTier ? 'text-gold-soft' : 'text-success'}`}>
-                      Average {tier.averageDiscount}% savings
-                    </p>
-                  )}
-                  <ul className="space-y-2">
-                    {tier.benefits.map((benefit, idx) => (
-                      <li key={idx} className={`flex items-start gap-2 text-sm ${isCurrentTier ? 'text-sand/80' : 'text-stone'}`}>
-                        <Check size={14} className={`mt-0.5 ${isCurrentTier ? 'text-gold-soft' : 'text-success'}`} />
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Tabs */}
         <div className="flex gap-1 bg-parchment p-1 mb-8">
           {[
@@ -350,100 +302,108 @@ export default function PricingPage() {
                           </div>
                         )}
                       </div>
-                      {/* Negotiation History Timeline */}
+                      {/* Negotiation History */}
                       <div className="mb-4">
-                        <span className="text-[10px] tracking-[0.2em] uppercase text-taupe block mb-3">Negotiation History</span>
-                        <div className="relative pl-5 border-l border-sand/60 space-y-4">
-                          {/* Step 1: Client proposed */}
+                        <span className="text-[10px] tracking-[0.2em] uppercase text-taupe block mb-3">History</span>
+                        <div className="relative pl-5 border-l border-sand/60 space-y-3">
+                          {/* You proposed */}
                           <div className="relative">
                             <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-charcoal-deep flex items-center justify-center">
                               <span className="w-1.5 h-1.5 rounded-full bg-ivory-cream" />
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-charcoal-deep">You proposed</span>
-                                <span className="text-xs font-medium text-charcoal-deep">{formatCurrency(negotiation.proposedPrice)}</span>
-                              </div>
-                              {negotiation.clientMessage && (
-                                <p className="text-sm text-stone mt-1 italic">&ldquo;{negotiation.clientMessage}&rdquo;</p>
-                              )}
-                              <p className="text-[10px] text-taupe mt-1">
-                                {new Date(negotiation.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                              </p>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-medium text-charcoal-deep">You proposed {formatCurrency(negotiation.proposedPrice)}</span>
+                              <span className="text-[10px] text-taupe">
+                                {new Date(negotiation.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
                             </div>
                           </div>
 
-                          {/* Concierge notes (if any) */}
-                          {negotiation.conciergeNotes.map((note, idx) => (
-                            <div key={idx} className="relative">
-                              <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-gold-soft/40 flex items-center justify-center">
-                                <Crown size={8} className="text-gold-deep" />
-                              </div>
-                              <div>
-                                <span className="text-xs font-medium text-gold-muted">Concierge</span>
-                                <p className="text-sm text-stone mt-0.5">{note}</p>
-                              </div>
+                          {/* Concierge submitted */}
+                          <div className="relative">
+                            <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-gold-soft/40 flex items-center justify-center">
+                              <Crown size={8} className="text-gold-deep" />
                             </div>
-                          ))}
+                            <span className="text-xs text-gold-muted">Concierge submitted to {negotiation.brandName}</span>
+                          </div>
 
-                          {/* Step 2: Brand responded (counter/approved/declined) */}
-                          {(negotiation.status === 'counter_offered' || negotiation.status === 'approved' || negotiation.status === 'declined') && (
-                            <div className="relative">
-                              <div className={`absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full flex items-center justify-center ${
-                                negotiation.status === 'counter_offered' ? 'bg-gold-soft' :
-                                negotiation.status === 'approved' ? 'bg-success' : 'bg-error/70'
-                              }`}>
-                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
-                              </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-medium text-charcoal-deep">{negotiation.brandName}</span>
-                                  {negotiation.status === 'counter_offered' && negotiation.counterOffer && (
-                                    <span className="text-xs font-medium text-gold-deep">countered at {formatCurrency(negotiation.counterOffer)}</span>
-                                  )}
-                                  {negotiation.status === 'approved' && (
-                                    <span className="text-xs font-medium text-success">approved your price</span>
-                                  )}
-                                  {negotiation.status === 'declined' && (
-                                    <span className="text-xs font-medium text-error">declined</span>
-                                  )}
-                                </div>
-                                {negotiation.brandMessage && (
-                                  <p className="text-sm text-stone mt-1 italic">&ldquo;{negotiation.brandMessage}&rdquo;</p>
-                                )}
-                                {negotiation.respondedAt && (
-                                  <p className="text-[10px] text-taupe mt-1">
-                                    {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Step 3: Client accepted/rejected counter */}
-                          {negotiation.status === 'accepted' && (
+                          {/* Brand responded */}
+                          {negotiation.status === 'approved' && (
                             <div className="relative">
                               <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-success flex items-center justify-center">
-                                <Check size={10} className="text-white" />
+                                <Check size={8} className="text-white" />
                               </div>
-                              <div>
-                                <span className="text-xs font-medium text-success">You accepted the counter offer</span>
-                                <p className="text-[10px] text-taupe mt-1">
-                                  Final price: <span className="font-medium text-charcoal-deep">{formatCurrency(negotiation.counterOffer || negotiation.proposedPrice)}</span>
-                                  {' · Saved '}
-                                  <span className="font-medium text-success">{formatCurrency(negotiation.originalPrice - (negotiation.counterOffer || negotiation.proposedPrice))}</span>
-                                </p>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-success">{negotiation.brandName} approved {formatCurrency(negotiation.proposedPrice)}</span>
+                                {negotiation.respondedAt && (
+                                  <span className="text-[10px] text-taupe">
+                                    {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </span>
+                                )}
                               </div>
                             </div>
                           )}
 
-                          {/* Pending indicator */}
+                          {negotiation.status === 'counter_offered' && (
+                            <div className="relative">
+                              <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-gold-soft flex items-center justify-center">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-gold-deep">{negotiation.brandName} countered at {formatCurrency(negotiation.counterOffer || 0)}</span>
+                                {negotiation.respondedAt && (
+                                  <span className="text-[10px] text-taupe">
+                                    {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {negotiation.status === 'declined' && (
+                            <div className="relative">
+                              <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-error/70 flex items-center justify-center">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-error">{negotiation.brandName} declined</span>
+                                {negotiation.respondedAt && (
+                                  <span className="text-[10px] text-taupe">
+                                    {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* You accepted the counter */}
+                          {negotiation.status === 'accepted' && (
+                            <>
+                              <div className="relative">
+                                <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-gold-soft flex items-center justify-center">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                                </div>
+                                <span className="text-xs font-medium text-gold-deep">{negotiation.brandName} countered at {formatCurrency(negotiation.counterOffer || 0)}</span>
+                              </div>
+                              <div className="relative">
+                                <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-success flex items-center justify-center">
+                                  <Check size={8} className="text-white" />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-success">You accepted — {formatCurrency(negotiation.counterOffer || negotiation.proposedPrice)}</span>
+                                  <span className="text-[10px] text-success">saved {formatCurrency(negotiation.originalPrice - (negotiation.counterOffer || negotiation.proposedPrice))}</span>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Pending */}
                           {negotiation.status === 'pending' && (
                             <div className="relative">
                               <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-sand flex items-center justify-center">
                                 <Clock size={8} className="text-stone" />
                               </div>
-                              <span className="text-xs text-taupe italic">Awaiting brand response...</span>
+                              <span className="text-xs text-taupe italic">Awaiting {negotiation.brandName}&apos;s response...</span>
                             </div>
                           )}
                         </div>
