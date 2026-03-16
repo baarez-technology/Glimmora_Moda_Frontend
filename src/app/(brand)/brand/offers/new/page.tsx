@@ -5,9 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Package, FolderOpen, Building, Percent, DollarSign, Plus, X } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { createUhniOffer } from '@/services/uhni-offers.service';
-import { fetchProducts, type BackendProduct } from '@/services/brand-product.service';
-import { fetchCollections, type CollectionResponse } from '@/services/brand-collection.service';
+import { createUhniOffer, fetchOfferBrandProducts, fetchOfferBrandCollections, type OfferBrandProduct, type OfferBrandCollection } from '@/services/uhni-offers.service';
 import { useApp } from '@/context/AppContext';
 
 type OfferType = 'products' | 'collections' | 'brand';
@@ -28,9 +26,17 @@ export default function NewOfferPage() {
   const router = useRouter();
   const { showToast } = useApp();
 
-  const [products, setProducts] = useState<BackendProduct[]>([]);
-  const [collections, setCollections] = useState<CollectionResponse[]>([]);
-  const [isLoadingTargets, setIsLoadingTargets] = useState(false);
+  const [products, setProducts] = useState<OfferBrandProduct[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [productSearch, setProductSearch] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [pageNumber, setPageNumber] = useState(1);
+
+  const [collections, setCollections] = useState<OfferBrandCollection[]>([]);
+  const [collectionsLoading, setCollectionsLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     offerType: 'products' as OfferType,
@@ -46,17 +52,33 @@ export default function NewOfferPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load products and collections from real API
+  // Load products with search/filter/pagination
   useEffect(() => {
-    setIsLoadingTargets(true);
-    Promise.all([
-      fetchProducts().catch(() => []),
-      fetchCollections().catch(() => []),
-    ]).then(([prods, cols]) => {
-      setProducts(prods);
-      setCollections(cols);
-    }).finally(() => setIsLoadingTargets(false));
-  }, []);
+    if (formData.offerType !== 'products') return;
+    setProductsLoading(true);
+    fetchOfferBrandProducts({
+      query: productSearch || undefined,
+      min_price: minPrice ? parseFloat(minPrice) : undefined,
+      max_price: maxPrice ? parseFloat(maxPrice) : undefined,
+      page: pageNumber,
+      page_size: 10,
+    }).then(res => {
+      setProducts(res.items);
+      setTotalProducts(res.total);
+      setTotalPages(res.total_pages);
+    }).catch(() => setProducts([]))
+      .finally(() => setProductsLoading(false));
+  }, [formData.offerType, productSearch, minPrice, maxPrice, pageNumber]);
+
+  // Load collections once when switching to collections type
+  useEffect(() => {
+    if (formData.offerType !== 'collections') return;
+    setCollectionsLoading(true);
+    fetchOfferBrandCollections()
+      .then(cols => setCollections(cols))
+      .catch(() => setCollections([]))
+      .finally(() => setCollectionsLoading(false));
+  }, [formData.offerType]);
 
   const toggleProduct = (productId: string) => {
     setFormData(prev => ({
@@ -184,80 +206,139 @@ export default function NewOfferPage() {
               <h2 className="font-medium text-charcoal-deep">
                 Select {formData.offerType === 'products' ? 'Products' : 'Collections'}
               </h2>
-              {formData.offerType === 'products' && formData.selectedProducts.length > 0 && (
-                <span className="text-xs text-taupe">{formData.selectedProducts.length} selected</span>
-              )}
-              {formData.offerType === 'collections' && formData.selectedCollections.length > 0 && (
-                <span className="text-xs text-taupe">{formData.selectedCollections.length} selected</span>
-              )}
+              <span className="text-sm text-taupe">
+                {formData.offerType === 'products' ? formData.selectedProducts.length : formData.selectedCollections.length} selected
+              </span>
             </div>
             <div className="p-6">
-              {isLoadingTargets ? (
-                <p className="text-sm text-taupe text-center py-4">Loading...</p>
-              ) : formData.offerType === 'products' ? (
-                products.length === 0 ? (
-                  <p className="text-sm text-taupe text-center py-4">No products available</p>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 max-h-72 overflow-y-auto pr-1">
-                    {products.map(product => {
-                      const isSelected = formData.selectedProducts.includes(product.product_id);
-                      return (
-                        <button
-                          key={product.product_id}
-                          type="button"
-                          onClick={() => toggleProduct(product.product_id)}
-                          className={`flex items-center gap-3 p-3 border text-left transition-colors ${
-                            isSelected ? 'border-charcoal-deep bg-parchment' : 'border-sand hover:border-charcoal-deep/50'
-                          }`}
-                        >
-                          <div className="w-10 h-10 bg-parchment flex-shrink-0 overflow-hidden">
-                            {product.product_image && (
-                              <img src={product.product_image} alt={product.product_name} className="w-full h-full object-cover" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-xs truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
-                              {product.product_name}
-                            </p>
-                            <p className="text-[10px] text-taupe">${product.price.toLocaleString()}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
+              {formData.offerType === 'products' ? (
+                <>
+                  <div className="flex gap-3 mb-4">
+                    <input
+                      type="text"
+                      value={productSearch}
+                      onChange={e => { setProductSearch(e.target.value); setPageNumber(1); }}
+                      placeholder="Search products..."
+                      className="flex-1 px-4 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    />
+                    <input
+                      type="number"
+                      value={minPrice}
+                      onChange={e => { setMinPrice(e.target.value); setPageNumber(1); }}
+                      placeholder="Min price"
+                      min={0}
+                      className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    />
+                    <input
+                      type="number"
+                      value={maxPrice}
+                      onChange={e => { setMaxPrice(e.target.value); setPageNumber(1); }}
+                      placeholder="Max price"
+                      min={0}
+                      className="w-28 px-3 py-2 border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    />
                   </div>
-                )
+                  {productsLoading ? (
+                    <p className="text-sm text-taupe text-center py-8">Loading products...</p>
+                  ) : products.length === 0 ? (
+                    <p className="text-sm text-taupe text-center py-8">No products available</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {products.map(product => {
+                        const isSelected = formData.selectedProducts.includes(product.product_id);
+                        return (
+                          <button
+                            key={product.product_id}
+                            type="button"
+                            onClick={() => toggleProduct(product.product_id)}
+                            className={`flex items-center gap-4 p-4 border text-left transition-colors ${
+                              isSelected ? 'border-charcoal-deep bg-parchment' : 'border-sand hover:border-charcoal-deep/50'
+                            }`}
+                          >
+                            <div className="w-12 h-12 bg-parchment flex-shrink-0">
+                              {product.product_image && (
+                                <img src={product.product_image} alt={product.product_name} className="w-full h-full object-cover" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
+                                {product.product_name}
+                              </p>
+                              <p className="text-xs text-taupe">&euro;{product.price.toLocaleString()}</p>
+                            </div>
+                            <div className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 ${
+                              isSelected ? 'border-charcoal-deep bg-charcoal-deep' : 'border-taupe'
+                            }`}>
+                              {isSelected && (
+                                <svg className="w-3 h-3 text-ivory-cream" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t border-sand/50">
+                      <p className="text-xs text-taupe">Page {pageNumber} of {totalPages} · {totalProducts} products</p>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={pageNumber === 1}
+                          className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40">
+                          Previous
+                        </button>
+                        <button type="button" onClick={() => setPageNumber(p => Math.min(totalPages, p + 1))} disabled={pageNumber === totalPages}
+                          className="px-3 py-1 text-xs border border-sand text-charcoal-deep hover:bg-parchment transition-colors disabled:opacity-40">
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : collectionsLoading ? (
+                <p className="text-sm text-taupe text-center py-8">Loading collections...</p>
+              ) : collections.length === 0 ? (
+                <p className="text-sm text-taupe text-center py-8">No collections available</p>
               ) : (
-                collections.length === 0 ? (
-                  <p className="text-sm text-taupe text-center py-4">No collections available</p>
-                ) : (
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {collections.map(collection => {
-                      const isSelected = formData.selectedCollections.includes(collection.collection_id);
-                      return (
-                        <button
-                          key={collection.collection_id}
-                          type="button"
-                          onClick={() => toggleCollection(collection.collection_id)}
-                          className={`flex items-center gap-3 p-3 border text-left transition-colors ${
-                            isSelected ? 'border-charcoal-deep bg-parchment' : 'border-sand hover:border-charcoal-deep/50'
-                          }`}
-                        >
-                          <div className="w-12 h-12 bg-parchment flex-shrink-0 overflow-hidden">
-                            {collection.collection_image && (
-                              <img src={collection.collection_image} alt={collection.collection_name} className="w-full h-full object-cover" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className={`text-sm truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
-                              {collection.collection_name}
-                            </p>
-                            <p className="text-[10px] text-taupe capitalize">{collection.season} {collection.year}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {collections.map(collection => {
+                    const isSelected = formData.selectedCollections.includes(collection.collection_id);
+                    return (
+                      <button
+                        key={collection.collection_id}
+                        type="button"
+                        onClick={() => toggleCollection(collection.collection_id)}
+                        className={`flex items-center gap-4 p-4 border text-left transition-colors ${
+                          isSelected ? 'border-charcoal-deep bg-parchment' : 'border-sand hover:border-charcoal-deep/50'
+                        }`}
+                      >
+                        <div className="w-12 h-12 bg-parchment flex-shrink-0">
+                          {collection.collection_image && (
+                            <img src={collection.collection_image} alt={collection.collection_name} className="w-full h-full object-cover" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${isSelected ? 'text-charcoal-deep' : 'text-stone'}`}>
+                            {collection.collection_name}
+                          </p>
+                          {(collection.season || collection.year) && (
+                            <p className="text-xs text-taupe capitalize">{collection.season} {collection.year}</p>
+                          )}
+                        </div>
+                        <div className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 ${
+                          isSelected ? 'border-charcoal-deep bg-charcoal-deep' : 'border-taupe'
+                        }`}>
+                          {isSelected && (
+                            <svg className="w-3 h-3 text-ivory-cream" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>

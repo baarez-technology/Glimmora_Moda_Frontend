@@ -981,53 +981,183 @@ export function saveSourcingState(req: EnrichedSourcingRequest) {
   saveLocalEnrichment(enrichments);
 }
 
+// ── API Base ──────────────────────────────────────────────────────────
+
+const BASE = '/api/consumer-sourcing';
+
 // ── API Functions ─────────────────────────────────────────────────────
 
 export async function getProductCategories(): Promise<string[]> {
   try {
-    const res = await fetch(
-      '/api/v1/consumer/sourcing-requests/product-categories',
-      { headers: authHeaders() },
-    );
+    const res = await fetch(`${BASE}/product-categories`, { headers: authHeaders() });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     return data.product_categories as string[];
   } catch {
-    // Fallback categories for demo
     return ['Handbags', 'Ready-to-Wear', 'Watches', 'Jewelry', 'Shoes', 'Accessories', 'Trunks & Travel', 'Complete Looks', 'Fine Art', 'Home & Living'];
   }
 }
 
 export async function getSourcingRequests(): Promise<ApiSourcingRequest[]> {
   try {
-    const res = await fetch('/api/v1/consumer/sourcing-requests', {
-      headers: authHeaders(),
-    });
+    const res = await fetch(BASE, { headers: authHeaders() });
     if (!res.ok) throw new Error(`${res.status}`);
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) return data;
   } catch {
     // API unavailable — fall back to mock + local data
   }
-  // Merge mock data with locally created/modified requests
   const local = getLocalRequests();
   const mockCopy = [...MOCK_REQUESTS];
-  // Local overrides mock (for modified mock requests) and adds new ones
   for (const lr of local) {
     const idx = mockCopy.findIndex(m => m.sourcing_id === lr.sourcing_id);
-    if (idx >= 0) {
-      mockCopy[idx] = lr; // override mock with local changes
-    } else {
-      mockCopy.unshift(lr); // new request at top
-    }
+    if (idx >= 0) { mockCopy[idx] = lr; } else { mockCopy.unshift(lr); }
   }
   return mockCopy;
 }
 
-/** Override enrichment: local enrichment takes priority over built-in mock */
+export async function getSourcingRequestById(sourcingId: string): Promise<ApiSourcingRequest | null> {
+  try {
+    const res = await fetch(`${BASE}/${sourcingId}`, { headers: authHeaders() });
+    if (!res.ok) throw new Error(`${res.status}`);
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function selectSourcingOption(sourcingId: string, optionId: string): Promise<void> {
+  await fetch(`${BASE}/${sourcingId}/product-options/${optionId}/select`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+  });
+}
+
+export async function sendConsumerMessage(sourcingId: string, message: string): Promise<void> {
+  await fetch(`${BASE}/${sourcingId}/messages?message=${encodeURIComponent(message)}`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+}
+
+export async function addConsumerNegotiation(
+  sourcingId: string,
+  optionId: string,
+  offerPrice: number,
+  notes: string,
+): Promise<void> {
+  await fetch(
+    `${BASE}/${sourcingId}/product-options/${optionId}/negotiations?offer_price=${offerPrice}&notes=${encodeURIComponent(notes)}`,
+    { method: 'POST', headers: authHeaders() },
+  );
+}
+
+export async function acceptConsumerNegotiation(
+  sourcingId: string,
+  optionId: string,
+  negotiationsId: string,
+): Promise<void> {
+  await fetch(
+    `${BASE}/${sourcingId}/product-options/${optionId}/negotiations/${negotiationsId}/accept`,
+    { method: 'PATCH', headers: authHeaders() },
+  );
+}
+
+/** Map real API product_options → SourcingOptionItem[] */
+function mapApiOptions(apiReq: ApiSourcingRequest): SourcingOptionItem[] {
+  const raw = (apiReq as unknown as { product_options?: unknown[] }).product_options;
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+
+  return raw.map((opt: unknown) => {
+    const o = opt as Record<string, unknown>;
+    const negs = Array.isArray(o.negotiations) ? (o.negotiations as Record<string, unknown>[]) : [];
+    const realNegs = negs.filter(n => n.negotiations_id);
+    const lastNeg = realNegs[realNegs.length - 1];
+
+    let negotiationStatus: NegotiationStatus = 'none';
+    let proposedPrice: number | undefined;
+    let negotiationNote: string | undefined;
+
+    if (lastNeg) {
+      if (lastNeg.is_accepted) {
+        negotiationStatus = 'accepted';
+        proposedPrice = lastNeg.offer_price as number;
+      } else {
+        negotiationStatus = 'negotiating';
+        proposedPrice = lastNeg.offer_price as number;
+        negotiationNote = lastNeg.notes as string | undefined;
+      }
+    }
+
+    const price = o.price as number;
+    const offerPrice = o.offer_price as number;
+
+    return {
+      id: o.option_product_id as string,
+      title: o.option_title as string,
+      brandName: o.source_name as string | undefined,
+      source: o.source_name as string,
+      sourceLocation: o.source_location as string,
+      condition: 'new' as const,
+      price,
+      originalPrice: offerPrice < price ? price : undefined,
+      currency: 'EUR',
+      estimatedDelivery: o.estimate_delivery as string,
+      conciergeNote: o.notes as string | undefined,
+      selected: o.is_customer_selected as boolean,
+      negotiationStatus,
+      proposedPrice,
+      negotiationNote,
+      // store the negotiations_id of the last negotiation for accept/decline
+      counterPrice: lastNeg && !lastNeg.is_accepted ? lastNeg.offer_price as number : undefined,
+      counterNote: lastNeg && !lastNeg.is_accepted ? lastNeg.notes as string | undefined : undefined,
+    } as SourcingOptionItem & { _negId?: string };
+  });
+}
+
+/** Map real API messages → SourcingChatMessage[] */
+function mapApiMessages(apiReq: ApiSourcingRequest): SourcingChatMessage[] {
+  const raw = (apiReq as unknown as { messages?: unknown[] }).messages;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((m: unknown, idx: number) => {
+    const msg = m as Record<string, unknown>;
+    const isClient = msg.type === 'customer';
+    return {
+      id: `api-msg-${idx}`,
+      sender: isClient ? ('client' as const) : ('concierge' as const),
+      senderName: isClient ? 'You' : 'Brand',
+      content: msg.message as string,
+      timestamp: msg.created_at as string,
+    };
+  });
+}
+
+/** Override enrichment: uses real API data when available, otherwise mock */
 export function enrichSourcingRequestWithLocal(
   req: ApiSourcingRequest,
 ): EnrichedSourcingRequest {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const apiReq: any = req;
+  const hasRealData = apiReq.product_options !== undefined || apiReq.timelines !== undefined;
+
+  if (hasRealData) {
+    // Build timeline dates from timelines array
+    const timelineDates: Record<string, string> = {};
+    if (Array.isArray(apiReq.timelines)) {
+      for (const t of apiReq.timelines) {
+        timelineDates[t.status] = t.updated_at;
+      }
+    }
+    return {
+      ...req,
+      timeline: buildTimeline(req.status, timelineDates),
+      options: mapApiOptions(req),
+      messages: mapApiMessages(req),
+      conciergeAssigned: undefined,
+    };
+  }
+
+  // Fall back to local enrichment or mock
   const localEnrichments = getLocalEnrichment();
   const local = localEnrichments[req.sourcing_id];
   if (local) {
@@ -1046,7 +1176,7 @@ export async function createSourcingRequest(
   payload: CreateSourcingRequestPayload,
 ): Promise<ApiSourcingRequest> {
   try {
-    const res = await fetch('/api/v1/consumer/sourcing-requests', {
+    const res = await fetch(BASE, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(payload),
