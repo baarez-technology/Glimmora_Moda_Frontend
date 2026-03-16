@@ -20,6 +20,10 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Check,
+  Info,
+  ShoppingBag,
+  Heart,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { uhniService } from '@/services';
@@ -35,6 +39,7 @@ export default function SilentCommercePage() {
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [items, setItems] = useState<SilentCommerceItem[]>([]);
   const [transactions, setTransactions] = useState<InvisibleTransaction[]>([]);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     Promise.all([
@@ -204,68 +209,203 @@ export default function SilentCommercePage() {
         {/* ═══════════════════════════════════════════════ */}
         {activeTab === 'awareness' && (
           <>
-            <h2 className="text-[10px] tracking-[0.3em] uppercase text-stone mb-6">Product Awareness</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {items.map(item => {
-                const AwarenessIcon = getAwarenessIcon(item.awareness);
-                const DisplayModeIcon = getDisplayModeIcon(item.displayMode);
-                const relevancePercent = Math.round(item.relevanceScore * 100);
-                return (
-                  <div key={item.id} className="bg-white border border-sand/30 overflow-hidden flex flex-col">
-                    <div className="relative w-full aspect-square bg-parchment">
-                      <Image
-                        src={item.productImage}
-                        alt={item.productName}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute top-3 right-3 bg-charcoal-deep/80 backdrop-blur-sm px-2 py-1 flex items-center gap-1.5">
-                        <Gauge size={12} className="text-gold-soft" />
-                        <span className="text-[10px] text-ivory-cream font-medium">{relevancePercent}%</span>
-                      </div>
-                    </div>
-
-                    <div className="p-6 flex flex-col flex-1">
-                      <div className="flex items-center flex-wrap gap-2 mb-4">
-                        <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase inline-flex items-center gap-1.5 ${getAwarenessBadge(item.awareness)}`}>
-                          <AwarenessIcon size={12} />
-                          {item.awareness}
-                        </span>
-                        <span className={`px-3 py-1 text-[10px] tracking-[0.15em] uppercase inline-flex items-center gap-1.5 ${getDisplayModeBadge(item.displayMode)}`}>
-                          <DisplayModeIcon size={12} />
-                          {item.displayMode}
-                        </span>
-                      </div>
-
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-1">{item.brandName}</p>
-                      <h3 className="font-display text-lg text-charcoal-deep mb-2">{item.productName}</h3>
-                      <p className="font-display text-xl text-charcoal-deep mb-4">{formatCurrency(item.price)}</p>
-
-                      <p className="text-sm text-stone leading-relaxed mt-auto">{item.context}</p>
-
-                      <div className="mt-4 pt-4 border-t border-sand/30">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[10px] tracking-[0.15em] uppercase text-stone">Relevance</span>
-                          <span className="text-xs text-charcoal-deep font-medium">{relevancePercent}%</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-parchment overflow-hidden">
-                          <div
-                            className="h-full bg-gold-soft transition-all duration-500"
-                            style={{ width: `${relevancePercent}%` }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* How it works */}
+            <div className="mb-8 bg-parchment border border-sand p-5 flex gap-4">
+              <Info size={18} className="text-stone flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-charcoal-deep mb-1">How Silent Commerce Works</p>
+                <p className="text-sm text-stone leading-relaxed">
+                  Based on your style profile, browsing patterns, and upcoming events, our AI quietly surfaces items
+                  you might love. Select items to add to your cart or wishlist — you&apos;re always in control.
+                </p>
+              </div>
             </div>
 
-            {items.length === 0 && isLoaded && (
-              <div className="text-center py-16">
-                <Radio size={40} className="text-stone/40 mx-auto mb-4" />
-                <p className="text-stone">No silent commerce items available</p>
+            {items.length === 0 && isLoaded ? (
+              <div className="text-center py-16 bg-white border border-sand">
+                <Radio size={40} className="text-taupe/40 mx-auto mb-4" />
+                <p className="text-charcoal-deep font-medium mb-2">No items prepared yet</p>
+                <p className="text-sm text-stone mb-6 max-w-md mx-auto">
+                  Browse products and build your wardrobe so Silent Commerce can learn your preferences.
+                </p>
+                <Link
+                  href="/uhni/discover"
+                  className="inline-block px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+                >
+                  Browse Products
+                </Link>
               </div>
+            ) : (
+              <>
+                {/* Items count + Select All */}
+                <div className="flex items-center justify-between mb-6 pb-4 border-b border-sand">
+                  <p className="text-sm text-charcoal-deep">
+                    <span className="font-medium">{items.length} items</span> prepared for you
+                  </p>
+                  <button
+                    onClick={() => {
+                      if (selectedItems.size === items.length) {
+                        setSelectedItems(new Set());
+                      } else {
+                        setSelectedItems(new Set(items.map(i => i.id)));
+                      }
+                    }}
+                    className="text-sm font-medium tracking-[0.1em] uppercase text-charcoal-deep hover:text-gold-deep transition-colors"
+                  >
+                    {selectedItems.size === items.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+
+                {/* Item Cards */}
+                <div className="space-y-4">
+                  {items.map(item => {
+                    const AwarenessIcon = getAwarenessIcon(item.awareness);
+                    const relevancePercent = Math.round(item.relevanceScore * 100);
+                    const isSelected = selectedItems.has(item.id);
+
+                    return (
+                      <div key={item.id} className="bg-white border border-sand/50 overflow-hidden">
+                        {/* Product Row */}
+                        <div className="flex gap-4 p-5">
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => {
+                              setSelectedItems(prev => {
+                                const next = new Set(prev);
+                                if (next.has(item.id)) next.delete(item.id);
+                                else next.add(item.id);
+                                return next;
+                              });
+                            }}
+                            className={`flex-shrink-0 w-5 h-5 mt-1 border transition-colors flex items-center justify-center ${
+                              isSelected
+                                ? 'bg-charcoal-deep border-charcoal-deep'
+                                : 'border-sand hover:border-charcoal-deep'
+                            }`}
+                          >
+                            {isSelected && <Check size={12} className="text-ivory-cream" />}
+                          </button>
+
+                          {/* Image */}
+                          <Link href={`/product/${item.productId}`} className="flex-shrink-0">
+                            <div className="relative w-[90px] h-[110px] bg-parchment overflow-hidden">
+                              <Image
+                                src={item.productImage}
+                                alt={item.productName}
+                                fill
+                                className="object-cover hover:scale-105 transition-transform duration-500"
+                              />
+                              {/* Awareness indicator */}
+                              <div className={`absolute top-0 left-0 w-1.5 h-full ${
+                                item.awareness === 'urgent' ? 'bg-error' :
+                                item.awareness === 'active' ? 'bg-gold-soft' : 'bg-info/50'
+                              }`} />
+                            </div>
+                          </Link>
+
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-0.5">
+                              {item.brandName}
+                            </p>
+                            <Link href={`/product/${item.productId}`} className="hover:underline decoration-sand">
+                              <p className="text-sm font-medium text-charcoal-deep leading-tight mb-1">
+                                {item.productName}
+                              </p>
+                            </Link>
+                            <p className="font-display text-lg text-charcoal-deep">
+                              {formatCurrency(item.price)}
+                            </p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className={`px-2 py-0.5 text-[9px] tracking-[0.1em] uppercase inline-flex items-center gap-1 ${getAwarenessBadge(item.awareness)}`}>
+                                <AwarenessIcon size={10} />
+                                {item.awareness}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Relevance Score */}
+                          <div className="flex-shrink-0 text-right">
+                            <div className="flex items-center gap-1.5">
+                              <Gauge size={14} className="text-gold-soft" />
+                              <span className="text-sm font-medium text-charcoal-deep">{relevancePercent}%</span>
+                            </div>
+                            <p className="text-[9px] text-taupe mt-0.5">match</p>
+                          </div>
+                        </div>
+
+                        {/* Context / Reason */}
+                        <div className="px-5 pb-4">
+                          <div className="bg-parchment/50 border border-sand/30 px-4 py-3">
+                            <p className="text-xs text-stone leading-relaxed">{item.context}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Cart Summary */}
+                {items.length > 0 && (
+                  <div className="mt-8 border-t border-sand pt-6">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Selected Total</p>
+                        <p className="text-lg font-display text-charcoal-deep">
+                          {formatCurrency(
+                            items.filter(i => selectedItems.has(i.id)).reduce((sum, i) => sum + i.price, 0)
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] tracking-[0.15em] uppercase text-taupe mb-1">Full Cart Value</p>
+                        <p className="text-lg font-display text-charcoal-deep">
+                          {formatCurrency(items.reduce((sum, i) => sum + i.price, 0))}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          if (selectedItems.size === 0) return;
+                          showToast(`${selectedItems.size} item${selectedItems.size > 1 ? 's' : ''} added to cart`, 'success');
+                          setSelectedItems(new Set());
+                        }}
+                        disabled={selectedItems.size === 0}
+                        className={`flex-1 py-3.5 text-sm tracking-[0.1em] uppercase flex items-center justify-center gap-2 transition-colors ${
+                          selectedItems.size > 0
+                            ? 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
+                            : 'bg-sand text-stone cursor-not-allowed'
+                        }`}
+                      >
+                        <ShoppingBag size={16} />
+                        Add to Cart ({selectedItems.size})
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (selectedItems.size === 0) return;
+                          showToast(`${selectedItems.size} item${selectedItems.size > 1 ? 's' : ''} added to wishlist`, 'success');
+                          setSelectedItems(new Set());
+                        }}
+                        disabled={selectedItems.size === 0}
+                        className={`px-6 py-3.5 text-sm tracking-[0.1em] uppercase flex items-center justify-center gap-2 border transition-colors ${
+                          selectedItems.size > 0
+                            ? 'border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream'
+                            : 'border-sand text-stone cursor-not-allowed'
+                        }`}
+                      >
+                        <Heart size={16} />
+                        Wishlist
+                      </button>
+                    </div>
+
+                    <p className="text-xs text-taupe text-center mt-4">
+                      Items are prepared based on your preferences and expire after 30 days.
+                    </p>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
