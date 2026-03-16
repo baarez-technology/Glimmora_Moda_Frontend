@@ -7,6 +7,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Crown, Phone, Mail, MessageCircle, Calendar, Clock, Globe, Award, Send, ChevronRight, X, User, Star, Users, Check, ClipboardList } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { AppointmentType, ConciergeAppointment } from '@/types/uhni';
+import type { Brand } from '@/types';
+import { getAllBrands } from '@/services/recommendation.service';
 import TasksSection from './TasksSection';
 
 interface Message {
@@ -69,9 +71,13 @@ export default function ConciergePage() {
   const [bookingTime, setBookingTime] = useState('');
   const [bookingDuration, setBookingDuration] = useState(60);
   const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingLocation, setBookingLocation] = useState<'in_store' | 'virtual' | 'home'>('in_store');
+  const [bookingBrandId, setBookingBrandId] = useState('');
+  const [brands, setBrands] = useState<Brand[]>([]);
 
   useEffect(() => {
     setIsLoaded(true);
+    getAllBrands().then(setBrands).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -286,6 +292,8 @@ export default function ConciergePage() {
       time: bookingTime,
       duration: bookingDuration,
       notes: bookingNotes || undefined,
+      location: bookingLocation,
+      brand_id: bookingBrandId || undefined,
     });
 
     // Add chat message
@@ -312,6 +320,8 @@ export default function ConciergePage() {
     setBookingTime('');
     setBookingDuration(60);
     setBookingNotes('');
+    setBookingLocation('in_store');
+    setBookingBrandId('');
   };
 
   const upcomingAppointments = conciergeAppointments.filter(a => a.status === 'upcoming');
@@ -830,6 +840,23 @@ export default function ConciergePage() {
                 </div>
               </div>
 
+              {/* Brand */}
+              {brands.length > 0 && (
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Brand (Optional)</label>
+                  <select
+                    value={bookingBrandId}
+                    onChange={e => setBookingBrandId(e.target.value)}
+                    className="w-full px-4 py-3 bg-parchment border-0 text-charcoal-deep focus:outline-none focus:ring-1 focus:ring-charcoal-deep"
+                  >
+                    <option value="">Select a brand…</option>
+                    {brands.map(b => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Date & Time */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -869,6 +896,32 @@ export default function ConciergePage() {
                       }`}
                     >
                       {d}m
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Location */}
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Location</label>
+                <div className="grid grid-cols-3 gap-3">
+                  {([
+                    { value: 'in_store', label: 'In Store', icon: '🏪' },
+                    { value: 'virtual', label: 'Virtual', icon: '💻' },
+                    { value: 'home', label: 'Home Visit', icon: '🏠' },
+                  ] as const).map(loc => (
+                    <button
+                      key={loc.value}
+                      type="button"
+                      onClick={() => setBookingLocation(loc.value)}
+                      className={`p-3 text-center border transition-colors ${
+                        bookingLocation === loc.value
+                          ? 'border-charcoal-deep bg-parchment'
+                          : 'border-sand bg-white hover:border-charcoal-deep/50'
+                      }`}
+                    >
+                      <span className="text-lg mb-1 block">{loc.icon}</span>
+                      <p className="text-xs font-medium text-charcoal-deep">{loc.label}</p>
                     </button>
                   ))}
                 </div>
