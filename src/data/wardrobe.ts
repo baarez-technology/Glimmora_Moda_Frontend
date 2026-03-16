@@ -118,92 +118,72 @@ export const mockWardrobeAnalysis: WardrobeAnalysis = {
 // ============================================
 
 export function getMockOutfits(product: Product): CompleteOutfit[] {
-  const relatedProducts = products.filter(p => p.id !== product.id);
+  // Build complementary items from DIFFERENT categories than the current product
+  const clothing = products.find(p => p.category === 'clothing' && p.id !== product.id);
+  const shoes    = products.find(p => p.category === 'shoes' && p.id !== product.id);
+  const bags     = products.find(p => p.category === 'bags' && p.id !== product.id);
+  const accessories = products.find(p => p.category === 'accessories' && p.id !== product.id);
+
+  // Pick 2-3 items from categories the current product is NOT in
+  const complementary = [clothing, shoes, bags, accessories]
+    .filter((p): p is Product => p != null && p.category !== product.category);
+
+  const categoryLabel = (cat: string) => cat.charAt(0).toUpperCase() + cat.slice(1);
+
+  // Build outfits using available complementary products
+  const outfit1Items = complementary.slice(0, 3);
+  const outfit2Items = complementary.length >= 2 ? [complementary[complementary.length - 1], complementary[0]] : complementary.slice(0, 2);
+  const outfit3Items = complementary.slice(0, 2);
+
+  const makeItems = (picks: Product[]) => [
+    {
+      type: 'suggested' as const,
+      productId: product.id,
+      product: product,
+      category: categoryLabel(product.category),
+    },
+    ...picks.map((p, i) => ({
+      type: (i === 0 ? 'wardrobe' : 'suggested') as 'wardrobe' | 'suggested',
+      productId: p.id,
+      product: p,
+      category: categoryLabel(p.category),
+      ...(i === 0 ? { note: 'From your wardrobe' } : {}),
+    })),
+  ];
+
+  const totalPrice = (picks: Product[]) =>
+    product.price + picks.reduce((sum, p) => sum + p.price, 0);
 
   return [
     {
       id: 'outfit-1',
       name: 'Power Professional',
       occasion: 'Business Meeting',
-      description: 'A commanding yet refined ensemble perfect for important meetings and presentations.',
-      items: [
-        {
-          type: 'suggested',
-          productId: product.id,
-          product: product,
-          category: product.category.charAt(0).toUpperCase() + product.category.slice(1)
-        },
-        {
-          type: 'wardrobe',
-          productId: 'dior-bar-jacket',
-          product: products.find(p => p.id === 'dior-bar-jacket') || relatedProducts[0],
-          category: 'Jacket',
-          note: 'From your wardrobe'
-        },
-        {
-          type: 'suggested',
-          productId: 'gucci-horsebit-loafer',
-          product: products.find(p => p.id === 'gucci-horsebit-loafer') || relatedProducts[1],
-          category: 'Shoes'
-        }
-      ],
+      description: `A commanding yet refined ensemble built around your ${product.name}.`,
+      items: makeItems(outfit1Items),
       compatibilityScore: 94,
-      totalPrice: product.price + 3200 + 890,
-      agiReasoning: 'The structured lines of the Bar Jacket complement the sophistication of this piece, while the Horsebit Loafers ground the look with Italian craftsmanship. This combination projects confidence and refined taste.'
+      totalPrice: totalPrice(outfit1Items),
+      agiReasoning: `The ${outfit1Items.map(p => p.name).join(' and ')} complement the ${product.name} with structured elegance — projecting confidence and refined taste for professional settings.`,
     },
     {
       id: 'outfit-2',
       name: 'Evening Events',
       occasion: 'Art & Culture',
-      description: 'An artistically sophisticated look for cultural events and gallery openings.',
-      items: [
-        {
-          type: 'suggested',
-          productId: product.id,
-          product: product,
-          category: product.category.charAt(0).toUpperCase() + product.category.slice(1)
-        },
-        {
-          type: 'suggested',
-          productId: 'bottega-cassette',
-          product: products.find(p => p.id === 'bottega-cassette') || relatedProducts[2],
-          category: 'Bag',
-          note: 'The intrecciato weave adds artistic texture'
-        },
-        {
-          type: 'suggested',
-          productId: 'hermes-silk-scarf',
-          product: products.find(p => p.id === 'hermes-silk-scarf') || relatedProducts[3],
-          category: 'Accessory'
-        }
-      ],
+      description: `An artistically sophisticated look for cultural events featuring the ${product.name}.`,
+      items: makeItems(outfit2Items),
       compatibilityScore: 91,
-      totalPrice: product.price + 3200 + 450,
-      agiReasoning: 'For cultural environments, this ensemble balances artistic expression with understated luxury. The Bottega intrecciato weave resonates with craft appreciation, while the Hermès scarf adds a touch of heritage artistry.'
+      totalPrice: totalPrice(outfit2Items),
+      agiReasoning: `For cultural environments, the ${outfit2Items.map(p => p.name).join(' paired with ')} balances artistic expression with the understated luxury of your ${product.name}.`,
     },
     {
       id: 'outfit-3',
       name: 'Weekend Elegance',
       occasion: 'Brunch & Leisure',
-      description: 'Effortlessly chic for relaxed yet refined weekend occasions.',
-      items: [
-        {
-          type: 'suggested',
-          productId: product.id,
-          product: product,
-          category: product.category.charAt(0).toUpperCase() + product.category.slice(1)
-        },
-        {
-          type: 'suggested',
-          productId: 'gucci-jackie-1961',
-          product: products.find(p => p.id === 'gucci-jackie-1961') || relatedProducts[0],
-          category: 'Bag',
-          note: 'Iconic relaxed sophistication'
-        }
-      ],
+      description: `Effortlessly chic weekend styling centred on the ${product.name}.`,
+      items: makeItems(outfit3Items),
       compatibilityScore: 88,
-      totalPrice: product.price + 2950,
-      agiReasoning: 'The Jackie bag\'s curved silhouette brings a relaxed elegance that perfectly complements weekend styling while maintaining an air of refined taste.'
-    }
+      totalPrice: totalPrice(outfit3Items),
+      agiReasoning: `The relaxed sophistication of ${outfit3Items.map(p => p.name).join(' and ')} perfectly complements weekend styling with the ${product.name}.`,
+    },
   ];
 }

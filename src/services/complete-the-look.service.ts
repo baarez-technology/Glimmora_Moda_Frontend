@@ -27,6 +27,8 @@ export interface CompleteTheLookRequest {
   event_title: string;
   event_short_description: string;
   current_product_id: string;
+  current_product_name?: string;
+  current_product_category?: string;
 }
 
 export interface CompleteTheLookResponse {

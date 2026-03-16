@@ -42,12 +42,25 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
       event_title: event.title,
       event_short_description: event.description,
       current_product_id: product.id,
+      current_product_name: product.name,
+      current_product_category: product.category,
     });
+
+    // Filter out items that share the same category as the selected product
+    // (e.g. don't suggest another jacket when viewing a jacket)
+    if (result && result.products) {
+      const currentCat = product.category?.toLowerCase();
+      result.products = result.products.filter(p => {
+        const cat = p.product_category?.toLowerCase();
+        // Keep item if its category differs from current product's category
+        return !currentCat || !cat || cat !== currentCat;
+      });
+    }
 
     setApiResponse(result);
     setIsLoadingApi(false);
     setHasCalledApi(true);
-  }, [product.id]);
+  }, [product.id, product.name, product.category]);
 
   // Fetch on mount
   useEffect(() => {
