@@ -3,14 +3,15 @@
 import { Suspense, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2 } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2, Shield } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { brandLogin, userLogin, storeUserAuth, socialSignIn, verify2FALogin } from '@/services/auth.service';
 import type { UserTokenResponse } from '@/services/auth.service';
 import { signInWithGoogle, signInWithApple } from '@/lib/firebase';
+import { getAdminUser } from '@/data/admin';
 
-type LoginTier = 'consumer' | 'uhni' | 'brand';
+type LoginTier = 'consumer' | 'uhni' | 'brand' | 'admin';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
@@ -32,7 +33,7 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedTier, setSelectedTier] = useState<LoginTier>(
-    initialMode === 'brand' ? 'brand' : initialMode === 'uhni' ? 'uhni' : 'consumer'
+    initialMode === 'admin' ? 'admin' : initialMode === 'brand' ? 'brand' : initialMode === 'uhni' ? 'uhni' : 'consumer'
   );
   const [formData, setFormData] = useState({
     email: '',
@@ -112,6 +113,24 @@ function LoginForm() {
 
     setIsSubmitting(true);
     setLoginError(null);
+
+    if (selectedTier === 'admin') {
+      try {
+        const adminUser = getAdminUser();
+        adminUser.email = formData.email;
+        adminUser.lastActive = new Date().toISOString();
+        localStorage.setItem('moda-admin-auth', 'true');
+        localStorage.setItem('moda-admin-data', JSON.stringify(adminUser));
+        showToast('Welcome to the Admin Console.', 'success');
+        router.push('/admin');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Login failed';
+        setLoginError(message);
+        showToast(message, 'error');
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     if (selectedTier === 'brand') {
       try {
@@ -314,15 +333,25 @@ function LoginForm() {
               </h2>
             </Link>
             <p className="text-[10px] tracking-[0.5em] uppercase text-gold-soft mb-6">
-              {selectedTier === 'brand' ? 'Brand Partner Portal' : 'Experience-First Luxury Commerce'}
+              {selectedTier === 'admin' ? 'Admin Console' : selectedTier === 'brand' ? 'Brand Partner Portal' : 'Experience-First Luxury Commerce'}
             </p>
             <p className="text-sand leading-relaxed mb-10">
-              {selectedTier === 'brand'
+              {selectedTier === 'admin'
+                ? 'Manage users, brands, content moderation, platform configuration, and system health.'
+                : selectedTier === 'brand'
                 ? 'Manage your products, track performance, and access demand intelligence through our B2B platform.'
                 : 'The world\'s first AGI-native fashion universe. Where intelligence meets elegance, and every interaction is crafted for distinction.'}
             </p>
             <div className="flex items-center justify-center gap-8 text-taupe text-sm">
-              {selectedTier === 'brand' ? (
+              {selectedTier === 'admin' ? (
+                <>
+                  <span>User Management</span>
+                  <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
+                  <span>Platform Control</span>
+                  <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
+                  <span>System Health</span>
+                </>
+              ) : selectedTier === 'brand' ? (
                 <>
                   <span>Real-time Analytics</span>
                   <span className="w-1 h-1 bg-gold-soft/50 rounded-full" />
@@ -358,10 +387,12 @@ function LoginForm() {
 
           <div className="text-center mb-10">
             <h1 className="font-display text-[clamp(2rem,4vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-4">
-              {selectedTier === 'brand' ? 'Brand Portal' : 'Welcome Back'}
+              {selectedTier === 'admin' ? 'Admin Console' : selectedTier === 'brand' ? 'Brand Portal' : 'Welcome Back'}
             </h1>
             <p className="text-stone">
-              {selectedTier === 'brand'
+              {selectedTier === 'admin'
+                ? 'Sign in to the platform administration console'
+                : selectedTier === 'brand'
                 ? 'Sign in to manage your brand on ModaGlimmora'
                 : 'Sign in to your personalized fashion experience'}
             </p>
@@ -381,7 +412,7 @@ function LoginForm() {
                 className={`w-full px-5 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
                   emailError ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
                 }`}
-                placeholder={selectedTier === 'brand' ? 'partner@brand.com' : 'your@email.com'}
+                placeholder={selectedTier === 'admin' ? 'admin@glimmora.com' : selectedTier === 'brand' ? 'partner@brand.com' : 'your@email.com'}
                 required
               />
               {emailError && (
@@ -437,7 +468,7 @@ function LoginForm() {
               <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-4">
                 Select Account Type
               </p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 <button
                   type="button"
                   onClick={() => setSelectedTier('consumer')}
@@ -483,6 +514,21 @@ function LoginForm() {
                   </p>
                   <p className={`text-[10px] mt-1 ${selectedTier === 'brand' ? 'text-sand' : 'text-taupe'}`}>Partner</p>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTier('admin')}
+                  className={`p-4 border transition-all duration-300 ${
+                    selectedTier === 'admin'
+                      ? 'border-charcoal-deep bg-noir text-ivory-cream'
+                      : 'border-sand/50 hover:border-sand'
+                  }`}
+                >
+                  <Shield size={20} className={`mx-auto mb-2 ${selectedTier === 'admin' ? 'text-gold-soft' : 'text-stone'}`} />
+                  <p className={`text-sm font-medium ${selectedTier === 'admin' ? 'text-ivory-cream' : 'text-stone'}`}>
+                    Admin
+                  </p>
+                  <p className={`text-[10px] mt-1 ${selectedTier === 'admin' ? 'text-gold-soft/70' : 'text-taupe'}`}>Console</p>
+                </button>
               </div>
             </div>
 
@@ -492,6 +538,8 @@ function LoginForm() {
               className={`w-full py-4 px-6 flex items-center justify-center gap-3 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed ${
                 selectedTier === 'uhni'
                   ? 'bg-gold-deep text-white hover:bg-gold-deep/90'
+                  : selectedTier === 'admin'
+                  ? 'bg-noir text-gold-soft hover:bg-charcoal-deep'
                   : 'bg-charcoal-deep text-ivory-cream hover:bg-noir'
               }`}
             >
@@ -501,13 +549,13 @@ function LoginForm() {
                     selectedTier === 'uhni' ? 'border-white' : 'border-ivory-cream'
                   }`} />
                   <span className="text-sm tracking-[0.15em] uppercase">
-                    {selectedTier === 'brand' ? 'Accessing Portal...' : 'Signing In...'}
+                    {selectedTier === 'admin' ? 'Accessing Console...' : selectedTier === 'brand' ? 'Accessing Portal...' : 'Signing In...'}
                   </span>
                 </>
               ) : (
                 <>
                   <span className="text-sm tracking-[0.15em] uppercase">
-                    {selectedTier === 'brand' ? 'Access Portal' : 'Sign In'}
+                    {selectedTier === 'admin' ? 'Access Console' : selectedTier === 'brand' ? 'Access Portal' : 'Sign In'}
                   </span>
                   <ArrowRight size={16} />
                 </>
@@ -516,7 +564,7 @@ function LoginForm() {
           </form>
 
           {/* Social Login — only for consumer & uhni */}
-          {selectedTier !== 'brand' && (
+          {selectedTier !== 'brand' && selectedTier !== 'admin' && (
             <>
               <div className="relative my-10">
                 <div className="absolute inset-0 flex items-center">
@@ -568,7 +616,17 @@ function LoginForm() {
           )}
 
           <p className="text-center text-stone mt-10">
-            {selectedTier === 'brand' ? (
+            {selectedTier === 'admin' ? (
+              <>
+                Not an admin?{' '}
+                <button
+                  onClick={() => setSelectedTier('consumer')}
+                  className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors"
+                >
+                  Sign in as customer
+                </button>
+              </>
+            ) : selectedTier === 'brand' ? (
               <>
                 Not a brand partner?{' '}
                 <button

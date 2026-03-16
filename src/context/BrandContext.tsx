@@ -35,6 +35,7 @@ import * as brandPortalService from '@/services/brand-portal.service';
 import * as privateCollectionService from '@/services/private-collection.service';
 import { addSharedOffer } from '@/lib/shared-store';
 import { getSharedSessions, addSharedSession as addSessionToStore, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
+import { getUhniSourcingRequests, subscribeToSourcingChanges, writeBrandOptionToUhni, writeBrandNegotiationResponse, writeBrandMessage, writeBrandStatusUpdate } from '@/lib/shared-sourcing-store';
 import type { BrandLoginResponse } from '@/services/auth.service';
 import { brandLogout as clearBrandTokens } from '@/services/auth.service';
 
@@ -123,6 +124,7 @@ interface BrandContextType {
   updateBespokeStatus: (orderId: string, newStatus: BespokeOrderStatus, note: string) => void;
   sendBespokeMessage: (orderId: string, content: string) => void;
   updateBespokePrice: (orderId: string, price: number, depositPercentage: number) => void;
+  updateBespokeTimelineDates: (orderId: string, stepDates: Record<string, string>, estimatedCompletion?: string) => void;
 
   priceNegotiations: PriceNegotiation[];
   getNegotiationById: (id: string) => PriceNegotiation | undefined;
@@ -150,6 +152,7 @@ interface BrandContextType {
   }) => void;
   updateSourcingStatus: (requestId: string, newStatus: SourcingRequestStatus, note: string) => void;
   addSourcingOption: (requestId: string, option: Omit<SourcingOption, 'id' | 'addedAt' | 'source' | 'condition' | 'images'>) => void;
+  updateSourcingOption: (requestId: string, optionId: string, updates: Partial<SourcingOption>) => void;
   removeSourcingOption: (requestId: string, optionId: string) => void;
   sendSourcingMessage: (requestId: string, content: string) => void;
 
@@ -230,6 +233,37 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     }
     return merged;
   }, [stylingSessions, sharedSessionsList]);
+
+  // UHNI sourcing requests from localStorage (cross-portal sync)
+  const [uhniSourcingRequests, setUhniSourcingRequests] = useState<SourcingRequest[]>(getUhniSourcingRequests());
+
+  useEffect(() => {
+    // Same-tab listener (in-memory)
+    const unsubscribe = subscribeToSourcingChanges(() => {
+      setUhniSourcingRequests(getUhniSourcingRequests());
+    });
+    // Cross-tab listener (localStorage storage event)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'moda-sourcing-created' || e.key === 'moda-sourcing-enrichment') {
+        setUhniSourcingRequests(getUhniSourcingRequests());
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
+  // Merge mock sourcing requests with UHNI-created requests
+  const mergedSourcingRequests = useMemo(() => {
+    const ids = new Set(sourcingRequests.map(s => s.id));
+    const merged = [...sourcingRequests];
+    for (const s of uhniSourcingRequests) {
+      if (!ids.has(s.id)) merged.push(s);
+    }
+    return merged;
+  }, [sourcingRequests, uhniSourcingRequests]);
 
   // Commerce Settings
   const [commerceSettings, setCommerceSettings] = useState<CommerceSettings>({
@@ -591,6 +625,23 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const updateBespokeTimelineDates = useCallback((orderId: string, stepDates: Record<string, string>, estimatedCompletion?: string) => {
+    setBespokeOrders(prev =>
+      prev.map(order => {
+        if (order.id !== orderId) return order;
+        const updatedTimeline = order.timeline.map(step => {
+          if (stepDates[step.id]) {
+            return { ...step, estimatedDate: stepDates[step.id] };
+          }
+          return step;
+        });
+        const lastStep = updatedTimeline[updatedTimeline.length - 1];
+        const newCompletion = estimatedCompletion || lastStep?.estimatedDate || lastStep?.completedAt || order.estimatedCompletion;
+        return { ...order, timeline: updatedTimeline, estimatedCompletion: newCompletion, updatedAt: new Date().toISOString() };
+      })
+    );
+  }, []);
+
   const getNegotiationById = useCallback((id: string): PriceNegotiation | undefined => {
     return priceNegotiations.find(n => n.id === id);
   }, [priceNegotiations]);
@@ -716,8 +767,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getSourcingRequestById = useCallback((id: string): SourcingRequest | undefined => {
-    return sourcingRequests.find(r => r.id === id);
-  }, [sourcingRequests]);
+    return mergedSourcingRequests.find(r => r.id === id);
+  }, [mergedSourcingRequests]);
 
   const submitSourcingOption = useCallback((requestId: string, option: {
     customDescription: string;
@@ -773,6 +824,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         };
       })
     );
+    // Persist to shared localStorage so UHNI side can see it
+    writeBrandStatusUpdate(requestId, newStatus);
   }, []);
 
   const addSourcingOption = useCallback((requestId: string, option: Omit<SourcingOption, 'id' | 'addedAt' | 'source' | 'condition' | 'images'>) => {
@@ -806,6 +859,18 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         };
       })
     );
+    // Persist to shared localStorage so UHNI side can see it
+    writeBrandOptionToUhni(requestId, newOption);
+  }, []);
+
+  const updateSourcingOption = useCallback((requestId: string, optionId: string, updates: Partial<SourcingOption>) => {
+    setSourcingRequests(prev =>
+      prev.map(req =>
+        req.id === requestId
+          ? { ...req, foundOptions: req.foundOptions.map(o => o.id === optionId ? { ...o, ...updates } : o), updatedAt: new Date().toISOString() }
+          : req
+      )
+    );
   }, []);
 
   const removeSourcingOption = useCallback((requestId: string, optionId: string) => {
@@ -834,6 +899,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           : req
       )
     );
+    // Persist to shared localStorage so UHNI side can see it
+    writeBrandMessage(requestId, content);
   }, []);
 
   const getHeritageEventById = useCallback((id: string): HeritageEvent | undefined => {
@@ -1007,6 +1074,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         updateBespokeStatus,
         sendBespokeMessage,
         updateBespokePrice,
+        updateBespokeTimelineDates,
         priceNegotiations,
         getNegotiationById,
         submitCounterOffer,
@@ -1020,11 +1088,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         sendCollectionInvitation,
         approveAccessRequest,
         denyAccessRequest,
-        sourcingRequests,
+        sourcingRequests: mergedSourcingRequests,
         getSourcingRequestById,
         submitSourcingOption,
         updateSourcingStatus,
         addSourcingOption,
+        updateSourcingOption,
         removeSourcingOption,
         sendSourcingMessage,
         heritageEvents,

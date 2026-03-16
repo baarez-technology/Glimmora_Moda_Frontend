@@ -3,7 +3,7 @@
  * Endpoints: /api/uhni/*
  */
 
-import { apiRequest, generateMockId } from './api-client';
+import { apiRequest, generateMockId, ApiError } from './api-client';
 import type { ApiResponse } from './api-client';
 import type {
   PersonalConcierge,
@@ -183,8 +183,19 @@ export async function acceptNegotiation(id: string): Promise<ApiResponse<PriceNe
     method: 'POST',
     mockHandler: () => {
       const negotiation = mockPriceNegotiations.find(n => n.id === id);
-      if (!negotiation) throw new Error(`Negotiation ${id} not found`);
+      if (!negotiation) throw new ApiError('NOT_FOUND', `Negotiation ${id} not found`, 404);
       return { ...negotiation, status: 'accepted' as const };
+    },
+  });
+}
+
+export async function declineNegotiation(id: string): Promise<ApiResponse<PriceNegotiation>> {
+  return apiRequest<PriceNegotiation>(`/api/uhni/pricing/negotiations/${id}/decline`, {
+    method: 'POST',
+    mockHandler: () => {
+      const negotiation = mockPriceNegotiations.find(n => n.id === id);
+      if (!negotiation) throw new ApiError('NOT_FOUND', `Negotiation ${id} not found`, 404);
+      return { ...negotiation, status: 'declined' as const };
     },
   });
 }

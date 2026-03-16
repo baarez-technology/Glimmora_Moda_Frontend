@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
-import { getRecommendedBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
+import { getAllBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
 export default function HomePage() {
@@ -19,7 +19,7 @@ export default function HomePage() {
     async function loadData() {
       try {
         const [recommendedBrands, recommendedProducts, stories] = await Promise.all([
-          getRecommendedBrands(),
+          getAllBrands(),
           getRecommendedProducts(),
           searchStories({ limit: 4 }),
         ]);
