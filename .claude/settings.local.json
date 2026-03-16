@@ -26,15 +26,12 @@
       "Bash(export TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTllZTMxMTM4OTVkYjljNzMzMTFkZmMiLCJlbWFpbCI6InRlc3RkZXZAbW9kYWdsaW1tb3JhLmNvbSIsInJvbGUiOiJ1c2VyIiwiZXhwIjoxNzcyMjM2NDk4LCJ0eXBlIjoiYWNjZXNzIn0.eHrblzGUSfWAsAVhnebBBuV3wkoLc2w1-4jpNTwSFN8\")",
       "Bash(xargs grep -l \"error.tsx\\\\|ErrorBoundary\")",
       "Bash(grep -n \"framer-motion\\\\|AnimatePresence\\\\|motion\\\\.\" \"/z/Moda-Glimmora-new-v2/src/components/product/\"*.tsx)",
-<<<<<<< HEAD
       "Bash(powershell -ExecutionPolicy Bypass -File \"d:\\\\BAAREZ\\\\Moda-Glimmora-new-v2\\\\fix-urls.ps1\")",
-      "Bash(del \"d:\\\\BAAREZ\\\\Moda-Glimmora-new-v2\\\\fix-urls.ps1\")"
-=======
+      "Bash(del \"d:\\\\BAAREZ\\\\Moda-Glimmora-new-v2\\\\fix-urls.ps1\")",
       "mcp__puppeteer__puppeteer_navigate",
       "mcp__puppeteer__puppeteer_screenshot",
       "mcp__puppeteer__puppeteer_evaluate",
       "mcp__puppeteer__puppeteer_fill"
->>>>>>> origin/main
     ]
   }
 }

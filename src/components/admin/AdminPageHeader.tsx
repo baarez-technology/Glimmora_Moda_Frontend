@@ -1,5 +1,6 @@
 'use client';
 
+import { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 
@@ -12,16 +13,16 @@ interface AdminPageHeaderProps {
   title: string;
   subtitle?: string;
   breadcrumbs?: Breadcrumb[];
-  actions?: React.ReactNode;
+  actions?: ReactNode;
 }
 
 export function AdminPageHeader({ title, subtitle, breadcrumbs, actions }: AdminPageHeaderProps) {
   return (
     <div className="bg-charcoal-deep text-ivory-cream">
-      <div className="max-w-[1400px] mx-auto px-8 py-8">
+      <div className="px-8 py-6">
         {/* Breadcrumbs */}
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav className="flex items-center gap-2 text-xs text-stone/60 mb-4">
+          <nav className="flex items-center gap-2 text-xs text-stone/60 mb-3">
             <Link href="/admin" className="hover:text-ivory-cream transition-colors">
               Admin
             </Link>
@@ -40,6 +41,7 @@ export function AdminPageHeader({ title, subtitle, breadcrumbs, actions }: Admin
           </nav>
         )}
 
+        {/* Title row */}
         <div className="flex items-end justify-between gap-6">
           <div>
             <h1 className="text-2xl font-display tracking-wide">{title}</h1>

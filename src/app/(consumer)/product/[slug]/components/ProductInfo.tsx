@@ -71,8 +71,8 @@ export default function ProductInfo({
         €{product.price.toLocaleString()}
       </div>
 
-      {/* Personalization Badge */}
-      {personalizationMatch && personalizationMatch.score >= 50 && (
+      {/* Personalization Badge — temporarily disabled for production */}
+      {/* {personalizationMatch && personalizationMatch.score >= 50 && (
         <div
           className="mb-6 p-4 bg-gradient-to-r from-gold-muted/10 to-transparent border-l-2 border-gold-muted"
           title="Personalization score based on your style profile, occasions, aesthetics, and budget preferences"
@@ -98,7 +98,7 @@ export default function ProductInfo({
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* No Profile CTA */}
       {!fashionIdentity && (

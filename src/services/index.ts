@@ -44,6 +44,7 @@ export * as userService from './user.service';
 export * as wardrobeService from './wardrobe.service';
 export * as calendarService from './calendar.service';
 export * as uhniService from './uhni.service';
+export * as bespokeService from './bespoke.service';
 export * as intelligenceService from './intelligence.service';
 export * as brandPortalService from './brand-portal.service';
 export * as brandIntelligenceService from './brand-intelligence.service';

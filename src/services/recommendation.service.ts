@@ -935,6 +935,111 @@ export async function getProductDetail(productId: string, brandName?: string): P
   }, PRODUCT_DETAIL_TTL);
 }
 
+// ============================================
+// Product AI Insights (public)
+// ============================================
+
+// Raw API response shape from GET /api/v1/products/{id}/ai-insights
+interface AIInsightsRaw {
+  product_id: string;
+  product_name: string;
+  brand_id?: string;
+  ai_data?: {
+    craftsmanship?: {
+      title?: string;
+      subtitle?: string;
+      description?: string;
+    };
+    materials_section?: {
+      headline?: string;
+      description?: string;
+      material_composition?: { material: string; percentage: number }[];
+    };
+    material_experience?: {
+      texture?: { title?: string; description?: string };
+      weight?: { title?: string; description?: string };
+      temperature?: { title?: string; description?: string };
+      comfort?: { title?: string; description?: string };
+      aging?: { title?: string; description?: string };
+    };
+    sensory_highlights?: string[];
+    ai_material_insight?: { title?: string; description?: string };
+    fabrics?: string;
+  };
+}
+
+// Normalised shape used by components
+export interface ProductAIInsights {
+  materials: {
+    name: string;
+    composition: string;
+    origin: string;
+    sustainability?: string;
+  }[];
+  craftsmanship: {
+    title: string;
+    description: string;
+    duration?: string;
+    artisans?: number;
+  }[];
+  material_feel: {
+    texture: string;
+    weight: string;
+    temperature: string;
+    comfort: string;
+    aging: string;
+    sensory_highlights: string[];
+    agi_description: string;
+  } | null;
+}
+
+function mapAIInsights(raw: AIInsightsRaw): ProductAIInsights {
+  const ai = raw.ai_data;
+
+  // Materials — build from material_composition array
+  const materials = (ai?.materials_section?.material_composition ?? []).map(mc => ({
+    name: mc.material,
+    composition: `${mc.percentage}%`,
+    origin: '',
+    sustainability: undefined,
+  }));
+
+  // Craftsmanship — single item from the craftsmanship object
+  const craftsmanship = ai?.craftsmanship?.title
+    ? [{
+        title: ai.craftsmanship.title,
+        description: ai.craftsmanship.description || '',
+        duration: undefined,
+        artisans: undefined,
+      }]
+    : [];
+
+  // Material Feel — map from material_experience
+  const me = ai?.material_experience;
+  const materialFeel = me ? {
+    texture: me.texture?.description || me.texture?.title || 'smooth',
+    weight: me.weight?.description || me.weight?.title || 'medium',
+    temperature: me.temperature?.description || me.temperature?.title || 'neutral',
+    comfort: me.comfort?.description || me.comfort?.title || 'Comfortable',
+    aging: me.aging?.description || me.aging?.title || 'gracefully',
+    sensory_highlights: ai?.sensory_highlights ?? [],
+    agi_description: ai?.ai_material_insight?.description || '',
+  } : null;
+
+  return { materials, craftsmanship, material_feel: materialFeel };
+}
+
+export async function getProductAIInsights(productId: string): Promise<ProductAIInsights | null> {
+  try {
+    const res = await fetchWithTimeout(`/api/v1/products/${productId}/ai-insights`);
+    if (!res.ok) return null;
+    const raw: AIInsightsRaw = await res.json();
+    return mapAIInsights(raw);
+  } catch {
+    return null;
+  }
+}
+
 /** Invalidate wardrobe cache after mutations (add/remove) */
 export function invalidateWardrobeCache() {
   invalidateCache('wardrobe');
