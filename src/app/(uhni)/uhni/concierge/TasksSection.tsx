@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ClipboardList,
@@ -21,9 +21,11 @@ import {
   X,
   Check,
   Crown,
+  MapPin,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { ConciergeTaskType, ConciergeTaskPriority, ConciergeTaskStatus, ConciergeAppointment, AppointmentType } from '@/types/uhni';
+import { getAllBrands } from '@/services/recommendation.service';
 
 type TabValue = 'tasks' | 'appointments';
 
@@ -51,6 +53,16 @@ export default function TasksSection() {
   const [taskPriority, setTaskPriority] = useState<ConciergeTaskPriority>('normal');
   const [taskDueDate, setTaskDueDate] = useState('');
   const [taskInstructions, setTaskInstructions] = useState('');
+
+  // Brands map for resolving brand names
+  const [brandsMap, setBrandsMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    getAllBrands().then(list => {
+      const map: Record<string, string> = {};
+      list.forEach(b => { map[b.id] = b.name; });
+      setBrandsMap(map);
+    }).catch(() => {});
+  }, []);
 
   // Reschedule modal state
   const [rescheduleId, setRescheduleId] = useState<string | null>(null);
@@ -457,6 +469,19 @@ export default function TasksSection() {
                           <User size={14} className="text-stone" />
                           {appt.conciergeName}
                         </div>
+                        {appt.location && (
+                          <div className="flex items-center gap-2 text-sm text-charcoal-deep">
+                            <MapPin size={14} className="text-stone" />
+                            {appt.location === 'in_store' ? 'In Store' : appt.location === 'virtual' ? 'Virtual' : 'Home Visit'}
+                          </div>
+                        )}
+                        {appt.brandId && brandsMap[appt.brandId] && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] tracking-[0.15em] uppercase text-gold-deep bg-gold-soft/10 px-2 py-0.5">
+                              {brandsMap[appt.brandId]}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {appt.notes && (

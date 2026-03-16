@@ -156,6 +156,8 @@ interface AppContextType {
     time: string;
     duration: number;
     notes?: string;
+    location?: ConciergeAppointment['location'];
+    brand_id?: string;
   }) => ConciergeAppointment;
   cancelAppointment: (appointmentId: string) => void;
   rescheduleAppointment: (appointmentId: string, newDate: string, newTime: string) => void;
