@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, SourcingMessage, SourcingRequestStatus, BespokeOrder, AutonomousActivity, BespokeMessage, BespokeDetailedSpec, PriceNegotiation, NegotiationStatus, ConciergeAppointment, ConciergeTask, ConciergeTaskInput } from '@/types';
 import * as uhniService from '@/services/uhni.service';
+import * as bespokeService from '@/services/bespoke.service';
 
 interface UseUHNIFeaturesProps {
   isUHNI: boolean;
@@ -28,7 +29,12 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       uhniService.getConcierge().then(r => { if (r.success) setConcierge(r.data); });
       uhniService.getAutonomousSettings().then(r => { if (r.success) setAutonomousSettings(r.data); });
       uhniService.getSourcingRequests().then(r => { if (r.success) setSourcingRequests(r.data); });
-      uhniService.getBespokeOrders().then(r => { if (r.success) setBespokeOrders(r.data); });
+      bespokeService.fetchConsumerBespokeOrders()
+        .then(orders => setBespokeOrders(orders))
+        .catch(() => {
+          // Fallback to mock if API unavailable
+          uhniService.getBespokeOrders().then(r => { if (r.success) setBespokeOrders(r.data); });
+        });
       uhniService.getAutonomousActivity().then(r => { if (r.success) setAutonomousActivity(r.data); });
       uhniService.getPriceNegotiations().then(r => { if (r.success) setPriceNegotiations(r.data); });
       uhniService.getConciergeTasks().then(r => { if (r.success) setLocalConciergeTasks(r.data); });
@@ -82,8 +88,32 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
     selectedBrands?: { id: string; name: string }[];
   }) => {
     const brands = orderData.selectedBrands || [];
+    const m = orderData.detailedSpec.measurements || {};
+
+    const payload: bespokeService.CreateBespokePayload = {
+      order_title: orderData.title,
+      brand_ids: brands.map(b => b.id),
+      order_type: orderData.type,
+      description: orderData.description,
+      budget: orderData.estimatedBudget,
+      timeline: orderData.requestedDeadline || '',
+      chest: m.chest || 0,
+      waist: m.waist || 0,
+      hips: m.hips || 0,
+      shoulders: m.shoulders || 0,
+      inseam: m.inseam || 0,
+      sleeve_length: m.sleeveLength || 0,
+      height: m.height || 0,
+      measurement_notes: (m as Record<string, unknown>).notes as string || '',
+      fabric_preferences: orderData.detailedSpec.fabricPreferences || '',
+      color_preferences: orderData.detailedSpec.colorPreferences || '',
+      occations_context: orderData.detailedSpec.occasionContext || '',
+      special_instructions: orderData.detailedSpec.specialInstructions || '',
+    };
+
+    // Optimistic local order for immediate UI update
     const primaryBrand = brands[0];
-    const newOrder: BespokeOrder = {
+    const optimisticOrder: BespokeOrder = {
       id: `bespoke-${Date.now()}`,
       brandId: primaryBrand?.id || 'brand-default',
       brandName: primaryBrand?.name || 'ModaGlimmora Atelier',
@@ -104,24 +134,36 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       ],
       price: orderData.estimatedBudget,
       depositPaid: 0,
-      depositPercentage: 50,
+      depositPercentage: 0,
       estimatedCompletion: orderData.requestedDeadline
         || new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
       progressImages: [],
       messages: [],
-      timelineEvents: [
-        { id: `tl-${Date.now()}`, status: 'consultation', note: 'Bespoke request submitted by client', updatedBy: 'system', createdAt: new Date().toISOString() },
-      ],
+      timelineEvents: [],
       clientApprovalRequired: false,
       clientApproved: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setBespokeOrders(prev => [newOrder, ...prev]);
-    return newOrder;
-  }, []);
+    setBespokeOrders(prev => [optimisticOrder, ...prev]);
+
+    // Fire real API call, replace optimistic with real data
+    bespokeService.createConsumerBespokeOrder(payload)
+      .then(realOrder => {
+        setBespokeOrders(prev =>
+          prev.map(o => o.id === optimisticOrder.id ? realOrder : o)
+        );
+      })
+      .catch(err => {
+        console.error('Failed to create bespoke order via API:', err);
+        showToast('Order saved locally — will sync when connected', 'info');
+      });
+
+    return optimisticOrder;
+  }, [showToast]);
 
   const addMessageToBespokeOrder = useCallback((orderId: string, content: string, role: 'client' | 'brand') => {
+    // Optimistic update
     const newMessage: BespokeMessage = {
       id: `msg-${Date.now()}`,
       senderId: role === 'client' ? 'uhni-user' : 'brand-user',
@@ -137,17 +179,40 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
           : order
       )
     );
+
+    // Real API call
+    bespokeService.addConsumerMessage(orderId, content)
+      .then(updatedOrder => {
+        setBespokeOrders(prev =>
+          prev.map(o => o.id === orderId ? { ...o, messages: updatedOrder.messages } : o)
+        );
+      })
+      .catch(err => console.error('Failed to send message via API:', err));
   }, []);
 
   const approveBespokeDesign = useCallback((orderId: string) => {
+    // Optimistic update
     setBespokeOrders(prev =>
       prev.map(order =>
         order.id === orderId
-          ? { ...order, clientApproved: true }
+          ? { ...order, clientApproved: true, clientApprovalRequired: false, status: 'production' as const }
           : order
       )
     );
-  }, []);
+
+    // Real API call
+    bespokeService.approveConsumerDesign(orderId)
+      .then(updatedOrder => {
+        setBespokeOrders(prev =>
+          prev.map(o => o.id === orderId ? updatedOrder : o)
+        );
+        showToast('Design approved — moving to production', 'success');
+      })
+      .catch(err => {
+        console.error('Failed to approve design via API:', err);
+        showToast('Approval saved locally', 'info');
+      });
+  }, [showToast]);
 
   const createNegotiation = useCallback((data: {
     productId: string;

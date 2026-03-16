@@ -37,11 +37,11 @@ export default function BespokeOrderDetailPage() {
   const [selectedNextStatus, setSelectedNextStatus] = useState<BespokeOrderStatus | null>(null);
   const [messageText, setMessageText] = useState('');
   const [priceInput, setPriceInput] = useState('');
-  const [depositPctInput, setDepositPctInput] = useState('50');
+  const [depositInput, setDepositInput] = useState('');
   const [statusSuccess, setStatusSuccess] = useState(false);
+  const [priceSuccess, setPriceSuccess] = useState(false);
   const [editingTimeline, setEditingTimeline] = useState(false);
   const [timelineDateEdits, setTimelineDateEdits] = useState<Record<string, string>>({});
-  const [completionDateInput, setCompletionDateInput] = useState('');
 
   const orderId = params.id as string;
   const order = getBespokeOrderById(orderId);
@@ -153,16 +153,8 @@ export default function BespokeOrderDetailPage() {
   const handleAdvancedStatusUpdate = () => {
     if (!selectedNextStatus) return;
     updateBespokeStatus(order.id, selectedNextStatus, statusNote || `Status updated to ${getStatusLabel(selectedNextStatus)}`);
-    if (priceInput && Number(priceInput) > 0) {
-      updateBespokePrice(order.id, Number(priceInput), Number(depositPctInput) || 50);
-    }
-    if (completionDateInput) {
-      updateBespokeTimelineDates(order.id, {}, completionDateInput);
-    }
     setSelectedNextStatus(null);
     setStatusNote('');
-    setPriceInput('');
-    setCompletionDateInput('');
     setStatusSuccess(true);
     setTimeout(() => setStatusSuccess(false), 3000);
   };
@@ -543,44 +535,6 @@ export default function BespokeOrderDetailPage() {
                       className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                     />
                   </div>
-                  {(order.status === 'consultation' || order.status === 'design_approval') && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-taupe mb-1">Final Price (€)</p>
-                        <input
-                          type="number"
-                          min={0}
-                          value={priceInput}
-                          onChange={e => setPriceInput(e.target.value)}
-                          placeholder={String(order.price)}
-                          className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs text-taupe mb-1">Deposit %</p>
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          value={depositPctInput}
-                          onChange={e => setDepositPctInput(e.target.value)}
-                          className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
-                        />
-                      </div>
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-xs text-taupe mb-1">Estimated Completion</p>
-                    <input
-                      type="date"
-                      value={completionDateInput}
-                      onChange={e => setCompletionDateInput(e.target.value)}
-                      className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
-                    />
-                    <p className="text-[10px] text-taupe mt-1">
-                      Current: {formatDate(order.estimatedCompletion)}
-                    </p>
-                  </div>
                   <button
                     onClick={handleAdvancedStatusUpdate}
                     disabled={!selectedNextStatus}
@@ -590,6 +544,70 @@ export default function BespokeOrderDetailPage() {
                   </button>
                   {statusSuccess && (
                     <p className="text-xs text-success text-center">Status updated successfully</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Set Price & Deposit — shown only when price is not yet set */}
+            {order.price === 0 && order.status !== 'complete' && (
+              <div className="bg-white border border-gold-soft/30">
+                <div className="px-6 py-4 border-b border-gold-soft/30 bg-gold-soft/5">
+                  <h2 className="font-medium text-charcoal-deep flex items-center gap-2">
+                    <DollarSign size={16} className="text-gold-deep" />
+                    Set Price &amp; Deposit
+                  </h2>
+                </div>
+                <div className="p-6 space-y-4">
+                  <p className="text-xs text-stone">
+                    Set the final price and deposit amount for this bespoke order.
+                    {(order as unknown as { budget?: number }).budget != null && (order as unknown as { budget?: number }).budget! > 0 && (
+                      <> Customer budget: <span className="font-medium text-charcoal-deep">{formatCurrency((order as unknown as { budget?: number }).budget!)}</span></>
+                    )}
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-xs text-taupe mb-1">Final Price (€)</p>
+                      <input
+                        type="number"
+                        min={0}
+                        value={priceInput}
+                        onChange={e => setPriceInput(e.target.value)}
+                        placeholder="0"
+                        className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs text-taupe mb-1">Deposit Amount (€)</p>
+                      <input
+                        type="number"
+                        min={0}
+                        value={depositInput}
+                        onChange={e => setDepositInput(e.target.value)}
+                        placeholder="0"
+                        className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const price = Number(priceInput);
+                      const deposit = Number(depositInput);
+                      if (price <= 0) { showToast('Please enter a valid price', 'error'); return; }
+                      updateBespokePrice(order.id, price, deposit);
+                      setPriceInput('');
+                      setDepositInput('');
+                      setPriceSuccess(true);
+                      showToast('Price and deposit set successfully', 'success');
+                      setTimeout(() => setPriceSuccess(false), 3000);
+                    }}
+                    disabled={!priceInput || Number(priceInput) <= 0}
+                    className="w-full px-4 py-2 bg-gold-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-gold-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Set Price &amp; Deposit
+                  </button>
+                  {priceSuccess && (
+                    <p className="text-xs text-success text-center">Price set successfully</p>
                   )}
                 </div>
               </div>

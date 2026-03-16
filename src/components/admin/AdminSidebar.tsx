@@ -1,8 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Users,
@@ -10,14 +9,13 @@ import {
   Shield,
   BarChart3,
   Settings,
-  LogOut,
   ChevronRight,
+  ChevronLeft,
   FileCheck,
   DollarSign,
   Activity,
   ToggleLeft,
 } from 'lucide-react';
-import { useAdmin } from '@/context/AdminContext';
 
 interface NavItem {
   label: string;
@@ -68,15 +66,8 @@ const navigation: NavSection[] = [
   },
 ];
 
-export function AdminSidebar() {
+export function AdminSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { admin, logout } = useAdmin();
-
-  const handleLogout = () => {
-    logout();
-    router.push('/auth/login?mode=admin');
-  };
 
   const isActive = (href: string) => {
     if (href === '/admin') return pathname === '/admin';
@@ -84,27 +75,51 @@ export function AdminSidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 bg-charcoal-deep border-r border-charcoal-deep flex flex-col z-40">
-      {/* Logo */}
-      <div className="p-6 border-b border-white/10">
-        <Link href="/admin" className="block">
-          <h1 className="font-display text-xl text-ivory-cream tracking-wide">
-            ModaGlimmora
-          </h1>
-          <span className="text-[10px] tracking-[0.2em] uppercase text-gold-soft mt-1 block">
-            Admin Console
-          </span>
-        </Link>
+    <aside
+      className={`fixed left-0 top-0 h-screen bg-charcoal-deep flex flex-col z-40 transition-all duration-300 ${
+        collapsed ? 'w-[72px]' : 'w-64'
+      }`}
+    >
+      {/* Logo + collapse toggle */}
+      <div className="h-14 px-4 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+        {!collapsed && (
+          <Link href="/admin" className="flex items-center gap-2">
+            <h1 className="font-display text-lg text-ivory-cream tracking-wide">
+              ModaGlimmora
+            </h1>
+          </Link>
+        )}
+        <button
+          onClick={onToggle}
+          className={`p-1.5 hover:bg-white/10 transition-colors text-stone/70 hover:text-ivory-cream rounded ${
+            collapsed ? 'mx-auto' : ''
+          }`}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
       </div>
 
+      {/* Portal label */}
+      {!collapsed && (
+        <div className="px-6 py-3 border-b border-white/10">
+          <span className="text-[10px] tracking-[0.2em] uppercase text-gold-soft">
+            Admin Console
+          </span>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto">
+      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
         {navigation.map((section) => (
           <div key={section.title}>
-            <p className="text-[10px] tracking-[0.2em] uppercase text-stone/60 mb-2 px-3">
-              {section.title}
-            </p>
-            <div className="space-y-1">
+            {!collapsed && (
+              <p className="text-[10px] tracking-[0.2em] uppercase text-stone/50 mb-2 px-3">
+                {section.title}
+              </p>
+            )}
+            {collapsed && <div className="border-t border-white/5 my-2" />}
+            <div className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
@@ -112,15 +127,18 @@ export function AdminSidebar() {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 group ${
+                    title={collapsed ? item.label : undefined}
+                    className={`flex items-center gap-3 px-3 py-2.5 text-sm transition-all duration-200 ${
+                      collapsed ? 'justify-center' : ''
+                    } ${
                       active
                         ? 'bg-white/10 text-ivory-cream'
-                        : 'text-stone/70 hover:text-ivory-cream hover:bg-white/5'
+                        : 'text-stone/60 hover:text-ivory-cream hover:bg-white/5'
                     }`}
                   >
-                    <Icon size={18} strokeWidth={1.5} />
-                    <span className="flex-1">{item.label}</span>
-                    {active && <ChevronRight size={14} className="text-gold-soft" />}
+                    <Icon size={18} strokeWidth={1.5} className="flex-shrink-0" />
+                    {!collapsed && <span className="flex-1">{item.label}</span>}
+                    {!collapsed && active && <ChevronRight size={14} className="text-gold-soft" />}
                   </Link>
                 );
               })}
@@ -129,29 +147,14 @@ export function AdminSidebar() {
         ))}
       </nav>
 
-      {/* Admin User */}
-      <div className="p-4 border-t border-white/10">
-        {admin && (
-          <div className="flex items-center gap-3 px-3 py-2 mb-2">
-            <div className="w-8 h-8 bg-gold-soft/20 rounded-full flex items-center justify-center text-sm text-gold-soft font-medium">
-              {admin.name.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-ivory-cream truncate">{admin.name}</p>
-              <p className="text-[10px] text-gold-soft/70 truncate capitalize">
-                {admin.role.replace('_', ' ')}
-              </p>
-            </div>
-          </div>
-        )}
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2 w-full text-sm text-stone/70 hover:text-red-400 transition-colors"
-        >
-          <LogOut size={18} strokeWidth={1.5} />
-          <span>Sign Out</span>
-        </button>
-      </div>
+      {/* Bottom branding */}
+      {!collapsed && (
+        <div className="px-4 py-3 border-t border-white/10">
+          <p className="text-[9px] tracking-[0.15em] uppercase text-stone/30 text-center">
+            Platform v10.3
+          </p>
+        </div>
+      )}
     </aside>
   );
 }
