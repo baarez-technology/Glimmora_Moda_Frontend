@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, addColorImages, restockProduct, fetchRestockHistory, parseColorMapping, parseRegionalStocks, computeTotalUnits, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload, type RestockPayload, type RestockHistoryItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
+import { getProductAIInsights } from '@/services/recommendation.service';
 import { CoverImageUpload } from '@/components/brand/CoverImageUpload';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { BrandProductStatus, RegionalStock } from '@/types/brand-portal';
@@ -137,8 +138,24 @@ export default function ProductDetailPage() {
       setProductImages(data.product_images ? [...data.product_images] : []);
       setImages([]);
       setVariants([]);
-      setMaterials([]);
-      setCraftsmanship([]);
+      // Load AI insights for materials & craftsmanship
+      getProductAIInsights(productId).then(insights => {
+        if (insights?.materials && insights.materials.length > 0) {
+          setMaterials(insights.materials.map(m => ({
+            name: m.name,
+            composition: m.composition || '',
+            origin: m.origin || '',
+            sustainability: m.sustainability,
+          })));
+        }
+        if (insights?.craftsmanship && insights.craftsmanship.length > 0) {
+          setCraftsmanship(insights.craftsmanship.map(c => ({
+            title: c.title,
+            description: c.description,
+            duration: c.duration,
+          })));
+        }
+      }).catch(() => {});
       // Load sizes from backend
       setSizes(data.sizes || []);
       // Parse color_based_images_mapping JSON strings into ColorOption[] and ColorImages

@@ -1,12 +1,12 @@
 'use client';
 
-import { use, useState, useEffect } from 'react';
+import { use, useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ArrowRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import * as productService from '@/services/product.service';
-import { getProductDetail, getRecommendedBrands } from '@/services/recommendation.service';
+import { getProductDetail, getRecommendedBrands, getProductAIInsights, type ProductAIInsights } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import OutfitSuggestions from '@/components/product/OutfitSuggestions';
 import { useProductPageState, useProductIntelligence } from './hooks/useProductPageState';
@@ -38,7 +38,7 @@ interface ProductPageProps {
   params: Promise<{ slug: string }>;
 }
 
-function ProductPageContent({ product }: { product: Product }) {
+function ProductPageContent({ product, aiInsights }: { product: Product; aiInsights?: ProductAIInsights | null }) {
   // Use custom hooks for state management
   const state = useProductPageState({ product });
 
@@ -52,6 +52,22 @@ function ProductPageContent({ product }: { product: Product }) {
     allProducts: state.allProducts,
     showIntelligence: state.showIntelligence
   });
+
+  // Override materialFeel with AI insights data when available
+  const materialFeel = useMemo(() => {
+    const mf = aiInsights?.material_feel;
+    if (!mf) return intelligence.materialFeel;
+    return {
+      productId: product.id,
+      texture: mf.texture || 'smooth',
+      weight: mf.weight || 'medium',
+      temperature: mf.temperature || 'neutral',
+      comfort: mf.comfort || 'Comfortable',
+      aging: mf.aging || 'gracefully',
+      sensoryHighlights: mf.sensory_highlights || [],
+      agiDescription: mf.agi_description || '',
+    };
+  }, [aiInsights, intelligence.materialFeel, product.id]);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -148,7 +164,7 @@ function ProductPageContent({ product }: { product: Product }) {
       {/* Materials Section */}
       <ProductMaterials
         product={product}
-        materialFeel={intelligence.materialFeel}
+        materialFeel={materialFeel}
       />
 
       {/* Complete the Look - Outfit Suggestions */}
@@ -218,17 +234,19 @@ export default function ProductPage({ params }: ProductPageProps) {
   const productIdParam = searchParams.get('productId');
   const imageParam = searchParams.get('img');
   const [product, setProduct] = useState<Product | null>(null);
+  const [aiInsights, setAIInsights] = useState<ProductAIInsights | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
         if (productIdParam) {
-          // Real API — fetch brands + product detail in parallel
+          // Real API — fetch brands + product detail + AI insights in parallel
           try {
-            const [brands, loaded] = await Promise.all([
+            const [brands, loaded, aiInsights] = await Promise.all([
               getRecommendedBrands(),
               getProductDetail(productIdParam),
+              getProductAIInsights(productIdParam),
             ]);
             const matchBrand = brands.find(b => b.id === loaded.brandId);
             const brandName = matchBrand ? matchBrand.name : '';
@@ -244,7 +262,24 @@ export default function ProductPage({ params }: ProductPageProps) {
                 type: 'hero',
               }];
             }
-            setProduct({ ...loaded, brandName });
+
+            // Merge AI insights into the product data
+            const merged = { ...loaded, brandName };
+            if (aiInsights) {
+              if (aiInsights.materials && aiInsights.materials.length > 0) {
+                merged.materials = aiInsights.materials.map(m => ({
+                  name: m.name,
+                  composition: m.composition || '',
+                  origin: m.origin || '',
+                  sustainability: m.sustainability,
+                }));
+              }
+              if (aiInsights.craftsmanship && aiInsights.craftsmanship.length > 0) {
+                merged.craftsmanship = aiInsights.craftsmanship;
+              }
+            }
+            setProduct(merged);
+            if (aiInsights) setAIInsights(aiInsights);
           } catch {
             // Fall back to mock if real API fails
             const res = await productService.getProductBySlug(slug);
@@ -280,5 +315,5 @@ export default function ProductPage({ params }: ProductPageProps) {
     notFound();
   }
 
-  return <ProductPageContent product={product} />;
+  return <ProductPageContent product={product} aiInsights={aiInsights} />;
 }
