@@ -268,7 +268,7 @@ export default function PrivateCollectionsPage() {
 
                     {isAvailable ? (
                       <Link
-                        href={`/discover?collection=${collection.id}`}
+                        href={`/collection/${collection.id}`}
                         className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors"
                       >
                         Preview Collection

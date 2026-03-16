@@ -152,6 +152,28 @@ export default function PricingPage() {
     }
   };
 
+  const getOfferTargetUrl = (offer: UHNIPriceOffer): string | null => {
+    switch (offer.type) {
+      case 'product':
+        return offer.productSlug ? `/product/${offer.productSlug}` : null;
+      case 'collection':
+        return offer.targetId ? `/uhni/collections` : null;
+      case 'brand':
+        return offer.targetId ? `/brands/${offer.targetId}` : null;
+      default:
+        return null;
+    }
+  };
+
+  const getOfferTargetLabel = (type: UHNIPriceOffer['type']) => {
+    switch (type) {
+      case 'product': return 'View Product';
+      case 'collection': return 'View Collection';
+      case 'brand': return 'View Brand';
+      default: return 'View';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-ivory-cream">
       {/* Header */}
@@ -328,31 +350,104 @@ export default function PricingPage() {
                           </div>
                         )}
                       </div>
-                      {negotiation.brandMessage && (
-                        <div className="bg-gold-soft/5 border border-gold-soft/20 p-4 mb-4">
-                          <span className="text-[10px] tracking-[0.1em] uppercase text-gold-muted block mb-2">Brand Response</span>
-                          <p className="text-sm text-charcoal-deep">{negotiation.brandMessage}</p>
-                          {negotiation.respondedAt && (
-                            <p className="text-[10px] text-taupe mt-2">
-                              {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                            </p>
+                      {/* Negotiation History Timeline */}
+                      <div className="mb-4">
+                        <span className="text-[10px] tracking-[0.2em] uppercase text-taupe block mb-3">Negotiation History</span>
+                        <div className="relative pl-5 border-l border-sand/60 space-y-4">
+                          {/* Step 1: Client proposed */}
+                          <div className="relative">
+                            <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-charcoal-deep flex items-center justify-center">
+                              <span className="w-1.5 h-1.5 rounded-full bg-ivory-cream" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-charcoal-deep">You proposed</span>
+                                <span className="text-xs font-medium text-charcoal-deep">{formatCurrency(negotiation.proposedPrice)}</span>
+                              </div>
+                              {negotiation.clientMessage && (
+                                <p className="text-sm text-stone mt-1 italic">&ldquo;{negotiation.clientMessage}&rdquo;</p>
+                              )}
+                              <p className="text-[10px] text-taupe mt-1">
+                                {new Date(negotiation.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Concierge notes (if any) */}
+                          {negotiation.conciergeNotes.map((note, idx) => (
+                            <div key={idx} className="relative">
+                              <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-gold-soft/40 flex items-center justify-center">
+                                <Crown size={8} className="text-gold-deep" />
+                              </div>
+                              <div>
+                                <span className="text-xs font-medium text-gold-muted">Concierge</span>
+                                <p className="text-sm text-stone mt-0.5">{note}</p>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Step 2: Brand responded (counter/approved/declined) */}
+                          {(negotiation.status === 'counter_offered' || negotiation.status === 'approved' || negotiation.status === 'declined') && (
+                            <div className="relative">
+                              <div className={`absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full flex items-center justify-center ${
+                                negotiation.status === 'counter_offered' ? 'bg-gold-soft' :
+                                negotiation.status === 'approved' ? 'bg-success' : 'bg-error/70'
+                              }`}>
+                                <span className="w-1.5 h-1.5 rounded-full bg-white" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-medium text-charcoal-deep">{negotiation.brandName}</span>
+                                  {negotiation.status === 'counter_offered' && negotiation.counterOffer && (
+                                    <span className="text-xs font-medium text-gold-deep">countered at {formatCurrency(negotiation.counterOffer)}</span>
+                                  )}
+                                  {negotiation.status === 'approved' && (
+                                    <span className="text-xs font-medium text-success">approved your price</span>
+                                  )}
+                                  {negotiation.status === 'declined' && (
+                                    <span className="text-xs font-medium text-error">declined</span>
+                                  )}
+                                </div>
+                                {negotiation.brandMessage && (
+                                  <p className="text-sm text-stone mt-1 italic">&ldquo;{negotiation.brandMessage}&rdquo;</p>
+                                )}
+                                {negotiation.respondedAt && (
+                                  <p className="text-[10px] text-taupe mt-1">
+                                    {new Date(negotiation.respondedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Step 3: Client accepted/rejected counter */}
+                          {negotiation.status === 'accepted' && (
+                            <div className="relative">
+                              <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-success flex items-center justify-center">
+                                <Check size={10} className="text-white" />
+                              </div>
+                              <div>
+                                <span className="text-xs font-medium text-success">You accepted the counter offer</span>
+                                <p className="text-[10px] text-taupe mt-1">
+                                  Final price: <span className="font-medium text-charcoal-deep">{formatCurrency(negotiation.counterOffer || negotiation.proposedPrice)}</span>
+                                  {' · Saved '}
+                                  <span className="font-medium text-success">{formatCurrency(negotiation.originalPrice - (negotiation.counterOffer || negotiation.proposedPrice))}</span>
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Pending indicator */}
+                          {negotiation.status === 'pending' && (
+                            <div className="relative">
+                              <div className="absolute -left-[22.5px] top-0.5 w-4 h-4 rounded-full bg-sand flex items-center justify-center">
+                                <Clock size={8} className="text-stone" />
+                              </div>
+                              <span className="text-xs text-taupe italic">Awaiting brand response...</span>
+                            </div>
                           )}
                         </div>
-                      )}
-                      {negotiation.clientMessage && (
-                        <div className="bg-parchment p-4 mb-4">
-                          <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block mb-2">Your Message</span>
-                          <p className="text-sm text-stone">{negotiation.clientMessage}</p>
-                        </div>
-                      )}
-                      {negotiation.conciergeNotes.length > 0 && (
-                        <div className="bg-parchment p-4 mb-4">
-                          <span className="text-[10px] tracking-[0.1em] uppercase text-taupe block mb-2">Concierge Notes</span>
-                          {negotiation.conciergeNotes.map((note, idx) => (
-                            <p key={idx} className="text-sm text-stone">{note}</p>
-                          ))}
-                        </div>
-                      )}
+                      </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {daysRemaining > 0 ? (
@@ -428,14 +523,21 @@ export default function PricingPage() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-lg font-display text-gold-deep">{claimed.discountLabel}</p>
-                        {claimed.productSlug && (
+                        {claimed.productSlug ? (
                           <Link
                             href={`/product/${claimed.productSlug}`}
                             className="text-xs text-stone hover:text-charcoal-deep transition-colors underline mt-1 block"
                           >
                             View Product
                           </Link>
-                        )}
+                        ) : claimed.productId ? (
+                          <Link
+                            href={claimed.brandName ? `/brands/${claimed.brandName.toLowerCase().replace(/\s+/g, '-')}` : '#'}
+                            className="text-xs text-stone hover:text-charcoal-deep transition-colors underline mt-1 block"
+                          >
+                            View Brand
+                          </Link>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -503,7 +605,16 @@ export default function PricingPage() {
                             <p className="text-[10px] tracking-[0.15em] uppercase text-gold-muted">
                               {offer.brandName}
                             </p>
-                            <p className="font-medium text-charcoal-deep mt-0.5">{offer.targetName}</p>
+                            {(() => {
+                              const targetUrl = getOfferTargetUrl(offer);
+                              return targetUrl ? (
+                                <Link href={targetUrl} className="font-medium text-charcoal-deep mt-0.5 hover:text-gold-deep transition-colors underline decoration-sand hover:decoration-gold-deep block">
+                                  {offer.targetName}
+                                </Link>
+                              ) : (
+                                <p className="font-medium text-charcoal-deep mt-0.5">{offer.targetName}</p>
+                              );
+                            })()}
 
                             {/* Discount display */}
                             <div className="flex items-baseline gap-2 mt-2">
@@ -900,6 +1011,19 @@ export default function PricingPage() {
                   <p className="text-success font-medium">You have claimed this offer</p>
                 </div>
               )}
+              {(() => {
+                const targetUrl = getOfferTargetUrl(selectedOffer);
+                return targetUrl ? (
+                  <Link
+                    href={targetUrl}
+                    onClick={() => setShowOfferDetail(false)}
+                    className="w-full px-6 py-3 border border-gold-soft text-gold-deep hover:bg-gold-soft/10 transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
+                  >
+                    <ArrowRight size={16} />
+                    {getOfferTargetLabel(selectedOffer.type)}
+                  </Link>
+                ) : null;
+              })()}
               <button
                 onClick={() => setShowOfferDetail(false)}
                 className="w-full px-6 py-3 border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"

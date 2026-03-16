@@ -21,19 +21,23 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { uhniService } from '@/services';
-import type { ProductCategory } from '@/types';
+import { uhniService, brandService } from '@/services';
+import type { ProductCategory, Brand } from '@/types';
 import type { ZeroUIConfig, ZeroUITrigger } from '@/types/uhni';
 
 export default function AutonomousCommercePage() {
   const { autonomousSettings, updateAutonomousSettings, autonomousActivity, showToast } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [zeroConfig, setZeroConfig] = useState<ZeroUIConfig | null>(null);
+  const [allBrands, setAllBrands] = useState<Brand[]>([]);
 
   useEffect(() => {
     setIsLoaded(true);
     uhniService.getZeroUIConfig().then(res => {
       if (res.data) setZeroConfig(res.data);
+    }).catch(() => {});
+    brandService.getAllBrands().then(res => {
+      if (res.success && res.data) setAllBrands(res.data);
     }).catch(() => {});
   }, []);
 
@@ -88,6 +92,28 @@ export default function AutonomousCommercePage() {
       ? current.filter(c => c !== category)
       : [...current, category];
     updateAutonomousSettings({ categories: updated });
+  };
+
+  const handlePreferredBrandToggle = (brandId: string) => {
+    if (!autonomousSettings) return;
+    const current = autonomousSettings.preferredBrands;
+    const updated = current.includes(brandId)
+      ? current.filter(b => b !== brandId)
+      : [...current, brandId];
+    // If adding to preferred, remove from excluded
+    const updatedExcluded = autonomousSettings.excludedBrands.filter(b => b !== brandId);
+    updateAutonomousSettings({ preferredBrands: updated, excludedBrands: updatedExcluded });
+  };
+
+  const handleExcludedBrandToggle = (brandId: string) => {
+    if (!autonomousSettings) return;
+    const current = autonomousSettings.excludedBrands;
+    const updated = current.includes(brandId)
+      ? current.filter(b => b !== brandId)
+      : [...current, brandId];
+    // If adding to excluded, remove from preferred
+    const updatedPreferred = autonomousSettings.preferredBrands.filter(b => b !== brandId);
+    updateAutonomousSettings({ excludedBrands: updated, preferredBrands: updatedPreferred });
   };
 
   const getTriggerTypeBadge = (type: ZeroUITrigger['type']) => {
@@ -266,8 +292,8 @@ export default function AutonomousCommercePage() {
                 <ShoppingBag size={20} className="text-stone" />
                 Categories & Brands
               </h3>
-              <p className="text-sm text-stone mb-6">Select which product categories can be purchased autonomously</p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
+              <p className="text-sm text-stone mb-4">Select which product categories can be purchased autonomously</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {categories.map((category) => {
                   const isSelected = autonomousSettings.categories.includes(category.value);
                   return (
@@ -286,36 +312,40 @@ export default function AutonomousCommercePage() {
                 })}
               </div>
 
-              {zeroConfig && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-sand">
-                  <div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <Heart size={16} className="text-gold-deep" />
-                      <h4 className="text-[10px] tracking-[0.2em] uppercase text-stone">Preferred Brands</h4>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {zeroConfig.preferences.preferredBrands.map(brand => (
-                        <span key={brand} className="px-3 py-1.5 bg-parchment text-xs text-charcoal-deep">
-                          {brand}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-3 mb-3">
-                      <XCircle size={16} className="text-stone" />
-                      <h4 className="text-[10px] tracking-[0.2em] uppercase text-stone">Excluded Categories</h4>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {zeroConfig.preferences.excludedCategories.map(category => (
-                        <span key={category} className="px-3 py-1.5 bg-stone/5 text-xs text-stone">
-                          {category}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+              {/* Preferred Brands */}
+              <div className="pt-8 border-t border-sand mt-8">
+                <div className="flex items-center gap-3 mb-2">
+                  <Heart size={16} className="text-gold-deep" />
+                  <h4 className="text-[10px] tracking-[0.2em] uppercase text-stone">Preferred Brands</h4>
                 </div>
-              )}
+                <p className="text-sm text-stone mb-4">Select brands for autonomous purchases — only selected brands will be included</p>
+                <div className="flex flex-wrap gap-2">
+                  {allBrands.map(brand => {
+                    const brandKey = brand.id || brand.name.toLowerCase().replace(/\s+/g, '-');
+                    const isPreferred = autonomousSettings.preferredBrands.includes(brandKey)
+                      || autonomousSettings.preferredBrands.includes(brand.name.toLowerCase())
+                      || autonomousSettings.preferredBrands.includes(brand.name);
+                    return (
+                      <button
+                        key={brand.id}
+                        onClick={() => handlePreferredBrandToggle(brandKey)}
+                        className={`px-4 py-2 border text-xs tracking-[0.05em] transition-all ${
+                          isPreferred
+                            ? 'border-gold-deep bg-gold-soft/10 text-gold-deep'
+                            : 'border-sand hover:border-gold-deep/40 text-stone'
+                        }`}
+                      >
+                        {isPreferred && <Heart size={10} className="inline mr-1.5 fill-current" />}
+                        {brand.name}
+                      </button>
+                    );
+                  })}
+                  {allBrands.length === 0 && (
+                    <p className="text-xs text-taupe italic">Loading brands...</p>
+                  )}
+                </div>
+              </div>
+
             </div>
 
             {/* ── Section 3: Commerce Modes & Triggers ── */}
