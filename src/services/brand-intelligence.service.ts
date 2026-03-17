@@ -233,10 +233,10 @@ export async function getDropSimulations(): Promise<ApiResponse<DropSimulation[]
 }
 
 export async function createDropSimulation(payload: {
-  dropName: string;
-  collection: string;
-  launchDate: string;
-  regions: string[];
+  drop_name: string;
+  collection_name?: string;
+  product_ids: string[];
+  launch_date?: string;
 }): Promise<ApiResponse<DropSimulation>> {
   return fetchIntelligence('drop-simulations', () => mockDropSimulations[0], 'POST', payload);
 }
@@ -276,6 +276,73 @@ export async function getHeritageAssets(): Promise<ApiResponse<HeritageAsset[]>>
   } catch {
     return { data: mockHeritageAssets, success: true, timestamp: new Date().toISOString() };
   }
+}
+
+export async function createHeritageAsset(payload: {
+  name: string;
+  era: string;
+  year?: number;
+  significance: string;
+  description: string;
+  digital_status?: string;
+  image?: string;
+  condition_notes?: string;
+}): Promise<HeritageAsset | null> {
+  try {
+    const res = await fetch('/api/v1/intelligence/heritage-assets', {
+      method: 'POST',
+      headers: intelligenceAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    _heritageCache = null; // invalidate cache
+    return data;
+  } catch { return null; }
+}
+
+export async function updateHeritageAsset(assetId: string, payload: Record<string, unknown>): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/intelligence/heritage-assets/${assetId}`, {
+      method: 'PATCH',
+      headers: intelligenceAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) _heritageCache = null;
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function deleteHeritageAsset(assetId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/intelligence/heritage-assets/${assetId}`, {
+      method: 'DELETE',
+      headers: intelligenceAuthHeaders(),
+    });
+    if (res.ok) _heritageCache = null;
+    return res.ok;
+  } catch { return false; }
+}
+
+export async function reportCounterfeitAlert(payload: {
+  product_id: string;
+  similarity: number;
+  source: string;
+  source_url?: string;
+  region?: string;
+  risk_level?: string;
+}): Promise<CounterfeitAlert | null> {
+  try {
+    const res = await fetch('/api/v1/intelligence/counterfeit-alerts', {
+      method: 'POST',
+      headers: intelligenceAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    _counterfeitCache = null;
+    return data;
+  } catch { return null; }
 }
 
 // ============================================

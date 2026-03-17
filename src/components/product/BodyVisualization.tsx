@@ -61,7 +61,7 @@ export default function BodyVisualization({
     if (modelUrl && productImage) {
       setIsGenerating(true);
       try {
-        const result = await virtualTryOn(modelUrl, productImage);
+        const result = await virtualTryOn(modelUrl, productImage, product.name);
         setTryOnImage(result.image_url);
       } catch (err) {
         setTryOnError(err instanceof Error ? err.message : 'Try-on generation failed');

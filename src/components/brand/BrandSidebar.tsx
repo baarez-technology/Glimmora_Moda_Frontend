@@ -22,6 +22,7 @@ import {
   BookOpen,
   Gift,
   Calendar,
+  CalendarCheck,
   Brain,
   Activity,
   Bot,
@@ -86,6 +87,7 @@ const navigation: NavSection[] = [
     title: 'Insights',
     items: [
       { label: 'Analytics', href: '/brand/analytics', icon: BarChart3 },
+      { label: 'Appointments', href: '/brand/appointments', icon: CalendarCheck },
       { label: 'Styling Sessions', href: '/brand/styling-sessions', icon: Calendar }
     ]
   },
