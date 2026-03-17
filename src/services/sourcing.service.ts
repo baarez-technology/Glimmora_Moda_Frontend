@@ -999,21 +999,10 @@ export async function getProductCategories(): Promise<string[]> {
 }
 
 export async function getSourcingRequests(): Promise<ApiSourcingRequest[]> {
-  try {
-    const res = await fetch(BASE, { headers: authHeaders() });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) return data;
-  } catch {
-    // API unavailable — fall back to mock + local data
-  }
-  const local = getLocalRequests();
-  const mockCopy = [...MOCK_REQUESTS];
-  for (const lr of local) {
-    const idx = mockCopy.findIndex(m => m.sourcing_id === lr.sourcing_id);
-    if (idx >= 0) { mockCopy[idx] = lr; } else { mockCopy.unshift(lr); }
-  }
-  return mockCopy;
+  const res = await fetch(BASE, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Failed to load sourcing requests: ${res.status}`);
+  const data = await res.json();
+  return Array.isArray(data) ? data : (data?.data ?? []);
 }
 
 export async function getSourcingRequestById(sourcingId: string): Promise<ApiSourcingRequest | null> {

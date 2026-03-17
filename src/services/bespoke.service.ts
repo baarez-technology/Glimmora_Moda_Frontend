@@ -133,25 +133,36 @@ function mapApiTimelineToSteps(
   apiTimeline: ApiBespokeTimeline[],
   currentStatus: string
 ): BespokeTimelineStep[] {
-  const currentIndex = TIMELINE_STAGES.indexOf(currentStatus as BespokeOrderStatus);
-
-  // If the backend returns a structured timeline, use it
+  // If the backend returns a structured timeline, trust it directly
   if (apiTimeline && apiTimeline.length > 0) {
+    // Find the first non-completed step — that's the "current" one
+    const firstIncompleteIdx = apiTimeline.findIndex(item => !item.is_completed);
+
     return apiTimeline.map((item, index) => {
-      const stage = (item.status || TIMELINE_STAGES[index]) as BespokeOrderStatus;
-      const stageIndex = TIMELINE_STAGES.indexOf(stage);
+      // Map API stage name to our stage type (normalize common variations)
+      const rawStatus = (item.status || '').toLowerCase().replace(/\s+/g, '_');
+      const stage = (
+        STAGE_TITLES[rawStatus] ? rawStatus :
+        rawStatus.includes('consult') ? 'consultation' :
+        rawStatus.includes('design') ? 'design_approval' :
+        rawStatus.includes('production') || rawStatus.includes('atelier') ? 'production' :
+        rawStatus.includes('fitting') ? 'fitting' :
+        rawStatus.includes('adjust') || rawStatus.includes('final') ? 'final_adjustments' :
+        rawStatus.includes('deliver') || rawStatus.includes('complete') ? 'complete' :
+        TIMELINE_STAGES[index] || 'consultation'
+      ) as BespokeOrderStatus;
+
       let stepStatus: 'completed' | 'current' | 'upcoming';
       if (item.is_completed) {
         stepStatus = 'completed';
-      } else if (stageIndex === currentIndex) {
+      } else if (index === firstIncompleteIdx) {
         stepStatus = 'current';
-      } else if (stageIndex < currentIndex) {
-        stepStatus = 'completed';
       } else {
         stepStatus = 'upcoming';
       }
+
       return {
-        id: `step-${stage}`,
+        id: `step-${index}-${stage}`,
         stage,
         title: item.title || STAGE_TITLES[stage] || stage,
         description: item.description || STAGE_DESCRIPTIONS[stage] || '',
@@ -163,9 +174,10 @@ function mapApiTimelineToSteps(
     });
   }
 
-  // Fallback: generate from status
+  // Fallback: generate from current status
+  const currentIndex = TIMELINE_STAGES.indexOf(currentStatus as BespokeOrderStatus);
   return TIMELINE_STAGES.map((stage, index) => ({
-    id: `step-${stage}`,
+    id: `step-${index}-${stage}`,
     stage,
     title: STAGE_TITLES[stage],
     description: STAGE_DESCRIPTIONS[stage],
@@ -261,7 +273,10 @@ export async function fetchConsumerBespokeOrders(): Promise<BespokeOrder[]> {
     headers: consumerAuthHeaders(),
   });
   if (!res.ok) throw new Error(`Failed to fetch bespoke orders: ${res.status}`);
-  const data: ApiBespokeOrder[] = await res.json();
+  const raw = await res.json();
+  const data: ApiBespokeOrder[] = Array.isArray(raw)
+    ? raw
+    : (raw?.orders ?? raw?.data ?? []);
   return data.map(mapApiBespokeToFrontend);
 }
 
@@ -345,11 +360,17 @@ export async function addConsumerMessage(
 // ============================================
 
 export async function fetchBrandBespokeOrders(): Promise<BespokeOrder[]> {
-  const res = await fetchWithTimeout('/api/v1/brand/bespoke-orders/', {
-    headers: brandAuthHeaders(),
-  });
+  const headers = brandAuthHeaders();
+  // IMPORTANT: Backend requires trailing slash for this endpoint.
+  // Without trailing slash → returns {orders:[], total_orders:0} (empty paginated)
+  // With trailing slash → returns full array of all orders
+  // Using window.fetch directly to ensure trailing slash is preserved
+  const res = await window.fetch('/api/v1/brand/bespoke-orders/', { headers });
   if (!res.ok) throw new Error(`Failed to fetch brand bespoke orders: ${res.status}`);
-  const data: ApiBespokeOrder[] = await res.json();
+  const raw = await res.json();
+  const data: ApiBespokeOrder[] = Array.isArray(raw)
+    ? raw
+    : (raw?.orders ?? raw?.data ?? []);
   return data.map(mapApiBespokeToFrontend);
 }
 

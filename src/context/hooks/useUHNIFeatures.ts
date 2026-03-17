@@ -30,12 +30,11 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
     if (isUHNI) {
       uhniService.getConcierge().then(r => { if (r.success) setConcierge(r.data); });
       uhniService.getAutonomousSettings().then(r => { if (r.success) setAutonomousSettings(r.data); });
-      uhniService.getSourcingRequests().then(r => { if (r.success) setSourcingRequests(r.data); });
+      // Sourcing requests are loaded directly by the sourcing page via sourcing.service
       bespokeService.fetchConsumerBespokeOrders()
         .then(orders => setBespokeOrders(orders))
         .catch(() => {
-          // Fallback to mock if API unavailable
-          uhniService.getBespokeOrders().then(r => { if (r.success) setBespokeOrders(r.data); });
+          showToast('Failed to load bespoke orders', 'error');
         });
       uhniService.getAutonomousActivity().then(r => { if (r.success) setAutonomousActivity(r.data); });
       uhniService.getPriceNegotiations().then(r => { if (r.success) setPriceNegotiations(r.data); });
