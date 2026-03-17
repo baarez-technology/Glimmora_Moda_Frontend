@@ -68,13 +68,14 @@ function LoginForm() {
       showToast('Welcome back to ModaGlimmora!', 'success');
     }
 
-    // Small delay to ensure React commits the auth state updates
-    // before navigation triggers the AuthGuard check on the target page
-    const target = data.context_required ? '/onboarding' : redirectUrl;
-    if (data.context_required && redirectUrl && redirectUrl !== '/') {
-      localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+    if (data.context_required) {
+      if (redirectUrl && redirectUrl !== '/') {
+        localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
+      }
+      router.replace('/onboarding');
+    } else {
+      router.replace(redirectUrl);
     }
-    setTimeout(() => router.push(target), 50);
   };
 
   // Handle 2FA verification

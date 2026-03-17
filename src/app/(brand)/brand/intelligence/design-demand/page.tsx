@@ -41,7 +41,7 @@ export default function DesignDemandPage() {
       title="Design-to-Demand Simulation"
       subtitle="Simulate market demand before production to optimize sell-before-make strategies"
       phase={2}
-      status="mock"
+      status="live"
       backendNote="Requires design asset pipeline and market-data feed. Endpoint: POST /api/intelligence/design-demand"
       isLoading={isLoading}
     >
@@ -66,6 +66,43 @@ export default function DesignDemandPage() {
             <div className="bg-white border border-sand/50 p-6">
               <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Highest Scoring Concept</p>
               <p className="font-display text-2xl text-charcoal-deep">{highestConcept?.concept ?? '\u2014'}</p>
+            </div>
+          </div>
+
+          {/* Regional Demand Heatmap */}
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Regional Demand Heatmap</h2>
+              <p className="text-xs text-taupe mt-1">Aggregated demand scores across all concepts by region</p>
+            </div>
+            <div className="p-6">
+              {(() => {
+                const regionMap = new Map<string, { total: number; count: number }>();
+                simulations.forEach(sim => sim.regionBreakdown.forEach(r => {
+                  const prev = regionMap.get(r.region) || { total: 0, count: 0 };
+                  regionMap.set(r.region, { total: prev.total + r.score, count: prev.count + 1 });
+                }));
+                const regions = Array.from(regionMap.entries())
+                  .map(([region, { total, count }]) => ({ region, avg: Math.round(total / count) }))
+                  .sort((a, b) => b.avg - a.avg);
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {regions.map(r => (
+                      <div
+                        key={r.region}
+                        className="p-4 text-center transition-colors"
+                        style={{
+                          backgroundColor: `rgba(26, 26, 26, ${Math.max(0.05, r.avg / 100 * 0.85)})`,
+                          color: r.avg > 60 ? '#FAF5EF' : '#1A1A1A',
+                        }}
+                      >
+                        <p className="font-display text-2xl">{r.avg}</p>
+                        <p className="text-[10px] tracking-[0.1em] uppercase mt-1 opacity-80">{r.region}</p>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

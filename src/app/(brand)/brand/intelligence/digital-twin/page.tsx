@@ -46,7 +46,7 @@ export default function DigitalTwinPage() {
       title="Brand Digital Twin"
       subtitle="A living digital replica of your brand's identity, connections, and market position"
       phase={3}
-      status="mock"
+      status="live"
       backendNote="Requires graph database for node-relationship mapping. Endpoint: GET /api/intelligence/digital-twin"
       isLoading={isLoading}
     >
@@ -90,6 +90,69 @@ export default function DigitalTwinPage() {
                       style={{ width: `${entry.value}%` }}
                     />
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Network Graph Visualization */}
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Network Graph</h2>
+              <p className="text-xs text-taupe mt-1">Visual map of brand identity nodes and their connections</p>
+            </div>
+            <div className="p-6 flex justify-center">
+              <svg viewBox="0 0 500 400" className="w-full max-w-[600px] h-auto">
+                {/* Connection lines */}
+                {twin.nodes.map((node, i) => {
+                  const angle = (i / twin.nodes.length) * Math.PI * 2 - Math.PI / 2;
+                  const cx = 250 + Math.cos(angle) * 140;
+                  const cy = 200 + Math.sin(angle) * 120;
+                  return node.connections.map(connId => {
+                    const j = twin.nodes.findIndex(n => n.id === connId);
+                    if (j <= i) return null;
+                    const angle2 = (j / twin.nodes.length) * Math.PI * 2 - Math.PI / 2;
+                    const cx2 = 250 + Math.cos(angle2) * 140;
+                    const cy2 = 200 + Math.sin(angle2) * 120;
+                    return (
+                      <line key={`${node.id}-${connId}`} x1={cx} y1={cy} x2={cx2} y2={cy2} stroke="#D4C5B0" strokeWidth="1" opacity="0.5" />
+                    );
+                  });
+                })}
+                {/* Nodes */}
+                {twin.nodes.map((node, i) => {
+                  const angle = (i / twin.nodes.length) * Math.PI * 2 - Math.PI / 2;
+                  const cx = 250 + Math.cos(angle) * 140;
+                  const cy = 200 + Math.sin(angle) * 120;
+                  const r = 10 + node.strength / 5;
+                  const fill = node.type === 'collection' ? '#3B82F6' : node.type === 'heritage' ? '#D97706' : node.type === 'cultural' ? '#7C3AED' : '#22C55E';
+                  return (
+                    <g key={node.id}>
+                      <circle cx={cx} cy={cy} r={r} fill={fill} opacity="0.2" />
+                      <circle cx={cx} cy={cy} r={r * 0.7} fill={fill} opacity="0.8" />
+                      <text x={cx} y={cy + r + 14} textAnchor="middle" fontSize="10" fill="#8B8680" className="font-sans">
+                        {node.label.length > 12 ? node.label.slice(0, 12) + '…' : node.label}
+                      </text>
+                    </g>
+                  );
+                })}
+                {/* Center brand label */}
+                <text x="250" y="200" textAnchor="middle" fontSize="12" fill="#1A1A1A" fontWeight="600" className="font-display">
+                  {twin.brandName}
+                </text>
+              </svg>
+            </div>
+            {/* Legend */}
+            <div className="px-6 pb-6 flex items-center justify-center gap-6">
+              {[
+                { type: 'Collection', color: '#3B82F6' },
+                { type: 'Heritage', color: '#D97706' },
+                { type: 'Cultural', color: '#7C3AED' },
+                { type: 'Product', color: '#22C55E' },
+              ].map(item => (
+                <div key={item.type} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-[10px] tracking-[0.1em] uppercase text-stone">{item.type}</span>
                 </div>
               ))}
             </div>

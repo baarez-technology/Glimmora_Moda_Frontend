@@ -59,7 +59,7 @@ export default function MemoryImprintPage() {
       subtitle="Measure how deeply your brand touchpoints resonate in customer memory"
       acronym="BMI™"
       phase={3}
-      status="mock"
+      status="live"
       backendNote="Requires post-experience survey integration. Endpoint: GET /api/intelligence/memory-imprints"
       isLoading={isLoading}
     >
@@ -84,6 +84,55 @@ export default function MemoryImprintPage() {
             <div className="bg-white border border-sand/50 p-6">
               <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Avg Return Probability</p>
               <p className="font-display text-2xl text-charcoal-deep">{avgReturn}%</p>
+            </div>
+          </div>
+
+          {/* Comparison Chart */}
+          <div className="bg-white border border-sand/50">
+            <div className="px-6 py-4 border-b border-sand/50">
+              <h2 className="font-medium text-charcoal-deep">Touchpoint Comparison</h2>
+              <p className="text-xs text-taupe mt-1">Recall, resonance, and return probability across all touchpoints</p>
+            </div>
+            <div className="p-6">
+              <div className="space-y-4">
+                {imprints.map(imprint => (
+                  <div key={imprint.id} className="flex items-center gap-4">
+                    <div className="w-28 flex-shrink-0">
+                      <p className="text-xs text-charcoal-deep font-medium truncate">{touchpointLabel(imprint.touchpoint)}</p>
+                    </div>
+                    <div className="flex-1 flex gap-1">
+                      <div className="h-6 bg-charcoal-deep/80 transition-all flex items-center justify-end px-1.5" style={{ width: `${imprint.recallScore}%` }}>
+                        <span className="text-[9px] text-ivory-cream">{imprint.recallScore}</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 flex gap-1">
+                      <div className="h-6 bg-gold-muted/80 transition-all flex items-center justify-end px-1.5" style={{ width: `${imprint.emotionalResonance}%` }}>
+                        <span className="text-[9px] text-charcoal-deep">{imprint.emotionalResonance}</span>
+                      </div>
+                    </div>
+                    <div className="flex-1 flex gap-1">
+                      <div className="h-6 bg-success/70 transition-all flex items-center justify-end px-1.5" style={{ width: `${imprint.returnProbability}%` }}>
+                        <span className="text-[9px] text-charcoal-deep">{imprint.returnProbability}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Legend */}
+              <div className="flex items-center gap-6 mt-4 pt-4 border-t border-sand/30">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-charcoal-deep/80" />
+                  <span className="text-[10px] tracking-[0.1em] uppercase text-stone">Recall</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-gold-muted/80" />
+                  <span className="text-[10px] tracking-[0.1em] uppercase text-stone">Resonance</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 bg-success/70" />
+                  <span className="text-[10px] tracking-[0.1em] uppercase text-stone">Return Prob.</span>
+                </div>
+              </div>
             </div>
           </div>
 
