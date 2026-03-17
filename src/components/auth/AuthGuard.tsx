@@ -8,18 +8,38 @@ interface AuthGuardProps {
   children: React.ReactNode;
 }
 
+/**
+ * Check localStorage directly for a valid token.
+ * This is needed because after login, `storeUserAuth()` writes to localStorage
+ * synchronously BEFORE `router.push()`, but the React AuthContext state update
+ * may not have committed yet when AuthGuard renders on the target page.
+ */
+function hasTokenInStorage(): boolean {
+  try {
+    return !!localStorage.getItem('moda-user-token');
+  } catch {
+    return false;
+  }
+}
+
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isHydrated } = useAuth();
+  const { isAuthenticated, isHydrated, isLoggingOut } = useAuth();
+
+  // Also check localStorage as a synchronous fallback
+  const hasToken = hasTokenInStorage();
+  const effectivelyAuthenticated = isAuthenticated || hasToken;
 
   useEffect(() => {
-    if (isHydrated && !isAuthenticated) {
-      // Encode the current path to redirect back after login
+    // Don't redirect during logout (state is transitioning)
+    if (isLoggingOut) return;
+
+    if (isHydrated && !effectivelyAuthenticated) {
       const redirectUrl = encodeURIComponent(pathname);
       router.replace(`/auth/login?redirect=${redirectUrl}`);
     }
-  }, [isHydrated, isAuthenticated, pathname, router]);
+  }, [isHydrated, effectivelyAuthenticated, isLoggingOut, pathname, router]);
 
   // Show loading state while checking authentication
   if (!isHydrated) {
@@ -33,8 +53,8 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // Show redirect message if not authenticated
-  if (!isAuthenticated) {
+  // Show redirect message if not authenticated (and no token in storage)
+  if (!effectivelyAuthenticated) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center max-w-md px-8">

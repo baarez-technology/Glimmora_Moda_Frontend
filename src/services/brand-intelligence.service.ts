@@ -1,8 +1,13 @@
 /**
- * Brand Intelligence Service
- * Endpoints: /api/brand/intelligence/*
+ * Brand Intelligence Service (B17-B27)
+ *
+ * Endpoints: GET /api/v1/intelligence/*
+ * Auth: Brand token (moda-brand-token)
+ *
+ * Tries real API first, falls back to mock data if API unavailable.
  */
 
+import { fetchWithTimeout } from '@/lib/api-cache';
 import { apiRequest } from './api-client';
 import type { ApiResponse } from './api-client';
 import type {
@@ -33,23 +38,80 @@ import {
 } from '@/data/brand-intelligence';
 
 // ============================================
-// B17: Design-to-Demand Simulation
+// Auth helpers
 // ============================================
 
-export async function getDemandSimulations(): Promise<ApiResponse<DemandSimulation[]>> {
-  return apiRequest<DemandSimulation[]>('/api/brand/intelligence/demand-simulations', {
-    mockHandler: () => mockDemandSimulations,
+function getBrandToken(): string | null {
+  try {
+    return localStorage.getItem('moda-brand-token');
+  } catch {
+    return null;
+  }
+}
+
+function brandHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = getBrandToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
+
+// ============================================
+// Generic fetcher — real API first, mock fallback
+// ============================================
+
+async function fetchIntelligence<T>(
+  endpoint: string,
+  mockFallback: () => T | Promise<T>,
+  method: 'GET' | 'POST' | 'PATCH' = 'GET',
+  body?: unknown,
+): Promise<ApiResponse<T>> {
+  const token = getBrandToken();
+
+  // Try real API if brand is authenticated
+  if (token) {
+    try {
+      const res = await fetchWithTimeout(`/api/v1/intelligence/${endpoint}`, {
+        method,
+        headers: brandHeaders(),
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          data: data as T,
+          success: true,
+          timestamp: new Date().toISOString(),
+        };
+      }
+      console.log(`[brand-intelligence] API ${endpoint}: ${res.status}, falling back to mock`);
+    } catch (err) {
+      console.log(`[brand-intelligence] API ${endpoint} failed, using mock:`, err);
+    }
+  }
+
+  // Fallback to mock
+  return apiRequest<T>(`/api/brand/intelligence/${endpoint}`, {
+    method,
+    mockHandler: mockFallback,
   });
 }
 
 // ============================================
-// B18: Intelligence Agent
+// B17: Design-to-Demand Simulation
+// ============================================
+
+export async function getDemandSimulations(): Promise<ApiResponse<DemandSimulation[]>> {
+  return fetchIntelligence('design-demand', () => mockDemandSimulations);
+}
+
+// ============================================
+// B18: Intelligence Agent — Signal Feed
 // ============================================
 
 export async function getIntelligenceSignals(): Promise<ApiResponse<BrandIntelligenceSignal[]>> {
-  return apiRequest<BrandIntelligenceSignal[]>('/api/brand/intelligence/signals', {
-    mockHandler: () => mockIntelligenceSignals,
-  });
+  return fetchIntelligence('signals', () => mockIntelligenceSignals);
 }
 
 // ============================================
@@ -57,19 +119,15 @@ export async function getIntelligenceSignals(): Promise<ApiResponse<BrandIntelli
 // ============================================
 
 export async function getBrandConciergeConfig(): Promise<ApiResponse<BrandConciergeConfig>> {
-  return apiRequest<BrandConciergeConfig>('/api/brand/intelligence/concierge-config', {
-    mockHandler: () => mockBrandConciergeConfig,
-  });
+  return fetchIntelligence('concierge-config', () => mockBrandConciergeConfig);
 }
 
 // ============================================
-// B20: Brand Memory Imprint
+// B20: Brand Memory Imprint (BMI)
 // ============================================
 
 export async function getMemoryImprints(): Promise<ApiResponse<MemoryImprint[]>> {
-  return apiRequest<MemoryImprint[]>('/api/brand/intelligence/memory-imprints', {
-    mockHandler: () => mockMemoryImprints,
-  });
+  return fetchIntelligence('memory-imprints', () => mockMemoryImprints);
 }
 
 // ============================================
@@ -77,9 +135,7 @@ export async function getMemoryImprints(): Promise<ApiResponse<MemoryImprint[]>>
 // ============================================
 
 export async function getBrandDigitalTwin(): Promise<ApiResponse<BrandDigitalTwin>> {
-  return apiRequest<BrandDigitalTwin>('/api/brand/intelligence/digital-twin', {
-    mockHandler: () => mockBrandDigitalTwin,
-  });
+  return fetchIntelligence('digital-twin', () => mockBrandDigitalTwin);
 }
 
 // ============================================
@@ -87,9 +143,7 @@ export async function getBrandDigitalTwin(): Promise<ApiResponse<BrandDigitalTwi
 // ============================================
 
 export async function getCulturalAuthority(): Promise<ApiResponse<CulturalAuthority[]>> {
-  return apiRequest<CulturalAuthority[]>('/api/brand/intelligence/cultural-authority', {
-    mockHandler: () => mockCulturalAuthority,
-  });
+  return fetchIntelligence('cultural-authority', () => mockCulturalAuthority);
 }
 
 // ── Intelligence API helpers ───────────────────────────────────────────────────
@@ -172,9 +226,28 @@ export async function updateCounterfeitAlert(id: string, status: string): Promis
 // ============================================
 
 export async function getDropSimulations(): Promise<ApiResponse<DropSimulation[]>> {
-  return apiRequest<DropSimulation[]>('/api/brand/intelligence/drop-simulations', {
-    mockHandler: () => mockDropSimulations,
-  });
+  return fetchIntelligence('drop-simulations', () => mockDropSimulations);
+}
+
+export async function createDropSimulation(payload: {
+  dropName: string;
+  collection: string;
+  launchDate: string;
+  regions: string[];
+}): Promise<ApiResponse<DropSimulation>> {
+  return fetchIntelligence('drop-simulations', () => mockDropSimulations[0], 'POST', payload);
+}
+
+export async function updateDropSimulationStatus(
+  simulationId: string,
+  status: DropSimulation['status'],
+): Promise<ApiResponse<DropSimulation>> {
+  return fetchIntelligence(
+    `drop-simulations/${simulationId}`,
+    () => ({ ...mockDropSimulations[0], status }),
+    'PATCH',
+    { status },
+  );
 }
 
 // ============================================

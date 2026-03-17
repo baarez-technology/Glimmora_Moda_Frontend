@@ -40,7 +40,7 @@ export default function CulturalAuthorityPage() {
       subtitle="Measure and track cultural authority across key brand dimensions"
       acronym="CBCE™"
       phase={3}
-      status="mock"
+      status="live"
       backendNote="Requires NLP sentiment pipeline on social/press mentions. Endpoint: GET /api/intelligence/cultural-authority"
       isLoading={isLoading}
     >
@@ -65,6 +65,73 @@ export default function CulturalAuthorityPage() {
             <div className="bg-white border border-sand/50 p-6">
               <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Improving</p>
               <p className="font-display text-2xl text-charcoal-deep">{improvingCount}</p>
+            </div>
+          </div>
+
+          {/* Radar Chart Visualization */}
+          <div className="bg-white border border-sand/50 p-6">
+            <h2 className="font-medium text-charcoal-deep mb-6">Cultural Authority Overview</h2>
+            <div className="flex items-center justify-center">
+              <div className="relative w-64 h-64">
+                {/* Background circles */}
+                {[100, 75, 50, 25].map(r => (
+                  <div
+                    key={r}
+                    className="absolute border border-sand/30 rounded-full"
+                    style={{
+                      width: `${r * 2.4}px`, height: `${r * 2.4}px`,
+                      top: `${128 - r * 1.2}px`, left: `${128 - r * 1.2}px`,
+                    }}
+                  />
+                ))}
+                {/* Dimension points with labels */}
+                {dimensions.map((d, i) => {
+                  const angle = (i / dimensions.length) * Math.PI * 2 - Math.PI / 2;
+                  const scorePercent = d.maxScore > 0 ? d.score / d.maxScore : 0;
+                  const radius = scorePercent * 120;
+                  const x = 128 + Math.cos(angle) * radius;
+                  const y = 128 + Math.sin(angle) * radius;
+                  const labelX = 128 + Math.cos(angle) * 140;
+                  const labelY = 128 + Math.sin(angle) * 140;
+                  return (
+                    <div key={d.id}>
+                      <div
+                        className="absolute w-3 h-3 bg-charcoal-deep rounded-full -translate-x-1.5 -translate-y-1.5"
+                        style={{ left: `${x}px`, top: `${y}px` }}
+                      />
+                      <div
+                        className="absolute text-[9px] tracking-[0.05em] uppercase text-stone -translate-x-1/2 -translate-y-1/2 text-center w-20"
+                        style={{ left: `${labelX}px`, top: `${labelY}px` }}
+                      >
+                        {d.dimension.split(' ').slice(0, 2).join(' ')}
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* SVG connecting lines */}
+                <svg className="absolute inset-0" viewBox="0 0 256 256">
+                  <polygon
+                    points={dimensions.map((d, i) => {
+                      const angle = (i / dimensions.length) * Math.PI * 2 - Math.PI / 2;
+                      const scorePercent = d.maxScore > 0 ? d.score / d.maxScore : 0;
+                      const radius = scorePercent * 120;
+                      return `${128 + Math.cos(angle) * radius},${128 + Math.sin(angle) * radius}`;
+                    }).join(' ')}
+                    fill="rgba(26, 26, 26, 0.08)"
+                    stroke="#1A1A1A"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </div>
+            </div>
+            {/* Legend */}
+            <div className="flex items-center justify-center gap-6 mt-6 flex-wrap">
+              {dimensions.map(d => (
+                <div key={d.id} className="text-center">
+                  <p className="font-display text-lg text-charcoal-deep">{d.score}</p>
+                  <p className="text-[9px] tracking-[0.1em] uppercase text-taupe">{d.dimension}</p>
+                </div>
+              ))}
             </div>
           </div>
 

@@ -1,15 +1,14 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-  ArrowLeft, ArrowRight, Check, Ruler, Palette,
-  Scissors, Crown, AlertCircle, X, Search
+  ArrowLeft, Check, Ruler, Palette, Scissors,
+  Crown, X, Search, ChevronDown, CheckCircle
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import * as brandService from '@/services/brand.service';
+import { getAllBrands as getBackendBrands } from '@/services/recommendation.service';
 import type { Brand } from '@/types';
 import type { BespokeDetailedSpec } from '@/types';
 
@@ -31,6 +30,14 @@ interface FormData {
   spec: BespokeDetailedSpec;
 }
 
+const initialSpec: BespokeDetailedSpec = {
+  measurements: {},
+  fabricPreferences: '',
+  colorPreferences: '',
+  occasionContext: '',
+  specialInstructions: '',
+};
+
 const initialForm: FormData = {
   title: '',
   type: '',
@@ -38,39 +45,60 @@ const initialForm: FormData = {
   estimatedBudget: 0,
   requestedDeadline: '',
   selectedBrands: [],
-  spec: {
-    measurements: {},
-    fabricPreferences: '',
-    colorPreferences: '',
-    specialInstructions: '',
-    occasionContext: '',
-  },
+  spec: initialSpec,
 };
 
 export default function NewBespokeOrderPage() {
-  const router = useRouter();
-  const { createBespokeOrder, isUHNI } = useApp();
-  const [currentStep, setCurrentStep] = useState(1);
+  const { isUHNI, createBespokeOrder } = useApp();
+  const [isLoaded, setIsLoaded] = useState(false);
   const [formData, setFormData] = useState<FormData>(initialForm);
   const [submitted, setSubmitted] = useState(false);
-  const [errors, setErrors] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // Brand loading state
   const [allBrands, setAllBrands] = useState<Brand[]>([]);
   const [brandsLoading, setBrandsLoading] = useState(true);
+  const [brandsError, setBrandsError] = useState<string | null>(null);
   const [brandSearch, setBrandSearch] = useState('');
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+  const brandRef = useRef<HTMLDivElement>(null);
 
-  // Load brands on mount
   useEffect(() => {
-    brandService.getAllBrands()
-      .then(res => {
-        if (res.success && res.data) {
-          setAllBrands(res.data);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setBrandsLoading(false));
+    setIsLoaded(true);
+  }, []);
+
+  // Load brands from backend API
+  const loadBrands = useCallback(async () => {
+    setBrandsLoading(true);
+    setBrandsError(null);
+    try {
+      const brands = await getBackendBrands();
+      if (brands.length > 0) {
+        setAllBrands(brands);
+      } else {
+        setBrandsError('No brands available. Please try again.');
+      }
+    } catch {
+      setBrandsError('Failed to load brands. Please check your connection and try again.');
+    } finally {
+      setBrandsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBrands();
+  }, [loadBrands]);
+
+  // Close brand dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (brandRef.current && !brandRef.current.contains(e.target as Node)) {
+        setBrandDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
   // Filter brands by search
@@ -79,21 +107,32 @@ export default function NewBespokeOrderPage() {
     !formData.selectedBrands.some(sb => sb.id === b.id)
   );
 
-  const addBrand = useCallback((brand: Brand) => {
+  const addBrand = (brand: Brand) => {
     setFormData(prev => ({
       ...prev,
       selectedBrands: [...prev.selectedBrands, { id: brand.id, name: brand.name, logoUrl: brand.logoUrl }],
     }));
     setBrandSearch('');
     setBrandDropdownOpen(false);
-  }, []);
+  };
 
-  const removeBrand = useCallback((brandId: string) => {
+  const removeBrand = (brandId: string) => {
     setFormData(prev => ({
       ...prev,
       selectedBrands: prev.selectedBrands.filter(b => b.id !== brandId),
     }));
-  }, []);
+  };
+
+  const updateMeasurement = (key: string, value: string) => {
+    const num = value === '' ? undefined : Number(value);
+    setFormData(prev => ({
+      ...prev,
+      spec: {
+        ...prev.spec,
+        measurements: { ...prev.spec.measurements, [key]: num },
+      },
+    }));
+  };
 
   if (!isUHNI) {
     return (
@@ -108,55 +147,6 @@ export default function NewBespokeOrderPage() {
       </div>
     );
   }
-
-  const validateStep1 = () => {
-    const errs: string[] = [];
-    if (!formData.title.trim()) errs.push('Title is required');
-    if (!formData.type) errs.push('Please select an order type');
-    if (formData.selectedBrands.length === 0) errs.push('Please select at least one brand');
-    if (formData.estimatedBudget <= 0) errs.push('Please enter an estimated budget');
-    setErrors(errs);
-    return errs.length === 0;
-  };
-
-  const handleNext = () => {
-    if (currentStep === 1 && !validateStep1()) return;
-    setErrors([]);
-    setCurrentStep(prev => Math.min(3, prev + 1));
-  };
-
-  const handleBack = () => {
-    setErrors([]);
-    setCurrentStep(prev => Math.max(1, prev - 1));
-  };
-
-  const handleSubmit = () => {
-    if (!formData.type) return;
-    createBespokeOrder({
-      title: formData.title,
-      type: formData.type as OrderType,
-      description: formData.description,
-      detailedSpec: formData.spec,
-      estimatedBudget: formData.estimatedBudget,
-      requestedDeadline: formData.requestedDeadline || undefined,
-      selectedBrands: formData.selectedBrands.map(b => ({ id: b.id, name: b.name })),
-    });
-    setSubmitted(true);
-  };
-
-  const updateMeasurement = (key: string, value: string) => {
-    const num = value === '' ? undefined : Number(value);
-    setFormData(prev => ({
-      ...prev,
-      spec: {
-        ...prev.spec,
-        measurements: {
-          ...prev.spec.measurements,
-          [key]: num,
-        },
-      },
-    }));
-  };
 
   const typeOptions: { value: OrderType; label: string; desc: string; icon: typeof Ruler }[] = [
     { value: 'made_to_measure', label: 'Made to Measure', desc: 'Your exact measurements applied to an existing design', icon: Ruler },
@@ -174,49 +164,103 @@ export default function NewBespokeOrderPage() {
     { key: 'height', label: 'Height (cm)' },
   ];
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.title.trim()) { setError('Title is required'); return; }
+    if (!formData.type) { setError('Please select an order type'); return; }
+    if (formData.selectedBrands.length === 0) { setError('Please select at least one brand'); return; }
+    if (formData.estimatedBudget <= 0) { setError('Please enter an estimated budget'); return; }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      createBespokeOrder({
+        title: formData.title,
+        type: formData.type as OrderType,
+        description: formData.description,
+        detailedSpec: formData.spec,
+        estimatedBudget: formData.estimatedBudget,
+        requestedDeadline: formData.requestedDeadline || undefined,
+        selectedBrands: formData.selectedBrands.map(b => ({ id: b.id, name: b.name })),
+      });
+      setSubmitted(true);
+    } catch {
+      setError('Failed to submit request. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Success Screen ──
   if (submitted) {
     return (
-      <div className="min-h-screen bg-ivory-cream flex items-center justify-center p-8">
-        <div className="max-w-md w-full text-center">
-          <div className="w-20 h-20 bg-gold-soft/20 flex items-center justify-center mx-auto mb-6">
-            <Crown size={40} className="text-gold-soft" />
+      <div className="min-h-screen bg-ivory-cream">
+        <div className="bg-charcoal-deep">
+          <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
+            <div className="flex items-center gap-2 mb-4">
+              <Crown size={12} className="text-gold-soft" />
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70">
+                Bespoke Commission
+              </span>
+            </div>
+            <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
+              New Bespoke Order
+            </h1>
           </div>
-          <h2 className="font-display text-2xl text-charcoal-deep mb-3">
-            Your Bespoke Request Has Been Submitted
-          </h2>
-          <p className="text-stone text-sm mb-4">
-            Commission sent to {formData.selectedBrands.length === 1
-              ? formData.selectedBrands[0].name
-              : `${formData.selectedBrands.length} brands`
-            }
-          </p>
-          <p className="text-stone text-sm mb-8">
-            Our atelier team will review your request and contact you within 48 hours to arrange your initial consultation.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/uhni/bespoke"
-              className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-            >
-              View My Orders
-            </Link>
-            <Link
-              href="/uhni"
-              className="px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
-            >
-              Return to Dashboard
-            </Link>
+        </div>
+        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-16">
+          <div className="text-center">
+            <div className="w-20 h-20 bg-success/10 flex items-center justify-center mx-auto mb-6">
+              <CheckCircle size={40} className="text-success" />
+            </div>
+            <h2 className="font-display text-2xl text-charcoal-deep mb-3">
+              Bespoke Request Submitted
+            </h2>
+            <p className="text-stone max-w-md mx-auto mb-4">
+              Commission sent to {formData.selectedBrands.length === 1
+                ? formData.selectedBrands[0].name
+                : `${formData.selectedBrands.length} brands`
+              }
+            </p>
+            <div className="flex items-center justify-center gap-2 mb-10 flex-wrap">
+              {formData.selectedBrands.map(b => (
+                <span key={b.id} className="inline-flex items-center gap-2 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep">
+                  {b.logoUrl && (
+                    <Image src={b.logoUrl} alt={b.name} width={16} height={16} className="object-contain" />
+                  )}
+                  {b.name}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-taupe mb-10">
+              Our atelier team will review your request and contact you within 48 hours to arrange your initial consultation.
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <Link
+                href="/uhni/bespoke"
+                className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
+              >
+                View My Orders
+              </Link>
+              <Link
+                href="/uhni"
+                className="px-6 py-3 border border-sand text-charcoal-deep text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+              >
+                Return to Dashboard
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // ── Main Form ──
   return (
     <div className="min-h-screen bg-ivory-cream">
       {/* Header */}
       <div className="bg-charcoal-deep">
-        <div className="max-w-[800px] mx-auto px-8 md:px-16 py-12">
+        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
           <Link
             href="/uhni/bespoke"
             className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
@@ -224,476 +268,330 @@ export default function NewBespokeOrderPage() {
             <ArrowLeft size={16} />
             Back to Bespoke Orders
           </Link>
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gold-soft/20 flex items-center justify-center">
-              <Crown size={28} className="text-gold-soft" />
+
+          <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+            <div className="flex items-center gap-2 mb-4">
+              <Crown size={12} className="text-gold-soft" />
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70">
+                Bespoke Commission
+              </span>
             </div>
-            <div>
-              <h1 className="font-display text-2xl text-ivory-cream">New Bespoke Commission</h1>
-              <p className="text-sm text-stone mt-1">Step {currentStep} of 3</p>
-            </div>
+            <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
+              New Bespoke Order
+            </h1>
+            <p className="text-sand mt-3">Design your vision and select the brand partners to commission</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-[800px] mx-auto px-8 md:px-16 py-12">
-        {/* Errors */}
-        {errors.length > 0 && (
-          <div className="bg-error/10 border border-error/20 p-4 mb-6">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle size={16} className="text-error" />
-              <span className="text-sm font-medium text-error">Please fix the following:</span>
-            </div>
-            <ul className="list-disc list-inside text-sm text-error space-y-1">
-              {errors.map((err, i) => <li key={i}>{err}</li>)}
-            </ul>
+      <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        {error && (
+          <div className="mb-6 p-4 bg-error/10 border border-error/30 text-error text-sm">
+            {error}
           </div>
         )}
 
-        {/* STEP 1 — Order Details */}
-        {currentStep === 1 && (
-          <div className="space-y-8">
-            <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Order Title *
-              </label>
-              <input
-                type="text"
-                value={formData.title}
-                onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="e.g. Evening Gown for Met Gala"
-                className="w-full border border-sand px-4 py-3 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-              />
-            </div>
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Title */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              What would you like made? *
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              placeholder="e.g., Custom Evening Gown, Bespoke Tailored Suit"
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              required
+            />
+          </div>
 
-            {/* Brand Multi-Select */}
-            <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Select Brand(s) *
-              </label>
-              <p className="text-xs text-stone mb-3">
-                Choose one or more brands for your bespoke commission
-              </p>
+          {/* Brand Partners — same pattern as sourcing page */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Commission Brand(s) *
+            </label>
+            <p className="text-xs text-stone mb-3">
+              Select which brand partners should receive this bespoke commission. They will review and arrange a consultation.
+            </p>
 
-              {/* Selected Brands Tags */}
-              {formData.selectedBrands.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {formData.selectedBrands.map(brand => (
-                    <span
-                      key={brand.id}
-                      className="inline-flex items-center gap-2 px-3 py-2 bg-charcoal-deep text-ivory-cream text-sm"
+            {/* Selected brands as tags */}
+            {formData.selectedBrands.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {formData.selectedBrands.map(brand => (
+                  <span
+                    key={brand.id}
+                    className="inline-flex items-center gap-2 pl-3 pr-1.5 py-1.5 bg-charcoal-deep text-ivory-cream text-sm"
+                  >
+                    {brand.logoUrl && (
+                      <Image src={brand.logoUrl} alt={brand.name} width={14} height={14} className="object-contain brightness-0 invert" />
+                    )}
+                    {brand.name}
+                    <button
+                      type="button"
+                      onClick={() => removeBrand(brand.id)}
+                      className="p-0.5 hover:bg-ivory-cream/20 transition-colors rounded-sm"
                     >
-                      {brand.logoUrl && (
-                        <Image
-                          src={brand.logoUrl}
-                          alt={brand.name}
-                          width={16}
-                          height={16}
-                          className="rounded-full object-cover"
-                        />
-                      )}
-                      {brand.name}
-                      <button
-                        onClick={() => removeBrand(brand.id)}
-                        className="ml-1 hover:text-gold-soft transition-colors"
-                        aria-label={`Remove ${brand.name}`}
-                      >
-                        <X size={14} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
 
-              {/* Search Input */}
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-taupe" />
+            {/* Error state */}
+            {brandsError && (
+              <div className="p-3 bg-error/5 border border-error/20 flex items-center justify-between gap-3 mb-3">
+                <p className="text-sm text-error">{brandsError}</p>
+                <button
+                  type="button"
+                  onClick={loadBrands}
+                  className="px-3 py-1.5 text-xs tracking-[0.1em] uppercase border border-error/30 text-error hover:bg-error/10 transition-colors flex-shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Brand search dropdown */}
+            <div ref={brandRef} className="relative">
+              <div
+                className="flex items-center bg-white border border-sand focus-within:border-charcoal-deep transition-colors cursor-text"
+                onClick={() => !brandsLoading && !brandsError && setBrandDropdownOpen(true)}
+              >
+                <Search size={16} className="text-taupe ml-5 flex-shrink-0" />
                 <input
                   type="text"
                   value={brandSearch}
-                  onChange={e => {
+                  onChange={(e) => {
                     setBrandSearch(e.target.value);
                     setBrandDropdownOpen(true);
                   }}
-                  onFocus={() => setBrandDropdownOpen(true)}
-                  placeholder={brandsLoading ? 'Loading brands...' : 'Search brands...'}
-                  disabled={brandsLoading}
-                  className="w-full border border-sand pl-10 pr-4 py-3 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onFocus={() => !brandsError && setBrandDropdownOpen(true)}
+                  placeholder={brandsLoading ? 'Loading brands...' : brandsError ? 'Brands unavailable' : 'Search brand partners...'}
+                  disabled={brandsLoading || !!brandsError}
+                  className="w-full px-3 py-4 bg-transparent text-charcoal-deep placeholder:text-taupe focus:outline-none"
                 />
-
-                {/* Dropdown */}
-                {brandDropdownOpen && !brandsLoading && (
-                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-sand shadow-lg max-h-60 overflow-y-auto">
-                    {filteredBrands.length === 0 ? (
-                      <div className="px-4 py-3 text-sm text-taupe">
-                        {brandSearch ? 'No matching brands' : 'All brands selected'}
-                      </div>
-                    ) : (
-                      filteredBrands.map(brand => (
-                        <button
-                          key={brand.id}
-                          onClick={() => addBrand(brand)}
-                          className="w-full flex items-center gap-3 px-4 py-3 hover:bg-parchment transition-colors text-left"
-                        >
-                          {brand.logoUrl ? (
-                            <Image
-                              src={brand.logoUrl}
-                              alt={brand.name}
-                              width={28}
-                              height={28}
-                              className="rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-7 h-7 rounded-full bg-sand flex items-center justify-center flex-shrink-0">
-                              <span className="text-xs text-stone font-medium">
-                                {brand.name.charAt(0)}
-                              </span>
-                            </div>
-                          )}
-                          <div>
-                            <p className="text-sm text-charcoal-deep font-medium">{brand.name}</p>
-                            {brand.tagline && (
-                              <p className="text-[10px] text-taupe truncate max-w-[300px]">{brand.tagline}</p>
-                            )}
-                          </div>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                )}
+                <ChevronDown size={16} className={`text-taupe mr-5 flex-shrink-0 transition-transform ${brandDropdownOpen ? 'rotate-180' : ''}`} />
               </div>
 
-              {/* Click-away to close dropdown */}
-              {brandDropdownOpen && (
-                <div
-                  className="fixed inset-0 z-10"
-                  onClick={() => setBrandDropdownOpen(false)}
-                />
+              {brandDropdownOpen && !brandsLoading && !brandsError && (
+                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-sand shadow-lg max-h-[280px] overflow-y-auto">
+                  {filteredBrands.length === 0 ? (
+                    <div className="px-5 py-4 text-sm text-stone">
+                      {brandSearch ? 'No matching brands found' : 'All brands selected'}
+                    </div>
+                  ) : (
+                    filteredBrands.map(brand => (
+                      <button
+                        key={brand.id}
+                        type="button"
+                        onClick={() => addBrand(brand)}
+                        className="w-full flex items-center gap-3 px-5 py-3 hover:bg-parchment transition-colors text-left"
+                      >
+                        {brand.logoUrl ? (
+                          <Image src={brand.logoUrl} alt={brand.name} width={24} height={24} className="object-contain flex-shrink-0" />
+                        ) : (
+                          <div className="w-6 h-6 bg-parchment flex items-center justify-center flex-shrink-0 text-[10px] font-medium text-stone">
+                            {brand.name.charAt(0)}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-charcoal-deep font-medium">{brand.name}</p>
+                          {brand.heritage?.origin && (
+                            <p className="text-[10px] text-taupe">{brand.heritage.origin}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
               )}
             </div>
+          </div>
 
+          {/* Order Type */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Order Type *
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {typeOptions.map(opt => {
+                const Icon = opt.icon;
+                const selected = formData.type === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, type: opt.value }))}
+                    className={`p-6 border text-left transition-colors ${
+                      selected
+                        ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
+                        : 'border-sand bg-white hover:border-charcoal-deep'
+                    }`}
+                  >
+                    <Icon size={24} className={`mb-3 ${selected ? 'text-gold-soft' : 'text-stone'}`} />
+                    <p className={`text-sm font-medium mb-1 ${selected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                      {opt.label}
+                    </p>
+                    <p className={`text-xs ${selected ? 'text-sand' : 'text-taupe'}`}>
+                      {opt.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              rows={4}
+              placeholder="Describe your vision, inspiration, references..."
+              className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+            />
+          </div>
+
+          {/* Budget & Deadline */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-4">
-                Order Type *
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                Estimated Budget *
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {typeOptions.map(opt => {
-                  const Icon = opt.icon;
-                  const selected = formData.type === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      onClick={() => setFormData(prev => ({ ...prev, type: opt.value }))}
-                      className={`p-6 border text-left transition-colors ${
-                        selected
-                          ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream'
-                          : 'border-sand bg-white hover:border-charcoal-deep'
-                      }`}
-                    >
-                      <Icon size={24} className={`mb-3 ${selected ? 'text-gold-soft' : 'text-stone'}`} />
-                      <p className={`text-sm font-medium mb-1 ${selected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
-                        {opt.label}
-                      </p>
-                      <p className={`text-xs ${selected ? 'text-sand' : 'text-taupe'}`}>
-                        {opt.desc}
-                      </p>
-                    </button>
-                  );
-                })}
+              <div className="relative">
+                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-stone">&euro;</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.estimatedBudget || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, estimatedBudget: Number(e.target.value) }))}
+                  placeholder="0"
+                  className="w-full pl-10 pr-5 py-4 bg-white border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  required
+                />
               </div>
             </div>
-
             <div>
-              <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                Description
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                Requested Deadline (Optional)
               </label>
-              <textarea
-                value={formData.description}
-                onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                rows={4}
-                placeholder="Describe your vision, inspiration, references..."
-                className="w-full border border-sand px-4 py-3 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+              <input
+                type="date"
+                value={formData.requestedDeadline}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={e => setFormData(prev => ({ ...prev, requestedDeadline: e.target.value }))}
+                className="w-full px-5 py-4 bg-white border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
               />
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                  Estimated Budget (€) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-taupe">€</span>
+          {/* Measurements (optional) */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Body Measurements (Optional)
+            </label>
+            <p className="text-xs text-stone mb-4">
+              Measurements are optional — your concierge will arrange a fitting consultation after your request is reviewed.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {measurementFields.map(field => (
+                <div key={field.key}>
+                  <label className="block text-xs text-stone mb-1">{field.label}</label>
                   <input
                     type="number"
                     min={0}
-                    value={formData.estimatedBudget || ''}
-                    onChange={e => setFormData(prev => ({ ...prev, estimatedBudget: Number(e.target.value) }))}
-                    placeholder="5000"
-                    className="w-full border border-sand pl-8 pr-4 py-3 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    value={formData.spec.measurements?.[field.key as keyof typeof formData.spec.measurements] ?? ''}
+                    onChange={e => updateMeasurement(field.key, e.target.value)}
+                    placeholder="—"
+                    className="w-full px-4 py-3 bg-white border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                   />
                 </div>
-              </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Design Preferences (optional) */}
+          <div>
+            <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+              Design Preferences (Optional)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                  Requested Deadline (optional)
-                </label>
+                <label className="block text-xs text-stone mb-1">Fabric Preferences</label>
                 <input
-                  type="date"
-                  value={formData.requestedDeadline}
-                  onChange={e => setFormData(prev => ({ ...prev, requestedDeadline: e.target.value }))}
-                  className="w-full border border-sand px-4 py-3 text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors"
+                  type="text"
+                  value={formData.spec.fabricPreferences || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, spec: { ...prev.spec, fabricPreferences: e.target.value } }))}
+                  placeholder="Silk, cashmere, avoid synthetics..."
+                  className="w-full px-4 py-3 bg-white border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-stone mb-1">Color Preferences</label>
+                <input
+                  type="text"
+                  value={formData.spec.colorPreferences || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, spec: { ...prev.spec, colorPreferences: e.target.value } }))}
+                  placeholder="Deep navy, champagne..."
+                  className="w-full px-4 py-3 bg-white border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-stone mb-1">Occasion</label>
+                <input
+                  type="text"
+                  value={formData.spec.occasionContext || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, spec: { ...prev.spec, occasionContext: e.target.value } }))}
+                  placeholder="Black tie gala, wedding, business..."
+                  className="w-full px-4 py-3 bg-white border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-stone mb-1">Special Instructions</label>
+                <input
+                  type="text"
+                  value={formData.spec.specialInstructions || ''}
+                  onChange={e => setFormData(prev => ({ ...prev, spec: { ...prev.spec, specialInstructions: e.target.value } }))}
+                  placeholder="Any special requirements..."
+                  className="w-full px-4 py-3 bg-white border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
                 />
               </div>
             </div>
           </div>
-        )}
 
-        {/* STEP 2 — Measurements & Specifications */}
-        {currentStep === 2 && (
-          <div className="space-y-8">
-            <div className="bg-parchment border border-sand/50 p-4">
-              <p className="text-sm text-stone">
-                Measurements are optional at this stage. Your concierge will arrange a fitting consultation after your request is reviewed.
-              </p>
-            </div>
-
-            <div>
-              <h3 className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-4">
-                Body Measurements (optional)
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                {measurementFields.map(field => (
-                  <div key={field.key}>
-                    <label className="block text-xs text-stone mb-1">{field.label}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formData.spec.measurements?.[field.key as keyof typeof formData.spec.measurements] ?? ''}
-                      onChange={e => updateMeasurement(field.key, e.target.value)}
-                      placeholder="—"
-                      className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4">
-                <label className="block text-xs text-stone mb-1">Measurement Notes</label>
-                <textarea
-                  value={formData.spec.measurements?.notes || ''}
-                  onChange={e => setFormData(prev => ({
-                    ...prev,
-                    spec: {
-                      ...prev.spec,
-                      measurements: { ...prev.spec.measurements, notes: e.target.value },
-                    },
-                  }))}
-                  rows={2}
-                  placeholder="Any additional measurement notes..."
-                  className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-4">
-                Design Preferences
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-xs text-stone mb-1">Fabric Preferences</label>
-                  <textarea
-                    value={formData.spec.fabricPreferences || ''}
-                    onChange={e => setFormData(prev => ({
-                      ...prev,
-                      spec: { ...prev.spec, fabricPreferences: e.target.value },
-                    }))}
-                    rows={2}
-                    placeholder="Silk, cashmere, avoid synthetics..."
-                    className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-stone mb-1">Color Preferences</label>
-                  <textarea
-                    value={formData.spec.colorPreferences || ''}
-                    onChange={e => setFormData(prev => ({
-                      ...prev,
-                      spec: { ...prev.spec, colorPreferences: e.target.value },
-                    }))}
-                    rows={2}
-                    placeholder="Deep navy, champagne, avoid black..."
-                    className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-stone mb-1">Occasion Context</label>
-                  <input
-                    type="text"
-                    value={formData.spec.occasionContext || ''}
-                    onChange={e => setFormData(prev => ({
-                      ...prev,
-                      spec: { ...prev.spec, occasionContext: e.target.value },
-                    }))}
-                    placeholder="Black tie gala, wedding, business..."
-                    className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-stone mb-1">Special Instructions</label>
-                  <textarea
-                    value={formData.spec.specialInstructions || ''}
-                    onChange={e => setFormData(prev => ({
-                      ...prev,
-                      spec: { ...prev.spec, specialInstructions: e.target.value },
-                    }))}
-                    rows={3}
-                    placeholder="Any special requirements or instructions..."
-                    className="w-full border border-sand px-3 py-2 text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3 — Review & Submit */}
-        {currentStep === 3 && (
-          <div className="space-y-6">
-            <div className="bg-white border border-sand/50 p-6 space-y-4">
-              <div className="flex items-center gap-3 mb-2">
-                <span className="px-3 py-1 bg-parchment text-[10px] tracking-[0.15em] uppercase text-stone">
-                  {formData.type && typeOptions.find(t => t.value === formData.type)?.label}
-                </span>
-              </div>
+          {/* Submit */}
+          <div className="pt-8 border-t border-sand">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Title</p>
-                <p className="text-charcoal-deep font-medium">{formData.title}</p>
-              </div>
-
-              {/* Selected Brands Summary */}
-              <div>
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">
-                  {formData.selectedBrands.length === 1 ? 'Brand' : 'Brands'}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {formData.selectedBrands.map(brand => (
-                    <span
-                      key={brand.id}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-parchment text-sm text-charcoal-deep"
-                    >
-                      {brand.logoUrl && (
-                        <Image
-                          src={brand.logoUrl}
-                          alt={brand.name}
-                          width={16}
-                          height={16}
-                          className="rounded-full object-cover"
-                        />
-                      )}
-                      {brand.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {formData.description && (
-                <div>
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Description</p>
-                  <p className="text-sm text-stone">{formData.description}</p>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4 pt-2 border-t border-sand/30">
-                <div>
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Budget</p>
-                  <p className="text-lg font-display text-charcoal-deep">€{formData.estimatedBudget.toLocaleString()}</p>
-                </div>
-                {formData.requestedDeadline && (
-                  <div>
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">Deadline</p>
-                    <p className="text-sm text-charcoal-deep">
-                      {new Date(formData.requestedDeadline).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                    </p>
-                  </div>
+                {formData.selectedBrands.length > 0 && (
+                  <p className="text-xs text-stone">
+                    Commissioning {formData.selectedBrands.length} brand{formData.selectedBrands.length !== 1 ? 's' : ''}:{' '}
+                    {formData.selectedBrands.map(b => b.name).join(', ')}
+                  </p>
+                )}
+                {formData.estimatedBudget > 0 && (
+                  <p className="text-xs text-taupe mt-1">
+                    50% deposit (~&euro;{Math.round(formData.estimatedBudget / 2).toLocaleString()}) required upon design approval
+                  </p>
                 )}
               </div>
-
-              {/* Measurements Summary */}
-              <div className="pt-2 border-t border-sand/30">
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Measurements</p>
-                {(() => {
-                  const m = formData.spec.measurements || {};
-                  const filled = Object.entries(m).filter(([k, v]) => k !== 'notes' && v !== undefined && v !== '');
-                  if (filled.length === 0) {
-                    return <p className="text-xs text-stone italic">To be confirmed at fitting</p>;
-                  }
-                  return (
-                    <div className="grid grid-cols-3 gap-2">
-                      {filled.map(([key, val]) => (
-                        <div key={key} className="text-center p-2 bg-parchment/30">
-                          <p className="text-sm font-medium text-charcoal-deep">{String(val)}</p>
-                          <p className="text-[10px] text-taupe capitalize">{key.replace(/([A-Z])/g, ' $1')}</p>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Preferences Summary */}
-              {(formData.spec.fabricPreferences || formData.spec.colorPreferences || formData.spec.occasionContext) && (
-                <div className="pt-2 border-t border-sand/30">
-                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Design Preferences</p>
-                  <div className="space-y-1 text-sm text-stone">
-                    {formData.spec.fabricPreferences && <p>Fabric: {formData.spec.fabricPreferences}</p>}
-                    {formData.spec.colorPreferences && <p>Color: {formData.spec.colorPreferences}</p>}
-                    {formData.spec.occasionContext && <p>Occasion: {formData.spec.occasionContext}</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Deposit Info */}
-            <div className="bg-parchment border border-sand/50 p-4">
-              <p className="text-sm text-stone">
-                A 50% deposit of approximately <span className="font-medium text-charcoal-deep">€{Math.round(formData.estimatedBudget / 2).toLocaleString()}</span> will
-                be required upon design approval. Final payment on delivery.
-              </p>
+              <button
+                type="submit"
+                disabled={submitting || !formData.title || !formData.type || formData.selectedBrands.length === 0 || formData.estimatedBudget <= 0}
+                className="px-8 py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+              >
+                <Check size={16} />
+                {submitting ? 'Submitting...' : 'Submit Commission'}
+              </button>
             </div>
           </div>
-        )}
-
-        {/* Navigation */}
-        <div className="flex items-center justify-between mt-10 pt-6 border-t border-sand/50">
-          {currentStep > 1 ? (
-            <button
-              onClick={handleBack}
-              className="inline-flex items-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
-            >
-              <ArrowLeft size={16} />
-              Back
-            </button>
-          ) : (
-            <div />
-          )}
-
-          {currentStep < 3 ? (
-            <button
-              onClick={handleNext}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-            >
-              Next
-              <ArrowRight size={16} />
-            </button>
-          ) : (
-            <button
-              onClick={handleSubmit}
-              className="inline-flex items-center gap-2 px-8 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-            >
-              <Check size={16} />
-              Submit Bespoke Request
-            </button>
-          )}
-        </div>
+        </form>
       </div>
     </div>
   );
