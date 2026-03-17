@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
 import { brandIntelligenceService } from '@/services';
 import type { BrandIntelligenceSignal, SignalType } from '@/types/brand-intelligence';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
@@ -9,13 +9,23 @@ import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper'
 export default function IntelligenceAgentPage() {
   const [signals, setSignals] = useState<BrandIntelligenceSignal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<SignalType | 'all'>('all');
 
-  useEffect(() => {
+  const loadSignals = useCallback(() => {
+    setIsLoading(true);
     brandIntelligenceService.getIntelligenceSignals().then(res => {
       if (res.data) setSignals(res.data);
       setIsLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    loadSignals();
+    const interval = setInterval(loadSignals, 30000);
+    return () => clearInterval(interval);
+  }, [loadSignals]);
+
+  const filteredSignals = activeFilter === 'all' ? signals : signals.filter(s => s.type === activeFilter);
 
   const totalSignals = signals.length;
   const highConfidenceCount = signals.filter(s => s.confidence >= 80).length;
@@ -54,7 +64,7 @@ export default function IntelligenceAgentPage() {
       title="Demand Intelligence Agent"
       subtitle="Real-time market signals and brand intelligence for data-driven decisions"
       phase={1}
-      status="mock"
+      status="live"
       backendNote="Requires user-behavior events API, browse/click/wishlist webhooks. Endpoint: GET /api/intelligence/signals"
       isLoading={isLoading}
     >
@@ -82,13 +92,38 @@ export default function IntelligenceAgentPage() {
             </div>
           </div>
 
+          {/* Signal Type Filter */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] tracking-[0.15em] uppercase text-stone mr-2">Filter:</span>
+            {(['all', 'demand', 'validation', 'timing', 'competition', 'sentiment'] as const).map(type => (
+              <button
+                key={type}
+                onClick={() => setActiveFilter(type)}
+                className={`px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase transition-colors ${
+                  activeFilter === type
+                    ? 'bg-charcoal-deep text-ivory-cream'
+                    : 'bg-white border border-sand text-stone hover:border-charcoal-deep'
+                }`}
+              >
+                {type === 'all' ? `All (${signals.length})` : `${type} (${signals.filter(s => s.type === type).length})`}
+              </button>
+            ))}
+            <button
+              onClick={loadSignals}
+              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase border border-sand text-stone hover:border-charcoal-deep transition-colors"
+            >
+              <RefreshCw size={12} />
+              Refresh
+            </button>
+          </div>
+
           {/* Signal Feed */}
           <div className="bg-white border border-sand/50">
             <div className="px-6 py-4 border-b border-sand/50">
               <h2 className="font-medium text-charcoal-deep">Signal Feed</h2>
             </div>
             <div className="divide-y divide-sand/30">
-              {signals.map(signal => (
+              {filteredSignals.map(signal => (
                 <div key={signal.id} className="p-6">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
