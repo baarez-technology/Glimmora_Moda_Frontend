@@ -369,12 +369,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         }
         // Load price negotiations from real API — no mock fallback
         setPriceNegotiations(d.priceNegotiations);
-        // Load private collections from real API — no mock fallback
+        // Load private collections from real API
         try {
           const realCollections = await privateCollectionService.fetchPrivateCollections();
+          console.log('[BrandContext] Loaded private collections:', realCollections.length);
           setPrivateCollections(realCollections);
         } catch (err) {
-          console.error('[BrandContext] Failed to load private collections:', err);
+          console.error('[BrandContext] Failed to load private collections:', err instanceof Error ? err.message : err);
         }
         // Sourcing requests are loaded directly by the sourcing page via brand-sourcing.service
         // Heritage events, brand stories, offers, styling sessions — loaded by their own pages
