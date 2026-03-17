@@ -23,12 +23,17 @@ import {
   Tag,
   XCircle,
   DollarSign,
+  RefreshCw,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import {
   getSourcingRequests,
+  getSourcingRequestById,
   enrichSourcingRequestWithLocal,
   saveSourcingState,
+  selectSourcingOption,
+  sendConsumerMessage,
+  addConsumerNegotiation,
   type EnrichedSourcingRequest,
   type SourcingChatMessage,
   type SourcingOptionItem,
@@ -443,7 +448,12 @@ function OptionCard({
 
 // ── Message Thread ────────────────────────────────────────────────────
 
-function MessageThread({ messages, onSend }: { messages: SourcingChatMessage[]; onSend: (content: string) => void }) {
+function MessageThread({ messages, onSend, onRefresh, refreshing }: {
+  messages: SourcingChatMessage[];
+  onSend: (content: string) => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
   const [value, setValue] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -459,6 +469,18 @@ function MessageThread({ messages, onSend }: { messages: SourcingChatMessage[]; 
 
   return (
     <div>
+      {onRefresh && (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 text-[11px] tracking-[0.08em] uppercase text-taupe hover:text-charcoal-deep transition-colors disabled:opacity-40"
+          >
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Fetching…' : 'Fetch new messages'}
+          </button>
+        </div>
+      )}
       <div className="max-h-[500px] overflow-y-auto space-y-3 mb-4 pr-1">
         {messages.map((msg) => {
           if (msg.sender === 'system') {
@@ -530,12 +552,17 @@ export default function SourcingDetailPage() {
   const [request, setRequest] = useState<EnrichedSourcingRequest | null>(null);
   const [activeSection, setActiveSection] = useState<'timeline' | 'options' | 'messages'>('timeline');
   const [negotiatingId, setNegotiatingId] = useState<string | null>(null);
+  const [refreshingMessages, setRefreshingMessages] = useState(false);
 
   useEffect(() => {
-    getSourcingRequests()
-      .then((raw) => {
-        const found = raw.find((r) => r.sourcing_id === id);
-        if (found) setRequest(enrichSourcingRequestWithLocal(found));
+    // Try direct API fetch first, fall back to list search (covers mock IDs)
+    getSourcingRequestById(id)
+      .then((found) => {
+        if (found) { setRequest(enrichSourcingRequestWithLocal(found)); return; }
+        return getSourcingRequests().then((raw) => {
+          const f = raw.find((r) => r.sourcing_id === id);
+          if (f) setRequest(enrichSourcingRequestWithLocal(f));
+        });
       })
       .catch(() => {})
       .finally(() => setIsLoaded(true));
@@ -568,6 +595,7 @@ export default function SourcingDetailPage() {
 
   const handleSendMessage = (content: string) => {
     if (!request) return;
+    // Optimistic update
     const newMsg: SourcingChatMessage = {
       id: `msg-${Date.now()}`,
       sender: 'client',
@@ -576,10 +604,27 @@ export default function SourcingDetailPage() {
       timestamp: new Date().toISOString(),
     };
     setRequest({ ...request, messages: [...request.messages, newMsg] });
+    // Fire-and-forget API call
+    sendConsumerMessage(request.sourcing_id, content).catch(() => {});
+  };
+
+  const handleRefreshMessages = () => {
+    if (!request || refreshingMessages) return;
+    setRefreshingMessages(true);
+    getSourcingRequestById(request.sourcing_id)
+      .then((fresh) => {
+        if (fresh) {
+          const enriched = enrichSourcingRequestWithLocal(fresh);
+          setRequest((prev) => prev ? { ...prev, messages: enriched.messages } : prev);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setRefreshingMessages(false));
   };
 
   const handleSelectOption = (optionId: string) => {
     if (!request) return;
+    // Optimistic update
     setRequest({
       ...request,
       status: 'awaiting_approval',
@@ -595,10 +640,13 @@ export default function SourcingDetailPage() {
       ],
     });
     setActiveSection('messages');
+    // API call
+    selectSourcingOption(request.sourcing_id, optionId).catch(() => {});
   };
 
   const handleNegotiate = (optionId: string, proposedPrice: number, note: string) => {
     if (!request) return;
+    // Optimistic update
     setRequest({
       ...request,
       options: request.options.map((o) =>
@@ -617,6 +665,8 @@ export default function SourcingDetailPage() {
         },
       ],
     });
+    // API call
+    addConsumerNegotiation(request.sourcing_id, optionId, proposedPrice, note).catch(() => {});
   };
 
   const handleAcceptCounter = (optionId: string) => {
@@ -1094,7 +1144,7 @@ export default function SourcingDetailPage() {
                 <p className="text-xs text-taupe">Your sourcing team will be in touch soon. You can also send the first message below.</p>
               </div>
             ) : null}
-            <MessageThread messages={request.messages} onSend={handleSendMessage} />
+            <MessageThread messages={request.messages} onSend={handleSendMessage} onRefresh={handleRefreshMessages} refreshing={refreshingMessages} />
           </div>
         )}
       </div>

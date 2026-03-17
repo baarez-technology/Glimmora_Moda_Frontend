@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, SourcingMessage, SourcingRequestStatus, BespokeOrder, AutonomousActivity, BespokeMessage, BespokeDetailedSpec, PriceNegotiation, NegotiationStatus, ConciergeAppointment, ConciergeTask, ConciergeTaskInput } from '@/types';
 import * as uhniService from '@/services/uhni.service';
+import { fetchConsumerTasks, createConsumerTask, updateConsumerTask } from '@/services/consumer-task.service';
+import { fetchConsumerAppointments, createConsumerAppointment, patchConsumerAppointment } from '@/services/consumer-appointment.service';
 import * as bespokeService from '@/services/bespoke.service';
 
 interface UseUHNIFeaturesProps {
@@ -38,34 +40,8 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       uhniService.getAutonomousActivity().then(r => { if (r.success) setAutonomousActivity(r.data); });
       uhniService.getPriceNegotiations().then(r => { if (r.success) setPriceNegotiations(r.data); });
       uhniService.getConciergeTasks().then(r => { if (r.success) setLocalConciergeTasks(r.data); });
-      // Seed demo appointments
-      setConciergeAppointments([
-        {
-          id: 'appt-demo-1',
-          type: 'styling_session',
-          title: 'Spring Wardrobe Refresh',
-          date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '14:00',
-          duration: 60,
-          notes: 'Focus on transitional pieces for spring events',
-          status: 'upcoming',
-          conciergeId: 'isabella',
-          conciergeName: 'Isabella Romano',
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: 'appt-demo-2',
-          type: 'private_viewing',
-          title: 'Hermès Private Preview',
-          date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          time: '11:00',
-          duration: 90,
-          status: 'upcoming',
-          conciergeId: 'isabella',
-          conciergeName: 'Isabella Romano',
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      fetchConsumerTasks().then(tasks => { if (tasks.length) setLocalConciergeTasks(tasks); }).catch(() => {});
+      fetchConsumerAppointments().then(appts => { setConciergeAppointments(appts); }).catch(() => {});
     } else {
       setConcierge(null);
       setAutonomousSettings(null);
@@ -336,6 +312,8 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
     time: string;
     duration: number;
     notes?: string;
+    location?: ConciergeAppointment['location'];
+    brand_id?: string;
   }): ConciergeAppointment => {
     const newAppt: ConciergeAppointment = {
       id: `appt-${Date.now()}`,
@@ -345,6 +323,8 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       time: data.time,
       duration: data.duration,
       notes: data.notes,
+      location: data.location,
+      brandId: data.brand_id,
       status: 'upcoming',
       conciergeId: 'isabella',
       conciergeName: 'Isabella Romano',
@@ -352,6 +332,15 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
     };
     setConciergeAppointments(prev => [newAppt, ...prev]);
     showToast('Appointment booked successfully', 'success');
+    createConsumerAppointment({
+      appointment_type: data.type,
+      brand_id: data.brand_id ?? '',
+      date: data.date,
+      time: data.time,
+      duration: String(data.duration),
+      notes: data.notes,
+      location: data.location,
+    }).catch(() => {});
     return newAppt;
   }, [showToast]);
 
@@ -360,6 +349,7 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       prev.map(a => a.id === appointmentId ? { ...a, status: 'cancelled' as const } : a)
     );
     showToast('Appointment cancelled', 'info');
+    patchConsumerAppointment(appointmentId, { status: 'cancelled' }).catch(() => {});
   }, [showToast]);
 
   const rescheduleAppointment = useCallback((appointmentId: string, newDate: string, newTime: string) => {
@@ -367,6 +357,7 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       prev.map(a => a.id === appointmentId ? { ...a, date: newDate, time: newTime, status: 'rescheduled' as const } : a)
     );
     showToast('Appointment rescheduled', 'success');
+    patchConsumerAppointment(appointmentId, { date: newDate, time: newTime, status: 'rescheduled' }).catch(() => {});
   }, [showToast]);
 
   const addConciergeTask = useCallback((input: ConciergeTaskInput): ConciergeTask => {
@@ -386,6 +377,14 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
     };
     setLocalConciergeTasks(prev => [newTask, ...prev]);
     showToast('Task created', 'success');
+    createConsumerTask({
+      title: input.title,
+      description: input.description,
+      type: input.type,
+      priority: input.priority,
+      due_date: input.dueDate,
+      instructions: input.clientInstructions,
+    }).catch(() => {});
     return newTask;
   }, [showToast]);
 
@@ -394,6 +393,7 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
       prev.map(t => t.id === taskId ? { ...t, status: 'completed' as const, updatedAt: new Date().toISOString() } : t)
     );
     showToast('Task marked as completed', 'success');
+    updateConsumerTask(taskId, { status: 'completed' }).catch(() => {});
   }, [showToast]);
 
   const respondToCounterOffer = useCallback((negotiationId: string, action: 'accept' | 'reject') => {

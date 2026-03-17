@@ -608,6 +608,9 @@ export interface ConciergeAppointment {
   durationMinutes?: number; // alias for duration
   scheduledAt?: string; // ISO datetime string (computed from date+time if not provided)
   notes?: string;
+  location?: 'in_store' | 'virtual' | 'home';
+  brandId?: string;
+  brandName?: string;
   status: AppointmentStatus;
   conciergeId: string;
   conciergeName: string;

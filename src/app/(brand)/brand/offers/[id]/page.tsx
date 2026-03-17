@@ -106,9 +106,9 @@ export default function ViewOfferPage() {
             </SecondaryButton>
             <Link
               href={`/brand/offers/${id}/edit`}
-              className="flex items-center gap-2 px-4 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-wide hover:bg-noir transition-colors"
             >
-              <Pencil size={14} />
+              <Pencil size={16} />
               Edit
             </Link>
           </div>
