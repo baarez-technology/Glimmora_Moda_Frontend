@@ -1,17 +1,14 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Clock, AlertCircle, CheckCircle, Info } from 'lucide-react';
-
-type Phase = 1 | 2 | 3;
-type Status = 'live' | 'mock' | 'coming_soon';
+import { AlertCircle } from 'lucide-react';
 
 interface IntelligencePageWrapperProps {
   title: string;
   subtitle: string;
   acronym?: string;
-  phase: Phase;
-  status: Status;
+  phase?: number;
+  status?: string;
   backendNote?: string;
   children: ReactNode;
   isLoading?: boolean;
@@ -22,27 +19,10 @@ export default function IntelligencePageWrapper({
   title,
   subtitle,
   acronym,
-  phase,
-  status,
-  backendNote,
   children,
   isLoading,
   error,
 }: IntelligencePageWrapperProps) {
-  const phaseConfig = {
-    1: { label: 'Phase 1 — Core', color: 'bg-success/10 text-success' },
-    2: { label: 'Phase 2 — Advanced', color: 'bg-info/10 text-info' },
-    3: { label: 'Phase 3 — Specialist', color: 'bg-gold-soft/20 text-gold-deep' },
-  };
-
-  const statusConfig = {
-    live: { icon: CheckCircle, label: 'Live Data', color: 'text-success' },
-    mock: { icon: Clock, label: 'Mock Data — API Pending', color: 'text-gold-muted' },
-    coming_soon: { icon: AlertCircle, label: 'Coming Soon', color: 'text-taupe' },
-  };
-
-  const StatusIcon = statusConfig[status].icon;
-
   return (
     <div>
       {/* Intelligence Header */}
@@ -59,21 +39,7 @@ export default function IntelligencePageWrapper({
             <h1 className="font-display text-2xl text-charcoal-deep">{title}</h1>
             <p className="text-stone text-sm mt-1">{subtitle}</p>
           </div>
-          <div className={`flex items-center gap-1.5 text-xs ${statusConfig[status].color} flex-shrink-0`}>
-            <StatusIcon size={14} />
-            <span>{statusConfig[status].label}</span>
-          </div>
         </div>
-
-        {backendNote && status !== 'live' && (
-          <div className="mt-4 flex items-start gap-2 p-3 bg-parchment border border-sand/50 text-xs text-stone">
-            <Info size={14} className="text-taupe flex-shrink-0 mt-0.5" />
-            <div>
-              <span className="font-medium text-charcoal-deep">Backend dependency: </span>
-              {backendNote}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Content */}

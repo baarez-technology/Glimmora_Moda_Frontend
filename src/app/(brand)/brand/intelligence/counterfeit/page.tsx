@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { ShieldAlert, Search, X } from 'lucide-react';
 import { brandIntelligenceService } from '@/services';
+import { updateCounterfeitAlert } from '@/services/brand-intelligence.service';
 import type { CounterfeitAlert, CounterfeitRiskLevel, CounterfeitStatus } from '@/types/brand-intelligence';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
 
@@ -53,12 +54,14 @@ export default function CounterfeitPage() {
     setAlerts(prev =>
       prev.map(a => a.id === id ? { ...a, status: 'investigating' as CounterfeitStatus } : a)
     );
+    updateCounterfeitAlert(id, 'investigating').catch(() => {});
   };
 
   const handleDismiss = (id: string) => {
     setAlerts(prev =>
       prev.map(a => a.id === id ? { ...a, status: 'dismissed' as CounterfeitStatus } : a)
     );
+    updateCounterfeitAlert(id, 'dismissed').catch(() => {});
   };
 
   return (
