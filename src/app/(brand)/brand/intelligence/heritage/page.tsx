@@ -12,7 +12,7 @@ export default function HeritagePage() {
 
   useEffect(() => {
     brandIntelligenceService.getHeritageAssets().then(res => {
-      if (res.data) setAssets(res.data);
+      if (res.data) setAssets(Array.isArray(res.data) ? res.data : []);
       setIsLoading(false);
     });
   }, []);

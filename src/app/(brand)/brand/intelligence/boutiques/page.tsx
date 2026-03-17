@@ -12,7 +12,7 @@ export default function BoutiquesPage() {
 
   useEffect(() => {
     brandIntelligenceService.getBoutiquePerformances().then(res => {
-      if (res.data) setBoutiques(res.data);
+      if (res.data) setBoutiques(Array.isArray(res.data) ? res.data : []);
       setIsLoading(false);
     });
   }, []);

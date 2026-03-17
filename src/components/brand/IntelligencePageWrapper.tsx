@@ -49,16 +49,13 @@ export default function IntelligencePageWrapper({
       <div className="px-8 py-6 border-b border-sand/50">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              {acronym && (
+            {acronym && (
+              <div className="flex items-center gap-3 mb-2">
                 <span className="text-[10px] tracking-[0.3em] uppercase text-gold-muted font-medium">
                   {acronym}
                 </span>
-              )}
-              <span className={`text-[10px] px-2 py-0.5 tracking-[0.05em] uppercase ${phaseConfig[phase].color}`}>
-                {phaseConfig[phase].label}
-              </span>
-            </div>
+              </div>
+            )}
             <h1 className="font-display text-2xl text-charcoal-deep">{title}</h1>
             <p className="text-stone text-sm mt-1">{subtitle}</p>
           </div>

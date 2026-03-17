@@ -12,7 +12,7 @@ export default function MemoryImprintPage() {
 
   useEffect(() => {
     brandIntelligenceService.getMemoryImprints().then(res => {
-      if (res.data) setImprints(res.data);
+      if (res.data) setImprints(Array.isArray(res.data) ? res.data : []);
       setIsLoading(false);
     });
   }, []);

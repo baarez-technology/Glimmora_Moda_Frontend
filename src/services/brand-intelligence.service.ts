@@ -78,9 +78,12 @@ async function fetchIntelligence<T>(
       });
 
       if (res.ok) {
-        const data = await res.json();
+        const raw = await res.json();
+        // Normalize: API may return { data: [...] }, a direct array, or an object
+        // Extract the array/object payload for the component
+        const data = (raw?.data !== undefined ? raw.data : raw) as T;
         return {
-          data: data as T,
+          data,
           success: true,
           timestamp: new Date().toISOString(),
         };
