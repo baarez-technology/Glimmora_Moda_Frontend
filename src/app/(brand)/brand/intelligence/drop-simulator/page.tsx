@@ -10,29 +10,29 @@ export default function DropSimulatorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [simulations, setSimulations] = useState<DropSimulation[]>([]);
   const [showNewForm, setShowNewForm] = useState(false);
-  const [newDrop, setNewDrop] = useState({ dropName: '', collection: '', launchDate: '', regions: '' });
+  const [newDrop, setNewDrop] = useState({ dropName: '', collection: '', launchDate: '', productIds: '' });
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     brandIntelligenceService.getDropSimulations().then(res => {
-      if (res.data) setSimulations(res.data);
+      if (res.data) setSimulations(Array.isArray(res.data) ? res.data : []);
       setIsLoading(false);
     });
   }, []);
 
   const handleCreate = useCallback(async () => {
-    if (!newDrop.dropName || !newDrop.collection || !newDrop.launchDate) return;
+    if (!newDrop.dropName || !newDrop.productIds) return;
     setCreating(true);
     try {
       const res = await brandIntelligenceService.createDropSimulation({
-        dropName: newDrop.dropName,
-        collection: newDrop.collection,
-        launchDate: newDrop.launchDate,
-        regions: newDrop.regions.split(',').map(r => r.trim()).filter(Boolean),
+        drop_name: newDrop.dropName,
+        collection_name: newDrop.collection || undefined,
+        product_ids: newDrop.productIds.split(',').map(r => r.trim()).filter(Boolean),
+        launch_date: newDrop.launchDate || undefined,
       });
       if (res.data) setSimulations(prev => [res.data!, ...prev]);
       setShowNewForm(false);
-      setNewDrop({ dropName: '', collection: '', launchDate: '', regions: '' });
+      setNewDrop({ dropName: '', collection: '', launchDate: '', productIds: '' });
     } catch { /* handled by service */ }
     setCreating(false);
   }, [newDrop]);
@@ -140,15 +140,15 @@ export default function DropSimulatorPage() {
                   />
                   <input
                     type="text"
-                    value={newDrop.regions}
-                    onChange={e => setNewDrop(prev => ({ ...prev, regions: e.target.value }))}
-                    placeholder="Regions (comma-separated)"
+                    value={newDrop.productIds}
+                    onChange={e => setNewDrop(prev => ({ ...prev, productIds: e.target.value }))}
+                    placeholder="Product IDs (comma-separated)"
                     className="px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
                   />
                 </div>
                 <button
                   onClick={handleCreate}
-                  disabled={creating || !newDrop.dropName || !newDrop.collection || !newDrop.launchDate}
+                  disabled={creating || !newDrop.dropName || !newDrop.productIds}
                   className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
                 >
                   {creating ? 'Creating...' : 'Run Simulation'}

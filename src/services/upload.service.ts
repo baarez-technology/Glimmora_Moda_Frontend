@@ -107,6 +107,7 @@ export interface VirtualTryOnResult {
 export async function virtualTryOn(
   modelImageUrl: string,
   garmentImageUrl: string,
+  productName?: string,
 ): Promise<VirtualTryOnResult> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -116,13 +117,18 @@ export async function virtualTryOn(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  const body: Record<string, string> = {
+    model_image: modelImageUrl,
+    garment_image: garmentImageUrl,
+  };
+  if (productName) {
+    body.product_name = productName;
+  }
+
   const res = await fetch(`/api/v1/customer/virtual-tryon`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model_image: modelImageUrl,
-      garment_image: garmentImageUrl,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!res.ok) {

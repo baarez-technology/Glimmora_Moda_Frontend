@@ -55,3 +55,4 @@ export * as addressService from './address.service';
 export * as orderManagementService from './order-management.service';
 export * as immersiveVisualizationService from './immersive-visualization.service';
 export * as completeTheLookService from './complete-the-look.service';
+export * as privateShoppingService from './private-shopping.service';

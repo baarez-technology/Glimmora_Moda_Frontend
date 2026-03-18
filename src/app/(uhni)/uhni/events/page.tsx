@@ -22,13 +22,15 @@ import { useApp } from '@/context/AppContext';
 import {
   getExclusiveEvents,
   joinExclusiveEvent,
-  getPrivateShoppingEvents,
-  joinPrivateShoppingEvent,
   type ApiExclusiveEvent,
   type ApiEventType,
+} from '@/services/exclusive-events.service';
+import {
+  getPrivateShoppingEvents,
+  joinPrivateShoppingEvent,
   type ApiPrivateShoppingEvent,
   type ApiPrivateShoppingStatus,
-} from '@/services/exclusive-events.service';
+} from '@/services/private-shopping.service';
 
 type Tab = 'exclusive' | 'shopping';
 

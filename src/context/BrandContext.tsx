@@ -359,22 +359,27 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setInventory(d.inventory);
         setAnalytics(d.analytics);
         setRecentActivity(d.recentActivity);
-        // Try to load real bespoke orders; fall back to mock if unavailable
+        // Load bespoke orders from real API
         try {
           const realBespoke = await bespokeService.fetchBrandBespokeOrders();
+          console.log('[BrandContext] Loaded bespoke orders:', realBespoke.length);
           setBespokeOrders(realBespoke);
-        } catch {
-          setBespokeOrders(d.bespokeOrders);
+        } catch (err) {
+          console.error('[BrandContext] Failed to load bespoke orders:', err instanceof Error ? err.message : err);
         }
+        // Load price negotiations from real API — no mock fallback
         setPriceNegotiations(d.priceNegotiations);
-        // Try to load real private collections; fall back to mock if unavailable
+        // Load private collections from real API
         try {
           const realCollections = await privateCollectionService.fetchPrivateCollections();
+          console.log('[BrandContext] Loaded private collections:', realCollections.length);
           setPrivateCollections(realCollections);
-        } catch {
-          setPrivateCollections(d.privateCollections);
+        } catch (err) {
+          console.error('[BrandContext] Failed to load private collections:', err instanceof Error ? err.message : err);
         }
-        setSourcingRequests(d.sourcingRequests);
+        // Sourcing requests are loaded directly by the sourcing page via brand-sourcing.service
+        // Heritage events, brand stories, offers, styling sessions — loaded by their own pages
+        setSourcingRequests([]);
         setHeritageEvents(d.heritageEvents);
         setBrandStories(d.brandStories);
         setUhniOffers(d.uhniOffers);

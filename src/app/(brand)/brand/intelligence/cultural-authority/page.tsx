@@ -12,7 +12,7 @@ export default function CulturalAuthorityPage() {
 
   useEffect(() => {
     brandIntelligenceService.getCulturalAuthority().then(res => {
-      if (res.data) setDimensions(res.data);
+      if (res.data) setDimensions(Array.isArray(res.data) ? res.data : []);
       setIsLoading(false);
     });
   }, []);

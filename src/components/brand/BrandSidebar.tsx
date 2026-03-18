@@ -22,6 +22,7 @@ import {
   BookOpen,
   Gift,
   Calendar,
+  CalendarCheck,
   Brain,
   Activity,
   Bot,
@@ -32,7 +33,9 @@ import {
   AlertTriangle,
   Rocket,
   Gem,
-  Users
+  Users,
+  TrendingUp,
+  Wand2
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 
@@ -86,6 +89,7 @@ const navigation: NavSection[] = [
     title: 'Insights',
     items: [
       { label: 'Analytics', href: '/brand/analytics', icon: BarChart3 },
+      { label: 'Appointments', href: '/brand/appointments', icon: CalendarCheck },
       { label: 'Styling Sessions', href: '/brand/styling-sessions', icon: Calendar }
     ]
   },
@@ -103,7 +107,10 @@ const navigation: NavSection[] = [
       { label: 'Counterfeit Detection', href: '/brand/intelligence/counterfeit', icon: AlertTriangle, phase: 3 },
       { label: 'Drop Simulator', href: '/brand/intelligence/drop-simulator', icon: Rocket, phase: 2 },
       { label: 'Heritage DNA', href: '/brand/intelligence/heritage', icon: Gem, phase: 2 },
-      { label: 'Client Genome', href: '/brand/intelligence/client-genome', icon: Users, phase: 1 }
+      { label: 'Client Genome', href: '/brand/intelligence/client-genome', icon: Users, phase: 1 },
+      // { label: 'Grey-Market', href: '/brand/intelligence/grey-market', icon: AlertTriangle },
+      // { label: 'Shadow Demand', href: '/brand/intelligence/shadow-demand', icon: TrendingUp },
+      // { label: 'Curator Studio', href: '/brand/intelligence/curator', icon: Wand2 }
     ]
   },
   {

@@ -30,7 +30,7 @@ export default function IntelligencePageWrapper({
         <div className="flex items-start justify-between gap-4">
           <div>
             {acronym && (
-              <div className="mb-2">
+              <div className="flex items-center gap-3 mb-2">
                 <span className="text-[10px] tracking-[0.3em] uppercase text-gold-muted font-medium">
                   {acronym}
                 </span>

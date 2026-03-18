@@ -3,10 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Settings, Bell, Lock, ShoppingBag, Monitor, Save, Check, RotateCcw, Shield } from 'lucide-react';
+import { ArrowLeft, Settings, Bell, Lock, ShoppingBag, Monitor, Save, Check, RotateCcw, Shield, Sparkles } from 'lucide-react';
 import * as userService from '@/services/user.service';
+import * as calendarService from '@/services/calendar.service';
 import { useAuth } from '@/context/AuthContext';
-import type { UserPreferences } from '@/types';
+import type { UserPreferences, SuggestionPreferences } from '@/types';
 
 export default function PreferencesPage() {
   const router = useRouter();
@@ -25,6 +26,10 @@ export default function PreferencesPage() {
   const [newBrandName, setNewBrandName] = useState('');
   const [budgetError, setBudgetError] = useState('');
 
+  // Styling Suggestion Preferences (real API)
+  const [suggestionPrefs, setSuggestionPrefs] = useState<SuggestionPreferences | null>(null);
+  const [updatingSuggPref, setUpdatingSuggPref] = useState<string | null>(null);
+
   useEffect(() => {
     const loadPreferences = async () => {
       const response = await userService.getUserPreferences();
@@ -33,6 +38,15 @@ export default function PreferencesPage() {
       setIsLoaded(true);
     };
     loadPreferences();
+  }, []);
+
+  // Load suggestion preferences from real API
+  useEffect(() => {
+    calendarService.getSuggestionPreferences()
+      .then(setSuggestionPrefs)
+      .catch(() => {
+        // API not available yet — leave as null
+      });
   }, []);
 
   const updatePreference = <T extends keyof UserPreferences>(
@@ -86,6 +100,20 @@ export default function PreferencesPage() {
       setPreferences(initialPreferences);
     }
     setHasChanges(false);
+  };
+
+  const handleToggleSuggPref = async (key: keyof SuggestionPreferences) => {
+    if (!suggestionPrefs) return;
+    const newValue = !suggestionPrefs[key];
+    setUpdatingSuggPref(key);
+    try {
+      const updated = await calendarService.updateSuggestionPreferences({ [key]: newValue });
+      setSuggestionPrefs(updated);
+    } catch {
+      // Silently fail — preference toggle will revert visually
+    } finally {
+      setUpdatingSuggPref(null);
+    }
   };
 
   if (!preferences) {
@@ -207,6 +235,70 @@ export default function PreferencesPage() {
               );
             })}
           </div>
+        </section>
+
+        {/* Styling Suggestions Section */}
+        <section className="bg-white overflow-hidden">
+          <div className="p-6 border-b border-sand flex items-center gap-3">
+            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
+              <Sparkles size={18} className="text-charcoal-deep" />
+            </div>
+            <div>
+              <h2 className="font-medium text-charcoal-deep">Styling Suggestions</h2>
+              <p className="text-sm text-stone">Control how outfit recommendations work</p>
+            </div>
+          </div>
+
+          <div className="divide-y divide-sand">
+            {([
+              { key: 'include_weather_in_suggestions' as const, label: 'Include Weather in Suggestions', desc: 'Factor in weather conditions for outfit recommendations' },
+              { key: 'prioritize_wardrobe_items' as const, label: 'Prioritize Wardrobe Items', desc: 'Show items from your Digital Wardrobe first' },
+              { key: 'daily_outfit_reminders' as const, label: 'Daily Outfit Reminders', desc: "Get a notification with outfit ideas for tomorrow's events" },
+              { key: 'suggest_new_pieces' as const, label: 'Suggest New Pieces', desc: 'Include product recommendations to complete your looks' },
+            ]).map((item) => {
+              const checked = suggestionPrefs ? suggestionPrefs[item.key] : false;
+              const isUpdating = updatingSuggPref === item.key;
+
+              return (
+                <button
+                  key={item.key}
+                  onClick={() => handleToggleSuggPref(item.key)}
+                  disabled={!suggestionPrefs || isUpdating}
+                  className="w-full flex items-center justify-between p-6 text-left hover:bg-parchment/50 transition-colors disabled:opacity-70"
+                >
+                  <div>
+                    <p className="text-charcoal-deep">{item.label}</p>
+                    <p className="text-sm text-stone">{item.desc}</p>
+                  </div>
+                  <span className="relative flex-shrink-0">
+                    <span
+                      className={`w-6 h-6 border-2 flex items-center justify-center transition-all ${
+                        checked
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand'
+                      }`}
+                    >
+                      {isUpdating ? (
+                        <div className="w-3 h-3 border border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                      ) : checked ? (
+                        <svg className="w-3 h-3 text-ivory-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : null}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {!suggestionPrefs && (
+            <div className="p-6 bg-parchment/50">
+              <p className="text-sm text-stone">
+                Sign in and connect a calendar to manage styling suggestion preferences.
+              </p>
+            </div>
+          )}
         </section>
 
         {/* Privacy Section */}

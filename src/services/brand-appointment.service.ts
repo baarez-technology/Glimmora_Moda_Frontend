@@ -46,10 +46,10 @@ export interface ApiBrandAppointment {
 
 // ─── API Functions ─────────────────────────────────────────────────────────────
 
-const BASE = '/api/brand-appointments';
+const BASE = '/api/v1/brand/appointments';
 
 export async function fetchBrandAppointments(): Promise<ApiBrandAppointment[]> {
-  return apiFetch<ApiBrandAppointment[]>(BASE);
+  return apiFetch<ApiBrandAppointment[]>(`${BASE}/`);
 }
 
 export async function fetchBrandAppointment(appointmentId: string): Promise<ApiBrandAppointment> {
@@ -62,8 +62,11 @@ export async function rescheduleBrandAppointment(
   time: string
 ): Promise<ApiBrandAppointment> {
   return apiFetch<ApiBrandAppointment>(
-    `${BASE}/${appointmentId}/reschedule?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}`,
-    { method: 'PATCH' }
+    `${BASE}/${appointmentId}/reschedule`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ date, time }),
+    }
   );
 }
 
