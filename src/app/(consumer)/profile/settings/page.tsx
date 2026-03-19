@@ -193,8 +193,9 @@ export default function SettingsPage() {
     localStorage.removeItem('moda-user-tier');
     authLogout();
     setUserRole('standard');
+    try { sessionStorage.clear(); } catch { /* ignore */ }
     showToast('You have been signed out', 'success');
-    router.push('/');
+    router.replace('/auth/login');
   };
 
   const handleLanguageSelect = async (code: string) => {

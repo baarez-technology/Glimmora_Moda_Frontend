@@ -45,6 +45,17 @@ export async function fetchWithTimeout(
       ...options,
       signal: controller.signal,
     });
+    // Auto-redirect to login on 401 (expired/invalid token)
+    if (response.status === 401 && typeof window !== 'undefined') {
+      const isAuthEndpoint = url.includes('/auth/');
+      if (!isAuthEndpoint) {
+        localStorage.removeItem('moda-user-token');
+        localStorage.removeItem('moda-brand-token');
+        try { sessionStorage.clear(); } catch { /* ignore */ }
+        window.location.href = '/auth/login';
+        throw new Error('Session expired — redirecting to login');
+      }
+    }
     return response;
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
