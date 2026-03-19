@@ -316,11 +316,12 @@ export default function SettingsPage() {
       userLogout();
       authLogout();
       setUserRole('standard');
+      try { sessionStorage.clear(); } catch { /* ignore */ }
       showToast('Account and all associated data deleted', 'success');
       setShowDeleteConfirm(false);
       setShowDeleteFinal(false);
       setDeleteConfirmText('');
-      router.push('/');
+      router.replace('/auth/login');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete account';
       showToast(message, 'error');

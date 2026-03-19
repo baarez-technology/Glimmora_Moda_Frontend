@@ -13,8 +13,7 @@ export default function DesignDemandPage() {
   useEffect(() => {
     brandIntelligenceService.getDemandSimulations().then(res => {
       if (res.data) setSimulations(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const totalSimulations = simulations.length;

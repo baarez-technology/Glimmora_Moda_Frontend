@@ -27,8 +27,7 @@ export default function CounterfeitPage() {
   useEffect(() => {
     brandIntelligenceService.getCounterfeitAlerts().then(res => {
       if (res.data) setAlerts(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const totalAlerts = alerts.length;

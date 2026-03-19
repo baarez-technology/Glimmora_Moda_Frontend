@@ -12,8 +12,7 @@ export default function DigitalTwinPage() {
   useEffect(() => {
     brandIntelligenceService.getBrandDigitalTwin().then(res => {
       if (res.data) setTwin(res.data);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const totalNodes = twin?.nodes.length ?? 0;

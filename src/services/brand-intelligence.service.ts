@@ -82,37 +82,32 @@ function extractArray<T>(raw: unknown): T[] {
 
 async function fetchIntelligence<T>(
   endpoint: string,
-  mockFallback: () => T | Promise<T>,
+  _mockFallback: () => T | Promise<T>,
   method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
   body?: unknown,
 ): Promise<ApiResponse<T>> {
   const token = getBrandToken();
 
-  if (token) {
-    try {
-      const res = await window.fetch(`/api/v1/intelligence/${endpoint}`, {
-        method,
-        headers: brandHeaders(),
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-
-      if (res.ok) {
-        const raw = await res.json();
-        return {
-          data: raw as T,
-          success: true,
-          timestamp: new Date().toISOString(),
-        };
-      }
-    } catch {
-      // API failed — fall through to mock
-    }
+  if (!token) {
+    return { data: [] as unknown as T, success: true, timestamp: new Date().toISOString() };
   }
 
-  return apiRequest<T>(`/api/brand/intelligence/${endpoint}`, {
+  const res = await window.fetch(`/api/v1/intelligence/${endpoint}`, {
     method,
-    mockHandler: mockFallback,
+    headers: brandHeaders(),
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
+
+  if (!res.ok) {
+    throw new Error(`Intelligence API error: ${res.status}`);
+  }
+
+  const raw = await res.json();
+  return {
+    data: raw as T,
+    success: true,
+    timestamp: new Date().toISOString(),
+  };
 }
 
 // ============================================

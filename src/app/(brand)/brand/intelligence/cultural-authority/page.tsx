@@ -13,8 +13,7 @@ export default function CulturalAuthorityPage() {
   useEffect(() => {
     brandIntelligenceService.getCulturalAuthority().then(res => {
       if (res.data) setDimensions(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const averageScore = dimensions.length > 0

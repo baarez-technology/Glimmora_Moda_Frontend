@@ -13,8 +13,7 @@ export default function BoutiquesPage() {
   useEffect(() => {
     brandIntelligenceService.getBoutiquePerformances().then(res => {
       if (res.data) setBoutiques(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const totalBoutiques = boutiques.length;

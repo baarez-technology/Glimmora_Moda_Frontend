@@ -28,8 +28,7 @@ export default function HeritagePage() {
     setIsLoading(true);
     brandIntelligenceService.getHeritageAssets().then(res => {
       if (res.data) setAssets(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => { loadAssets(); }, [loadAssets]);

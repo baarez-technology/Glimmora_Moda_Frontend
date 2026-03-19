@@ -12,8 +12,7 @@ export default function BrandConciergePage() {
   useEffect(() => {
     brandIntelligenceService.getBrandConciergeConfig().then(res => {
       if (res.data) setConfig(res.data);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const activeConversations = config?.conversations.filter(c => c.status === 'active').length ?? 0;

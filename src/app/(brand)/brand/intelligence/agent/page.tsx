@@ -15,8 +15,7 @@ export default function IntelligenceAgentPage() {
     setIsLoading(true);
     brandIntelligenceService.getIntelligenceSignals().then(res => {
       if (res.data) setSignals(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
