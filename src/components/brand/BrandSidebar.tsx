@@ -30,6 +30,7 @@ import {
   Network,
   Shield,
   Store,
+  MapPin,
   AlertTriangle,
   Rocket,
   Gem,
@@ -89,8 +90,10 @@ const navigation: NavSection[] = [
     title: 'Insights',
     items: [
       { label: 'Analytics', href: '/brand/analytics', icon: BarChart3 },
+      { label: 'Reviews', href: '/brand/reviews', icon: MessageSquare },
       { label: 'Appointments', href: '/brand/appointments', icon: CalendarCheck },
-      { label: 'Styling Sessions', href: '/brand/styling-sessions', icon: Calendar }
+      { label: 'Styling Sessions', href: '/brand/styling-sessions', icon: Calendar },
+      { label: 'Shop Locations', href: '/brand/locations', icon: MapPin }
     ]
   },
   {

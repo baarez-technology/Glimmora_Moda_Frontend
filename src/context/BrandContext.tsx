@@ -367,8 +367,8 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           console.error('[BrandContext] Failed to load bespoke orders:', err instanceof Error ? err.message : err);
         }
-        // Load price negotiations from real API — no mock fallback
-        setPriceNegotiations(d.priceNegotiations);
+        // No mock data for negotiations — no backend API yet
+        setPriceNegotiations([]);
         // Load private collections from real API
         try {
           const realCollections = await privateCollectionService.fetchPrivateCollections();
@@ -379,11 +379,12 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         }
         // Sourcing requests are loaded directly by the sourcing page via brand-sourcing.service
         // Heritage events, brand stories, offers, styling sessions — loaded by their own pages
+        // These are loaded by their own pages via real API — don't load mock here
         setSourcingRequests([]);
-        setHeritageEvents(d.heritageEvents);
-        setBrandStories(d.brandStories);
-        setUhniOffers(d.uhniOffers);
-        setStylingSessions(d.stylingSessions);
+        setHeritageEvents([]);
+        setBrandStories([]);
+        setUhniOffers([]);
+        setStylingSessions([]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load brand data');

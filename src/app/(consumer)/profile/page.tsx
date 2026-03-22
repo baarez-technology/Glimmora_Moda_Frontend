@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin } from 'lucide-react';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin, Star } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
@@ -134,6 +134,12 @@ export default function ProfilePage() {
       icon: Package,
       title: 'Orders',
       subtitle: orders.length > 0 ? `${orders.length} orders` : 'View history',
+    },
+    {
+      href: '/profile/reviews',
+      icon: Star,
+      title: 'My Reviews',
+      subtitle: 'Rate your purchases',
     },
     {
       href: '/calendar',

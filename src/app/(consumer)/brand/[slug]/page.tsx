@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Star, Navigation, Phone } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
 import { getRecommendedProductsPaginated, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
+import { getAllBrandShops, type BrandShopLocation } from '@/services/brand-locations.service';
+import { getReviewsByBrand, type ProductReview } from '@/services/reviews.service';
 import type { PaginatedProducts } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -27,6 +29,8 @@ export default function BrandPage({ params }: BrandPageProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeProductHover, setActiveProductHover] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shopLocation, setShopLocation] = useState<BrandShopLocation | null>(null);
+  const [brandReviews, setBrandReviews] = useState<ProductReview[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
@@ -101,6 +105,16 @@ export default function BrandPage({ params }: BrandPageProps) {
       } finally {
         setLoading(false);
         setTimeout(() => setIsLoaded(true), 50);
+        // Load shop location and reviews (non-blocking)
+        try {
+          const allShops = getAllBrandShops();
+          const brandShop = allShops.find(s => s.is_active) || null;
+          setShopLocation(brandShop);
+        } catch { /* no shops */ }
+        try {
+          const reviews = getReviewsByBrand();
+          setBrandReviews(reviews);
+        } catch { /* no reviews */ }
       }
     }
 
@@ -254,88 +268,113 @@ export default function BrandPage({ params }: BrandPageProps) {
       ) : null}
 
       {/* ═══ STORE LOCATION ═══ */}
-      <section className={`py-20 lg:py-28 bg-charcoal-deep transition-all duration-700 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-16">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div>
-              <span className="font-body text-[10px] tracking-[0.4em] uppercase text-white/40 block mb-4">
-                Visit Us
-              </span>
-              <h2 className="font-display text-3xl md:text-4xl text-ivory-cream tracking-[-0.02em] mb-8">
-                Our Store
-              </h2>
-              <div className="space-y-6">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <MapPin size={16} className="text-gold-muted" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Address</p>
-                    <p className="text-ivory-cream leading-relaxed">
-                      Sector-P, D-2/83, Mansarovar Yojna<br />
-                      LDA Colony, Kanpur Road<br />
-                      Lucknow, Uttar Pradesh
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                    <Clock size={16} className="text-gold-muted" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Hours</p>
-                    <p className="text-ivory-cream">Open · Closes 8:30 PM</p>
-                    <p className="text-white/40 text-sm mt-1">Online appointments available</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0">
-                    <Star size={16} className="text-gold-muted" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Rating</p>
-                    <div className="flex items-center gap-2">
-                      <span className="font-display text-2xl text-ivory-cream">4.6</span>
-                      <div className="flex items-center gap-0.5">
-                        {[1,2,3,4,5].map(i => (
-                          <Star key={i} size={12} className={i <= 4 ? 'text-gold-muted fill-gold-muted' : 'text-gold-muted fill-gold-muted/40'} />
-                        ))}
-                      </div>
-                      <span className="text-sm text-white/40">45 reviews</span>
+      {shopLocation && (
+        <section className={`py-20 lg:py-28 bg-charcoal-deep transition-all duration-700 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+          <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-16">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <div>
+                <span className="font-body text-[10px] tracking-[0.4em] uppercase text-white/40 block mb-4">
+                  Visit Us
+                </span>
+                <h2 className="font-display text-3xl md:text-4xl text-ivory-cream tracking-[-0.02em] mb-8">
+                  {shopLocation.shop_name || 'Our Store'}
+                </h2>
+                <div className="space-y-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <MapPin size={16} className="text-gold-muted" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Address</p>
+                      <p className="text-ivory-cream leading-relaxed">
+                        {shopLocation.address_line1}<br />
+                        {shopLocation.address_line2 && <>{shopLocation.address_line2}<br /></>}
+                        {shopLocation.city}, {shopLocation.state}
+                        {shopLocation.country && <><br />{shopLocation.country}</>}
+                      </p>
                     </div>
                   </div>
+                  {shopLocation.opening_hours && (
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <Clock size={16} className="text-gold-muted" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Hours</p>
+                        <p className="text-ivory-cream">{shopLocation.opening_hours}</p>
+                        <p className="text-white/40 text-sm mt-1">Online appointments available</p>
+                      </div>
+                    </div>
+                  )}
+                  {brandReviews.length > 0 && (
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <Star size={16} className="text-gold-muted" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Rating</p>
+                        <div className="flex items-center gap-2">
+                          {(() => {
+                            const avg = brandReviews.reduce((s, r) => s + r.rating, 0) / brandReviews.length;
+                            return (
+                              <>
+                                <span className="font-display text-2xl text-ivory-cream">{avg.toFixed(1)}</span>
+                                <div className="flex items-center gap-0.5">
+                                  {[1,2,3,4,5].map(i => (
+                                    <Star key={i} size={12} className={i <= Math.round(avg) ? 'text-gold-muted fill-gold-muted' : 'text-gold-muted fill-gold-muted/40'} />
+                                  ))}
+                                </div>
+                                <span className="text-sm text-white/40">{brandReviews.length} review{brandReviews.length !== 1 ? 's' : ''}</span>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {shopLocation.phone && (
+                    <div className="flex items-start gap-4">
+                      <div className="w-10 h-10 border border-white/10 flex items-center justify-center flex-shrink-0">
+                        <Phone size={16} className="text-gold-muted" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Phone</p>
+                        <p className="text-ivory-cream">{shopLocation.phone}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-10">
+                  <a
+                    href={`https://maps.google.com/?q=${shopLocation.latitude},${shopLocation.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-3 px-8 py-3 border border-white/20 text-ivory-cream hover:bg-white/10 transition-colors text-sm tracking-[0.15em] uppercase"
+                  >
+                    <Navigation size={15} />
+                    Get Directions
+                  </a>
                 </div>
               </div>
-              <div className="mt-10">
-                <a
-                  href="https://maps.google.com/?q=Sector+P+D-2/83+Mansarovar+Yojna+LDA+Colony+Lucknow"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-3 px-8 py-3 border border-white/20 text-ivory-cream hover:bg-white/10 transition-colors text-sm tracking-[0.15em] uppercase"
-                >
-                  <Navigation size={15} />
-                  Get Directions
-                </a>
+              <div className="relative">
+                <div className="aspect-[4/3] bg-white/5 border border-white/10 overflow-hidden">
+                  <iframe
+                    src={`https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d2000!2d${shopLocation.longitude}!3d${shopLocation.latitude}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sen!2sin`}
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0, filter: 'grayscale(100%) invert(90%) contrast(80%)' }}
+                    allowFullScreen
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                    title={`${shopLocation.shop_name} Location`}
+                  />
+                </div>
+                <div className="absolute -bottom-4 -right-4 w-20 h-20 border border-gold-muted/20 pointer-events-none" />
               </div>
-            </div>
-            <div className="relative">
-              <div className="aspect-[4/3] bg-white/5 border border-white/10 overflow-hidden">
-                <iframe
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3559.5!2d80.95!3d26.85!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjbCsDUxJzAwLjAiTiA4MMKwNTcnMDAuMCJF!5e0!3m2!1sen!2sin!4v1234567890"
-                  width="100%"
-                  height="100%"
-                  style={{ border: 0, filter: 'grayscale(100%) invert(90%) contrast(80%)' }}
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                  title="Ethnic Zone Store Location"
-                />
-              </div>
-              <div className="absolute -bottom-4 -right-4 w-20 h-20 border border-gold-muted/20 pointer-events-none" />
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ═══ PRODUCTS ═══ */}
       {error && (
@@ -577,6 +616,7 @@ export default function BrandPage({ params }: BrandPageProps) {
       )}
 
       {/* ═══ TESTIMONIALS ═══ */}
+      {brandReviews.length > 0 && (
       <section className={`py-20 lg:py-28 bg-white transition-all duration-700 delay-400 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
         <div className="max-w-[1400px] mx-auto px-6 md:px-12 lg:px-16">
           <div className="mb-12">
@@ -585,64 +625,26 @@ export default function BrandPage({ params }: BrandPageProps) {
             </span>
             <div className="flex items-end justify-between">
               <h2 className="font-display text-3xl md:text-4xl text-charcoal-deep tracking-[-0.02em]">
-                What Our Brides Say
+                What Our Clients Say
               </h2>
-              <div className="flex items-center gap-2 pb-1">
-                <div className="flex items-center gap-0.5">
-                  {[1,2,3,4,5].map(i => (
-                    <Star key={i} size={14} className={i <= 4 ? 'text-gold-muted fill-gold-muted' : 'text-gold-muted fill-gold-muted/40'} />
-                  ))}
-                </div>
-                <span className="font-display text-2xl text-charcoal-deep">4.6</span>
-                <span className="text-sm text-stone">· 45 Reviews</span>
-              </div>
+              {(() => {
+                const avg = brandReviews.reduce((s, r) => s + r.rating, 0) / brandReviews.length;
+                return (
+                  <div className="flex items-center gap-2 pb-1">
+                    <div className="flex items-center gap-0.5">
+                      {[1,2,3,4,5].map(i => (
+                        <Star key={i} size={14} className={i <= Math.round(avg) ? 'text-gold-muted fill-gold-muted' : 'text-gold-muted fill-gold-muted/40'} />
+                      ))}
+                    </div>
+                    <span className="font-display text-2xl text-charcoal-deep">{avg.toFixed(1)}</span>
+                    <span className="text-sm text-stone">· {brandReviews.length} Review{brandReviews.length !== 1 ? 's' : ''}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                name: 'Priya Sharma',
-                date: 'March 2025',
-                rating: 5,
-                text: 'Absolutely stunning collection! Found my dream bridal lehenga here. The craftsmanship and embroidery detail is exquisite. The staff was incredibly helpful in finding the perfect look for my wedding.',
-                occasion: 'Bridal'
-              },
-              {
-                name: 'Ananya Gupta',
-                date: 'February 2025',
-                rating: 5,
-                text: 'Ethnic Zone has the most beautiful ethnic wear I have seen in Lucknow. The quality of fabric and zari work is truly exceptional. My family is so happy with the outfits we selected for the wedding season.',
-                occasion: 'Wedding Season'
-              },
-              {
-                name: 'Rekha Verma',
-                date: 'January 2025',
-                rating: 4,
-                text: 'Great variety of bridal and festive wear. Prices are very reasonable for the quality you get. The team helped us coordinate outfits for the entire family. Highly recommend for any occasion.',
-                occasion: 'Family Function'
-              },
-              {
-                name: 'Sunita Agarwal',
-                date: 'December 2024',
-                rating: 5,
-                text: 'I came all the way from Kanpur for this store and it was absolutely worth it. The bridal collection is unmatched. Every piece tells a story of artisanal craftsmanship.',
-                occasion: 'Bridal'
-              },
-              {
-                name: 'Meera Singh',
-                date: 'November 2024',
-                rating: 5,
-                text: 'Exceptional service and a beautiful range of ethnic wear. The store ambiance itself is lovely. They also offer online appointments which made the whole experience so much more convenient.',
-                occasion: 'Festive'
-              },
-              {
-                name: 'Kavita Mishra',
-                date: 'October 2024',
-                rating: 4,
-                text: 'Found the most gorgeous lehenga for my daughter\'s sangeet here. The staff was patient, knowledgeable, and went out of their way to help us mix and match accessories perfectly.',
-                occasion: 'Sangeet'
-              },
-            ].map((review, index) => (
+            {brandReviews.slice(0, 6).map((review, index) => (
               <div
                 key={index}
                 className="bg-parchment/40 p-8 border border-sand/30 hover:border-sand transition-colors group"
@@ -656,21 +658,23 @@ export default function BrandPage({ params }: BrandPageProps) {
                     />
                   ))}
                 </div>
+                <p className="text-stone leading-relaxed text-sm mb-2 font-medium text-charcoal-deep">{review.title}</p>
                 <p className="text-stone leading-relaxed text-sm mb-6 group-hover:text-charcoal-deep transition-colors">
-                  &ldquo;{review.text}&rdquo;
+                  &ldquo;{review.content}&rdquo;
                 </p>
                 <div className="flex items-end justify-between pt-4 border-t border-sand/30">
                   <div>
-                    <p className="font-display text-base text-charcoal-deep">{review.name}</p>
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-stone mt-0.5">{review.occasion}</p>
+                    <p className="font-display text-base text-charcoal-deep">{review.customer_name}</p>
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-stone mt-0.5">{review.product_name}</p>
                   </div>
-                  <p className="text-xs text-taupe">{review.date}</p>
+                  <p className="text-xs text-taupe">{new Date(review.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
       </section>
+      )}
 
       {/* ═══ STYLING SESSION CTA ═══ */}
       <section className="py-16 bg-parchment">

@@ -84,6 +84,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearCache(); // Purge all cached API data to prevent user data leaking to next session
     authService.userLogout();
     authService.logout().catch(console.error);
+    // Clear all session storage to prevent stale cart/wishlist/wardrobe data
+    try { sessionStorage.clear(); } catch { /* SSR safety */ }
     setTimeout(() => setIsLoggingOut(false), 500);
   }, []);
 

@@ -35,10 +35,10 @@ export default function AutonomousCommercePage() {
     setIsLoaded(true);
     uhniService.getZeroUIConfig().then(res => {
       if (res.data) setZeroConfig(res.data);
-    }).catch(() => {});
+    }).catch(() => { console.error('[autonomous] Failed to load Zero UI config'); });
     brandService.getAllBrands().then(res => {
       if (res.success && res.data) setAllBrands(res.data);
-    }).catch(() => {});
+    }).catch(() => { console.error('[autonomous] Failed to load brands'); });
   }, []);
 
   const categories: { value: ProductCategory; label: string }[] = [

@@ -28,17 +28,10 @@ export function useUHNIFeatures({ isUHNI, showToast }: UseUHNIFeaturesProps) {
 
   useEffect(() => {
     if (isUHNI) {
-      uhniService.getConcierge().then(r => { if (r.success) setConcierge(r.data); });
-      uhniService.getAutonomousSettings().then(r => { if (r.success) setAutonomousSettings(r.data); });
-      // Sourcing requests are loaded directly by the sourcing page via sourcing.service
+      // No mock data — only load from real APIs
       bespokeService.fetchConsumerBespokeOrders()
         .then(orders => setBespokeOrders(orders))
-        .catch(() => {
-          showToast('Failed to load bespoke orders', 'error');
-        });
-      uhniService.getAutonomousActivity().then(r => { if (r.success) setAutonomousActivity(r.data); });
-      uhniService.getPriceNegotiations().then(r => { if (r.success) setPriceNegotiations(r.data); });
-      uhniService.getConciergeTasks().then(r => { if (r.success) setLocalConciergeTasks(r.data); });
+        .catch(() => { /* API unavailable */ });
       fetchConsumerTasks().then(tasks => { if (tasks.length) setLocalConciergeTasks(tasks); }).catch(() => {});
       fetchConsumerAppointments().then(appts => { setConciergeAppointments(appts); }).catch(() => {});
     } else {

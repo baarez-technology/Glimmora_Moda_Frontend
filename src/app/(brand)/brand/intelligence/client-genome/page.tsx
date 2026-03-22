@@ -13,8 +13,7 @@ export default function ClientGenomePage() {
   useEffect(() => {
     brandIntelligenceService.getClientArchetypes().then(res => {
       if (res.data) setArchetypes(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const totalArchetypes = archetypes.length;

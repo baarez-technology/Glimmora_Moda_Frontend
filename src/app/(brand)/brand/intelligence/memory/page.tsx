@@ -13,8 +13,7 @@ export default function MemoryImprintPage() {
   useEffect(() => {
     brandIntelligenceService.getMemoryImprints().then(res => {
       if (res.data) setImprints(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const avgRecall = imprints.length

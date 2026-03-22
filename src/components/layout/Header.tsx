@@ -30,11 +30,11 @@ export default function Header() {
 
   const handleLogout = () => {
     setIsAccountOpen(false);
-    router.replace('/');
-    setTimeout(() => {
-      logout();
-      showToast('You have been signed out', 'success');
-    }, 100);
+    logout();
+    // Clear all session caches
+    try { sessionStorage.clear(); } catch { /* ignore */ }
+    showToast('You have been signed out', 'success');
+    router.replace('/auth/login');
   };
 
   // ESC key handler and click outside handler

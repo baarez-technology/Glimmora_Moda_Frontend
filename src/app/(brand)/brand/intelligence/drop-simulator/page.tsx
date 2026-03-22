@@ -16,8 +16,7 @@ export default function DropSimulatorPage() {
   useEffect(() => {
     brandIntelligenceService.getDropSimulations().then(res => {
       if (res.data) setSimulations(Array.isArray(res.data) ? res.data : []);
-      setIsLoading(false);
-    });
+    }).catch(() => {}).finally(() => setIsLoading(false));
   }, []);
 
   const handleCreate = useCallback(async () => {

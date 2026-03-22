@@ -6,8 +6,7 @@ import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Archive, Calendar, Sparkles, ArrowRight, Crown, BookOpen, Search, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { getHeritageEvents, getCulturalJourneys, getBrands } from '@/services/uhni.service';
-import { searchStories } from '@/services/recommendation.service';
+import { searchStories, getAllBrands } from '@/services/recommendation.service';
 import type { HeritageEvent, HeritageEventSignificance, CulturalJourney, Brand, BrandStory } from '@/types';
 
 type Tab = 'timeline' | 'stories';
@@ -48,10 +47,30 @@ export default function HeritageAndStoriesPage() {
   const [sortBy, setSortBy] = useState<SortOption>('newest');
 
   useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('moda-user-token') : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     Promise.all([
-      getHeritageEvents().then(res => setEvents(res.data)),
-      getCulturalJourneys().then(res => setJourneys(res.data)),
-      getBrands().then(res => setAllBrands(res.data)),
+      // Real API: GET /api/v1/consumer/events
+      fetch('/api/v1/consumer/events', { headers }).then(r => r.ok ? r.json() : []).then(data => {
+        const mapped: HeritageEvent[] = (Array.isArray(data) ? data : []).map((e: Record<string, unknown>) => ({
+          id: e.event_id as string,
+          brandId: e.brand_id as string,
+          brandName: '',
+          year: (e.year || 2024) as number,
+          title: (e.title || '') as string,
+          description: (e.short_description || e.full_description || '') as string,
+          fullDescription: (e.full_description || '') as string,
+          image: (e.image_url || '') as string,
+          significance: ((e.significance_type || 'collection') as string).toLowerCase() as HeritageEventSignificance,
+          productIds: (e.product_list || []) as string[],
+        }));
+        setEvents(mapped);
+      }),
+      // Real API: brands
+      getAllBrands().then(brands => setAllBrands(brands)),
+      // Real API: stories
       searchStories().then(data => setStories(data)),
     ]).catch(() => {}).finally(() => {
       setIsLoaded(true);

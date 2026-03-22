@@ -7,7 +7,6 @@
  * Tries real API first, falls back to mock data if API unavailable.
  */
 
-import { fetchWithTimeout } from '@/lib/api-cache';
 import { apiRequest } from './api-client';
 import type { ApiResponse } from './api-client';
 import type {
@@ -60,45 +59,55 @@ function brandHeaders(): Record<string, string> {
 // Generic fetcher — real API first, mock fallback
 // ============================================
 
+/**
+ * Extract array data from API response.
+ * API returns objects like { simulations: [...], total: N } — not raw arrays.
+ * This function finds the first array property in the response.
+ */
+function extractArray<T>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    // Try common wrapper keys first
+    for (const key of ['data', 'items', 'results']) {
+      if (Array.isArray(obj[key])) return obj[key] as T[];
+    }
+    // Find first array property
+    for (const val of Object.values(obj)) {
+      if (Array.isArray(val)) return val as T[];
+    }
+  }
+  return [];
+}
+
 async function fetchIntelligence<T>(
   endpoint: string,
-  mockFallback: () => T | Promise<T>,
-  method: 'GET' | 'POST' | 'PATCH' = 'GET',
+  _mockFallback: () => T | Promise<T>,
+  method: 'GET' | 'POST' | 'PATCH' | 'DELETE' = 'GET',
   body?: unknown,
 ): Promise<ApiResponse<T>> {
   const token = getBrandToken();
 
-  // Try real API if brand is authenticated
-  if (token) {
-    try {
-      const res = await fetchWithTimeout(`/api/v1/intelligence/${endpoint}`, {
-        method,
-        headers: brandHeaders(),
-        ...(body ? { body: JSON.stringify(body) } : {}),
-      });
-
-      if (res.ok) {
-        const raw = await res.json();
-        // Normalize: API may return { data: [...] }, a direct array, or an object
-        // Extract the array/object payload for the component
-        const data = (raw?.data !== undefined ? raw.data : raw) as T;
-        return {
-          data,
-          success: true,
-          timestamp: new Date().toISOString(),
-        };
-      }
-      console.log(`[brand-intelligence] API ${endpoint}: ${res.status}, falling back to mock`);
-    } catch (err) {
-      console.log(`[brand-intelligence] API ${endpoint} failed, using mock:`, err);
-    }
+  if (!token) {
+    return { data: [] as unknown as T, success: true, timestamp: new Date().toISOString() };
   }
 
-  // Fallback to mock
-  return apiRequest<T>(`/api/brand/intelligence/${endpoint}`, {
+  const res = await window.fetch(`/api/v1/intelligence/${endpoint}`, {
     method,
-    mockHandler: mockFallback,
+    headers: brandHeaders(),
+    ...(body ? { body: JSON.stringify(body) } : {}),
   });
+
+  if (!res.ok) {
+    throw new Error(`Intelligence API error: ${res.status}`);
+  }
+
+  const raw = await res.json();
+  return {
+    data: raw as T,
+    success: true,
+    timestamp: new Date().toISOString(),
+  };
 }
 
 // ============================================
@@ -106,7 +115,12 @@ async function fetchIntelligence<T>(
 // ============================================
 
 export async function getDemandSimulations(): Promise<ApiResponse<DemandSimulation[]>> {
-  return fetchIntelligence('design-demand', () => mockDemandSimulations);
+  const res = await fetchIntelligence<DemandSimulation[]>('design-demand', () => mockDemandSimulations);
+  // API returns { simulations: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    res.data = extractArray<DemandSimulation>(res.data);
+  }
+  return res;
 }
 
 // ============================================
@@ -114,7 +128,13 @@ export async function getDemandSimulations(): Promise<ApiResponse<DemandSimulati
 // ============================================
 
 export async function getIntelligenceSignals(): Promise<ApiResponse<BrandIntelligenceSignal[]>> {
-  return fetchIntelligence('signals', () => mockIntelligenceSignals);
+  const res = await fetchIntelligence<BrandIntelligenceSignal[]>('signals', () => mockIntelligenceSignals);
+  // API returns { signal_feed: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.signal_feed ?? extractArray<BrandIntelligenceSignal>(raw)) as BrandIntelligenceSignal[];
+  }
+  return res;
 }
 
 // ============================================
@@ -130,7 +150,13 @@ export async function getBrandConciergeConfig(): Promise<ApiResponse<BrandConcie
 // ============================================
 
 export async function getMemoryImprints(): Promise<ApiResponse<MemoryImprint[]>> {
-  return fetchIntelligence('memory-imprints', () => mockMemoryImprints);
+  const res = await fetchIntelligence<MemoryImprint[]>('memory-imprints', () => mockMemoryImprints);
+  // API returns { memory_imprints: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.memory_imprints ?? extractArray<MemoryImprint>(raw)) as MemoryImprint[];
+  }
+  return res;
 }
 
 // ============================================
@@ -146,82 +172,70 @@ export async function getBrandDigitalTwin(): Promise<ApiResponse<BrandDigitalTwi
 // ============================================
 
 export async function getCulturalAuthority(): Promise<ApiResponse<CulturalAuthority[]>> {
-  return fetchIntelligence('cultural-authority', () => mockCulturalAuthority);
-}
-
-// ── Intelligence API helpers ───────────────────────────────────────────────────
-
-function intelligenceAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  try {
-    const token = localStorage.getItem('moda-brand-token');
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-  } catch { /* SSR */ }
-  return headers;
+  const res = await fetchIntelligence<CulturalAuthority[]>('cultural-authority', () => mockCulturalAuthority);
+  // API returns { dimensions: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.dimensions ?? extractArray<CulturalAuthority>(raw)) as CulturalAuthority[];
+  }
+  return res;
 }
 
 // ============================================
 // B23: Boutique Performance Index (BPI)
 // ============================================
 
-let _boutiqueCache: BoutiquePerformance[] | null = null;
-
 export async function getBoutiquePerformances(): Promise<ApiResponse<BoutiquePerformance[]>> {
-  if (_boutiqueCache) {
-    return { data: _boutiqueCache, success: true, timestamp: new Date().toISOString() };
+  const res = await fetchIntelligence<BoutiquePerformance[]>('boutique-performances', () => mockBoutiquePerformances);
+  // API returns { boutiques: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.boutiques ?? extractArray<BoutiquePerformance>(raw)) as BoutiquePerformance[];
   }
-  try {
-    const res = await fetch('/api/v1/intelligence/boutique-performances', {
-      headers: intelligenceAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('API error');
-    const json = await res.json();
-    const raw = json.boutiques ?? json.data ?? json;
-    const data: BoutiquePerformance[] = Array.isArray(raw) ? raw : [];
-    _boutiqueCache = data;
-    return { data, success: true, timestamp: new Date().toISOString() };
-  } catch {
-    return { data: mockBoutiquePerformances, success: true, timestamp: new Date().toISOString() };
-  }
+  return res;
 }
 
 // ============================================
 // B24: Counterfeit Digital Detection (CDDI)
 // ============================================
 
-let _counterfeitCache: CounterfeitAlert[] | null = null;
-
 export async function getCounterfeitAlerts(): Promise<ApiResponse<CounterfeitAlert[]>> {
-  if (_counterfeitCache) {
-    return { data: _counterfeitCache, success: true, timestamp: new Date().toISOString() };
+  const res = await fetchIntelligence<CounterfeitAlert[]>('counterfeit-alerts', () => mockCounterfeitAlerts);
+  // API returns { alerts: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.alerts ?? extractArray<CounterfeitAlert>(raw)) as CounterfeitAlert[];
   }
-  try {
-    const res = await fetch('/api/v1/intelligence/counterfeit-alerts', {
-      headers: intelligenceAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('API error');
-    const json = await res.json();
-    const raw = json.alerts ?? json.data ?? json;
-    const data: CounterfeitAlert[] = Array.isArray(raw) ? raw : [];
-    _counterfeitCache = data;
-    return { data, success: true, timestamp: new Date().toISOString() };
-  } catch {
-    return { data: mockCounterfeitAlerts, success: true, timestamp: new Date().toISOString() };
-  }
+  return res;
 }
 
 export async function updateCounterfeitAlert(id: string, status: string): Promise<void> {
-  // Update cache optimistically
-  if (_counterfeitCache) {
-    _counterfeitCache = _counterfeitCache.map(a => a.id === id ? { ...a, status: status as CounterfeitAlert['status'] } : a);
-  }
   try {
-    await fetch(`/api/v1/intelligence/counterfeit-alerts/${id}`, {
+    await window.fetch(`/api/v1/intelligence/counterfeit-alerts/${id}`, {
       method: 'PATCH',
-      headers: intelligenceAuthHeaders(),
+      headers: brandHeaders(),
       body: JSON.stringify({ status }),
     });
   } catch { /* fire-and-forget */ }
+}
+
+export async function reportCounterfeitAlert(payload: {
+  product_id: string;
+  similarity: number;
+  source: string;
+  source_url?: string;
+  region?: string;
+  risk_level?: string;
+}): Promise<CounterfeitAlert | null> {
+  try {
+    const res = await window.fetch('/api/v1/intelligence/counterfeit-alerts', {
+      method: 'POST',
+      headers: brandHeaders(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch { return null; }
 }
 
 // ============================================
@@ -229,7 +243,13 @@ export async function updateCounterfeitAlert(id: string, status: string): Promis
 // ============================================
 
 export async function getDropSimulations(): Promise<ApiResponse<DropSimulation[]>> {
-  return fetchIntelligence('drop-simulations', () => mockDropSimulations);
+  const res = await fetchIntelligence<DropSimulation[]>('drop-simulations', () => mockDropSimulations);
+  // API returns { simulations: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.simulations ?? extractArray<DropSimulation>(raw)) as DropSimulation[];
+  }
+  return res;
 }
 
 export async function createDropSimulation(payload: {
@@ -257,25 +277,14 @@ export async function updateDropSimulationStatus(
 // B26: Heritage Preservation AI (HPAI)
 // ============================================
 
-let _heritageCache: HeritageAsset[] | null = null;
-
 export async function getHeritageAssets(): Promise<ApiResponse<HeritageAsset[]>> {
-  if (_heritageCache) {
-    return { data: _heritageCache, success: true, timestamp: new Date().toISOString() };
+  const res = await fetchIntelligence<HeritageAsset[]>('heritage-assets', () => mockHeritageAssets);
+  // API returns { assets: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    res.data = (raw?.assets ?? extractArray<HeritageAsset>(raw)) as HeritageAsset[];
   }
-  try {
-    const res = await fetch('/api/v1/intelligence/heritage-assets', {
-      headers: intelligenceAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('API error');
-    const json = await res.json();
-    const raw = json.assets ?? json.data ?? json;
-    const data: HeritageAsset[] = Array.isArray(raw) ? raw : [];
-    _heritageCache = data;
-    return { data, success: true, timestamp: new Date().toISOString() };
-  } catch {
-    return { data: mockHeritageAssets, success: true, timestamp: new Date().toISOString() };
-  }
+  return res;
 }
 
 export async function createHeritageAsset(payload: {
@@ -289,71 +298,44 @@ export async function createHeritageAsset(payload: {
   condition_notes?: string;
 }): Promise<HeritageAsset | null> {
   try {
-    const res = await fetch('/api/v1/intelligence/heritage-assets', {
+    const res = await window.fetch('/api/v1/intelligence/heritage-assets', {
       method: 'POST',
-      headers: intelligenceAuthHeaders(),
+      headers: brandHeaders(),
       body: JSON.stringify(payload),
     });
     if (!res.ok) return null;
-    const data = await res.json();
-    _heritageCache = null; // invalidate cache
-    return data;
+    return res.json();
   } catch { return null; }
 }
 
 export async function updateHeritageAsset(assetId: string, payload: Record<string, unknown>): Promise<boolean> {
   try {
-    const res = await fetch(`/api/v1/intelligence/heritage-assets/${assetId}`, {
+    const res = await window.fetch(`/api/v1/intelligence/heritage-assets/${assetId}`, {
       method: 'PATCH',
-      headers: intelligenceAuthHeaders(),
+      headers: brandHeaders(),
       body: JSON.stringify(payload),
     });
-    if (res.ok) _heritageCache = null;
     return res.ok;
   } catch { return false; }
 }
 
 export async function deleteHeritageAsset(assetId: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/v1/intelligence/heritage-assets/${assetId}`, {
+    const res = await window.fetch(`/api/v1/intelligence/heritage-assets/${assetId}`, {
       method: 'DELETE',
-      headers: intelligenceAuthHeaders(),
+      headers: brandHeaders(),
     });
-    if (res.ok) _heritageCache = null;
     return res.ok;
   } catch { return false; }
-}
-
-export async function reportCounterfeitAlert(payload: {
-  product_id: string;
-  similarity: number;
-  source: string;
-  source_url?: string;
-  region?: string;
-  risk_level?: string;
-}): Promise<CounterfeitAlert | null> {
-  try {
-    const res = await fetch('/api/v1/intelligence/counterfeit-alerts', {
-      method: 'POST',
-      headers: intelligenceAuthHeaders(),
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    _counterfeitCache = null;
-    return data;
-  } catch { return null; }
 }
 
 // ============================================
 // B27: Ultra-Premium Client Genome (UPCG)
 // ============================================
 
-let _upcgCache: ClientArchetype[] | null = null;
-
 function mapArchetype(a: Record<string, unknown>): ClientArchetype {
   return {
-    archetypeId: (a.id ?? a.archetypeId ?? '') as string,
+    archetypeId: (a.id ?? a.archetypeId ?? a.archetype_id ?? '') as string,
     label: (a.label ?? '') as string,
     description: (a.description ?? '') as string,
     clientCount: (a.clientCount ?? a.client_count ?? 0) as number,
@@ -366,20 +348,12 @@ function mapArchetype(a: Record<string, unknown>): ClientArchetype {
 }
 
 export async function getClientArchetypes(): Promise<ApiResponse<ClientArchetype[]>> {
-  if (_upcgCache) {
-    return { data: _upcgCache, success: true, timestamp: new Date().toISOString() };
+  const res = await fetchIntelligence<ClientArchetype[]>('client-archetypes', () => mockClientArchetypes);
+  // API returns { archetypes: [...] }
+  if (res.data && !Array.isArray(res.data)) {
+    const raw = res.data as unknown as Record<string, unknown>;
+    const archetypes = (raw?.archetypes ?? extractArray(raw)) as Record<string, unknown>[];
+    res.data = archetypes.map(mapArchetype);
   }
-  try {
-    const res = await fetch('/api/v1/intelligence/client-archetypes', {
-      headers: intelligenceAuthHeaders(),
-    });
-    if (!res.ok) throw new Error('API error');
-    const json = await res.json();
-    const raw = json.archetypes ?? json.data ?? json;
-    const data: ClientArchetype[] = Array.isArray(raw) ? raw.map(mapArchetype) : [];
-    _upcgCache = data;
-    return { data, success: true, timestamp: new Date().toISOString() };
-  } catch {
-    return { data: mockClientArchetypes, success: true, timestamp: new Date().toISOString() };
-  }
+  return res;
 }
