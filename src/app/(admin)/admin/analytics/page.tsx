@@ -6,7 +6,7 @@ import {
   BarChart3,
   TrendingUp,
   TrendingDown,
-  Download,
+  // Download removed — no real data to export
   Calendar,
   Users,
   DollarSign,
@@ -395,10 +395,7 @@ export default function AnalyticsPage() {
                       </div>
                     </div>
 
-                    <button className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-charcoal-deep bg-parchment/50 hover:bg-parchment rounded-lg transition-colors shrink-0">
-                      <Download size={14} />
-                      Export
-                    </button>
+                    {/* Export button removed — all admin data is mock */}
                   </div>
                 ))}
                 {reports.length === 0 && (

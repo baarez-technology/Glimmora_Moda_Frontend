@@ -220,12 +220,14 @@ export default function SettingsPage() {
     setShowCurrencyDropdown(false);
     setCurrencySearch('');
     localStorage.setItem('moda-currency', code);
+    window.dispatchEvent(new Event('currency-change'));
     try {
       await updateUserProfile({ currency: code });
       showToast('Currency updated', 'success');
     } catch {
       setCurrency(prev);
       localStorage.setItem('moda-currency', prev);
+      window.dispatchEvent(new Event('currency-change'));
       showToast('Failed to update currency', 'error');
     }
   };

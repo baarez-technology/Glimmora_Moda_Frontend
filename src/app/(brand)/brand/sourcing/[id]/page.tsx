@@ -29,6 +29,7 @@ import {
   sendBrandSourcingMessage,
   type ApiBrandSourcingRequest,
 } from '@/services/brand-sourcing.service';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 function MessageInput({ onSend, disabled }: { onSend: (msg: string) => void; disabled?: boolean }) {
   const [value, setValue] = useState('');
@@ -402,7 +403,7 @@ export default function SourcingRequestDetailPage() {
                           Price *
                         </label>
                         <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">{getCurrencySymbol()}</span>
                           <input
                             type="number"
                             value={optionForm.price}
@@ -520,9 +521,9 @@ export default function SourcingRequestDetailPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-3 mt-2">
-                            <p className="text-lg font-medium text-charcoal-deep">€{option.offer_price.toLocaleString()}</p>
+                            <p className="text-lg font-medium text-charcoal-deep">{formatPrice(option.offer_price)}</p>
                             {option.offer_price !== option.price && (
-                              <p className="text-sm text-taupe line-through">€{option.price.toLocaleString()}</p>
+                              <p className="text-sm text-taupe line-through">{formatPrice(option.price)}</p>
                             )}
                             {option.source_location && (
                               <span className="text-xs text-stone">{option.source_location}</span>
@@ -564,7 +565,7 @@ export default function SourcingRequestDetailPage() {
                         <p className="text-xs text-gold-muted tracking-[0.1em] uppercase mt-0.5">{selectedOption.source_name}</p>
                       )}
                       <p className="font-display text-xl text-charcoal-deep mt-2">
-                        €{selectedOption.offer_price.toLocaleString()}
+                        {formatPrice(selectedOption.offer_price)}
                       </p>
                     </div>
                     <span className="px-3 py-1.5 bg-success/10 text-success text-xs tracking-[0.1em] uppercase">

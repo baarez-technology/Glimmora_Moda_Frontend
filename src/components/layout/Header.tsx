@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { User, Heart, ShoppingBag, Menu, X, LogOut, Settings, Sparkles } from 'lucide-react';
+import { User, Heart, ShoppingBag, Menu, X, LogOut, Settings, Sparkles, Bell, CheckCheck } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { getAllBrands } from '@/services/recommendation.service';
@@ -15,6 +15,11 @@ export default function Header() {
   const { considerations, userTier, isUHNI, showToast, cartCount, wishlistCount, pricingTier } = useApp();
   const { isAuthenticated, isHydrated, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [notifications, setNotifications] = useState<{ id: string; title: string; message: string; is_read: boolean; created_at: string }[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifsLoading, setNotifsLoading] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
   const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
@@ -27,6 +32,60 @@ export default function Header() {
       .then(setBrands)
       .catch(() => { /* silently fail — dropdown will be empty */ });
   }, []);
+
+  // Notification functions
+  const fetchNotifCount = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('moda-user-token') : null;
+    if (!token) return;
+    window.fetch('/api/v1/customer/notifications/count', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : null).then(data => {
+      if (data) setUnreadCount(data.unread || 0);
+    }).catch(() => {});
+  };
+
+  const fetchNotifications = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('moda-user-token') : null;
+    if (!token) return;
+    setNotifsLoading(true);
+    window.fetch('/api/v1/customer/notifications?limit=10', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    }).then(r => r.ok ? r.json() : null).then(data => {
+      if (data?.notifications) {
+        setNotifications(data.notifications);
+        setUnreadCount(data.unread ?? 0);
+      }
+    }).catch(() => {}).finally(() => setNotifsLoading(false));
+  };
+
+  const markNotifRead = (id: string) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('moda-user-token') : null;
+    if (!token) return;
+    window.fetch(`/api/v1/customer/notifications/${id}/read`, {
+      method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` },
+    }).catch(() => {});
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    setUnreadCount(prev => Math.max(0, prev - 1));
+  };
+
+  const markAllRead = () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('moda-user-token') : null;
+    if (!token) return;
+    window.fetch('/api/v1/customer/notifications/read-all', {
+      method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` },
+    }).catch(() => {});
+    setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+    setUnreadCount(0);
+  };
+
+  // Poll notification count
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifCount();
+      const interval = setInterval(fetchNotifCount, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = () => {
     setIsAccountOpen(false);
@@ -53,6 +112,9 @@ export default function Header() {
       }
       if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target as Node)) {
         setIsBrandDropdownOpen(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifs(false);
       }
     };
 
@@ -160,6 +222,65 @@ export default function Header() {
                 </span>
               )}
             </Link>
+
+            {/* Notifications */}
+            {isAuthenticated && (
+              <div ref={notifRef} className="relative">
+                <button
+                  onClick={() => { setShowNotifs(!showNotifs); if (!showNotifs) fetchNotifications(); }}
+                  className="p-2 text-charcoal-warm hover:text-noir transition-colors relative"
+                  aria-label="Notifications"
+                >
+                  <Bell size={20} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifs && (
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white shadow-xl border border-sand/50 z-50">
+                    <div className="px-4 py-3 border-b border-sand/50 flex items-center justify-between">
+                      <span className="text-xs font-medium tracking-[0.1em] uppercase text-charcoal-deep">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button onClick={markAllRead} className="text-[10px] text-stone hover:text-charcoal-deep flex items-center gap-1">
+                          <CheckCheck size={12} /> Mark all read
+                        </button>
+                      )}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto">
+                      {notifsLoading ? (
+                        <div className="px-4 py-8 text-center">
+                          <div className="w-5 h-5 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center">
+                          <Bell size={20} className="mx-auto text-taupe/40 mb-2" />
+                          <p className="text-xs text-stone">No notifications yet</p>
+                        </div>
+                      ) : (
+                        notifications.map(n => (
+                          <div
+                            key={n.id}
+                            onClick={() => !n.is_read && markNotifRead(n.id)}
+                            className={`px-4 py-3 border-b border-sand/20 last:border-0 hover:bg-parchment/50 cursor-pointer ${n.is_read ? '' : 'bg-parchment/30'}`}
+                          >
+                            <div className="flex items-start gap-2">
+                              {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />}
+                              <div className={n.is_read ? 'ml-3.5' : ''}>
+                                <p className="text-xs font-medium text-charcoal-deep">{n.title}</p>
+                                <p className="text-xs text-stone mt-0.5">{n.message}</p>
+                                <p className="text-[10px] text-taupe mt-1">{new Date(n.created_at).toLocaleDateString()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Cart */}
             <Link

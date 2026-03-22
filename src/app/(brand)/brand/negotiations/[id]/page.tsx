@@ -16,6 +16,7 @@ import {
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { NegotiationStatus } from '@/types/uhni';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 export default function NegotiationDetailPage() {
   const params = useParams();
@@ -42,7 +43,7 @@ export default function NegotiationDetailPage() {
   }
 
   const formatCurrency = (value: number) => {
-    return `€${value.toLocaleString()}`;
+    return formatPrice(value);
   };
 
   const formatDate = (dateString: string) => {
@@ -285,7 +286,7 @@ export default function NegotiationDetailPage() {
                     </p>
                     <div className="flex gap-4">
                       <div className="flex-1 relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">{getCurrencySymbol()}</span>
                         <input
                           type="number"
                           value={counterOfferValue}

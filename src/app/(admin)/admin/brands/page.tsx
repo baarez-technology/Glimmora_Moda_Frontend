@@ -1,52 +1,43 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import {
   Search,
-  Filter,
   Building2,
-  Star,
   CheckCircle,
   XCircle,
   Clock,
-  TrendingUp,
-  MoreVertical,
+  Ban,
+  Package,
+  DollarSign,
+  Calendar,
+  AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
-import { fetchManagedBrands, updateBrandStatus, updateBrandTier } from '@/services/admin.service';
-import type { ManagedBrand, BrandTier, BrandStatus } from '@/types/admin';
+import { fetchManagedBrands, updateBrandStatus } from '@/services/admin.service';
+import { getBrandWarningLevel } from '@/services/reports.service';
+import { formatPrice } from '@/lib/currency';
+import type { ManagedBrand, BrandStatus } from '@/types/admin';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const TIER_STYLES: Record<BrandTier, { bg: string; text: string; label: string }> = {
-  heritage: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Heritage' },
-  elite: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Elite' },
-  premium: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Premium' },
-  standard: { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Standard' },
-};
-
 const STATUS_STYLES: Record<BrandStatus, { bg: string; text: string; label: string }> = {
-  active: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Active' },
-  verified: { bg: 'bg-sky-100', text: 'text-sky-800', label: 'Verified' },
-  pending: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'Pending' },
-  suspended: { bg: 'bg-red-100', text: 'text-red-800', label: 'Suspended' },
-  rejected: { bg: 'bg-rose-100', text: 'text-rose-800', label: 'Rejected' },
+  active:    { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Active' },
+  verified:  { bg: 'bg-sky-100',     text: 'text-sky-800',     label: 'Verified' },
+  pending:   { bg: 'bg-amber-100',   text: 'text-amber-800',   label: 'Pending' },
+  suspended: { bg: 'bg-red-100',     text: 'text-red-800',     label: 'Suspended' },
+  rejected:  { bg: 'bg-rose-100',    text: 'text-rose-800',    label: 'Rejected' },
 };
 
-const TIERS: BrandTier[] = ['standard', 'premium', 'elite', 'heritage'];
-const STATUSES: BrandStatus[] = ['pending', 'verified', 'active', 'suspended', 'rejected'];
+const WARNING_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  low:    { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Low Risk' },
+  medium: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Medium Risk' },
+  high:   { bg: 'bg-red-100',   text: 'text-red-800',    label: 'High Risk' },
+};
 
-function formatCurrency(value: number): string {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(1)}K`;
-  return `$${value.toFixed(0)}`;
-}
-
-function scoreColor(score: number): string {
-  if (score > 80) return 'bg-emerald-500';
-  if (score > 60) return 'bg-amber-500';
-  return 'bg-red-500';
-}
+type Tab = 'all' | 'pending' | 'suspended';
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -54,48 +45,61 @@ export default function BrandPartnersPage() {
   const [brands, setBrands] = useState<ManagedBrand[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [tierFilter, setTierFilter] = useState<BrandTier | 'all'>('all');
-  const [statusFilter, setStatusFilter] = useState<BrandStatus | 'all'>('all');
-  const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [openTierMenu, setOpenTierMenu] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>('all');
+  const [warningMap, setWarningMap] = useState<Record<string, { total: number; level: string }>>({});
 
   // Fetch brands
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await fetchManagedBrands({
-        tier: tierFilter === 'all' ? undefined : tierFilter,
-        status: statusFilter === 'all' ? undefined : statusFilter,
-      });
+      const res = await fetchManagedBrands();
       if (!cancelled && res.data) {
         setBrands(res.data);
+        // Build warning map
+        const wMap: Record<string, { total: number; level: string }> = {};
+        res.data.forEach((b) => {
+          wMap[b.id] = getBrandWarningLevel(b.id);
+        });
+        setWarningMap(wMap);
       }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
-  }, [tierFilter, statusFilter]);
+  }, []);
 
-  // Search filter (client-side on top of API filters)
+  // Filtered brands based on tab + search
   const filtered = useMemo(() => {
-    if (!search.trim()) return brands;
-    const q = search.toLowerCase();
-    return brands.filter(
-      (b) =>
-        b.brandName.toLowerCase().includes(q) ||
-        b.category.toLowerCase().includes(q) ||
-        b.contactEmail.toLowerCase().includes(q)
-    );
-  }, [brands, search]);
+    let list = brands;
+
+    // Tab filter
+    if (activeTab === 'pending') {
+      list = list.filter((b) => b.status === 'pending');
+    } else if (activeTab === 'suspended') {
+      list = list.filter((b) => b.status === 'suspended');
+    }
+
+    // Search filter
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (b) =>
+          b.brandName.toLowerCase().includes(q) ||
+          b.category.toLowerCase().includes(q) ||
+          b.contactEmail.toLowerCase().includes(q)
+      );
+    }
+
+    return list;
+  }, [brands, activeTab, search]);
 
   // Stats
   const stats = useMemo(() => {
     const total = brands.length;
-    const verified = brands.filter((b) => b.status === 'verified' || b.status === 'active').length;
+    const active = brands.filter((b) => b.status === 'active' || b.status === 'verified').length;
     const pending = brands.filter((b) => b.status === 'pending').length;
-    const avgScore =
-      total > 0 ? Math.round(brands.reduce((s, b) => s + b.performanceScore, 0) / total) : 0;
-    return { total, verified, pending, avgScore };
+    const suspended = brands.filter((b) => b.status === 'suspended').length;
+    return { total, active, pending, suspended };
   }, [brands]);
 
   // Actions
@@ -104,15 +108,6 @@ export default function BrandPartnersPage() {
     if (res.data) {
       setBrands((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
     }
-    setOpenMenu(null);
-  }
-
-  async function handleTierChange(id: string, tier: BrandTier) {
-    const res = await updateBrandTier(id, tier);
-    if (res.data) {
-      setBrands((prev) => prev.map((b) => (b.id === id ? { ...b, tier } : b)));
-    }
-    setOpenTierMenu(null);
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
@@ -126,7 +121,7 @@ export default function BrandPartnersPage() {
       />
 
       <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-8">
-        {/* ── Stats Cards ────────────────────────────────────────────────── */}
+        {/* ── Stats Bar ──────────────────────────────────────────────────── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard
             icon={<Building2 size={20} className="text-charcoal-deep/60" />}
@@ -135,26 +130,38 @@ export default function BrandPartnersPage() {
           />
           <StatCard
             icon={<CheckCircle size={20} className="text-emerald-600" />}
-            label="Verified"
-            value={stats.verified}
+            label="Active"
+            value={stats.active}
           />
           <StatCard
             icon={<Clock size={20} className="text-amber-600" />}
-            label="Pending Verification"
+            label="Pending Approval"
             value={stats.pending}
           />
           <StatCard
-            icon={<TrendingUp size={20} className="text-blue-600" />}
-            label="Avg Performance Score"
-            value={stats.avgScore}
-            suffix="/100"
+            icon={<Ban size={20} className="text-red-600" />}
+            label="Suspended"
+            value={stats.suspended}
           />
         </div>
 
-        {/* ── Toolbar ────────────────────────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        {/* ── Tab Bar + Search ────────────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          {/* Tabs */}
+          <div className="flex items-center gap-1 bg-white border border-sand/50 rounded-xl p-1">
+            <TabButton active={activeTab === 'all'} onClick={() => setActiveTab('all')}>
+              All Brands
+            </TabButton>
+            <TabButton active={activeTab === 'pending'} onClick={() => setActiveTab('pending')} badge={stats.pending}>
+              New Registrations
+            </TabButton>
+            <TabButton active={activeTab === 'suspended'} onClick={() => setActiveTab('suspended')}>
+              Suspended
+            </TabButton>
+          </div>
+
           {/* Search */}
-          <div className="relative flex-1 w-full sm:max-w-xs">
+          <div className="relative w-full sm:max-w-xs">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone/40" />
             <input
               type="text"
@@ -164,40 +171,9 @@ export default function BrandPartnersPage() {
               className="w-full pl-9 pr-4 py-2 text-sm border border-sand/50 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-charcoal-deep/20"
             />
           </div>
-
-          {/* Tier filter */}
-          <div className="flex items-center gap-2">
-            <Filter size={14} className="text-stone/50" />
-            <select
-              value={tierFilter}
-              onChange={(e) => setTierFilter(e.target.value as BrandTier | 'all')}
-              className="text-sm border border-sand/50 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-charcoal-deep/20"
-            >
-              <option value="all">All Tiers</option>
-              {TIERS.map((t) => (
-                <option key={t} value={t}>
-                  {TIER_STYLES[t].label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Status filter */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as BrandStatus | 'all')}
-            className="text-sm border border-sand/50 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-charcoal-deep/20"
-          >
-            <option value="all">All Statuses</option>
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_STYLES[s].label}
-              </option>
-            ))}
-          </select>
         </div>
 
-        {/* ── Brand Cards Grid ───────────────────────────────────────────── */}
+        {/* ── Brand List ─────────────────────────────────────────────────── */}
         {loading ? (
           <div className="text-center py-20 text-stone/50 text-sm">Loading brands...</div>
         ) : filtered.length === 0 ? (
@@ -205,17 +181,15 @@ export default function BrandPartnersPage() {
             No brands match the current filters.
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="space-y-4">
             {filtered.map((brand) => (
               <BrandCard
                 key={brand.id}
                 brand={brand}
-                openMenu={openMenu}
-                setOpenMenu={setOpenMenu}
-                openTierMenu={openTierMenu}
-                setOpenTierMenu={setOpenTierMenu}
-                onStatusChange={handleStatusChange}
-                onTierChange={handleTierChange}
+                warning={warningMap[brand.id]}
+                isPendingTab={activeTab === 'pending'}
+                onApprove={(id) => handleStatusChange(id, 'active')}
+                onReject={(id) => handleStatusChange(id, 'rejected')}
               />
             ))}
           </div>
@@ -231,12 +205,10 @@ function StatCard({
   icon,
   label,
   value,
-  suffix,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
-  suffix?: string;
 }) {
   return (
     <div className="bg-white border border-sand/50 rounded-xl p-5 flex items-center gap-4">
@@ -245,167 +217,151 @@ function StatCard({
       </div>
       <div>
         <p className="text-xs text-stone/60 uppercase tracking-wider">{label}</p>
-        <p className="text-xl font-semibold text-charcoal-deep">
-          {value}
-          {suffix && <span className="text-sm font-normal text-stone/50">{suffix}</span>}
-        </p>
+        <p className="text-xl font-semibold text-charcoal-deep">{value}</p>
       </div>
     </div>
   );
 }
 
+function TabButton({
+  active,
+  onClick,
+  badge,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  badge?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+        active
+          ? 'bg-charcoal-deep text-ivory-cream'
+          : 'text-stone/60 hover:text-charcoal-deep hover:bg-parchment/60'
+      }`}
+    >
+      {children}
+      {badge !== undefined && badge > 0 && (
+        <span className={`ml-2 inline-flex items-center justify-center text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full ${
+          active
+            ? 'bg-amber-400 text-charcoal-deep'
+            : 'bg-amber-100 text-amber-800'
+        }`}>
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function BrandCard({
   brand,
-  openMenu,
-  setOpenMenu,
-  openTierMenu,
-  setOpenTierMenu,
-  onStatusChange,
-  onTierChange,
+  warning,
+  isPendingTab,
+  onApprove,
+  onReject,
 }: {
   brand: ManagedBrand;
-  openMenu: string | null;
-  setOpenMenu: (id: string | null) => void;
-  openTierMenu: string | null;
-  setOpenTierMenu: (id: string | null) => void;
-  onStatusChange: (id: string, status: BrandStatus) => void;
-  onTierChange: (id: string, tier: BrandTier) => void;
+  warning?: { total: number; level: string };
+  isPendingTab: boolean;
+  onApprove: (id: string) => void;
+  onReject: (id: string) => void;
 }) {
-  const tier = TIER_STYLES[brand.tier];
   const status = STATUS_STYLES[brand.status];
   const initial = brand.brandName.charAt(0).toUpperCase();
+  const warningStyle = warning && warning.level !== 'none' ? WARNING_STYLES[warning.level] : null;
+  const joinedDate = new Date(brand.partnerSince).toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 
   return (
-    <div className="bg-white border border-sand/50 rounded-xl p-5 space-y-4">
-      {/* Header row */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          {/* Logo placeholder */}
-          <div className="w-11 h-11 rounded-lg bg-charcoal-deep/10 flex items-center justify-center text-lg font-display text-charcoal-deep/70">
-            {initial}
-          </div>
-          <div>
+    <div className="bg-white border border-sand/50 rounded-xl p-5 hover:shadow-md transition-shadow">
+      <div className="flex items-center gap-5">
+        {/* Logo / Initial */}
+        <div className="w-12 h-12 rounded-xl bg-charcoal-deep/10 flex items-center justify-center text-xl font-display text-charcoal-deep/70 shrink-0 overflow-hidden">
+          {brand.brandLogo ? (
+            <img src={brand.brandLogo} alt={brand.brandName} className="w-full h-full object-cover" />
+          ) : (
+            initial
+          )}
+        </div>
+
+        {/* Main info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap">
             <h3 className="text-sm font-semibold text-charcoal-deep">{brand.brandName}</h3>
-            <p className="text-xs text-stone/50">{brand.category}</p>
+            <span className="text-xs text-stone/50">{brand.category}</span>
+            <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>
+              {status.label}
+            </span>
+            {warningStyle && (
+              <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 ${warningStyle.bg} ${warningStyle.text}`}>
+                <AlertTriangle size={10} />
+                {warning!.total} complaint{warning!.total !== 1 ? 's' : ''} &middot; {warningStyle.label}
+              </span>
+            )}
+          </div>
+
+          {/* Meta row */}
+          <div className="flex items-center gap-5 mt-2 text-xs text-stone/60 flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <Package size={12} className="text-stone/40" />
+              <span className="font-medium text-charcoal-deep">{brand.totalProducts}</span> products
+            </span>
+            <span className="flex items-center gap-1.5">
+              <DollarSign size={12} className="text-stone/40" />
+              <span className="font-medium text-charcoal-deep">{formatPrice(brand.totalRevenue, undefined, true)}</span> revenue
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Calendar size={12} className="text-stone/40" />
+              Joined {joinedDate}
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Tier badge */}
-          <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ${tier.bg} ${tier.text}`}>
-            {tier.label}
-          </span>
-          {/* Status badge */}
-          <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>
-            {status.label}
-          </span>
-        </div>
-      </div>
-
-      {/* Stats row */}
-      <div className="flex items-center gap-6 text-xs text-stone/60">
-        <span>
-          <span className="font-medium text-charcoal-deep">{brand.totalProducts}</span> products
-        </span>
-        <span>
-          <span className="font-medium text-charcoal-deep">{formatCurrency(brand.totalRevenue)}</span> revenue
-        </span>
-        <span>
-          <span className="font-medium text-charcoal-deep">{brand.commissionRate}%</span> commission
-        </span>
-      </div>
-
-      {/* Performance score bar */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-stone/50">Performance</span>
-          <span className="font-medium text-charcoal-deep">{brand.performanceScore}/100</span>
-        </div>
-        <div className="w-full h-1.5 bg-sand/30 rounded-full overflow-hidden">
-          <div
-            className={`h-full rounded-full transition-all ${scoreColor(brand.performanceScore)}`}
-            style={{ width: `${brand.performanceScore}%` }}
-          />
-        </div>
-      </div>
-
-      {/* Actions row */}
-      <div className="flex items-center gap-2 pt-1 border-t border-sand/30">
-        <button className="text-xs font-medium text-charcoal-deep hover:text-charcoal-deep/70 px-3 py-1.5 rounded-lg hover:bg-parchment/60 transition-colors">
-          View Details
-        </button>
-
-        {/* Change Tier dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setOpenTierMenu(openTierMenu === brand.id ? null : brand.id)}
-            className="text-xs font-medium text-stone/60 hover:text-charcoal-deep px-3 py-1.5 rounded-lg hover:bg-parchment/60 transition-colors flex items-center gap-1"
-          >
-            <Star size={12} />
-            Change Tier
-          </button>
-          {openTierMenu === brand.id && (
-            <div className="absolute left-0 top-full mt-1 z-20 w-36 bg-white border border-sand/50 rounded-lg shadow-lg py-1">
-              {TIERS.map((t) => (
-                <button
-                  key={t}
-                  onClick={() => onTierChange(brand.id, t)}
-                  disabled={t === brand.tier}
-                  className={`w-full text-left text-xs px-3 py-1.5 hover:bg-parchment/60 transition-colors ${
-                    t === brand.tier ? 'text-stone/30 cursor-default' : 'text-charcoal-deep'
-                  }`}
-                >
-                  {TIER_STYLES[t].label}
-                </button>
-              ))}
-            </div>
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Quick approve/reject for pending brands */}
+          {(brand.status === 'pending') && (
+            <>
+              <button
+                onClick={() => onApprove(brand.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                  isPendingTab
+                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                }`}
+              >
+                <CheckCircle size={14} />
+                Approve
+              </button>
+              <button
+                onClick={() => onReject(brand.id)}
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                  isPendingTab
+                    ? 'bg-red-600 text-white hover:bg-red-700'
+                    : 'bg-red-50 text-red-700 hover:bg-red-100'
+                }`}
+              >
+                <XCircle size={14} />
+                Reject
+              </button>
+            </>
           )}
-        </div>
 
-        {/* Status actions */}
-        <div className="relative ml-auto">
-          <button
-            onClick={() => setOpenMenu(openMenu === brand.id ? null : brand.id)}
-            className="p-1.5 rounded-lg hover:bg-parchment/60 transition-colors text-stone/50 hover:text-charcoal-deep"
+          {/* View Details link */}
+          <Link
+            href={`/admin/brands/${brand.id}`}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-charcoal-deep hover:text-charcoal-deep/70 rounded-lg hover:bg-parchment/60 transition-colors border border-sand/50"
           >
-            <MoreVertical size={16} />
-          </button>
-          {openMenu === brand.id && (
-            <div className="absolute right-0 top-full mt-1 z-20 w-40 bg-white border border-sand/50 rounded-lg shadow-lg py-1">
-              {brand.status === 'pending' && (
-                <button
-                  onClick={() => onStatusChange(brand.id, 'verified')}
-                  className="w-full text-left text-xs px-3 py-1.5 hover:bg-parchment/60 transition-colors text-emerald-700 flex items-center gap-2"
-                >
-                  <CheckCircle size={12} /> Verify
-                </button>
-              )}
-              {(brand.status === 'verified' || brand.status === 'active') && (
-                <button
-                  onClick={() => onStatusChange(brand.id, 'suspended')}
-                  className="w-full text-left text-xs px-3 py-1.5 hover:bg-parchment/60 transition-colors text-red-700 flex items-center gap-2"
-                >
-                  <XCircle size={12} /> Suspend
-                </button>
-              )}
-              {brand.status === 'suspended' && (
-                <button
-                  onClick={() => onStatusChange(brand.id, 'active')}
-                  className="w-full text-left text-xs px-3 py-1.5 hover:bg-parchment/60 transition-colors text-emerald-700 flex items-center gap-2"
-                >
-                  <CheckCircle size={12} /> Activate
-                </button>
-              )}
-              {brand.status === 'pending' && (
-                <button
-                  onClick={() => onStatusChange(brand.id, 'rejected')}
-                  className="w-full text-left text-xs px-3 py-1.5 hover:bg-parchment/60 transition-colors text-red-700 flex items-center gap-2"
-                >
-                  <XCircle size={12} /> Reject
-                </button>
-              )}
-            </div>
-          )}
+            View Details
+            <ArrowRight size={12} />
+          </Link>
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { getAllBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
+import { formatPrice } from '@/lib/currency';
 
 export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -272,7 +273,7 @@ export default function HomePage() {
                     </h3>
                   </div>
                   <p className="font-body text-sm text-stone">
-                    {featuredProducts[0].currency === 'INR' ? '₹' : '€'}{featuredProducts[0].price.toLocaleString()}
+                    {formatPrice(featuredProducts[0].price)}
                   </p>
                 </div>
               </Link>
@@ -302,7 +303,7 @@ export default function HomePage() {
                     {product.name}
                   </h3>
                   <p className="font-body text-xs text-charcoal-warm mt-1">
-                    {product.currency === 'INR' ? '₹' : '€'}{product.price.toLocaleString()}
+                    {formatPrice(product.price)}
                   </p>
                 </Link>
               ))}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight, Crown, AlertTriangle, RefreshCw } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 
@@ -192,10 +193,10 @@ function DiscoverContent() {
   }, []);
 
   const budgets = [
-    { id: 'under-500', label: 'Under €500' },
-    { id: '500-1500', label: '€500 - €1,500' },
-    { id: '1500-5000', label: '€1,500 - €5,000' },
-    { id: '5000-plus', label: '€5,000+' }
+    { id: 'under-500', label: `Under ${formatPrice(500)}` },
+    { id: '500-1500', label: `${formatPrice(500)} - ${formatPrice(1500)}` },
+    { id: '1500-5000', label: `${formatPrice(1500)} - ${formatPrice(5000)}` },
+    { id: '5000-plus', label: `${formatPrice(5000)}+` }
   ];
 
   if (!isLoaded && dataLoading) {
@@ -456,7 +457,7 @@ function DiscoverContent() {
                       </div>
                       <div className="absolute bottom-3 left-3">
                         <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-noir/80 px-3 py-1.5">
-                          €{product.price.toLocaleString()}
+                          {formatPrice(product.price)}
                         </span>
                       </div>
                     </div>

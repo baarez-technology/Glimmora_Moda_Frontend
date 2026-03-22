@@ -7,6 +7,7 @@ import { ChevronRight, Search, MessageSquare, Clock, CheckCircle, XCircle, Arrow
 import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import type { NegotiationStatus } from '@/types/uhni';
+import { formatPrice } from '@/lib/currency';
 
 type FilterTab = 'all' | NegotiationStatus;
 
@@ -24,7 +25,7 @@ export default function NegotiationsPage() {
   });
 
   const formatCurrency = (value: number) => {
-    return `€${value.toLocaleString()}`;
+    return formatPrice(value);
   };
 
   const formatDate = (dateString: string) => {

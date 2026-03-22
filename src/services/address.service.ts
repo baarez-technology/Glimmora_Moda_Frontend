@@ -20,6 +20,7 @@ export interface CustomerAddress {
   tag: string;
   created_at: string;
   updated_at: string;
+  is_default?: boolean;
 }
 
 export interface CreateAddressPayload {
@@ -129,6 +130,22 @@ export async function deleteAddress(addressId: string): Promise<string> {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to delete address' }));
     throw new Error(err.detail || `Failed to delete address (${res.status})`);
+  }
+
+  return res.json();
+}
+
+
+/** PATCH /api/v1/customer/addresses/:id/make-default — set as default address */
+export async function makeDefaultAddress(addressId: string): Promise<CustomerAddress> {
+  const res = await fetchWithTimeout(`/api/v1/customer/addresses/${addressId}/make-default`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to set default address' }));
+    throw new Error(err.detail || `Failed to set default address (${res.status})`);
   }
 
   return res.json();

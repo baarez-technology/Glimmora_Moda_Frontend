@@ -12,7 +12,7 @@ import {
   DollarSign,
   Clock,
 } from 'lucide-react';
-import { getAdminDashboard } from '@/services/admin.service';
+import { getAdminDashboard, fetchModerationQueue, fetchRevenueBreakdown, fetchServiceHealth } from '@/services/admin.service';
 import type { PlatformMetrics, DashboardActivity } from '@/types/admin';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -110,15 +110,33 @@ function getSeverityDot(severity?: DashboardActivity['severity']) {
 export default function AdminDashboardPage() {
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
   const [activity, setActivity] = useState<DashboardActivity[]>([]);
+  const [pendingModerations, setPendingModerations] = useState(0);
+  const [pendingPayouts, setPendingPayouts] = useState(0);
+  const [systemUptime, setSystemUptime] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await getAdminDashboard();
-        if (res.data) {
-          setMetrics(res.data.metrics);
-          setActivity(res.data.activity);
+        const [dashRes, modRes, revRes, healthRes] = await Promise.all([
+          getAdminDashboard(),
+          fetchModerationQueue({ status: 'pending' }),
+          fetchRevenueBreakdown(),
+          fetchServiceHealth(),
+        ]);
+        if (dashRes.data) {
+          setMetrics(dashRes.data.metrics);
+          setActivity(dashRes.data.activity);
+        }
+        if (modRes.data) {
+          setPendingModerations(modRes.data.length);
+        }
+        if (revRes.data) {
+          setPendingPayouts(revRes.data.pendingPayouts);
+        }
+        if (healthRes.data && healthRes.data.length > 0) {
+          const avgUptime = healthRes.data.reduce((sum, s) => sum + s.uptime, 0) / healthRes.data.length;
+          setSystemUptime(avgUptime);
         }
       } catch {
         // fail silently — dashboard shows empty state
@@ -375,7 +393,7 @@ export default function AdminDashboardPage() {
                   Pending Moderations
                 </p>
                 <p className="text-xl font-display text-charcoal-deep mt-0.5">
-                  24
+                  {formatNumber(pendingModerations)}
                 </p>
               </div>
             </div>
@@ -392,7 +410,7 @@ export default function AdminDashboardPage() {
                   Pending Payouts
                 </p>
                 <p className="text-xl font-display text-charcoal-deep mt-0.5">
-                  12
+                  {formatCurrency(pendingPayouts)}
                 </p>
               </div>
             </div>
@@ -409,7 +427,7 @@ export default function AdminDashboardPage() {
                   System Uptime
                 </p>
                 <p className="text-xl font-display text-charcoal-deep mt-0.5">
-                  99.97%
+                  {systemUptime.toFixed(2)}%
                 </p>
               </div>
             </div>

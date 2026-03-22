@@ -4,6 +4,7 @@
 // All consumer routes require authentication
 
 import AuthGuard from '@/components/auth/AuthGuard';
+import { MaintenanceGate } from '@/components/MaintenanceGate';
 
 export default function ConsumerLayout({
   children,
@@ -12,5 +13,10 @@ export default function ConsumerLayout({
 }) {
   // All consumer routes require authentication
   // The AuthGuard will redirect to /auth/login if not authenticated
-  return <AuthGuard>{children}</AuthGuard>;
+  // MaintenanceGate shows a maintenance screen when admin enables maintenance mode
+  return (
+    <AuthGuard>
+      <MaintenanceGate>{children}</MaintenanceGate>
+    </AuthGuard>
+  );
 }

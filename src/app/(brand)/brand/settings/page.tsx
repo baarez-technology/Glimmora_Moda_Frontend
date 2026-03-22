@@ -28,7 +28,7 @@ import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 
-type SettingsTab = 'profile' | 'team' | 'api' | 'notifications' | 'commerce';
+type SettingsTab = 'profile' | 'team' | 'notifications' | 'commerce';
 
 export default function SettingsPage() {
   const { partner, commerceSettings, updateTaxRule, updateShippingMethod, addShippingMethod, removeShippingMethod, updateCommerceConfig } = useBrand();
@@ -85,7 +85,7 @@ export default function SettingsPage() {
   const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
     { id: 'profile', label: 'Profile', icon: Building2 },
     { id: 'team', label: 'Team', icon: Users },
-    { id: 'api', label: 'API Keys', icon: Key },
+    // { id: 'api', label: 'API Keys', icon: Key }, // Hidden
     { id: 'notifications', label: 'Notifications', icon: Bell },
     { id: 'commerce', label: 'Commerce', icon: ShoppingCart }
   ];
@@ -368,84 +368,9 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {/* API Keys Tab */}
-            {activeTab === 'api' && (
-              <div className="space-y-6">
-                <div className="bg-white border border-sand/50">
-                  <div className="px-6 py-4 border-b border-sand/50 flex items-center justify-between">
-                    <h2 className="font-medium text-charcoal-deep">API Keys</h2>
-                    <button
-                      onClick={() => setShowCreateKeyModal(true)}
-                      className="inline-flex items-center gap-2 px-4 py-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
-                    >
-                      <Plus size={16} />
-                      Create Key
-                    </button>
-                  </div>
-
-                  <div className="divide-y divide-sand/30">
-                    {partner.apiKeys.map(key => (
-                      <div key={key.id} className="px-6 py-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <p className="text-sm font-medium text-charcoal-deep">{key.name}</p>
-                            <p className="text-xs text-taupe">Created {formatDate(key.createdAt)}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {key.permissions.map(perm => (
-                              <span key={perm} className="px-2 py-1 text-[10px] tracking-[0.1em] uppercase bg-parchment text-stone">
-                                {perm}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 p-3 bg-parchment/50">
-                          <code className="flex-1 text-sm text-charcoal-deep font-mono">
-                            {showKey === key.id ? 'sk_live_dior_a1b2c3d4e5f6g7h8i9j0...' : key.keyPrefix}
-                          </code>
-                          <button
-                            onClick={() => setShowKey(showKey === key.id ? null : key.id)}
-                            className="text-stone hover:text-charcoal-deep transition-colors"
-                            title={showKey === key.id ? 'Hide' : 'Show'}
-                          >
-                            {showKey === key.id ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                          <button
-                            onClick={() => copyToClipboard(key.keyPrefix, key.id)}
-                            className="text-stone hover:text-charcoal-deep transition-colors"
-                            title="Copy"
-                          >
-                            {copiedKey === key.id ? <Check size={16} className="text-success" /> : <Copy size={16} />}
-                          </button>
-                        </div>
-                        {key.lastUsed && (
-                          <p className="text-xs text-taupe mt-2">
-                            Last used: {formatDate(key.lastUsed)}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-white border border-sand/50 p-6">
-                  <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4 mb-6">
-                    Integration Settings
-                  </h2>
-
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                        Webhook URL
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="url"
-                          value={webhookUrl}
-                          onChange={(e) => setWebhookUrl(e.target.value)}
-                          placeholder="https://your-domain.com/webhook"
-                          className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep font-mono text-sm placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                        />
+            {/* API Keys Tab — commented out for now */}
+            {/* API Keys and Integration Settings section removed — will be enabled when API key management backend is ready */}
+            {/*
                         <button
                           onClick={() => {
                             if (webhookUrl) {
@@ -477,8 +402,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+            */}
 
             {/* Notifications Tab */}
             {activeTab === 'notifications' && (

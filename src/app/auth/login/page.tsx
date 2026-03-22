@@ -10,6 +10,7 @@ import { brandLogin, userLogin, storeUserAuth, socialSignIn, verify2FALogin } fr
 import type { UserTokenResponse } from '@/services/auth.service';
 import { signInWithGoogle, signInWithApple } from '@/lib/firebase';
 import { getAdminUser } from '@/data/admin';
+import { isRegistrationEnabled, isBrandOnboardingEnabled } from '@/lib/platform-config';
 
 type LoginTier = 'consumer' | 'uhni' | 'brand' | 'admin';
 
@@ -49,8 +50,15 @@ function LoginForm() {
   const [totpCode, setTotpCode] = useState('');
   const [is2FAVerifying, setIs2FAVerifying] = useState(false);
 
+  // Platform config: registration controls
+  const [registrationOpen, setRegistrationOpen] = useState(true);
+  const [brandOnboardingOpen, setBrandOnboardingOpen] = useState(true);
+
   useEffect(() => {
     setIsLoaded(true);
+    // Read admin-managed platform config
+    setRegistrationOpen(isRegistrationEnabled());
+    setBrandOnboardingOpen(isBrandOnboardingEnabled());
   }, []);
 
   // Complete login after successful auth (shared by normal + 2FA flows)
@@ -635,14 +643,28 @@ function LoginForm() {
                 >
                   Shop as customer
                 </button>
+                {brandOnboardingOpen && (
+                  <>
+                    {' '}&middot;{' '}
+                    <Link href="/auth/register?mode=brand" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
+                      Register as brand
+                    </Link>
+                  </>
+                )}
               </>
             ) : (
-              <>
-                Don&apos;t have an account?{' '}
-                <Link href="/auth/register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
-                  Create account
-                </Link>
-              </>
+              registrationOpen ? (
+                <>
+                  Don&apos;t have an account?{' '}
+                  <Link href="/auth/register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
+                    Create account
+                  </Link>
+                </>
+              ) : (
+                <span className="text-taupe text-sm">
+                  Registration is currently closed
+                </span>
+              )
             )}
           </p>
         </div>

@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Package, Truck, Check, ChevronRight, Clock } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Check, ChevronRight, Clock, Star, RotateCcw, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import * as orderManagementService from '@/services/order-management.service';
+import { submitReturnRequest, getReturnForOrder, RETURN_REASONS, type ReturnRequest } from '@/services/returns.service';
 import type { CustomerOrder } from '@/services/order-management.service';
 
 export default function OrdersPage() {
@@ -15,6 +16,10 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [returnModal, setReturnModal] = useState<{ order: CustomerOrder; product: CustomerOrder['products'][0] } | null>(null);
+  const [returnReason, setReturnReason] = useState<ReturnRequest['reason']>('wrong_size');
+  const [returnDetails, setReturnDetails] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -211,7 +216,36 @@ export default function OrdersPage() {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-4">
+                    {order.delivery_status === 'delivered' && (
+                      <>
+                        <Link
+                          href={`/profile/reviews?orderId=${order.order_id}`}
+                          className="flex items-center gap-1.5 px-4 py-2 border border-gold-soft/30 text-gold-deep text-xs tracking-[0.1em] uppercase hover:bg-gold-soft/10 transition-colors"
+                        >
+                          <Star size={14} />
+                          Write Review
+                        </Link>
+                        {order.products?.[0] && !getReturnForOrder(order.order_id) ? (
+                          <button
+                            onClick={() => setReturnModal({ order, product: order.products[0] })}
+                            className="flex items-center gap-1.5 px-4 py-2 border border-sand text-stone text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
+                          >
+                            <RotateCcw size={14} />
+                            Return
+                          </button>
+                        ) : getReturnForOrder(order.order_id) ? (
+                          <span className={`flex items-center gap-1.5 px-4 py-2 text-xs tracking-[0.1em] uppercase ${
+                            getReturnForOrder(order.order_id)?.status === 'approved' ? 'bg-success/10 text-success' :
+                            getReturnForOrder(order.order_id)?.status === 'rejected' ? 'bg-error/10 text-error' :
+                            'bg-gold-soft/10 text-gold-deep'
+                          }`}>
+                            <RotateCcw size={14} />
+                            Return {getReturnForOrder(order.order_id)?.status}
+                          </span>
+                        ) : null}
+                      </>
+                    )}
                     <span className="font-display text-lg text-charcoal-deep">
                       Total: {formatCurrency(order.payment_amount, order.payment_currency)}
                     </span>
@@ -249,6 +283,94 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      {/* Return Request Modal */}
+      {returnModal && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setReturnModal(null)}>
+          <div className="bg-white max-w-md w-full p-8" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Request Return</h3>
+              <button onClick={() => setReturnModal(null)} className="p-2 hover:bg-sand/20 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 mb-6 p-4 bg-parchment/50">
+              {returnModal.product.product_image && (
+                <Image src={returnModal.product.product_image} alt={returnModal.product.product_name} width={48} height={48} className="object-cover" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-charcoal-deep">{returnModal.product.product_name}</p>
+                <p className="text-xs text-stone">Order #{returnModal.order.order_id.slice(0, 8).toUpperCase()}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Reason for return *</label>
+                <select
+                  value={returnReason}
+                  onChange={e => setReturnReason(e.target.value as ReturnRequest['reason'])}
+                  className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep transition-colors"
+                >
+                  {RETURN_REASONS.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Additional details</label>
+                <textarea
+                  value={returnDetails}
+                  onChange={e => setReturnDetails(e.target.value)}
+                  rows={3}
+                  placeholder="Describe the issue..."
+                  className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe resize-none"
+                />
+              </div>
+
+              <p className="text-xs text-taupe">
+                Your return request will be reviewed by the brand. You&apos;ll be notified once it&apos;s approved or if additional information is needed.
+              </p>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setReturnModal(null)}
+                className="flex-1 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setSubmittingReturn(true);
+                  submitReturnRequest({
+                    order_id: returnModal.order.order_id,
+                    product_id: returnModal.product.product_id,
+                    product_name: returnModal.product.product_name,
+                    product_image: returnModal.product.product_image,
+                    brand_name: returnModal.product.brand_id || '',
+                    reason: returnReason,
+                    reason_details: returnDetails || undefined,
+                    refund_amount: returnModal.product.product_price,
+                    currency: returnModal.order.payment_currency,
+                  });
+                  showToast('Return request submitted. The brand will review it shortly.', 'success');
+                  setReturnModal(null);
+                  setReturnReason('wrong_size');
+                  setReturnDetails('');
+                  setSubmittingReturn(false);
+                }}
+                disabled={submittingReturn}
+                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                {submittingReturn ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

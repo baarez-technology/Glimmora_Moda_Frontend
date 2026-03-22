@@ -34,6 +34,10 @@ import type { CartItem, WishlistItem } from '@/services/customer-collection.serv
 export type { Toast, SavedOutfit, RestockAlert, OrderRecord };
 
 interface AppContextType {
+  // Currency
+  currency: string;
+  setCurrency: (currency: string) => void;
+
   // Fashion Identity (Style Profile)
   fashionIdentity: FashionIdentity | null;
   updateFashionIdentity: (identity: FashionIdentity) => void;
@@ -196,6 +200,30 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isHydrated, setIsHydrated] = useState(false);
+
+  // Currency state — reactive across app
+  const [currency, setCurrencyState] = useState('EUR');
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('moda-currency') : null;
+    if (stored) setCurrencyState(stored);
+    const handleChange = () => {
+      const updated = localStorage.getItem('moda-currency') || 'EUR';
+      setCurrencyState(updated);
+    };
+    window.addEventListener('currency-change', handleChange);
+    window.addEventListener('storage', handleChange);
+    return () => {
+      window.removeEventListener('currency-change', handleChange);
+      window.removeEventListener('storage', handleChange);
+    };
+  }, []);
+  const setCurrency = useCallback((c: string) => {
+    setCurrencyState(c);
+    try {
+      localStorage.setItem('moda-currency', c);
+      window.dispatchEvent(new Event('currency-change'));
+    } catch { /* ignore */ }
+  }, []);
 
   // Auth state — single source of truth from AuthContext
   const { userTier, isUHNI, isAuthenticated, setUserRole, logout } = useAuth();
@@ -755,6 +783,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider value={{
+      // Currency
+      currency,
+      setCurrency,
+
       // Fashion Identity
       fashionIdentity,
       updateFashionIdentity,

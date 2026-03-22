@@ -22,6 +22,7 @@ export interface ProductRecommendationRequest {
   filter_collection_name?: string;
   page_number?: number;
   page_size?: number;
+  disable_personalization?: boolean;
 }
 
 /** Paginated response wrapper from POST /api/v1/products/recommendations */

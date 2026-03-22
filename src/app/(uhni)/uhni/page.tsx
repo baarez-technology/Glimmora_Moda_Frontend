@@ -23,6 +23,8 @@ import {
   Star,
   Package,
   Clock,
+  MapPin,
+  Settings,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { TierBadge } from '@/components/shared/TierBadge';
@@ -71,6 +73,15 @@ const navGroups = [
       { href: '/uhni/events', icon: Star, title: 'Events & Shopping', subtitle: 'Experiences & private shopping' },
     ],
   },
+  {
+    label: 'Account',
+    items: [
+      { href: '/profile/orders', icon: Package, title: 'My Orders', subtitle: 'Order history & tracking' },
+      { href: '/profile/addresses', icon: MapPin, title: 'Addresses', subtitle: 'Manage delivery addresses' },
+      { href: '/profile/reviews', icon: Star, title: 'My Reviews', subtitle: 'Reviews & ratings' },
+      { href: '/profile/settings', icon: Settings, title: 'Account Settings', subtitle: 'Profile, password & privacy' },
+    ],
+  },
 ];
 
 export default function UHNIDashboardPage() {
@@ -85,6 +96,7 @@ export default function UHNIDashboardPage() {
     pricingTier,
     tierSince,
     priceAlerts,
+    fashionIdentity,
   } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -207,6 +219,50 @@ export default function UHNIDashboardPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Style Profile */}
+              {fashionIdentity && (fashionIdentity.occasions.length > 0 || fashionIdentity.aesthetics.length > 0) && (
+                <div>
+                  <div className="flex items-center justify-between mb-5">
+                    <div>
+                      <span className="text-[10px] tracking-[0.5em] uppercase text-taupe block mb-2">Your Preferences</span>
+                      <h3 className="font-display text-xl text-charcoal-deep">Style Profile</h3>
+                    </div>
+                    <Link
+                      href="/profile/preferences"
+                      className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                    >
+                      Update
+                    </Link>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {fashionIdentity.occasions.length > 0 && (
+                      <div>
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-3">Occasions</p>
+                        <div className="flex flex-wrap gap-2">
+                          {fashionIdentity.occasions.map(occ => (
+                            <span key={occ} className="px-3 py-1.5 border border-sand text-xs text-charcoal-deep">
+                              {occ}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {fashionIdentity.aesthetics.length > 0 && (
+                      <div>
+                        <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-3">Aesthetics</p>
+                        <div className="flex flex-wrap gap-2">
+                          {fashionIdentity.aesthetics.map(aes => (
+                            <span key={aes} className="px-3 py-1.5 border border-sand text-xs text-charcoal-deep">
+                              {aes}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Recent activity */}
               {(sourcingRequests.length > 0 || bespokeOrders.length > 0 || autonomousActivity.length > 0) && (

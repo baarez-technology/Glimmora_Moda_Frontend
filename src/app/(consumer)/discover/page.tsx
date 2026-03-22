@@ -8,6 +8,7 @@ import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } f
 import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import { useApp } from '@/context/AppContext';
 import type { Product, Brand, BrandStory } from '@/types';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
@@ -258,11 +259,12 @@ function DiscoverContent() {
       .map((id) => ({ id, label: labels[id] }));
   }, [products]);
 
+  const sym = getCurrencySymbol();
   const budgets = [
-    { id: 'under-500', label: 'Under €500' },
-    { id: '500-1500', label: '€500 - €1,500' },
-    { id: '1500-5000', label: '€1,500 - €5,000' },
-    { id: '5000-plus', label: '€5,000+' }
+    { id: 'under-500', label: `Under ${sym}500` },
+    { id: '500-1500', label: `${sym}500 - ${sym}1,500` },
+    { id: '1500-5000', label: `${sym}1,500 - ${sym}5,000` },
+    { id: '5000-plus', label: `${sym}5,000+` }
   ];
 
   if (!isLoaded && dataLoading) {
@@ -515,7 +517,7 @@ function DiscoverContent() {
                         {product.name}
                       </h3>
                       <p className="text-sm text-stone">
-                        {product.currency === 'INR' ? '₹' : product.currency === 'GBP' ? '£' : product.currency === 'USD' ? '$' : '€'}{product.price.toLocaleString()}
+                        {formatPrice(product.price)}
                       </p>
                     </div>
                   </Link>

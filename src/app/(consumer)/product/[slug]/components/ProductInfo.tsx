@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Sparkles, User, ArrowRight, ChevronRight } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import type { Product, Brand, FashionIdentity } from '@/types';
 
 interface PersonalizationMatch {
@@ -68,7 +69,7 @@ export default function ProductInfo({
 
       {/* Price */}
       <div className="font-display text-2xl text-charcoal-deep mb-4">
-        €{product.price.toLocaleString()}
+        {formatPrice(product.price)}
       </div>
 
       {/* Personalization Badge — temporarily disabled for production */}

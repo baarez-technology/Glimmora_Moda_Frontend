@@ -25,6 +25,7 @@ import { useApp } from '@/context/AppContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { BespokeOrderStatus, BespokeOrderType } from '@/types/uhni';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 export default function BespokeOrderDetailPage() {
   const params = useParams();
@@ -61,7 +62,7 @@ export default function BespokeOrderDetailPage() {
   }
 
   const formatCurrency = (value: number) => {
-    return `€${value.toLocaleString()}`;
+    return formatPrice(value);
   };
 
   const formatDate = (dateString: string) => {
@@ -567,7 +568,7 @@ export default function BespokeOrderDetailPage() {
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className="text-xs text-taupe mb-1">Final Price (€)</p>
+                      <p className="text-xs text-taupe mb-1">Final Price ({getCurrencySymbol()})</p>
                       <input
                         type="number"
                         min={0}
@@ -578,7 +579,7 @@ export default function BespokeOrderDetailPage() {
                       />
                     </div>
                     <div>
-                      <p className="text-xs text-taupe mb-1">Deposit Amount (€)</p>
+                      <p className="text-xs text-taupe mb-1">Deposit Amount ({getCurrencySymbol()})</p>
                       <input
                         type="number"
                         min={0}

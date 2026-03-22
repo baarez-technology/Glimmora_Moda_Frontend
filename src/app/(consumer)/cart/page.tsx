@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, X, Minus, Plus, ShoppingBag, MapPin, Check, User, Trash2, RefreshCw } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
@@ -215,7 +216,7 @@ export default function CartPage() {
                       {/* Price & Quantity */}
                       <div className="flex items-center justify-between mt-6">
                         <p className="font-display text-xl text-charcoal-deep">
-                          €{(item.price * item.quantity).toLocaleString()}
+                          {formatPrice(item.price * item.quantity)}
                         </p>
                         <div className="flex items-center gap-3">
                           <button
@@ -259,7 +260,7 @@ export default function CartPage() {
                           {item.product_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
                         </span>
                         <span className="text-ivory-cream flex-shrink-0">
-                          €{(item.price * item.quantity).toLocaleString()}
+                          {formatPrice(item.price * item.quantity)}
                         </span>
                       </div>
                     ))}
@@ -269,7 +270,7 @@ export default function CartPage() {
                   <div className="space-y-3 border-b border-ivory-cream/10 pb-6 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Subtotal</span>
-                      <span className="text-ivory-cream">€{total.toLocaleString()}</span>
+                      <span className="text-ivory-cream">{formatPrice(total)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Shipping</span>
@@ -281,7 +282,7 @@ export default function CartPage() {
                   <div className="flex justify-between items-end mb-10">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total</span>
                     <span className="font-display text-3xl text-ivory-cream">
-                      €{total.toLocaleString()}
+                      {formatPrice(total)}
                     </span>
                   </div>
 

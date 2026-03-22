@@ -22,7 +22,6 @@ import {
   BookOpen,
   Gift,
   Calendar,
-  CalendarCheck,
   Brain,
   Activity,
   Bot,
@@ -36,7 +35,8 @@ import {
   Gem,
   Users,
   TrendingUp,
-  Wand2
+  Wand2,
+  RotateCcw
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 
@@ -58,7 +58,8 @@ const navigation: NavSection[] = [
     title: 'Overview',
     items: [
       { label: 'Dashboard', href: '/brand', icon: LayoutDashboard },
-      { label: 'Orders', href: '/brand/orders', icon: ShoppingBag }
+      { label: 'Orders', href: '/brand/orders', icon: ShoppingBag },
+      { label: 'Returns', href: '/brand/returns', icon: RotateCcw }
     ]
   },
   {
@@ -91,7 +92,6 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Analytics', href: '/brand/analytics', icon: BarChart3 },
       { label: 'Reviews', href: '/brand/reviews', icon: MessageSquare },
-      { label: 'Appointments', href: '/brand/appointments', icon: CalendarCheck },
       { label: 'Styling Sessions', href: '/brand/styling-sessions', icon: Calendar },
       { label: 'Shop Locations', href: '/brand/locations', icon: MapPin }
     ]
@@ -111,9 +111,9 @@ const navigation: NavSection[] = [
       { label: 'Drop Simulator', href: '/brand/intelligence/drop-simulator', icon: Rocket, phase: 2 },
       { label: 'Heritage DNA', href: '/brand/intelligence/heritage', icon: Gem, phase: 2 },
       { label: 'Client Genome', href: '/brand/intelligence/client-genome', icon: Users, phase: 1 },
-      // { label: 'Grey-Market', href: '/brand/intelligence/grey-market', icon: AlertTriangle },
-      // { label: 'Shadow Demand', href: '/brand/intelligence/shadow-demand', icon: TrendingUp },
-      // { label: 'Curator Studio', href: '/brand/intelligence/curator', icon: Wand2 }
+      { label: 'Grey-Market', href: '/brand/intelligence/grey-market', icon: AlertTriangle },
+      { label: 'Shadow Demand', href: '/brand/intelligence/shadow-demand', icon: TrendingUp },
+      { label: 'Curator Studio', href: '/brand/intelligence/curator', icon: Wand2 }
     ]
   },
   {

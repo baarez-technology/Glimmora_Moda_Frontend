@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, DollarSign, Crown, Check, Clock, Bell, Tag, TrendingDown, MessageCircle, ArrowRight, AlertCircle, Gift, Package, FolderOpen, Building, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import {
   getPriceNegotiations,
   getPriceAlerts,
@@ -94,7 +95,7 @@ export default function PricingPage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(amount);
+    return formatPrice(amount);
   };
 
   const getDaysRemaining = (expiresAt: string) => {
@@ -127,7 +128,7 @@ export default function PricingPage() {
 
   const getDiscountDisplay = (offer: UHNIPriceOffer) => {
     if (offer.discountType === 'percentage') return `${offer.discountValue}% off`;
-    return `€${offer.discountValue.toLocaleString()} off`;
+    return `${formatPrice(offer.discountValue)} off`;
   };
 
   const getOfferTypeIcon = (type: UHNIPriceOffer['type']) => {
@@ -583,7 +584,7 @@ export default function PricingPage() {
                               </p>
                               {offer.type === 'product' && (offer.originalPrice || 0) > 0 && (
                                 <p className="text-sm text-stone">
-                                  on €{(offer.originalPrice || 0).toLocaleString()}
+                                  on {formatPrice(offer.originalPrice || 0)}
                                 </p>
                               )}
                             </div>
@@ -914,12 +915,12 @@ export default function PricingPage() {
                 <p className="text-3xl font-display text-charcoal-deep mt-3">{getDiscountDisplay(selectedOffer)}</p>
                 {selectedOffer.type === 'product' && (selectedOffer.originalPrice || 0) > 0 && (
                   <p className="text-sm text-stone mt-1">
-                    Original price: €{(selectedOffer.originalPrice || 0).toLocaleString()}
-                    {' → '}€
-                    {(selectedOffer.discountType === 'percentage'
+                    Original price: {formatPrice(selectedOffer.originalPrice || 0)}
+                    {' → '}
+                    {formatPrice(selectedOffer.discountType === 'percentage'
                       ? Math.round((selectedOffer.originalPrice || 0) * (1 - selectedOffer.discountValue / 100))
                       : (selectedOffer.originalPrice || 0) - selectedOffer.discountValue
-                    ).toLocaleString()}
+                    )}
                   </p>
                 )}
               </div>

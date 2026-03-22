@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Settings, Bell, Lock, ShoppingBag, Monitor, Save, Check, RotateCcw, Shield, Sparkles } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as calendarService from '@/services/calendar.service';
+import { getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 import type { UserPreferences, SuggestionPreferences } from '@/types';
 
@@ -382,7 +383,7 @@ export default function PreferencesPage() {
                 <div>
                   <span className="text-xs text-taupe block mb-2">Minimum</span>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">{getCurrencySymbol()}</span>
                     <input
                       type="number"
                       value={preferences.shopping.budgetMin}
@@ -404,7 +405,7 @@ export default function PreferencesPage() {
                 <div>
                   <span className="text-xs text-taupe block mb-2">Maximum</span>
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">{getCurrencySymbol()}</span>
                     <input
                       type="number"
                       value={preferences.shopping.budgetMax}
@@ -429,83 +430,7 @@ export default function PreferencesPage() {
               )}
             </div>
 
-            <div>
-              <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-4 block">Preferred Brands</label>
-              <div className="flex flex-wrap gap-2">
-                {preferences.shopping.preferredBrands.map((brand) => (
-                  <span key={brand} className="group px-4 py-2 bg-parchment text-sm text-charcoal-deep flex items-center gap-2">
-                    {brand}
-                    <button
-                      onClick={() => handleRemoveBrand(brand)}
-                      className="text-stone/40 hover:text-error transition-colors"
-                      aria-label={`Remove ${brand}`}
-                    >
-                      &times;
-                    </button>
-                  </span>
-                ))}
-                {showAddBrand ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newBrandName}
-                      onChange={(e) => setNewBrandName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleAddBrand(); if (e.key === 'Escape') { setShowAddBrand(false); setNewBrandName(''); } }}
-                      placeholder="Brand name"
-                      autoFocus
-                      className="px-3 py-2 border border-sand text-sm focus:outline-none focus:border-charcoal-deep transition-colors w-40"
-                    />
-                    <button
-                      onClick={handleAddBrand}
-                      disabled={!newBrandName.trim()}
-                      className="px-3 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors disabled:opacity-50"
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={() => { setShowAddBrand(false); setNewBrandName(''); }}
-                      className="px-2 py-2 text-sm text-stone hover:text-charcoal-deep transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowAddBrand(true)}
-                    className="px-4 py-2 border border-dashed border-sand text-sm text-taupe hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
-                  >
-                    + Add Brand
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2 block">Excluded Categories</label>
-              <p className="text-xs text-taupe mb-4">Items in these categories won't be suggested</p>
-              <div className="flex flex-wrap gap-2">
-                {['bags', 'shoes', 'jewelry', 'watches', 'accessories', 'clothing'].map((category) => (
-                  <button
-                    key={category}
-                    onClick={() => {
-                      const excluded = preferences.shopping.excludedCategories;
-                      if (excluded.includes(category)) {
-                        updatePreference('shopping', 'excludedCategories', excluded.filter(c => c !== category));
-                      } else {
-                        updatePreference('shopping', 'excludedCategories', [...excluded, category]);
-                      }
-                    }}
-                    className={`px-4 py-2 text-sm transition-colors capitalize ${
-                      preferences.shopping.excludedCategories.includes(category)
-                        ? 'bg-error/10 text-error border border-error/30'
-                        : 'bg-parchment text-stone hover:bg-sand'
-                    }`}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Preferred Brands and Excluded Categories removed — managed by onboarding set-context */}
           </div>
         </section>
 

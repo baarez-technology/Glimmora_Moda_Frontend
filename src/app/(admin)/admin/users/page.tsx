@@ -11,6 +11,14 @@ import {
   CheckCircle,
   Clock,
   UserPlus,
+  X,
+  Mail,
+  Phone,
+  Calendar,
+  ShoppingBag,
+  DollarSign,
+  ShieldCheck,
+  Send,
 } from 'lucide-react';
 import { fetchPlatformUsers, updateUserStatus } from '@/services/admin.service';
 import type { PlatformUser, UserRole, UserStatus } from '@/types/admin';
@@ -53,6 +61,11 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | ''>('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'admin' | 'moderator'>('admin');
+  const [inviteSent, setInviteSent] = useState(false);
 
   // ── Load users ──────────────────────────────────────────────────────────────
   const loadUsers = async () => {
@@ -161,10 +174,13 @@ export default function AdminUsersPage() {
             <option value="pending">Pending</option>
           </select>
 
-          {/* Add User (placeholder) */}
-          <button className="ml-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-ivory-cream bg-charcoal-deep rounded-lg hover:bg-charcoal-deep/90 transition-colors">
+          {/* Invite Admin */}
+          <button
+            onClick={() => { setShowInviteModal(true); setInviteSent(false); setInviteEmail(''); setInviteRole('admin'); }}
+            className="ml-auto flex items-center gap-2 px-4 py-2 text-sm font-medium text-ivory-cream bg-charcoal-deep rounded-lg hover:bg-charcoal-deep/90 transition-colors"
+          >
             <UserPlus size={16} />
-            Add User
+            Invite Admin
           </button>
         </div>
 
@@ -293,7 +309,7 @@ export default function AdminUsersPage() {
                           {openMenu === user.id && (
                             <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-sand/50 rounded-lg shadow-lg z-20 py-1">
                               <button
-                                onClick={() => setOpenMenu(null)}
+                                onClick={() => { setSelectedUser(user); setOpenMenu(null); }}
                                 className="w-full px-4 py-2 text-left text-sm hover:bg-parchment/40 transition-colors text-charcoal-deep"
                               >
                                 View Details
@@ -333,6 +349,243 @@ export default function AdminUsersPage() {
           )}
         </div>
       </div>
+
+      {/* ── User Detail Modal ───────────────────────────────────────────── */}
+      {selectedUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setSelectedUser(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30">
+              <h2 className="text-lg font-semibold text-charcoal-deep">User Details</h2>
+              <button onClick={() => setSelectedUser(null)} className="p-1.5 rounded-lg hover:bg-sand/30 transition-colors text-stone/50 hover:text-charcoal-deep">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Profile Section */}
+            <div className="px-6 py-5 border-b border-sand/30">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-charcoal-deep/10 flex items-center justify-center text-xl font-semibold text-charcoal-deep shrink-0">
+                  {selectedUser.avatar ? (
+                    <img src={selectedUser.avatar} alt={selectedUser.name} className="w-full h-full rounded-full object-cover" />
+                  ) : (
+                    selectedUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-lg font-semibold text-charcoal-deep">{selectedUser.name}</h3>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_BADGE[selectedUser.role]}`}>
+                      {selectedUser.role}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[selectedUser.status]}`}>
+                      {STATUS_ICON[selectedUser.status]}
+                      {selectedUser.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Info */}
+            <div className="px-6 py-4 border-b border-sand/30 space-y-3">
+              <h4 className="text-xs text-stone/50 uppercase tracking-wider font-medium">Contact Information</h4>
+              <div className="flex items-center gap-3 text-sm">
+                <Mail size={14} className="text-stone/40 shrink-0" />
+                <span className="text-charcoal-deep">{selectedUser.email}</span>
+              </div>
+              {selectedUser.phone && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Phone size={14} className="text-stone/40 shrink-0" />
+                  <span className="text-charcoal-deep">{selectedUser.phone}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-sm">
+                <Calendar size={14} className="text-stone/40 shrink-0" />
+                <span className="text-stone/60">Joined {formatDate(selectedUser.createdAt)}</span>
+              </div>
+            </div>
+
+            {/* Account Details */}
+            <div className="px-6 py-4 border-b border-sand/30 space-y-3">
+              <h4 className="text-xs text-stone/50 uppercase tracking-wider font-medium">Account Details</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-parchment/40 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-xs text-stone/50 mb-1">
+                    <Clock size={12} />
+                    Last Login
+                  </div>
+                  <p className="text-sm font-medium text-charcoal-deep">{formatDate(selectedUser.lastLogin)}</p>
+                </div>
+                <div className="bg-parchment/40 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-xs text-stone/50 mb-1">
+                    <ShieldCheck size={12} />
+                    Two-Factor Auth
+                  </div>
+                  <p className="text-sm font-medium text-charcoal-deep">{selectedUser.isTwoFAEnabled ? 'Enabled' : 'Disabled'}</p>
+                </div>
+                <div className="bg-parchment/40 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-xs text-stone/50 mb-1">
+                    <ShoppingBag size={12} />
+                    Total Orders
+                  </div>
+                  <p className="text-sm font-medium text-charcoal-deep">{selectedUser.totalOrders}</p>
+                </div>
+                <div className="bg-parchment/40 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-xs text-stone/50 mb-1">
+                    <DollarSign size={12} />
+                    Total Spend
+                  </div>
+                  <p className="text-sm font-medium text-charcoal-deep">{formatCurrency(selectedUser.totalSpend)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Status Change Actions */}
+            <div className="px-6 py-4 space-y-3">
+              <h4 className="text-xs text-stone/50 uppercase tracking-wider font-medium">Change Status</h4>
+              <div className="flex items-center gap-2">
+                {selectedUser.status !== 'active' && (
+                  <button
+                    onClick={async () => {
+                      await handleStatusChange(selectedUser.id, 'active');
+                      setSelectedUser((prev) => prev ? { ...prev, status: 'active' } : null);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  >
+                    <CheckCircle size={12} />
+                    Activate
+                  </button>
+                )}
+                {selectedUser.status !== 'suspended' && (
+                  <button
+                    onClick={async () => {
+                      await handleStatusChange(selectedUser.id, 'suspended');
+                      setSelectedUser((prev) => prev ? { ...prev, status: 'suspended' } : null);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    <Clock size={12} />
+                    Suspend
+                  </button>
+                )}
+                {selectedUser.status !== 'banned' && (
+                  <button
+                    onClick={async () => {
+                      await handleStatusChange(selectedUser.id, 'banned');
+                      setSelectedUser((prev) => prev ? { ...prev, status: 'banned' } : null);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
+                  >
+                    <Ban size={12} />
+                    Ban
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="px-6 py-4 border-t border-sand/30">
+              <button
+                onClick={() => setSelectedUser(null)}
+                className="w-full py-2 text-sm font-medium text-stone/60 hover:text-charcoal-deep bg-parchment/40 hover:bg-parchment/60 rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Invite Admin Modal ──────────────────────────────────────────── */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setShowInviteModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-sand/30">
+              <h2 className="text-lg font-semibold text-charcoal-deep">Invite Admin</h2>
+              <button onClick={() => setShowInviteModal(false)} className="p-1.5 rounded-lg hover:bg-sand/30 transition-colors text-stone/50 hover:text-charcoal-deep">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {inviteSent ? (
+                <div className="text-center py-6 space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+                    <Send size={20} className="text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-medium text-charcoal-deep">Invitation Sent</p>
+                  <p className="text-xs text-stone/50">
+                    An invite has been sent to <span className="font-medium text-charcoal-deep">{inviteEmail}</span> with the <span className="capitalize font-medium text-charcoal-deep">{inviteRole}</span> role.
+                  </p>
+                  <button
+                    onClick={() => setShowInviteModal(false)}
+                    className="mt-2 px-4 py-2 text-sm font-medium text-ivory-cream bg-charcoal-deep rounded-lg hover:bg-charcoal-deep/90 transition-colors"
+                  >
+                    Done
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-stone/50">
+                    Consumers and brands register through their own portals. Use this form to invite admin team members only.
+                  </p>
+
+                  {/* Email */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-charcoal-deep">Email Address</label>
+                    <div className="relative">
+                      <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone/40" />
+                      <input
+                        type="email"
+                        value={inviteEmail}
+                        onChange={(e) => setInviteEmail(e.target.value)}
+                        placeholder="admin@example.com"
+                        className="w-full pl-9 pr-4 py-2 text-sm border border-sand/50 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-charcoal-deep/10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Role */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-charcoal-deep">Admin Role</label>
+                    <select
+                      value={inviteRole}
+                      onChange={(e) => setInviteRole(e.target.value as 'admin' | 'moderator')}
+                      className="w-full px-3 py-2 text-sm border border-sand/50 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-charcoal-deep/10"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="moderator">Moderator</option>
+                    </select>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-3 pt-2">
+                    <button
+                      onClick={() => setShowInviteModal(false)}
+                      className="flex-1 py-2 text-sm font-medium text-stone/60 hover:text-charcoal-deep bg-parchment/40 hover:bg-parchment/60 rounded-lg transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (inviteEmail.trim()) {
+                          setInviteSent(true);
+                        }
+                      }}
+                      disabled={!inviteEmail.trim()}
+                      className="flex-1 py-2 text-sm font-medium text-ivory-cream bg-charcoal-deep rounded-lg hover:bg-charcoal-deep/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Send Invitation
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

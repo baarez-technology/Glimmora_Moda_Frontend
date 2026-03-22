@@ -23,6 +23,7 @@ import {
   Star
 } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
+import { formatPrice } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import type { CalendarConnection, EventType, BackendOutfitRecommendation } from '@/types';
 import { PROVIDER_DISPLAY_NAMES } from '@/types';
@@ -533,7 +534,7 @@ export default function CalendarPage() {
                                 <div className="flex items-center justify-between mt-3 pt-3 border-t border-sand/50">
                                   <div className="flex items-center gap-2">
                                     <span className="font-display text-base text-charcoal-deep">
-                                      €{p.price.toLocaleString()}
+                                      {formatPrice(p.price)}
                                     </span>
                                   </div>
                                   <span className="flex items-center gap-1 text-[10px] tracking-[0.15em] uppercase text-stone group-hover:text-charcoal-deep transition-colors">

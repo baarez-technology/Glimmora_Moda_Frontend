@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MapPin, Plus, Edit2, Trash2, X, Home, Briefcase, Building2, Tag } from 'lucide-react';
+import { ArrowLeft, MapPin, Plus, Edit2, Trash2, X, Home, Briefcase, Building2, Tag, CheckCircle } from 'lucide-react';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -44,6 +44,7 @@ export default function AddressesPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [deleteAddressId, setDeleteAddressId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
   const addressInputRef = useRef<HTMLInputElement>(null);
 
   // ESC key handler for address form
@@ -165,6 +166,22 @@ export default function AddressesPage() {
     } finally {
       setIsDeleting(false);
       setDeleteAddressId(null);
+    }
+  }, [showToast]);
+
+  const handleMakeDefault = useCallback(async (id: string) => {
+    setSettingDefaultId(id);
+    try {
+      await addressService.makeDefaultAddress(id);
+      setAddresses(prev => prev.map(a => ({
+        ...a,
+        is_default: a.address_id === id,
+      })));
+      showToast('Default address updated', 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Failed to set default address', 'error');
+    } finally {
+      setSettingDefaultId(null);
     }
   }, [showToast]);
 
@@ -345,6 +362,12 @@ export default function AddressesPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium text-charcoal-deep">{addr.tag || 'Address'}</p>
+                      {addr.is_default && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-success/10 text-success text-[10px] tracking-[0.1em] uppercase">
+                          <CheckCircle size={10} />
+                          Default
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-stone">{addr.address}</p>
                     <p className="text-sm text-stone">{addr.city}{addr.postal_code ? `, ${addr.postal_code}` : ''}</p>
@@ -352,6 +375,16 @@ export default function AddressesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {!addr.is_default && (
+                    <button
+                      onClick={() => handleMakeDefault(addr.address_id)}
+                      disabled={settingDefaultId === addr.address_id}
+                      className="px-3 py-1.5 text-xs tracking-wider uppercase border border-sand text-stone hover:border-charcoal-deep hover:text-charcoal-deep transition-colors disabled:opacity-50"
+                      title="Set as Default"
+                    >
+                      {settingDefaultId === addr.address_id ? 'Setting...' : 'Set Default'}
+                    </button>
+                  )}
                   <button onClick={() => handleEdit(addr)} className="p-2 hover:bg-sand/20 transition-colors" title="Edit">
                     <Edit2 size={16} className="text-stone" />
                   </button>

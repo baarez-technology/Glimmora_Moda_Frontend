@@ -13,6 +13,7 @@ import {
   fetchBrandOrderDetail, updateBrandOrderStatus,
   type ApiBrandOrderDetail
 } from '@/services/brand-order.service';
+import { formatPrice } from '@/lib/currency';
 
 const VALID_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 type DeliveryStatus = typeof VALID_STATUSES[number];
@@ -242,10 +243,10 @@ export default function OrderDetailPage() {
                     </div>
                     <div className="text-right flex-shrink-0">
                       <p className="text-xs text-taupe">
-                        {order.payment_currency} {(item.product_price ?? 0).toLocaleString()} × {item.quantity ?? 1}
+                        {formatPrice(item.product_price ?? 0, order.payment_currency)} × {item.quantity ?? 1}
                       </p>
                       <p className="text-sm font-medium text-charcoal-deep">
-                        {order.payment_currency} {((item.product_price ?? 0) * (item.quantity ?? 1)).toLocaleString()}
+                        {formatPrice((item.product_price ?? 0) * (item.quantity ?? 1), order.payment_currency)}
                       </p>
                       <span className={`text-[9px] tracking-[0.1em] uppercase px-1.5 py-0.5 ${getStatusBadge(item.delivery_status)}`}>
                         {item.delivery_status}
@@ -268,21 +269,21 @@ export default function OrderDetailPage() {
                   <div className="px-6 py-4 border-t border-sand/50 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-stone">Subtotal</span>
-                      <span className="text-charcoal-deep">{cur} {subtotal.toLocaleString()}</span>
+                      <span className="text-charcoal-deep">{formatPrice(subtotal, cur)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-stone">Shipping</span>
                       <span className="text-charcoal-deep">
-                        {shipping === 0 ? 'Complimentary' : `${cur} ${shipping.toLocaleString()}`}
+                        {shipping === 0 ? 'Complimentary' : formatPrice(shipping, cur)}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-stone">Tax</span>
-                      <span className="text-charcoal-deep">{cur} {tax.toLocaleString()}</span>
+                      <span className="text-charcoal-deep">{formatPrice(tax, cur)}</span>
                     </div>
                     <div className="flex justify-between text-base font-medium pt-2 border-t border-sand/30">
                       <span className="text-charcoal-deep">Total</span>
-                      <span className="text-charcoal-deep">{cur} {total.toLocaleString()}</span>
+                      <span className="text-charcoal-deep">{formatPrice(total, cur)}</span>
                     </div>
                   </div>
                 );

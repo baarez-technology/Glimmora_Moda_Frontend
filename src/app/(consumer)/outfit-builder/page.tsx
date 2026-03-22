@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Plus, Save, Trash2, Sparkles, Calendar, TrendingUp, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { formatPrice } from '@/lib/currency';
 import type { Product } from '@/types';
 
 interface OutfitSlot {
@@ -339,7 +340,7 @@ export default function OutfitBuilderPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-stone">Total Value</span>
-                  <span className="text-charcoal-deep font-medium">€{totalPrice.toLocaleString()}</span>
+                  <span className="text-charcoal-deep font-medium">{formatPrice(totalPrice)}</span>
                 </div>
                 {outfitSlots.some(s => s.product) && (
                   <div className="pt-3 border-t border-sand/30">

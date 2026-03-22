@@ -7,6 +7,7 @@ import { Sparkles, ChevronRight, Heart, Check, ShoppingBag, Loader2 } from 'luci
 import type { CompleteOutfit, Product } from '@/types';
 import { getCompleteTheLook } from '@/services/complete-the-look.service';
 import type { CompleteTheLookResponse, CompleteTheLookProduct } from '@/services/complete-the-look.service';
+import { formatPrice } from '@/lib/currency';
 
 interface OutfitSuggestionsProps {
   product: Product;
@@ -156,10 +157,9 @@ export default function OutfitSuggestions({ product, outfits }: OutfitSuggestion
                     <div>
                       <p className="text-sm text-greige">Suggested Pieces Total</p>
                       <p className="font-display text-xl text-charcoal-deep">
-                        €{apiResponse.products
+                        {formatPrice(apiResponse.products
                           .filter(p => !p.in_wardrobe)
-                          .reduce((sum, p) => sum + p.price, 0)
-                          .toLocaleString()}
+                          .reduce((sum, p) => sum + p.price, 0))}
                       </p>
                       {apiResponse.products.some(p => p.in_wardrobe) && (
                         <p className="text-xs text-success mt-1">
@@ -378,7 +378,7 @@ function ApiProductCard({ item }: { item: CompleteTheLookProduct }) {
       <p className="text-xs text-greige uppercase tracking-wider">{item.product_category}</p>
       <p className="text-sm font-medium text-charcoal-deep truncate">{item.product_name}</p>
       <p className="text-sm text-stone">
-        €{item.price.toLocaleString()}
+        {formatPrice(item.price)}
       </p>
     </div>
   );

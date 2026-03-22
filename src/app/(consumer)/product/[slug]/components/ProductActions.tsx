@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, DollarSign, X, Crown, TrendingDown } from 'lucide-react';
+import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, DollarSign, X, Crown, TrendingDown, Flag } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
+import { submitProductReport, hasReportedProduct, REPORT_REASONS, type ReportReason } from '@/services/reports.service';
 import type { Product, ProductVariant } from '@/types';
 import type { PricingTier } from '@/types/pricing-tiers';
 
@@ -70,6 +72,16 @@ export default function ProductActions({
   const [negotiateMessage, setNegotiateMessage] = useState('');
   const [showPriceAlertModal, setShowPriceAlertModal] = useState(false);
   const [alertTargetPrice, setAlertTargetPrice] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason | ''>('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [alreadyReported, setAlreadyReported] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return hasReportedProduct(product.id);
+    }
+    return false;
+  });
   const needsSize = sizeVariants.length > 0 && !selectedSize;
   const needsColor = colorVariants.length > 0 && !selectedColor;
   const selectionIncomplete = needsSize || needsColor;
@@ -274,6 +286,156 @@ export default function ProductActions({
         <span className="text-[10px] tracking-[0.15em] uppercase text-taupe group-hover:text-charcoal-deep transition-colors">Ask Concierge</span>
       </button>
 
+      {/* Report Product */}
+      <div className="mt-4 text-center">
+        {alreadyReported ? (
+          <span className="text-xs text-taupe cursor-default flex items-center justify-center gap-1.5">
+            <Flag size={12} />
+            Reported
+          </span>
+        ) : (
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="text-xs text-taupe hover:text-error transition-colors flex items-center justify-center gap-1.5 mx-auto"
+          >
+            <Flag size={12} />
+            Report this product
+          </button>
+        )}
+      </div>
+
+      {/* Report Product Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-noir/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white max-w-md w-full">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-sand/50">
+              <div className="flex items-center gap-2">
+                <Flag size={18} className="text-error/70" />
+                <h3 className="font-display text-lg text-charcoal-deep">Report Product</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setShowReportModal(false);
+                  setReportReason('');
+                  setReportDescription('');
+                  setReportSubmitted(false);
+                }}
+                className="text-taupe hover:text-charcoal-deep"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {reportSubmitted ? (
+                <div className="text-center py-6">
+                  <div className="w-12 h-12 bg-success/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Check size={24} className="text-success" />
+                  </div>
+                  <p className="text-sm text-charcoal-deep font-medium mb-2">Report Submitted</p>
+                  <p className="text-xs text-stone leading-relaxed">
+                    Your report has been submitted. Our team will review it.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowReportModal(false);
+                      setReportSubmitted(false);
+                    }}
+                    className="mt-6 py-2 px-8 border border-sand text-charcoal-deep text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <>
+                  {/* Product name (read-only) */}
+                  <div>
+                    <label className="text-[10px] tracking-[0.15em] uppercase text-taupe block mb-2">
+                      Product
+                    </label>
+                    <p className="text-sm text-charcoal-deep font-medium">{product.name}</p>
+                    <p className="text-xs text-taupe">{product.brandName}</p>
+                  </div>
+
+                  {/* Reason dropdown */}
+                  <div>
+                    <label className="text-[10px] tracking-[0.15em] uppercase text-taupe block mb-2">
+                      Reason for Report
+                    </label>
+                    <select
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value as ReportReason)}
+                      className="w-full px-4 py-3 border border-sand text-charcoal-deep bg-white focus:outline-none focus:border-charcoal-deep transition-colors text-sm appearance-none"
+                    >
+                      <option value="">Select a reason...</option>
+                      {REPORT_REASONS.map((r) => (
+                        <option key={r.value} value={r.value}>{r.label}</option>
+                      ))}
+                    </select>
+                    {reportReason && (
+                      <p className="text-xs text-stone mt-1">
+                        {REPORT_REASONS.find(r => r.value === reportReason)?.description}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Description textarea */}
+                  <div>
+                    <label className="text-[10px] tracking-[0.15em] uppercase text-taupe block mb-2">
+                      Description <span className="text-error">*</span>
+                    </label>
+                    <textarea
+                      value={reportDescription}
+                      onChange={(e) => setReportDescription(e.target.value)}
+                      rows={4}
+                      placeholder="Describe the issue in detail"
+                      className="w-full px-4 py-3 border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none text-sm"
+                    />
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        setShowReportModal(false);
+                        setReportReason('');
+                        setReportDescription('');
+                      }}
+                      className="flex-1 py-3 px-4 border border-sand text-charcoal-deep text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!reportReason || !reportDescription.trim()) return;
+                        submitProductReport({
+                          product_id: product.id,
+                          product_name: product.name,
+                          product_image: product.images?.[0]?.url,
+                          product_price: product.price,
+                          brand_id: product.brandId,
+                          brand_name: product.brandName,
+                          reason: reportReason as ReportReason,
+                          description: reportDescription.trim(),
+                        });
+                        setAlreadyReported(true);
+                        setReportSubmitted(true);
+                        setReportReason('');
+                        setReportDescription('');
+                      }}
+                      disabled={!reportReason || !reportDescription.trim()}
+                      className="flex-1 py-3 px-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+                    >
+                      Submit Report
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* UHNI: Negotiate Price */}
       {false && isUHNI && onNegotiatePrice && (
         <>
@@ -331,7 +493,7 @@ export default function ProductActions({
                     <p className="text-sm text-charcoal-deep font-medium">{product.name}</p>
                     <p className="text-xs text-taupe">{product.brandName}</p>
                     <p className="text-lg font-display text-charcoal-deep mt-1">
-                      €{product.price.toLocaleString()}
+                      {formatPrice(product.price)}
                     </p>
                   </div>
 
@@ -340,7 +502,7 @@ export default function ProductActions({
                       Your Proposed Price
                     </label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">{getCurrencySymbol()}</span>
                       <input
                         type="number"
                         value={negotiatePrice}
@@ -417,7 +579,7 @@ export default function ProductActions({
                 <p className="text-sm text-charcoal-deep font-medium">{product.name}</p>
                 <p className="text-xs text-taupe">{product.brandName}</p>
                 <p className="text-lg font-display text-charcoal-deep mt-1">
-                  Current: €{product.price.toLocaleString()}
+                  Current: {formatPrice(product.price)}
                 </p>
               </div>
 
@@ -426,7 +588,7 @@ export default function ProductActions({
                   Your Target Price
                 </label>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">€</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-stone">{getCurrencySymbol()}</span>
                   <input
                     type="number"
                     value={alertTargetPrice}
