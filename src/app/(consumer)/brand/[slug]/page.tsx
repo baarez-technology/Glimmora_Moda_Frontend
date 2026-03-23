@@ -301,8 +301,8 @@ export default function BrandPage({ params }: BrandPageProps) {
                     <div>
                       <p className="text-[10px] tracking-[0.3em] uppercase text-white/40 mb-2">Address</p>
                       <p className="text-ivory-cream leading-relaxed">
-                        {shopLocation.address_line1}<br />
-                        {shopLocation.address_line2 && <>{shopLocation.address_line2}<br /></>}
+                        {shopLocation.address_line_1}<br />
+                        {shopLocation.address_line_2 && <>{shopLocation.address_line_2}<br /></>}
                         {shopLocation.city}, {shopLocation.state}
                         {shopLocation.country && <><br />{shopLocation.country}</>}
                       </p>

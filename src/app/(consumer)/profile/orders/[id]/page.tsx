@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import * as orderManagementService from '@/services/order-management.service';
 import type { CustomerOrder } from '@/services/order-management.service';
+import { formatPrice } from '@/lib/currency';
 
 interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
@@ -129,10 +130,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     });
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
-    return `${symbol}${amount.toLocaleString()}`;
-  };
+  const formatCurrency = (amount: number, currency: string) => formatPrice(amount, currency);
 
   const getStatusColor = (status: string) => {
     switch (status) {

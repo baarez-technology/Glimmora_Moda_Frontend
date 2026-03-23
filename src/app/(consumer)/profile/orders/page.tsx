@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Package, Truck, Check, ChevronRight, Clock, Star, RotateCcw, X } from 'lucide-react';
+import { formatPrice } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import * as orderManagementService from '@/services/order-management.service';
 import { submitReturnRequest, getReturnForOrder, RETURN_REASONS, type ReturnRequest } from '@/services/returns.service';
+import { submitReview, getReviewsByCustomer, type ProductReview } from '@/services/reviews.service';
 import type { CustomerOrder } from '@/services/order-management.service';
 
 export default function OrdersPage() {
@@ -20,6 +22,19 @@ export default function OrdersPage() {
   const [returnReason, setReturnReason] = useState<ReturnRequest['reason']>('wrong_size');
   const [returnDetails, setReturnDetails] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
+
+  // Review state
+  const [reviewModal, setReviewModal] = useState<{ order: CustomerOrder; product: CustomerOrder['products'][0] } | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewHover, setReviewHover] = useState(0);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewContent, setReviewContent] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [submittedReviews, setSubmittedReviews] = useState<ProductReview[]>([]);
+
+  useEffect(() => {
+    try { setSubmittedReviews(getReviewsByCustomer()); } catch { /* ignore */ }
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -39,6 +54,17 @@ export default function OrdersPage() {
       fetchOrders();
     }
   }, [isHydrated, isAuthenticated, fetchOrders]);
+
+  // Derive overall order status from per-product statuses
+  const getOrderStatus = (order: CustomerOrder): string => {
+    const statuses = order.products.map(p => p.delivery_status).filter(Boolean);
+    if (!statuses.length) return 'pending';
+    if (statuses.every(s => s === 'delivered')) return 'delivered';
+    if (statuses.some(s => s === 'shipped')) return 'shipped';
+    if (statuses.some(s => s === 'processing')) return 'processing';
+    if (statuses.some(s => s === 'cancelled')) return 'cancelled';
+    return statuses[0];
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -61,6 +87,7 @@ export default function OrdersPage() {
       case 'shipped': return 'Shipped';
       case 'processing': return 'Processing';
       case 'confirmed': return 'Confirmed';
+      case 'cancelled': return 'Cancelled';
       default: return 'Pending';
     }
   };
@@ -73,10 +100,7 @@ export default function OrdersPage() {
     });
   };
 
-  const formatCurrency = (amount: number, currency: string) => {
-    const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
-    return `${symbol}${amount.toLocaleString()}`;
-  };
+  const formatCurrency = (amount: number, currency: string) => formatPrice(amount, currency);
 
   if (!isHydrated || !isAuthenticated) {
     return (
@@ -150,16 +174,22 @@ export default function OrdersPage() {
                     <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Order #{order.order_id}</p>
                     <p className="text-sm text-stone mt-1">Placed on {formatDate(order.order_date)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(order.delivery_status)}
-                    <span className={`text-sm font-medium ${
-                      order.delivery_status === 'delivered' ? 'text-success' :
-                      order.delivery_status === 'shipped' ? 'text-charcoal-deep' :
-                      order.delivery_status === 'confirmed' ? 'text-success' : 'text-stone'
-                    }`}>
-                      {getStatusLabel(order.delivery_status)}
-                    </span>
-                  </div>
+                  {(() => {
+                    const status = getOrderStatus(order);
+                    return (
+                      <div className="flex items-center gap-2">
+                        {getStatusIcon(status)}
+                        <span className={`text-sm font-medium ${
+                          status === 'delivered' ? 'text-success' :
+                          status === 'shipped' ? 'text-charcoal-deep' :
+                          status === 'confirmed' ? 'text-success' :
+                          status === 'cancelled' ? 'text-error' : 'text-stone'
+                        }`}>
+                          {getStatusLabel(status)}
+                        </span>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Order Items */}
@@ -194,9 +224,68 @@ export default function OrdersPage() {
                           {(product.size || product.color) && ' | '}
                           Qty: {product.quantity}
                         </p>
-                        <p className="text-sm text-charcoal-deep mt-2">
-                          {formatCurrency(product.product_price, order.payment_currency)}
-                        </p>
+                        <div className="flex items-center justify-between mt-2">
+                          <p className="text-sm text-charcoal-deep">
+                            {formatCurrency(product.product_price, product.currency || order.payment_currency)}
+                          </p>
+                          <div className="flex items-center gap-3">
+                            {product.delivery_status && (
+                              <span className={`flex items-center gap-1 text-xs ${
+                                product.delivery_status === 'delivered' ? 'text-success' :
+                                product.delivery_status === 'shipped' ? 'text-charcoal-deep' :
+                                product.delivery_status === 'cancelled' ? 'text-error' : 'text-stone'
+                              }`}>
+                                {getStatusIcon(product.delivery_status)}
+                                {getStatusLabel(product.delivery_status)}
+                              </span>
+                            )}
+                            {product.delivery_status === 'delivered' && (() => {
+                              const reviewed = submittedReviews.find(r => r.order_id === order.order_id && r.product_id === product.product_id);
+                              return reviewed ? (
+                                <span className="flex items-center gap-1 text-xs text-gold-deep tracking-[0.1em] uppercase">
+                                  {[1,2,3,4,5].map(s => (
+                                    <Star key={s} size={10} className={s <= reviewed.rating ? 'fill-gold-muted text-gold-muted' : 'text-sand'} />
+                                  ))}
+                                  Reviewed
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setReviewModal({ order, product });
+                                    setReviewRating(0);
+                                    setReviewHover(0);
+                                    setReviewTitle('');
+                                    setReviewContent('');
+                                  }}
+                                  className="flex items-center gap-1 text-xs text-gold-deep hover:text-gold-muted transition-colors tracking-[0.1em] uppercase"
+                                >
+                                  <Star size={12} />
+                                  Rate
+                                </button>
+                              );
+                            })()}
+                            {product.delivery_status === 'delivered' && (
+                              !getReturnForOrder(`${order.order_id}-${product.product_id}`) ? (
+                                <button
+                                  onClick={() => setReturnModal({ order, product })}
+                                  className="flex items-center gap-1 text-xs text-stone hover:text-charcoal-deep transition-colors tracking-[0.1em] uppercase"
+                                >
+                                  <RotateCcw size={12} />
+                                  Return
+                                </button>
+                              ) : (
+                                <span className={`flex items-center gap-1 text-xs tracking-[0.1em] uppercase ${
+                                  getReturnForOrder(`${order.order_id}-${product.product_id}`)?.status === 'approved' ? 'text-success' :
+                                  getReturnForOrder(`${order.order_id}-${product.product_id}`)?.status === 'rejected' ? 'text-error' :
+                                  'text-gold-deep'
+                                }`}>
+                                  <RotateCcw size={12} />
+                                  Return {getReturnForOrder(`${order.order_id}-${product.product_id}`)?.status}
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -205,46 +294,40 @@ export default function OrdersPage() {
                 {/* Order Footer */}
                 <div className="flex flex-wrap items-center justify-between gap-4 p-6 bg-parchment">
                   <div>
-                    {order.delivery_status === 'delivered' ? (
+                    {getOrderStatus(order) === 'delivered' ? (
                       <p className="text-sm text-stone">
-                        Delivered{order.delivery_date ? ` on ${formatDate(order.delivery_date)}` : ''}
+                        Delivered{order.products.find(p => p.delivery_date)?.delivery_date
+                          ? ` on ${formatDate(order.products.find(p => p.delivery_date)!.delivery_date)}`
+                          : ''}
                       </p>
                     ) : (
                       <p className="text-sm text-stone">
                         {order.delivery_method && `${order.delivery_method} delivery`}
-                        {order.delivery_tracking_number && ` · Tracking: ${order.delivery_tracking_number}`}
                       </p>
                     )}
                   </div>
                   <div className="flex items-center gap-4">
-                    {order.delivery_status === 'delivered' && (
-                      <>
-                        <Link
-                          href={`/profile/reviews?orderId=${order.order_id}`}
-                          className="flex items-center gap-1.5 px-4 py-2 border border-gold-soft/30 text-gold-deep text-xs tracking-[0.1em] uppercase hover:bg-gold-soft/10 transition-colors"
-                        >
-                          <Star size={14} />
-                          Write Review
-                        </Link>
-                        {order.products?.[0] && !getReturnForOrder(order.order_id) ? (
-                          <button
-                            onClick={() => setReturnModal({ order, product: order.products[0] })}
-                            className="flex items-center gap-1.5 px-4 py-2 border border-sand text-stone text-xs tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
-                          >
-                            <RotateCcw size={14} />
-                            Return
-                          </button>
-                        ) : getReturnForOrder(order.order_id) ? (
-                          <span className={`flex items-center gap-1.5 px-4 py-2 text-xs tracking-[0.1em] uppercase ${
-                            getReturnForOrder(order.order_id)?.status === 'approved' ? 'bg-success/10 text-success' :
-                            getReturnForOrder(order.order_id)?.status === 'rejected' ? 'bg-error/10 text-error' :
-                            'bg-gold-soft/10 text-gold-deep'
-                          }`}>
-                            <RotateCcw size={14} />
-                            Return {getReturnForOrder(order.order_id)?.status}
-                          </span>
-                        ) : null}
-                      </>
+                    {getOrderStatus(order) === 'delivered' && order.products.some(p =>
+                      !submittedReviews.find(r => r.order_id === order.order_id && r.product_id === p.product_id)
+                    ) && (
+                      <button
+                        onClick={() => {
+                          const unreviewed = order.products.find(p =>
+                            !submittedReviews.find(r => r.order_id === order.order_id && r.product_id === p.product_id)
+                          );
+                          if (unreviewed) {
+                            setReviewModal({ order, product: unreviewed });
+                            setReviewRating(0);
+                            setReviewHover(0);
+                            setReviewTitle('');
+                            setReviewContent('');
+                          }
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 border border-gold-soft/30 text-gold-deep text-xs tracking-[0.1em] uppercase hover:bg-gold-soft/10 transition-colors"
+                      >
+                        <Star size={14} />
+                        Write Review
+                      </button>
                     )}
                     <span className="font-display text-lg text-charcoal-deep">
                       Total: {formatCurrency(order.payment_amount, order.payment_currency)}
@@ -284,6 +367,118 @@ export default function OrdersPage() {
         )}
       </div>
 
+      {/* Review Modal */}
+      {reviewModal && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setReviewModal(null)}>
+          <div className="bg-white max-w-md w-full p-8" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Write a Review</h3>
+              <button onClick={() => setReviewModal(null)} className="p-2 hover:bg-sand/20 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-4 mb-6 p-4 bg-parchment/50">
+              {reviewModal.product.product_image && (
+                <Image src={reviewModal.product.product_image} alt={reviewModal.product.product_name} width={48} height={64} className="object-cover" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-charcoal-deep">{reviewModal.product.product_name}</p>
+                <p className="text-xs text-stone">Order #{reviewModal.order.order_id}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">Your Rating *</label>
+                <div className="flex items-center gap-1">
+                  {[1,2,3,4,5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      onMouseEnter={() => setReviewHover(star)}
+                      onMouseLeave={() => setReviewHover(0)}
+                      onClick={() => setReviewRating(star)}
+                      className="p-0.5"
+                    >
+                      <Star
+                        size={28}
+                        className={`transition-colors ${star <= (reviewHover || reviewRating) ? 'fill-gold-muted text-gold-muted' : 'text-sand fill-transparent'}`}
+                      />
+                    </button>
+                  ))}
+                  {reviewRating > 0 && (
+                    <span className="ml-2 text-sm text-stone">
+                      {['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'][reviewRating]}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Review Title</label>
+                <input
+                  type="text"
+                  value={reviewTitle}
+                  onChange={e => setReviewTitle(e.target.value)}
+                  placeholder="Summarise your experience..."
+                  className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Review</label>
+                <textarea
+                  value={reviewContent}
+                  onChange={e => setReviewContent(e.target.value)}
+                  rows={4}
+                  placeholder="Share your thoughts on quality, fit, and style..."
+                  className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setReviewModal(null)}
+                className="flex-1 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (reviewRating === 0) { showToast('Please select a star rating', 'error'); return; }
+                  setSubmittingReview(true);
+                  try {
+                    const review = submitReview({
+                      order_id: reviewModal.order.order_id,
+                      product_id: reviewModal.product.product_id,
+                      product_name: reviewModal.product.product_name,
+                      product_image: reviewModal.product.product_image,
+                      brand_name: reviewModal.product.brand_id || '',
+                      rating: reviewRating,
+                      title: reviewTitle,
+                      content: reviewContent,
+                    });
+                    setSubmittedReviews(prev => [...prev, review]);
+                    showToast('Thank you for your review!', 'success');
+                    setReviewModal(null);
+                  } catch {
+                    showToast('Failed to submit review', 'error');
+                  } finally {
+                    setSubmittingReview(false);
+                  }
+                }}
+                disabled={submittingReview || reviewRating === 0}
+                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                {submittingReview ? 'Submitting...' : 'Submit Review'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Return Request Modal */}
       {returnModal && (
         <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setReturnModal(null)}>
@@ -301,7 +496,7 @@ export default function OrdersPage() {
               )}
               <div>
                 <p className="text-sm font-medium text-charcoal-deep">{returnModal.product.product_name}</p>
-                <p className="text-xs text-stone">Order #{returnModal.order.order_id.slice(0, 8).toUpperCase()}</p>
+                <p className="text-xs text-stone">Order #{returnModal.order.order_id}</p>
               </div>
             </div>
 

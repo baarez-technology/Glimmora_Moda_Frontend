@@ -20,6 +20,10 @@ export interface OrderProduct {
   size: string;
   quantity: number;
   product_price: number;
+  currency: string;
+  delivery_tracking_number: string;
+  delivery_status: string;
+  delivery_date: string;
 }
 
 export interface CustomerOrder {

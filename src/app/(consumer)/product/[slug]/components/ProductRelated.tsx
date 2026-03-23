@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import type { Product, Brand } from '@/types';
+import { formatPrice } from '@/lib/currency';
 
 interface ProductRelatedProps {
   products: Product[];
@@ -71,7 +72,7 @@ export default function ProductRelated({ products, brand }: ProductRelatedProps)
                   {item.name}
                 </h3>
                 <p className="text-sm text-taupe">
-                  {item.currency === 'EUR' ? '€' : '$'}{item.price.toLocaleString()}
+                  {formatPrice(item.price, item.currency)}
                 </p>
               </div>
             </Link>
