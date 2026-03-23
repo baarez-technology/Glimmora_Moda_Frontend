@@ -445,11 +445,15 @@ export async function setRegionalStocks(
 
 // ─── Restock ────────────────────────────────────────────────────────────────
 
-export interface RestockPayload {
-  product_id: string;
+export interface RestockRegionEntry {
   city: string;
   country: string;
   units: number;
+}
+
+export interface RestockPayload {
+  product_id: string;
+  region_mapping: RestockRegionEntry[];
 }
 
 export interface RestockHistoryItem {

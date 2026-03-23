@@ -22,7 +22,7 @@ import {
     TrendingUp
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, addColorImages, restockProduct, fetchRestockHistory, parseColorMapping, parseRegionalStocks, computeTotalUnits, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload, type RestockPayload, type RestockHistoryItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
+import { fetchProduct, fetchCollectionNames, updateProduct, softDeleteProduct, setRegionalStocks, addColorImages, restockProduct, fetchRestockHistory, parseColorMapping, parseRegionalStocks, computeTotalUnits, type BackendProduct, type CollectionNameItem, type RegionalStockItem, type RegionalStockAddPayload, type RestockPayload, type RestockRegionEntry, type RestockHistoryItem, type ColorOption, type ColorImages } from '@/services/brand-product.service';
 import { getProductAIInsights } from '@/services/recommendation.service';
 import { CoverImageUpload } from '@/components/brand/CoverImageUpload';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
@@ -1336,9 +1336,7 @@ function RestockModal({
     try {
       await onRestock({
         product_id: productId,
-        city: city.trim(),
-        country: country.trim(),
-        units,
+        region_mapping: [{ city: city.trim(), country: country.trim(), units }],
       });
       onClose();
     } catch {
