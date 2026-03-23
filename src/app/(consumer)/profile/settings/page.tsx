@@ -85,7 +85,7 @@ const CURRENCIES = [
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { isAuthenticated, isHydrated, userData: authUserData, logout: authLogout } = useAuth();
+  const { isAuthenticated, isHydrated, isLoggingOut, userData: authUserData, logout: authLogout } = useAuth();
   const { showToast, setUserRole, userTier } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [notificationLoading, setNotificationLoading] = useState<string | null>(null);
@@ -121,13 +121,14 @@ export default function SettingsPage() {
   const [is2FAEnabled, setIs2FAEnabled] = useState(authUserData?.is_2fa_enabled ?? false);
   const [twoFAStep, setTwoFAStep] = useState<'idle' | 'setup' | 'verify' | 'disable'>('idle');
   const [twoFALoading, setTwoFALoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Redirect to login if not authenticated
+  // Redirect to login if not authenticated (skip during logout to avoid conflicting navigations)
   useEffect(() => {
-    if (isHydrated && !isAuthenticated) {
+    if (isHydrated && !isAuthenticated && !isLoggingOut) {
       router.push('/auth/login/consumer?redirect=/profile/settings');
     }
-  }, [isAuthenticated, isHydrated, router]);
+  }, [isAuthenticated, isHydrated, isLoggingOut, router]);
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
@@ -189,10 +190,7 @@ export default function SettingsPage() {
   };
 
   const handleSignOut = () => {
-    userLogout();
-    localStorage.removeItem('moda-user-tier');
     authLogout();
-    setUserRole('standard');
     try { sessionStorage.clear(); } catch { /* ignore */ }
     showToast('You have been signed out', 'success');
     router.replace('/auth/login');
@@ -306,8 +304,6 @@ export default function SettingsPage() {
     const keys = Object.keys(localStorage).filter(k => k.startsWith('moda-'));
     keys.forEach(k => localStorage.removeItem(k));
   };
-
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') return;
