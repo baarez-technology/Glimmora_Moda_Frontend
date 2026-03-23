@@ -10,10 +10,9 @@ import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
 import { fetchInventory, type InventoryData, type InventoryAlert } from '@/services/inventory.service';
 
+import { formatPrice as _fp } from '@/lib/currency';
 function formatCurrency(value: number) {
-  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
-  return `$${value.toLocaleString()}`;
+  return _fp(value, undefined, true);
 }
 
 function formatDate(ts: string) {
@@ -233,8 +232,8 @@ export default function InventoryPage() {
             </div>
           ) : (
             <div className="divide-y divide-sand/30">
-              {activeAlerts.map((alert: InventoryAlert) => (
-                <div key={alert.id} className="px-6 py-4 flex items-start gap-4">
+              {activeAlerts.map((alert: InventoryAlert, idx: number) => (
+                <div key={`${alert.id}_${idx}`} className="px-6 py-4 flex items-start gap-4">
                   <div className={`w-10 h-10 flex items-center justify-center flex-shrink-0 border ${getAlertColor(alert.priority)}`}>
                     <AlertTriangle size={18} />
                   </div>

@@ -186,6 +186,11 @@ interface BrandContextType {
   removeShippingMethod: (methodId: string) => void;
   updateCommerceConfig: (updates: Partial<CommerceSettings>) => void;
 
+  // Currency
+  currency: string;
+  setCurrency: (currency: string) => void;
+  patchBrandProfile: (fields: Record<string, unknown>) => Promise<void>;
+
   // Auth
   loginAsBrand: (data: BrandLoginResponse) => void;
   logout: () => void;
@@ -392,6 +397,51 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
     }
   }, []);
+
+  // Currency state — mirrors AppContext pattern
+  const [currency, setCurrencyState] = useState('USD');
+
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('moda-currency') : null;
+    if (stored) setCurrencyState(stored);
+    const handleChange = () => {
+      const updated = localStorage.getItem('moda-currency') || 'USD';
+      setCurrencyState(updated);
+    };
+    window.addEventListener('currency-change', handleChange);
+    return () => window.removeEventListener('currency-change', handleChange);
+  }, []);
+
+  // Persist a partial brand profile update to the backend
+  const patchBrandProfile = useCallback(async (fields: Record<string, unknown>) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('moda-brand-token') : null;
+      if (!token) return;
+      const res = await fetch('/api/v1/brand/me', {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        // Keep moda-brand-data in sync so next page refresh loads the latest values
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('moda-brand-data', JSON.stringify(updated));
+        }
+      }
+    } catch {
+      // silently fail — UI state is already updated optimistically
+    }
+  }, []);
+
+  const setCurrency = useCallback((c: string) => {
+    setCurrencyState(c);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('moda-currency', c);
+      window.dispatchEvent(new Event('currency-change'));
+    }
+    patchBrandProfile({ currency: c });
+  }, [patchBrandProfile]);
 
   // Load from localStorage on mount (persistent login)
   useEffect(() => {
@@ -1196,6 +1246,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         addShippingMethod,
         removeShippingMethod,
         updateCommerceConfig,
+        // Currency
+        currency,
+        setCurrency,
+        patchBrandProfile,
         // Auth
         loginAsBrand,
         logout,
