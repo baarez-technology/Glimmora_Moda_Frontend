@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Rocket, Calendar } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Rocket, Calendar, Plus, X } from 'lucide-react';
 import { brandIntelligenceService } from '@/services';
 import type { DropSimulation } from '@/types/brand-intelligence';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
@@ -9,12 +9,39 @@ import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper'
 export default function DropSimulatorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [simulations, setSimulations] = useState<DropSimulation[]>([]);
+  const [showNewForm, setShowNewForm] = useState(false);
+  const [newDrop, setNewDrop] = useState({ dropName: '', collection: '', launchDate: '', regions: '' });
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     brandIntelligenceService.getDropSimulations().then(res => {
       if (res.data) setSimulations(res.data);
       setIsLoading(false);
     });
+  }, []);
+
+  const handleCreate = useCallback(async () => {
+    if (!newDrop.dropName || !newDrop.collection || !newDrop.launchDate) return;
+    setCreating(true);
+    try {
+      const res = await brandIntelligenceService.createDropSimulation({
+        dropName: newDrop.dropName,
+        collection: newDrop.collection,
+        launchDate: newDrop.launchDate,
+        regions: newDrop.regions.split(',').map(r => r.trim()).filter(Boolean),
+      });
+      if (res.data) setSimulations(prev => [res.data!, ...prev]);
+      setShowNewForm(false);
+      setNewDrop({ dropName: '', collection: '', launchDate: '', regions: '' });
+    } catch { /* handled by service */ }
+    setCreating(false);
+  }, [newDrop]);
+
+  const handleStatusUpdate = useCallback(async (simId: string, status: DropSimulation['status']) => {
+    const res = await brandIntelligenceService.updateDropSimulationStatus(simId, status);
+    if (res.data) {
+      setSimulations(prev => prev.map(s => s.id === simId ? { ...s, status } : s));
+    }
   }, []);
 
   const totalSimulations = simulations.length;
@@ -52,7 +79,7 @@ export default function DropSimulatorPage() {
       subtitle="Simulate and optimize product drop strategies across global markets"
       acronym="GDSS™"
       phase={2}
-      status="mock"
+      status="live"
       backendNote="Requires regional market-data feeds and competitor tracking. Endpoint: POST /api/intelligence/drop-simulate"
       isLoading={isLoading}
     >
@@ -74,6 +101,60 @@ export default function DropSimulatorPage() {
               <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Avg Demand Forecast</p>
               <p className="font-display text-2xl text-charcoal-deep">{avgDemandForecast}</p>
             </div>
+          </div>
+
+          {/* Create New Simulation */}
+          <div className="bg-white border border-sand/50">
+            <button
+              onClick={() => setShowNewForm(!showNewForm)}
+              className="w-full px-6 py-4 flex items-center justify-between hover:bg-parchment/30 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <Plus size={16} className="text-charcoal-deep" />
+                <span className="text-sm font-medium text-charcoal-deep">Create New Simulation</span>
+              </div>
+              {showNewForm && <X size={16} className="text-stone" />}
+            </button>
+            {showNewForm && (
+              <div className="px-6 pb-6 border-t border-sand/30 pt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <input
+                    type="text"
+                    value={newDrop.dropName}
+                    onChange={e => setNewDrop(prev => ({ ...prev, dropName: e.target.value }))}
+                    placeholder="Drop Name"
+                    className="px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                  />
+                  <input
+                    type="text"
+                    value={newDrop.collection}
+                    onChange={e => setNewDrop(prev => ({ ...prev, collection: e.target.value }))}
+                    placeholder="Collection"
+                    className="px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                  />
+                  <input
+                    type="date"
+                    value={newDrop.launchDate}
+                    onChange={e => setNewDrop(prev => ({ ...prev, launchDate: e.target.value }))}
+                    className="px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep"
+                  />
+                  <input
+                    type="text"
+                    value={newDrop.regions}
+                    onChange={e => setNewDrop(prev => ({ ...prev, regions: e.target.value }))}
+                    placeholder="Regions (comma-separated)"
+                    className="px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
+                  />
+                </div>
+                <button
+                  onClick={handleCreate}
+                  disabled={creating || !newDrop.dropName || !newDrop.collection || !newDrop.launchDate}
+                  className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+                >
+                  {creating ? 'Creating...' : 'Run Simulation'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Simulation Cards */}
@@ -164,6 +245,27 @@ export default function DropSimulatorPage() {
                   <div className="pt-4 border-t border-sand/30">
                     <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Recommendation</p>
                     <p className="text-sm text-charcoal-deep">{sim.recommendation}</p>
+                  </div>
+                )}
+
+                {/* Status Actions */}
+                {sim.status !== 'launched' && (
+                  <div className="pt-4 border-t border-sand/30 flex items-center gap-3">
+                    {sim.status === 'draft' && (
+                      <button onClick={() => handleStatusUpdate(sim.id, 'simulated')} className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors">
+                        Run Simulation
+                      </button>
+                    )}
+                    {sim.status === 'simulated' && (
+                      <button onClick={() => handleStatusUpdate(sim.id, 'approved')} className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors">
+                        Approve
+                      </button>
+                    )}
+                    {sim.status === 'approved' && (
+                      <button onClick={() => handleStatusUpdate(sim.id, 'launched')} className="px-4 py-2 bg-success text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-success/90 transition-colors">
+                        Launch Drop
+                      </button>
+                    )}
                   </div>
                 )}
               </div>

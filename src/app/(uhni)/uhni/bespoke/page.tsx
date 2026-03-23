@@ -2,99 +2,61 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
-import { ArrowLeft, Crown, Gem, Plus, Clock, CheckCircle, Ruler, Palette, Scissors, Eye, ChevronDown, ChevronUp, Calendar, FileText, Printer, X, Download, Send } from 'lucide-react';
+import { ArrowLeft, Gem, Plus, Clock, CheckCircle, Calendar, ArrowRight } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import type { BespokeOrderStatus } from '@/types';
-import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 
-function BespokeMessageInput({ onSend }: { onSend: (content: string) => void }) {
-  const [value, setValue] = useState('');
-  const handleSend = () => {
-    if (!value.trim()) return;
-    onSend(value.trim());
-    setValue('');
-  };
-  return (
-    <div className="flex gap-2 mt-3">
-      <input
-        type="text"
-        value={value}
-        onChange={e => setValue(e.target.value)}
-        onKeyDown={e => e.key === 'Enter' && handleSend()}
-        placeholder="Send a message to the atelier..."
-        className="flex-1 border border-sand px-3 py-2 text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
-      />
-      <button
-        onClick={handleSend}
-        className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-sm hover:bg-noir transition-colors"
-      >
-        Send
-      </button>
-    </div>
-  );
-}
+const getStatusIcon = (status: BespokeOrderStatus) => {
+  switch (status) {
+    case 'consultation': return <Clock size={12} />;
+    case 'design_approval': return <Gem size={12} />;
+    case 'production': return <Gem size={12} />;
+    case 'fitting': return <Gem size={12} />;
+    case 'complete': return <CheckCircle size={12} />;
+    default: return <Clock size={12} />;
+  }
+};
+
+const getStatusLabel = (status: BespokeOrderStatus) => {
+  switch (status) {
+    case 'consultation': return 'Consultation';
+    case 'design_approval': return 'Design Approval';
+    case 'production': return 'In Production';
+    case 'fitting': return 'Fitting';
+    case 'final_adjustments': return 'Final Adjustments';
+    case 'complete': return 'Complete';
+    default: return status;
+  }
+};
+
+const getStatusColor = (status: BespokeOrderStatus) => {
+  switch (status) {
+    case 'consultation': return 'bg-gold-soft/10 text-gold-deep';
+    case 'design_approval': return 'bg-gold-soft/10 text-gold-deep';
+    case 'production': return 'bg-charcoal-deep/10 text-charcoal-deep';
+    case 'fitting': return 'bg-gold-soft/10 text-gold-deep';
+    case 'final_adjustments': return 'bg-gold-soft/10 text-gold-deep';
+    case 'complete': return 'bg-success/10 text-success';
+    default: return 'bg-parchment text-stone';
+  }
+};
+
+const getTypeLabel = (type: string) => {
+  switch (type) {
+    case 'made_to_measure': return 'Made to Measure';
+    case 'custom_design': return 'Custom Design';
+    case 'modification': return 'Modification';
+    default: return type;
+  }
+};
 
 export default function BespokeOrdersPage() {
-  const { bespokeOrders, concierge, addMessageToBespokeOrder, approveBespokeDesign } = useApp();
+  const { bespokeOrders, concierge } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
-  const [invoiceOrderId, setInvoiceOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     setIsLoaded(true);
   }, []);
-
-  const getStatusIcon = (status: BespokeOrderStatus) => {
-    switch (status) {
-      case 'consultation':
-        return <Eye size={16} />;
-      case 'design_approval':
-        return <Palette size={16} />;
-      case 'production':
-        return <Scissors size={16} />;
-      case 'fitting':
-        return <Ruler size={16} />;
-      case 'final_adjustments':
-        return <Scissors size={16} />;
-      case 'complete':
-        return <CheckCircle size={16} />;
-      default:
-        return <Clock size={16} />;
-    }
-  };
-
-  const getStatusLabel = (status: BespokeOrderStatus) => {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-  };
-
-  const getStatusColor = (status: BespokeOrderStatus) => {
-    switch (status) {
-      case 'complete':
-        return 'bg-success/10 text-success';
-      case 'production':
-      case 'fitting':
-      case 'final_adjustments':
-        return 'bg-gold-muted/10 text-gold-muted';
-      default:
-        return 'bg-parchment text-stone';
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'made_to_measure':
-        return 'Made to Measure';
-      case 'custom_design':
-        return 'Custom Design';
-      case 'modification':
-        return 'Modification';
-      default:
-        return type;
-    }
-  };
-
-  const activeInvoiceOrder = bespokeOrders.find(o => o.id === invoiceOrderId);
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -171,12 +133,15 @@ export default function BespokeOrdersPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {bespokeOrders.map((order) => (
-              <div key={order.id} className="bg-white overflow-hidden">
-                {/* Order Header */}
-                <div className="p-6 border-b border-sand">
-                  <div className="flex items-start justify-between gap-4 mb-4">
+              <Link
+                key={order.id}
+                href={`/uhni/bespoke/${order.id}`}
+                className="block bg-white border border-sand/50 hover:border-charcoal-deep/30 hover:shadow-sm transition-all group"
+              >
+                <div className="p-6">
+                  <div className="flex items-start justify-between gap-4 mb-3">
                     <div>
                       <div className="flex items-center gap-3 mb-2">
                         <span className={`flex items-center gap-1.5 px-3 py-1 text-[10px] tracking-[0.15em] uppercase ${getStatusColor(order.status)}`}>
@@ -194,311 +159,30 @@ export default function BespokeOrdersPage() {
                           : order.brandName || 'Bespoke Commission'}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0">
                       {order.price > 0 ? (
-                        <>
-                          <p className="font-display text-2xl text-charcoal-deep">€{order.price.toLocaleString()}</p>
-                          <p className="text-xs text-taupe mt-1">
-                            {order.depositPaid > 0
-                              ? `Deposit: €${order.depositPaid.toLocaleString()} (${order.depositPercentage}%)`
-                              : 'Deposit pending'}
-                          </p>
-                        </>
+                        <p className="font-display text-2xl text-charcoal-deep">&euro;{order.price.toLocaleString()}</p>
                       ) : (
                         <p className="text-sm text-taupe italic">Price pending</p>
                       )}
                     </div>
                   </div>
 
-                  <p className="text-stone text-sm">{order.description}</p>
-
-                  <div className="flex items-center gap-6 mt-4 text-sm">
-                    <div className="flex items-center gap-2 text-taupe">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-taupe">
                       <Calendar size={14} />
                       <span>Est. completion: {order.estimatedCompletion
                         ? new Date(order.estimatedCompletion).toLocaleDateString()
                         : 'To be determined'}</span>
                     </div>
+                    <ArrowRight size={16} className="text-taupe group-hover:text-charcoal-deep group-hover:translate-x-1 transition-all" />
                   </div>
                 </div>
-
-                {/* Timeline */}
-                <div className="p-6 bg-parchment/30">
-                  <button
-                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-                    aria-expanded={expandedOrder === order.id}
-                    className="w-full flex items-center justify-between"
-                  >
-                    <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Production Timeline</span>
-                    {expandedOrder === order.id ? (
-                      <ChevronUp size={18} className="text-stone" />
-                    ) : (
-                      <ChevronDown size={18} className="text-stone" />
-                    )}
-                  </button>
-
-                  {expandedOrder === order.id && (
-                    <div className="mt-6 space-y-0">
-                      {order.timeline.map((step, index) => (
-                        <div key={step.id} className="flex gap-4">
-                          {/* Timeline Line */}
-                          <div className="flex flex-col items-center">
-                            <div className={`w-8 h-8 flex items-center justify-center flex-shrink-0 ${
-                              step.status === 'completed' ? 'bg-success text-ivory-cream' :
-                              step.status === 'current' ? 'bg-charcoal-deep text-ivory-cream' :
-                              'bg-sand text-stone'
-                            }`}>
-                              {step.status === 'completed' ? (
-                                <CheckCircle size={14} />
-                              ) : (
-                                <span className="text-xs">{index + 1}</span>
-                              )}
-                            </div>
-                            {index < order.timeline.length - 1 && (
-                              <div className={`w-0.5 h-16 ${
-                                step.status === 'completed' ? 'bg-success' : 'bg-sand'
-                              }`} />
-                            )}
-                          </div>
-
-                          {/* Step Content */}
-                          <div className="pb-8 flex-1">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className={`font-medium ${
-                                  step.status === 'current' ? 'text-charcoal-deep' :
-                                  step.status === 'completed' ? 'text-success' : 'text-taupe'
-                                }`}>
-                                  {step.title}
-                                </p>
-                                <p className="text-sm text-stone mt-1">{step.description}</p>
-                                {step.notes && (
-                                  <p className="text-xs text-taupe mt-2 italic">{step.notes}</p>
-                                )}
-                              </div>
-                              <div className="text-right text-xs text-taupe">
-                                {step.completedAt ? (
-                                  <span className="text-success">
-                                    {new Date(step.completedAt).toLocaleDateString()}
-                                  </span>
-                                ) : step.estimatedDate ? (
-                                  <span>Est. {new Date(step.estimatedDate).toLocaleDateString()}</span>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Expanded: Timeline Events, Design Approval, Messages */}
-                {expandedOrder === order.id && (
-                  <div className="p-6 border-t border-sand space-y-6">
-                    {/* Status Timeline Events */}
-                    {order.timelineEvents && order.timelineEvents.length > 0 && (
-                      <div>
-                        <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
-                          Progress Timeline
-                        </p>
-                        <div className="space-y-2">
-                          {order.timelineEvents.map(event => (
-                            <div key={event.id} className="flex items-start gap-3">
-                              <div className="w-2 h-2 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />
-                              <div>
-                                <p className="text-sm text-charcoal-deep font-medium">
-                                  {getStatusLabel(event.status)}
-                                </p>
-                                <p className="text-xs text-stone">{event.note}</p>
-                                <p className="text-xs text-taupe">
-                                  {new Date(event.createdAt).toLocaleDateString('en-US', {
-                                    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                  })}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Design Approval Prompt */}
-                    {order.clientApprovalRequired && !order.clientApproved && (
-                      <div className="bg-gold-soft/10 border border-gold-soft/30 p-4">
-                        <p className="text-sm font-medium text-gold-deep mb-2">
-                          Design Approval Required
-                        </p>
-                        <p className="text-xs text-stone mb-3">
-                          The brand has shared a design for your approval.
-                          Please review and confirm to proceed to production.
-                        </p>
-                        <button
-                          onClick={() => approveBespokeDesign(order.id)}
-                          className="px-4 py-2 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-                        >
-                          Approve Design &amp; Proceed to Production
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Messages */}
-                    <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">
-                        Messages
-                      </p>
-
-                      {(!order.messages || order.messages.length === 0) ? (
-                        <p className="text-sm text-stone italic">
-                          No messages yet. Your atelier team will be in touch soon.
-                        </p>
-                      ) : (
-                        <div className="space-y-3 max-h-48 overflow-y-auto">
-                          {order.messages.map(msg => (
-                            <div
-                              key={msg.id}
-                              className={`p-3 max-w-sm ${
-                                msg.senderRole === 'client'
-                                  ? 'ml-auto bg-charcoal-deep text-ivory-cream'
-                                  : 'bg-parchment text-charcoal-deep'
-                              }`}
-                            >
-                              <p className="text-xs font-medium mb-1 opacity-70">
-                                {msg.senderName}
-                              </p>
-                              <p className="text-sm">{msg.content}</p>
-                              <p className="text-xs opacity-50 mt-1">
-                                {new Date(msg.createdAt).toLocaleTimeString('en-US', {
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <BespokeMessageInput
-                        onSend={(content) => addMessageToBespokeOrder(order.id, content, 'client')}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Specifications */}
-                {order.specifications.length > 0 && (
-                  <div className="p-6 border-t border-sand">
-                    <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Specifications</p>
-                    <div className="grid sm:grid-cols-2 gap-4">
-                      {order.specifications.map((spec, index) => (
-                        <div key={index} className="flex items-start gap-3">
-                          <div className="w-6 h-6 bg-parchment flex items-center justify-center flex-shrink-0">
-                            <span className="text-[10px] text-stone">{index + 1}</span>
-                          </div>
-                          <div>
-                            <p className="text-xs text-taupe">{spec.category} / {spec.label}</p>
-                            <p className="text-sm text-charcoal-deep">{spec.value}</p>
-                            {spec.notes && (
-                              <p className="text-xs text-taupe mt-1">{spec.notes}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Progress Images */}
-                {order.progressImages.length > 0 && (
-                  <div className="p-6 border-t border-sand">
-                    <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Progress Photos</p>
-                    <div className="flex gap-2 overflow-x-auto">
-                      {order.progressImages.map((img, index) => (
-                        <div key={index} className="w-20 h-20 bg-parchment flex-shrink-0 relative overflow-hidden">
-                          <Image src={img} alt={`Progress ${index + 1}`} fill className="object-cover" />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Footer */}
-                <div className="p-6 border-t border-sand bg-parchment/50 flex items-center justify-between">
-                  <div className="text-xs text-taupe">
-                    Order #{order.id.toUpperCase()} • Created {new Date(order.createdAt).toLocaleDateString()}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setInvoiceOrderId(order.id)}
-                      className="inline-flex items-center gap-2 text-xs text-stone hover:text-charcoal-deep transition-colors"
-                    >
-                      <FileText size={14} />
-                      View Invoice
-                    </button>
-                    {order.atelierContact && (
-                      <p className="text-xs text-stone">
-                        Atelier: <span className="text-charcoal-deep">{order.atelierContact}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
       </div>
-      {activeInvoiceOrder && (
-        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setInvoiceOrderId(null)}>
-          <div className="bg-white max-w-2xl w-full p-8 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="font-display text-xl text-charcoal-deep">Bespoke Invoice</h3>
-              <button onClick={() => setInvoiceOrderId(null)} className="p-2 hover:bg-sand/20 transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <InvoiceDocument
-              invoiceNumber={generateInvoiceNumber(activeInvoiceOrder.id, activeInvoiceOrder.createdAt)}
-              invoiceDate={activeInvoiceOrder.createdAt}
-              orderType="bespoke"
-              brandName={activeInvoiceOrder.brandName || 'ModaGlimmora Bespoke'}
-              buyerName="Valued Client"
-              buyerEmail=""
-              items={[{
-                description: activeInvoiceOrder.title,
-                detail: activeInvoiceOrder.description,
-                quantity: 1,
-                unitPrice: activeInvoiceOrder.price,
-                currency: 'EUR',
-              }]}
-              subtotal={activeInvoiceOrder.price}
-              shippingAmount={0}
-              taxRate={0.20}
-              taxAmount={Math.round(activeInvoiceOrder.price * 0.20 / 1.20)}
-              total={activeInvoiceOrder.price}
-              currency="EUR"
-              depositPaid={activeInvoiceOrder.depositPaid}
-              balanceDue={activeInvoiceOrder.price - activeInvoiceOrder.depositPaid}
-              paymentStatus={activeInvoiceOrder.status === 'complete' ? 'paid' : 'deposit_paid'}
-              notes={`Estimated completion: ${new Date(activeInvoiceOrder.estimatedCompletion).toLocaleDateString()}`}
-            />
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={printInvoice}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors"
-              >
-                <Printer size={16} />
-                Print Invoice
-              </button>
-              <button
-                onClick={printInvoice}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
-              >
-                <FileText size={16} />
-                Download PDF
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
