@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, Star, Gift, TrendingUp, Lock, Check } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoyaltyPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
-  const { userTier, orders, showToast } = useApp();
+  const { userTier, orders, showToast, currency } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [redeemedRewards, setRedeemedRewards] = useState<string[]>([]);
   const [spentPoints, setSpentPoints] = useState(0);
@@ -102,7 +103,7 @@ export default function LoyaltyPage() {
   }
 
   const benefits = [
-    { tier: 'standard', items: ['Earn 1 point per €1 spent', 'Birthday reward', 'Early access to sales'] },
+    { tier: 'standard', items: [`Earn 1 point per ${getCurrencySymbol(currency)}1 spent`, 'Birthday reward', 'Early access to sales'] },
     { tier: 'preferred', items: ['Earn 1.5x points', 'Free styling sessions', 'Priority customer support', 'Exclusive collections access'] },
     { tier: 'uhni', items: ['Earn 3x points', 'Personal concierge', 'Private shopping events', 'Bespoke services', 'Autonomous shopping'] }
   ];
