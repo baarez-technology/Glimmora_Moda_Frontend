@@ -169,27 +169,9 @@ export default function OrdersPage() {
             {orders.map((order) => (
               <div key={order.order_id} className="bg-white overflow-hidden">
                 {/* Order Header */}
-                <div className="flex flex-wrap items-center justify-between gap-4 p-6 border-b border-sand">
-                  <div>
-                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Order #{order.order_id}</p>
-                    <p className="text-sm text-stone mt-1">Placed on {formatDate(order.order_date)}</p>
-                  </div>
-                  {(() => {
-                    const status = getOrderStatus(order);
-                    return (
-                      <div className="flex items-center gap-2">
-                        {getStatusIcon(status)}
-                        <span className={`text-sm font-medium ${
-                          status === 'delivered' ? 'text-success' :
-                          status === 'shipped' ? 'text-charcoal-deep' :
-                          status === 'confirmed' ? 'text-success' :
-                          status === 'cancelled' ? 'text-error' : 'text-stone'
-                        }`}>
-                          {getStatusLabel(status)}
-                        </span>
-                      </div>
-                    );
-                  })()}
+                <div className="p-6 border-b border-sand">
+                  <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Order #{order.order_id}</p>
+                  <p className="text-sm text-stone mt-1">Placed on {formatDate(order.order_date)}</p>
                 </div>
 
                 {/* Order Items */}
@@ -307,28 +289,6 @@ export default function OrdersPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-4">
-                    {getOrderStatus(order) === 'delivered' && order.products.some(p =>
-                      !submittedReviews.find(r => r.order_id === order.order_id && r.product_id === p.product_id)
-                    ) && (
-                      <button
-                        onClick={() => {
-                          const unreviewed = order.products.find(p =>
-                            !submittedReviews.find(r => r.order_id === order.order_id && r.product_id === p.product_id)
-                          );
-                          if (unreviewed) {
-                            setReviewModal({ order, product: unreviewed });
-                            setReviewRating(0);
-                            setReviewHover(0);
-                            setReviewTitle('');
-                            setReviewContent('');
-                          }
-                        }}
-                        className="flex items-center gap-1.5 px-4 py-2 border border-gold-soft/30 text-gold-deep text-xs tracking-[0.1em] uppercase hover:bg-gold-soft/10 transition-colors"
-                      >
-                        <Star size={14} />
-                        Write Review
-                      </button>
-                    )}
                     <span className="font-display text-lg text-charcoal-deep">
                       Total: {formatCurrency(order.payment_amount, order.payment_currency)}
                     </span>
