@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
 import { useApp } from '@/context/AppContext';
+import { formatPrice } from '@/lib/currency';
 import type { CalendarConnection, EventType } from '@/types';
 import { PROVIDER_DISPLAY_NAMES } from '@/types';
 
@@ -398,7 +399,7 @@ export default function UHNICalendarPage() {
                                         {item.product.name}
                                       </h5>
                                     </Link>
-                                    <p className="text-sm text-taupe mt-1">€{item.product.price.toLocaleString()}</p>
+                                    <p className="text-sm text-taupe mt-1">{formatPrice(item.product.price)}</p>
                                     {item.note && <p className="text-xs text-stone mt-1 line-clamp-2">{item.note}</p>}
                                   </div>
                                 </div>

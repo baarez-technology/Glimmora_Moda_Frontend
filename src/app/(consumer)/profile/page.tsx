@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/currency';
 import { useRouter } from 'next/navigation';
 import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin, Star } from 'lucide-react';
 import * as userService from '@/services/user.service';
@@ -305,7 +306,7 @@ export default function ProfilePage() {
                     </h2>
                   </div>
                   <Link
-                    href="/onboarding"
+                    href="/profile/preferences"
                     className="text-sm tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
                   >
                     Update
@@ -353,9 +354,9 @@ export default function ProfilePage() {
                           {(() => {
                             const { min, max } = user.fashionIdentity.budgetRange;
                             if (min === 0 && max >= 1000000) return 'No Preference';
-                            if (min === 0 && max <= 1000) return `Up to €${max.toLocaleString()}`;
-                            if (min >= 5000 && max >= 1000000) return `€${min.toLocaleString()}+`;
-                            return `€${min.toLocaleString()} — €${max.toLocaleString()}`;
+                            if (min === 0 && max <= 1000) return `Up to ${formatPrice(max)}`;
+                            if (min >= 5000 && max >= 1000000) return `${formatPrice(min)}+`;
+                            return `${formatPrice(min)} — ${formatPrice(max)}`;
                           })()}
                         </p>
                       </div>
@@ -365,7 +366,7 @@ export default function ProfilePage() {
                   <div className="py-16 text-center bg-parchment">
                     <p className="text-stone mb-8">Complete your style profile for personalized recommendations</p>
                     <Link
-                      href="/onboarding"
+                      href="/profile/preferences"
                       className="group inline-flex items-center gap-4"
                     >
                       <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">

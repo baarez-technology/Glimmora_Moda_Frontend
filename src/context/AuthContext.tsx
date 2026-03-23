@@ -1,10 +1,11 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import type { UserTier } from '@/types';
 import * as authService from '@/services/auth.service';
 import type { UserData } from '@/services/auth.service';
 import { clearCache } from '@/lib/api-cache';
+import { getSessionTimeout } from '@/lib/platform-config';
 
 interface AuthContextType {
   userTier: UserTier;
@@ -66,6 +67,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [userTier, isHydrated]);
 
+  // ── Session Timeout ───────────────────────────────────────────────────────
+  // Auto-logout after the admin-configured session timeout.
+  // Resets on user activity (click, keypress, mousemove, scroll).
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoutRef = useRef<(() => void) | null>(null);
+
+  // Keep a stable reference to the logout function for the timeout handler
+  // (actual `logout` callback is defined below; we update the ref after it's created)
+  useEffect(() => {
+    if (!isAuthenticated || !isHydrated) return;
+
+    const timeoutSeconds = getSessionTimeout();
+    // Guard: don't set a timeout shorter than 60s to avoid accidental instant logout
+    if (timeoutSeconds < 60) return;
+    const timeoutMs = timeoutSeconds * 1000;
+
+    function resetTimer() {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        // Use the ref so we always call the latest logout function
+        logoutRef.current?.();
+      }, timeoutMs);
+    }
+
+    // Activity events that reset the idle timer
+    const events: (keyof WindowEventMap)[] = ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'];
+    events.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true }));
+
+    // Start the initial timer
+    resetTimer();
+
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      events.forEach(evt => window.removeEventListener(evt, resetTimer));
+    };
+    // Re-run when auth state or hydration changes; timeout value is read fresh inside
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isHydrated]);
+
   const setUserRole = useCallback((tier: UserTier) => {
     setUserTier(tier);
   }, []);
@@ -88,6 +128,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try { sessionStorage.clear(); } catch { /* SSR safety */ }
     setTimeout(() => setIsLoggingOut(false), 500);
   }, []);
+
+  // Keep logout ref in sync so the session-timeout handler always uses the latest function
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, [logout]);
 
   return (
     <AuthContext.Provider

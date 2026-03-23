@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { ChevronRight, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react';
 import type { BrandProduct } from '@/types/brand-portal';
 import { computeTotalUnits, type BackendProduct } from '@/services/brand-product.service';
+import { formatPrice } from '@/lib/currency';
 
 function computeDemandScore(product: BackendProduct): number {
   return product.performance_metrics?.demand_score ?? 0;
@@ -95,7 +96,7 @@ export function ApiProductCard({ product, showMetrics = true }: ApiProductCardPr
 
           <div className="flex items-center gap-4 mt-3 text-xs text-stone">
             <span className="font-medium text-charcoal-deep">
-              ${product.price.toLocaleString()}
+              {formatPrice(product.price)}
             </span>
             <span className="text-taupe">|</span>
             <span>SKU: {product.sku}</span>
@@ -194,7 +195,7 @@ export function ApiProductGridCard({ product }: { product: BackendProduct }) {
 
         <div className="flex items-center justify-between mt-3">
           <span className="text-sm font-medium text-charcoal-deep">
-            ${product.price.toLocaleString()}
+            {formatPrice(product.price)}
           </span>
           <span className={`text-xs ${totalUnits === 0 ? 'text-error' : totalUnits <= 10 ? 'text-warning' : 'text-stone'}`}>
             {totalUnits === 0 ? 'Out of stock' : `${totalUnits} units`}
@@ -256,12 +257,7 @@ export function ProductCard({ product, showMetrics = true }: ProductCardProps) {
   const isOutOfStock = product.totalStock === 0;
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: product.currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
+    return formatPrice(value);
   };
 
   return (
@@ -397,7 +393,7 @@ export function ProductListItem({ product }: { product: BrandProduct }) {
 
       {/* Price */}
       <div className="text-sm text-charcoal-deep w-20 text-right">
-        €{product.price.toLocaleString()}
+        {formatPrice(product.price)}
       </div>
 
       <ChevronRight size={14} className="text-taupe" />
@@ -454,7 +450,7 @@ export function ProductGridCard({ product }: { product: BrandProduct }) {
 
         <div className="flex items-center justify-between mt-3">
           <span className="text-sm font-medium text-charcoal-deep">
-            €{product.price.toLocaleString()}
+            {formatPrice(product.price)}
           </span>
           <span className="text-xs text-stone">
             {product.totalStock} units

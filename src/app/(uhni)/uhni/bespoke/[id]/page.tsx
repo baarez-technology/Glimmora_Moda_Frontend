@@ -12,6 +12,7 @@ import { useApp } from '@/context/AppContext';
 import type { BespokeOrderStatus } from '@/types';
 import type { BespokeOrder } from '@/types/uhni';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
+import { formatPrice } from '@/lib/currency';
 
 function formatMsgTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -239,10 +240,10 @@ export default function BespokeOrderDetailPage() {
             <div className="text-right">
               {order.price > 0 ? (
                 <>
-                  <p className="font-display text-2xl text-charcoal-deep">&euro;{order.price.toLocaleString()}</p>
+                  <p className="font-display text-2xl text-charcoal-deep">{formatPrice(order.price)}</p>
                   <p className="text-xs text-taupe mt-1">
                     {order.depositPaid > 0
-                      ? `Deposit: €${order.depositPaid.toLocaleString()} (${order.depositPercentage}%)`
+                      ? `Deposit: ${formatPrice(order.depositPaid)} (${order.depositPercentage}%)`
                       : 'Deposit pending'}
                   </p>
                 </>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Lock, Truck, Check, MapPin, Plus, CreditCard, Shield, Download, Mail, FileText, Printer, ChevronDown, Loader2 } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
@@ -646,7 +647,7 @@ export default function CheckoutPage() {
                   <div className="space-y-3">
                     {[
                       { id: 'standard', label: 'Standard Delivery', desc: '3-5 business days', price: 'Free' },
-                      { id: 'express', label: 'Express Delivery', desc: '1-2 business days', price: '$15' },
+                      { id: 'express', label: 'Express Delivery', desc: '1-2 business days', price: formatPrice(15) },
                     ].map(method => (
                       <button
                         key={method.id}
@@ -712,7 +713,7 @@ export default function CheckoutPage() {
                     </>
                   ) : (
                     <>
-                      <span className="text-sm tracking-[0.15em] uppercase">Complete Purchase — ${total.toLocaleString()}</span>
+                      <span className="text-sm tracking-[0.15em] uppercase">Complete Purchase — {formatPrice(total)}</span>
                       <ArrowRight size={16} />
                     </>
                   )}
@@ -733,7 +734,7 @@ export default function CheckoutPage() {
                         <div className="flex-1">
                           <p className="text-[9px] tracking-[0.2em] uppercase text-taupe mb-1">{item.product.brandName}</p>
                           <p className="text-sm text-ivory-cream mb-1">{item.product.name}</p>
-                          <p className="text-sm text-ivory-cream">€{item.product.price.toLocaleString()}</p>
+                          <p className="text-sm text-ivory-cream">{formatPrice(item.product.price)}</p>
                         </div>
                       </div>
                     ))}
@@ -742,17 +743,17 @@ export default function CheckoutPage() {
                   <div className="space-y-3 border-b border-ivory-cream/10 pb-6 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Subtotal</span>
-                      <span className="text-ivory-cream">${total.toLocaleString()}</span>
+                      <span className="text-ivory-cream">{formatPrice(total)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Shipping</span>
-                      <span className="text-gold-soft">{deliveryMethod === 'express' ? '$15' : 'Complimentary'}</span>
+                      <span className="text-gold-soft">{deliveryMethod === 'express' ? formatPrice(15) : 'Complimentary'}</span>
                     </div>
                   </div>
 
                   <div className="flex justify-between items-end mb-8">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total</span>
-                    <span className="font-display text-3xl text-ivory-cream">${(total + (deliveryMethod === 'express' ? 15 : 0)).toLocaleString()}</span>
+                    <span className="font-display text-3xl text-ivory-cream">{formatPrice(total + (deliveryMethod === 'express' ? 15 : 0))}</span>
                   </div>
 
                   <div className="space-y-3 pt-6 border-t border-ivory-cream/10">

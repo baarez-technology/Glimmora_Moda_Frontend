@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { MapPin, Globe, RefreshCw, Bell, ChevronDown, Check, X, Clock, Sparkles, Truck } from 'lucide-react';
 import type { AvailabilityIntelligence as AvailabilityIntelligenceType } from '@/types';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 interface AvailabilityIntelligenceProps {
   availability: AvailabilityIntelligenceType;
@@ -108,7 +109,7 @@ export default function AvailabilityIntelligence({ availability, onNotifyRestock
                         </div>
                         {alt.priceDifference && alt.priceDifference !== 0 && (
                           <p className={`text-sm ${alt.priceDifference > 0 ? 'text-error-soft' : 'text-success'}`}>
-                            {alt.priceDifference > 0 ? '+' : ''}€{alt.priceDifference}
+                            {alt.priceDifference > 0 ? '+' : ''}{getCurrencySymbol()}{Math.abs(alt.priceDifference)}
                           </p>
                         )}
                       </div>
@@ -147,7 +148,7 @@ export default function AvailabilityIntelligence({ availability, onNotifyRestock
                           <p className="text-sm text-stone">{alt.product.brandName}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium text-charcoal-deep">€{alt.product.price.toLocaleString()}</p>
+                          <p className="font-medium text-charcoal-deep">{formatPrice(alt.product.price)}</p>
                           <p className="text-sm text-success">{alt.availabilityConfidence}% available</p>
                         </div>
                       </div>

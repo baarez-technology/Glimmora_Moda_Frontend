@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Sparkles, ChevronRight, AlertCircle, TrendingUp, ShoppingBag } from 'lucide-react';
 import type { WardrobeAnalysis, WardrobeGap } from '@/types';
+import { formatPrice } from '@/lib/currency';
 
 interface WardrobeGapAnalysisProps {
   analysis: WardrobeAnalysis;
@@ -176,7 +177,7 @@ export default function WardrobeGapAnalysis({ analysis }: WardrobeGapAnalysisPro
                             </div>
                             <p className="text-xs text-greige">{product.brandName}</p>
                             <p className="text-sm text-charcoal-deep truncate">{product.name}</p>
-                            <p className="text-sm text-stone">€{product.price.toLocaleString()}</p>
+                            <p className="text-sm text-stone">{formatPrice(product.price)}</p>
                           </Link>
                         ))}
                       </div>

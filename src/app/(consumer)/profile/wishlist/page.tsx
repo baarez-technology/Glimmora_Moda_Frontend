@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Heart, X, Share2, ArrowLeft, ArrowRight, RefreshCw, ShoppingBag, Trash2 } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
@@ -275,7 +276,7 @@ export default function WishlistPage() {
                   {/* Price Badge — bottom left */}
                   <div className="absolute bottom-4 left-4">
                     <span className="text-[9px] tracking-[0.2em] uppercase text-charcoal-deep bg-ivory-cream/90 px-3 py-1.5">
-                      €{item.price.toLocaleString()}
+                      {formatPrice(item.price)}
                     </span>
                   </div>
                 </Link>
@@ -327,7 +328,7 @@ export default function WishlistPage() {
                       </h3>
                     </Link>
                     <p className="text-lg text-charcoal-warm mb-2">
-                      €{item.price.toLocaleString()}
+                      {formatPrice(item.price)}
                     </p>
                     {/* Variants */}
                     <div className="flex gap-3 mb-2">

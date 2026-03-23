@@ -9,6 +9,7 @@ import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHe
 import { fetchCollectionDetail, fetchCollectionBasicInfo, softDeleteCollection } from '@/services/brand-collection.service';
 import type { CollectionDetailResponse } from '@/services/brand-collection.service';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
+import { formatPrice } from '@/lib/currency';
 
 export default function CollectionDetailPage() {
   const params = useParams();
@@ -53,9 +54,7 @@ export default function CollectionDetailPage() {
   };
 
   const formatCurrency = (value: number) => {
-    if (value >= 1000000) return `$${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
-    return `$${value.toLocaleString()}`;
+    return formatPrice(value, undefined, true);
   };
 
   const getStatusBadge = (status: string) => {
@@ -285,7 +284,7 @@ export default function CollectionDetailPage() {
                   </div>
 
                   <div className="text-sm text-charcoal-deep w-20 text-right">
-                    ${product.price.toLocaleString()}
+                    {formatPrice(product.price)}
                   </div>
                 </div>
               ))}

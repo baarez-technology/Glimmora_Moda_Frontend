@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, MessageCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, MessageCircle, FileText, Star } from 'lucide-react';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -179,6 +179,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   }
 
   const currency = order.payment_currency || 'USD';
+  const isDelivered = order.delivery_status === 'delivered';
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -311,7 +312,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             {/* Actions */}
             <div className="bg-white p-8">
               <h2 className="font-display text-xl text-charcoal-deep mb-8">Need Help?</h2>
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className={`grid gap-4 ${isDelivered ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
                 <button
                   onClick={() => setShowInvoice(true)}
                   className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
@@ -332,6 +333,15 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                   <RotateCcw size={20} className="text-stone" />
                   <span className="text-sm text-charcoal-deep">Return Items</span>
                 </button>
+                {isDelivered && (
+                  <Link
+                    href={`/profile/reviews?orderId=${order.order_id}`}
+                    className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
+                  >
+                    <Star size={20} className="text-gold-muted" />
+                    <span className="text-sm text-charcoal-deep">Write Review</span>
+                  </Link>
+                )}
                 <button
                   onClick={() => setShowSupportModal(true)}
                   className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"

@@ -5,6 +5,7 @@ import { MapPin } from 'lucide-react';
 import { brandIntelligenceService } from '@/services';
 import type { BoutiquePerformance } from '@/types/brand-intelligence';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
+import { formatPrice } from '@/lib/currency';
 
 export default function BoutiquesPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -25,9 +26,7 @@ export default function BoutiquesPage() {
     : null;
 
   const formatCurrency = (value: number) => {
-    if (value >= 1000000) return `\u20AC${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `\u20AC${(value / 1000).toFixed(0)}K`;
-    return `\u20AC${value.toLocaleString()}`;
+    return formatPrice(value, undefined, true);
   };
 
   const formatNumber = (value: number) => {

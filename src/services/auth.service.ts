@@ -127,6 +127,9 @@ export interface BrandLoginResponse {
     email: string;
     phone_number: string;
     job_title: string;
+    language: string;
+    timezone: string;
+    currency: string;
     email_notification: {
       order_updates: boolean;
       inventory_alerts: boolean;

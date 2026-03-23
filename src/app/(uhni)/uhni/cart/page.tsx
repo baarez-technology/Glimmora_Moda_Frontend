@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, X, Minus, Plus, ShoppingBag, Crown, Shield, Trash2, RefreshCw } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as cartService from '@/services/customer-collection.service';
@@ -217,7 +218,7 @@ export default function UHNICartPage() {
                       {/* Price & Quantity */}
                       <div className="flex items-center justify-between mt-6">
                         <p className="font-display text-xl text-charcoal-deep">
-                          €{(item.price * item.quantity).toLocaleString()}
+                          {formatPrice(item.price * item.quantity)}
                         </p>
                         <div className="flex items-center gap-3">
                           <button
@@ -264,7 +265,7 @@ export default function UHNICartPage() {
                           {item.product_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
                         </span>
                         <span className="text-charcoal-deep flex-shrink-0">
-                          €{(item.price * item.quantity).toLocaleString()}
+                          {formatPrice(item.price * item.quantity)}
                         </span>
                       </div>
                     ))}
@@ -274,7 +275,7 @@ export default function UHNICartPage() {
                   <div className="space-y-3 border-b border-sand/50 pb-6 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Subtotal</span>
-                      <span className="text-charcoal-deep">€{total.toLocaleString()}</span>
+                      <span className="text-charcoal-deep">{formatPrice(total)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">White-Glove Delivery</span>
@@ -286,7 +287,7 @@ export default function UHNICartPage() {
                   <div className="flex justify-between items-end mb-8">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-stone">Total</span>
                     <span className="font-display text-3xl text-charcoal-deep">
-                      €{total.toLocaleString()}
+                      {formatPrice(total)}
                     </span>
                   </div>
 

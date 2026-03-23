@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AlertTriangle, Search, MapPin, DollarSign } from 'lucide-react';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
+import { formatPrice } from '@/lib/currency';
 
 interface GreyMarketAlert {
   id: string;
@@ -184,14 +185,14 @@ export default function GreyMarketPage() {
                     <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Original Price</p>
                     <div className="flex items-center gap-1">
                       <DollarSign size={14} className="text-stone" />
-                      <p className="text-sm text-charcoal-deep">&euro;{alert.originalPrice.toLocaleString()}</p>
+                      <p className="text-sm text-charcoal-deep">{formatPrice(alert.originalPrice, alert.currency)}</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Grey-Market Price</p>
                     <div className="flex items-center gap-1">
                       <DollarSign size={14} className="text-error" />
-                      <p className="text-sm text-error font-medium">&euro;{alert.greyMarketPrice.toLocaleString()}</p>
+                      <p className="text-sm text-error font-medium">{formatPrice(alert.greyMarketPrice, alert.currency)}</p>
                     </div>
                   </div>
                 </div>

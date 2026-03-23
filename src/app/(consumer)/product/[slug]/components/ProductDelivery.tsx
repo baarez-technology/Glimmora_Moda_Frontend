@@ -406,8 +406,7 @@ export default function ProductDelivery({
           </div>
         </div>
 
-        {/* Delivery Address Section */}
-        <DeliveryAddressSection />
+        {/* Delivery Address Section — removed from product page, managed in /profile/addresses */}
       </div>
 
       {/* Care & Longevity */}

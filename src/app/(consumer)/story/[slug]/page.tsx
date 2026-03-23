@@ -10,6 +10,7 @@ import * as productService from '@/services/product.service';
 import { getStoryById, getRecommendedBrands, searchStories } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import { useApp } from '@/context/AppContext';
+import { formatPrice } from '@/lib/currency';
 import type { Product, Brand, BrandStory } from '@/types';
 
 interface StoryPageProps {
@@ -327,7 +328,7 @@ export default function StoryPage({ params }: StoryPageProps) {
                       {product.name}
                     </h3>
                     <p className="text-sm text-stone">
-                      €{product.price.toLocaleString()}
+                      {formatPrice(product.price)}
                     </p>
                   </div>
                 </Link>

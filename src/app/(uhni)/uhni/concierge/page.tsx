@@ -10,6 +10,7 @@ import type { AppointmentType, ConciergeAppointment } from '@/types/uhni';
 import type { Brand } from '@/types';
 import { getAllBrands } from '@/services/recommendation.service';
 import TasksSection from './TasksSection';
+import { formatPrice } from '@/lib/currency';
 
 interface Message {
   id: string;
@@ -106,7 +107,7 @@ export default function ConciergePage() {
       const productMessage: Message = {
         id: `msg-product-${Date.now()}`,
         sender: 'user',
-        content: `I am looking at the ${context.productName} by ${context.brandName} — priced at €${context.price?.toLocaleString()}. Can you tell me more about it and whether it would suit me?`,
+        content: `I am looking at the ${context.productName} by ${context.brandName} — priced at ${formatPrice(context.price)}. Can you tell me more about it and whether it would suit me?`,
         timestamp: new Date().toISOString()
       }
 

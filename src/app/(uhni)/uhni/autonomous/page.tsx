@@ -21,6 +21,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { uhniService, brandService } from '@/services';
 import type { ProductCategory, Brand } from '@/types';
 import type { ZeroUIConfig, ZeroUITrigger } from '@/types/uhni';
@@ -126,7 +127,7 @@ export default function AutonomousCommercePage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(amount);
+    return formatPrice(amount);
   };
 
   const budgetUsedPercent = autonomousSettings
@@ -229,7 +230,7 @@ export default function AutonomousCommercePage() {
                   <div className="flex justify-between text-sm mb-2">
                     <span className="text-stone">Spent this month</span>
                     <span className="text-charcoal-deep font-medium">
-                      €{autonomousSettings.currentMonthSpend.toLocaleString()} / €{autonomousSettings.monthlyBudget.toLocaleString()}
+                      {formatPrice(autonomousSettings.currentMonthSpend)} / {formatPrice(autonomousSettings.monthlyBudget)}
                     </span>
                   </div>
                   <div className="h-3 bg-parchment overflow-hidden">
@@ -241,7 +242,7 @@ export default function AutonomousCommercePage() {
                     />
                   </div>
                   <p className="text-xs text-taupe mt-2">
-                    €{(autonomousSettings.monthlyBudget - autonomousSettings.currentMonthSpend).toLocaleString()} remaining
+                    {formatPrice(autonomousSettings.monthlyBudget - autonomousSettings.currentMonthSpend)} remaining
                   </p>
                 </div>
 
@@ -253,7 +254,7 @@ export default function AutonomousCommercePage() {
                       <p className="text-sm text-stone">Items below this amount are purchased automatically</p>
                     </div>
                     <p className="font-display text-2xl text-charcoal-deep">
-                      €{autonomousSettings.autoApproveThreshold.toLocaleString()}
+                      {formatPrice(autonomousSettings.autoApproveThreshold)}
                     </p>
                   </div>
                   <input
@@ -266,8 +267,8 @@ export default function AutonomousCommercePage() {
                     className="w-full accent-charcoal-deep"
                   />
                   <div className="flex justify-between text-xs text-taupe mt-2">
-                    <span>€1,000</span>
-                    <span>€20,000</span>
+                    <span>{formatPrice(1000)}</span>
+                    <span>{formatPrice(20000)}</span>
                   </div>
                 </div>
 
@@ -570,7 +571,7 @@ export default function AutonomousCommercePage() {
                         <p className="text-sm text-stone">{activity.reason}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-charcoal-deep">€{activity.price.toLocaleString()}</p>
+                        <p className="font-medium text-charcoal-deep">{formatPrice(activity.price)}</p>
                         <p className={`text-xs capitalize ${
                           activity.type === 'auto_purchased' ? 'text-success' :
                           activity.type === 'awaiting_approval' ? 'text-gold-muted' : 'text-taupe'

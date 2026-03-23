@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, TrendingUp, Sparkles, DollarSign, ShoppingBag, Calendar, Target, PieChart, BarChart3, Eye, Award, Clock, Heart, ChevronRight, Info } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { formatPrice } from '@/lib/currency';
 
 export default function IntelligenceDashboardPage() {
   const router = useRouter();
@@ -351,7 +352,7 @@ export default function IntelligenceDashboardPage() {
               {filteredWardrobeAdditions.length > 0 && <TrendingUp size={16} className="text-success" />}
             </div>
             <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Wardrobe Value</p>
-            <p className="font-display text-2xl text-charcoal-deep">€{totalWardrobeValue.toLocaleString()}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatPrice(totalWardrobeValue)}</p>
             <p className="text-xs text-stone mt-1">{filteredWardrobeAdditions.length > 0 ? `${filteredWardrobeAdditions.length} piece${filteredWardrobeAdditions.length !== 1 ? 's' : ''} added this ${timeframe}` : `Current ${timeframe}`}</p>
           </div>
 
@@ -362,7 +363,7 @@ export default function IntelligenceDashboardPage() {
               </div>
             </div>
             <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Avg. Item Value</p>
-            <p className="font-display text-2xl text-charcoal-deep">€{averageItemValue.toLocaleString()}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatPrice(averageItemValue)}</p>
             <p className="text-xs text-stone mt-1">{wardrobe.length} pieces total</p>
           </div>
 
@@ -509,12 +510,12 @@ export default function IntelligenceDashboardPage() {
                 <div className="p-4 bg-parchment">
                   <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Purchase Frequency</p>
                   <p className="font-display text-lg text-charcoal-deep">{shoppingBehavior.purchaseFrequency}</p>
-                  <p className="text-xs text-stone mt-1">Avg. order: {shoppingBehavior.averageOrderValue > 0 ? `€${Math.round(shoppingBehavior.averageOrderValue).toLocaleString()}` : 'N/A'}</p>
+                  <p className="text-xs text-stone mt-1">Avg. order: {shoppingBehavior.averageOrderValue > 0 ? formatPrice(Math.round(shoppingBehavior.averageOrderValue)) : 'N/A'}</p>
                 </div>
 
                 <div className="p-4 bg-parchment">
                   <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Cost Per Wear</p>
-                  <p className="font-display text-lg text-charcoal-deep">{efficiencyMetrics.costPerWear > 0 ? `€${efficiencyMetrics.costPerWear.toLocaleString()}` : 'N/A'}</p>
+                  <p className="font-display text-lg text-charcoal-deep">{efficiencyMetrics.costPerWear > 0 ? formatPrice(efficiencyMetrics.costPerWear) : 'N/A'}</p>
                   <p className="text-xs text-stone mt-1">{shoppingBehavior.preferredCategories !== 'N/A' ? `Top: ${shoppingBehavior.preferredCategories}` : 'Add items to track'}</p>
                 </div>
               </div>

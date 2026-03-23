@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { ArrowRight, ArrowLeft, Grid, LayoutList, X, Calendar, SlidersHorizontal, Trash2, RefreshCw, ChevronRight } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as wardrobeService from '@/services/wardrobe.service';
@@ -209,7 +210,7 @@ export default function WardrobePage() {
                 <p className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total Wears</p>
               </div>
               <div className="py-8 pl-8">
-                <p className="font-display text-3xl text-charcoal-deep mb-1">€{stats.totalValue.toLocaleString()}</p>
+                <p className="font-display text-3xl text-charcoal-deep mb-1">{formatPrice(stats.totalValue)}</p>
                 <p className="text-[10px] tracking-[0.3em] uppercase text-taupe">Collection Value</p>
               </div>
             </div>
@@ -281,8 +282,7 @@ export default function WardrobePage() {
                           </h3>
                         </Link>
                         <p className="text-sm text-stone mt-1">
-                          {item.product.currency === 'INR' ? '₹' : item.product.currency === 'GBP' ? '£' : item.product.currency === 'USD' ? '$' : '€'}
-                          {item.product.price.toLocaleString()}
+                          {formatPrice(item.product.price)}
                         </p>
                       </div>
                     ))}
@@ -325,8 +325,7 @@ export default function WardrobePage() {
                                 </h3>
                               </Link>
                               <p className="text-base text-charcoal-deep font-medium mt-2">
-                                {item.product.currency === 'INR' ? '₹' : item.product.currency === 'GBP' ? '£' : item.product.currency === 'USD' ? '$' : '€'}
-                                {item.product.price.toLocaleString()}
+                                {formatPrice(item.product.price)}
                               </p>
                             </div>
                             <button
@@ -692,10 +691,10 @@ export default function WardrobePage() {
                           </p>
                           <div className="flex items-center gap-2 mt-1">
                             {mp.discount_percentage > 0 && (
-                              <span className="text-xs text-taupe line-through">€{mp.price.toLocaleString()}</span>
+                              <span className="text-xs text-taupe line-through">{formatPrice(mp.price)}</span>
                             )}
                             <span className="text-sm font-medium text-charcoal-deep">
-                              €{(mp.offer_price || mp.price).toLocaleString()}
+                              {formatPrice(mp.offer_price || mp.price)}
                             </span>
                             {mp.discount_percentage > 0 && (
                               <span className="text-xs text-success">-{mp.discount_percentage}%</span>

@@ -15,6 +15,7 @@ import {
 } from '@/services/brand-appointment.service';
 import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 import type { StylingRecommendation } from '@/types/brand-portal';
+import { formatPrice } from '@/lib/currency';
 
 type FilterTab = 'all' | 'upcoming' | 'past';
 type ViewMode = 'list' | 'calendar';
@@ -597,7 +598,7 @@ export default function StylingSessionsPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-charcoal-deep truncate">{rec.productName}</p>
-                          <p className="text-xs text-taupe">€{rec.price.toLocaleString()}</p>
+                          <p className="text-xs text-taupe">{formatPrice(rec.price)}</p>
                           {rec.stylistNote && <p className="text-xs text-stone italic mt-1">{rec.stylistNote}</p>}
                         </div>
                         <button
@@ -623,7 +624,7 @@ export default function StylingSessionsPage() {
                   >
                     <option value="">Select a product…</option>
                     {products.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} — €{p.price.toLocaleString()}</option>
+                      <option key={p.id} value={p.id}>{p.name} — {formatPrice(p.price)}</option>
                     ))}
                   </select>
                   <input

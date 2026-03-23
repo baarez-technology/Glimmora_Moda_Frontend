@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Bell, BellOff, Trash2, Check, Clock, ExternalLink, ArrowRight } from 'lucide-react';
 import * as userService from '@/services/user.service';
+import { formatPrice } from '@/lib/currency';
 
 export default function RestockAlertsPage() {
   const [notifications, setNotifications] = useState<Awaited<ReturnType<typeof userService.getRestockNotifications>>['data']>([]);
@@ -170,7 +171,7 @@ export default function RestockAlertsPage() {
                                   {notification.product.name}
                                 </Link>
                                 <p className="text-stone mt-1">
-                                  €{notification.product.price.toLocaleString()}
+                                  {formatPrice(notification.product.price)}
                                 </p>
                               </div>
                               <span className={`px-3 py-1 text-xs font-medium flex-shrink-0 ${getStatusColor(notification.status)}`}>
@@ -248,7 +249,7 @@ export default function RestockAlertsPage() {
                                   {notification.product.name}
                                 </Link>
                                 <p className="text-stone mt-1">
-                                  €{notification.product.price.toLocaleString()}
+                                  {formatPrice(notification.product.price)}
                                 </p>
                               </div>
                               <span className={`px-3 py-1 text-xs font-medium flex-shrink-0 ${getStatusColor(notification.status)}`}>

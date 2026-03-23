@@ -67,9 +67,19 @@ export default function BrandPage({ params }: BrandPageProps) {
             };
           }
         } else {
-          // No brandId param — fall back to mock data lookup
-          const brandRes = await brandService.getBrandBySlug(slug);
-          loadedBrand = brandRes.data ?? null;
+          // No brandId param — try to find brand from real API by matching slug
+          try {
+            const apiBrands = await getRecommendedBrands();
+            const slugMatch = apiBrands.find(b => b.slug === slug);
+            if (slugMatch) {
+              loadedBrand = slugMatch;
+            }
+          } catch { /* API failed */ }
+          // If not found in API, try mock data
+          if (!loadedBrand) {
+            const brandRes = await brandService.getBrandBySlug(slug);
+            loadedBrand = brandRes.data ?? null;
+          }
         }
 
         if (!loadedBrand) {
@@ -86,17 +96,20 @@ export default function BrandPage({ params }: BrandPageProps) {
             filter_brand_id: loadedBrand.id,
             page_number: 1,
             page_size: PRODUCTS_PER_PAGE,
+            disable_personalization: true,
           }),
           searchStories({ brand_id: loadedBrand.id }),
           getCollections(loadedBrand.id),
         ]);
 
+        console.log('[brand-page] Products loaded:', productsResult.products.length, '| total:', productsResult.totalMatched);
         setProducts(productsResult.products);
         setTotalPages(productsResult.totalPages);
         setTotalProducts(productsResult.totalMatched);
         setStories(brandStories);
         setCollections(brandCollections);
       } catch (err) {
+        console.error('[brand-page] Error loading data:', err);
         if (!brand) {
           notFound();
         } else {
@@ -132,6 +145,7 @@ export default function BrandPage({ params }: BrandPageProps) {
           filter_brand_id: loadedBrandRef.current!.id,
           page_number: currentPage,
           page_size: PRODUCTS_PER_PAGE,
+          disable_personalization: true,
         });
         setProducts(result.products);
         setTotalPages(result.totalPages);

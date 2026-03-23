@@ -5,6 +5,7 @@ import { Users, Gem } from 'lucide-react';
 import { brandIntelligenceService } from '@/services';
 import type { ClientArchetype } from '@/types/brand-intelligence';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
+import { formatPrice } from '@/lib/currency';
 
 export default function ClientGenomePage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -23,9 +24,7 @@ export default function ClientGenomePage() {
     : 0;
 
   const formatCurrency = (value: number) => {
-    if (value >= 1000000) return `\u20AC${(value / 1000000).toFixed(2)}M`;
-    if (value >= 1000) return `\u20AC${(value / 1000).toFixed(0)}K`;
-    return `\u20AC${value.toLocaleString()}`;
+    return formatPrice(value, undefined, true);
   };
 
   const getStrengthBar = (strength: number) => {

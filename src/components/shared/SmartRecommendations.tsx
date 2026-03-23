@@ -7,6 +7,7 @@ import { ArrowRight, Sparkles, TrendingUp, Heart, Star } from 'lucide-react';
 import * as productService from '@/services/product.service';
 import { useApp } from '@/context/AppContext';
 import type { Product } from '@/types';
+import { formatPrice } from '@/lib/currency';
 
 interface SmartRecommendationsProps {
   currentProduct?: Product;
@@ -178,7 +179,7 @@ export default function SmartRecommendations({
                     {product.name}
                   </h3>
                   <p className="text-sm text-stone mb-3">
-                    €{product.price.toLocaleString()}
+                    {formatPrice(product.price)}
                   </p>
 
                   {/* Recommendation Reasons */}

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, X, Crown, Grid, LayoutList, Calendar, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import type { ProductCategory } from '@/types';
 
@@ -172,7 +173,7 @@ export default function UHNIWardrobePage() {
                 <p className="text-[10px] tracking-[0.3em] uppercase text-stone">Total Wears</p>
               </div>
               <div className="py-6 pl-8">
-                <p className="font-display text-2xl text-charcoal-deep mb-1">€{stats.totalValue.toLocaleString()}</p>
+                <p className="font-display text-2xl text-charcoal-deep mb-1">{formatPrice(stats.totalValue)}</p>
                 <p className="text-[10px] tracking-[0.3em] uppercase text-stone">Collection Value</p>
               </div>
             </div>
@@ -231,8 +232,7 @@ export default function UHNIWardrobePage() {
                           </h3>
                         </Link>
                         <p className="text-sm text-stone mt-1">
-                          {item.product.currency === 'INR' ? '₹' : item.product.currency === 'GBP' ? '£' : item.product.currency === 'USD' ? '$' : '€'}
-                          {item.product.price.toLocaleString()}
+                          {formatPrice(item.product.price, item.product.currency)}
                         </p>
                       </div>
                     ))}
@@ -269,8 +269,7 @@ export default function UHNIWardrobePage() {
                                 </h3>
                               </Link>
                               <p className="text-base text-charcoal-deep font-medium mt-2">
-                                {item.product.currency === 'INR' ? '₹' : item.product.currency === 'GBP' ? '£' : item.product.currency === 'USD' ? '$' : '€'}
-                                {item.product.price.toLocaleString()}
+                                {formatPrice(item.product.price, item.product.currency)}
                               </p>
                             </div>
                             <button

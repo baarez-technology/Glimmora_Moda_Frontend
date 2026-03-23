@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Crown, TrendingUp, TrendingDown, DollarSign, PieChart, Calendar, Award, AlertCircle, Info, ChevronRight, BarChart3, Target, Eye } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import { formatPrice } from '@/lib/currency';
 
 interface WardrobeItemAnalytics {
   id: string;
@@ -182,7 +183,7 @@ export default function WardrobeAnalyticsPage() {
               </div>
             </div>
             <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Current Value</p>
-            <p className="font-display text-2xl text-charcoal-deep">€{totalCurrentValue.toLocaleString()}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatPrice(totalCurrentValue)}</p>
             <div className={`flex items-center gap-1 text-xs mt-2 ${overallAppreciation >= 0 ? 'text-success' : 'text-error'}`}>
               {overallAppreciation >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               <span>{overallAppreciation >= 0 ? '+' : ''}{overallAppreciation.toFixed(1)}% vs purchase</span>
@@ -196,8 +197,8 @@ export default function WardrobeAnalyticsPage() {
               </div>
             </div>
             <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Avg. Cost Per Wear</p>
-            <p className="font-display text-2xl text-charcoal-deep">€{averageCostPerWear.toFixed(0)}</p>
-            <p className="text-xs text-stone mt-2">Luxury benchmark: €350</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatPrice(Math.round(averageCostPerWear))}</p>
+            <p className="text-xs text-stone mt-2">Luxury benchmark: {formatPrice(350)}</p>
           </div>
 
           <div className="bg-white p-6">
@@ -207,7 +208,7 @@ export default function WardrobeAnalyticsPage() {
               </div>
             </div>
             <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-2">Total Appreciation</p>
-            <p className="font-display text-2xl text-charcoal-deep">€{(totalCurrentValue - totalPurchaseValue).toLocaleString()}</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatPrice(totalCurrentValue - totalPurchaseValue)}</p>
             <p className="text-xs text-success mt-2">Portfolio gain</p>
           </div>
 
@@ -240,7 +241,7 @@ export default function WardrobeAnalyticsPage() {
                           <p className="text-xs text-taupe">{data.count} pieces</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-display text-lg text-charcoal-deep">€{data.value.toLocaleString()}</p>
+                          <p className="font-display text-lg text-charcoal-deep">{formatPrice(data.value)}</p>
                           <div className={`flex items-center justify-end gap-1 text-xs ${avgAppreciation >= 0 ? 'text-success' : 'text-error'}`}>
                             {avgAppreciation >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                             <span>{avgAppreciation >= 0 ? '+' : ''}{avgAppreciation.toFixed(1)}%</span>
@@ -276,7 +277,7 @@ export default function WardrobeAnalyticsPage() {
                         <p className="text-sm text-charcoal-deep truncate">{item.product.name}</p>
                         <div className="flex items-center gap-2">
                           <p className="text-xs text-success">+{item.appreciation.toFixed(1)}%</p>
-                          <p className="text-xs text-taupe">€{item.currentValue.toLocaleString()}</p>
+                          <p className="text-xs text-taupe">{formatPrice(item.currentValue)}</p>
                         </div>
                       </div>
                     </div>
@@ -298,7 +299,7 @@ export default function WardrobeAnalyticsPage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-charcoal-deep truncate">{item.product.name}</p>
                         <div className="flex items-center gap-2">
-                          <p className="text-xs text-gold-muted">€{item.costPerWear.toFixed(0)}/wear</p>
+                          <p className="text-xs text-gold-muted">{formatPrice(Math.round(item.costPerWear))}/wear</p>
                           <p className="text-xs text-taupe">{item.wearCount} wears</p>
                         </div>
                       </div>
@@ -350,7 +351,7 @@ export default function WardrobeAnalyticsPage() {
                       <p className="text-xs text-stone mt-1">Purchased {new Date(item.purchaseDate).toLocaleDateString()}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-display text-lg text-charcoal-deep">€{item.currentValue.toLocaleString()}</p>
+                      <p className="font-display text-lg text-charcoal-deep">{formatPrice(item.currentValue)}</p>
                       <div className={`flex items-center justify-end gap-1 text-xs ${item.appreciation >= 0 ? 'text-success' : 'text-error'}`}>
                         {item.appreciation >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                         <span>{item.appreciation >= 0 ? '+' : ''}{item.appreciation.toFixed(1)}%</span>
@@ -358,7 +359,7 @@ export default function WardrobeAnalyticsPage() {
                     </div>
                     <div className="text-right text-xs text-stone">
                       <p>{item.wearCount} wears</p>
-                      <p>€{item.costPerWear.toFixed(0)}/wear</p>
+                      <p>{formatPrice(Math.round(item.costPerWear))}/wear</p>
                     </div>
                   </Link>
                 ))}

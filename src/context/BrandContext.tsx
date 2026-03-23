@@ -402,6 +402,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         const apiBrand = JSON.parse(storedBrand);
         setIsAuthenticated(true);
         setPartner(mapApiBrandToPartner(apiBrand));
+        // Set brand currency for formatPrice()
+        if (apiBrand.currency) {
+          localStorage.setItem('moda-currency', apiBrand.currency);
+          window.dispatchEvent(new Event('currency-change'));
+        }
         loadBrandData();
       }
     } catch (err) {
@@ -417,6 +422,11 @@ export function BrandProvider({ children }: { children: ReactNode }) {
       localStorage.setItem('moda-brand-token', data.access_token);
       localStorage.setItem('moda-brand-refresh-token', data.refresh_token);
       localStorage.setItem('moda-brand-data', JSON.stringify(data.brand));
+      // Set brand currency so formatPrice() picks it up
+      if (data.brand?.currency) {
+        localStorage.setItem('moda-currency', data.brand.currency);
+        window.dispatchEvent(new Event('currency-change'));
+      }
     } catch (err) {
       console.error('Failed to store brand auth data:', err);
     }

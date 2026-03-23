@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { formatPrice } from '@/lib/currency';
 import { ArrowLeft, Palette, Sparkles, Target, MapPin, Compass, Pencil, Save, X, Briefcase, Users, Sun, Star, Plane } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -485,9 +486,9 @@ export default function StyleDNAPage() {
                       {(() => {
                         const { min, max } = fashionIdentity.budgetRange;
                         if (min === 0 && max >= 1000000) return 'No Preference';
-                        if (min === 0 && max <= 1000) return `Up to €${max.toLocaleString()}`;
-                        if (min >= 5000 && max >= 1000000) return `€${min.toLocaleString()}+`;
-                        return `€${min.toLocaleString()} — €${max.toLocaleString()}`;
+                        if (min === 0 && max <= 1000) return `Up to ${formatPrice(max)}`;
+                        if (min >= 5000 && max >= 1000000) return `${formatPrice(min)}+`;
+                        return `${formatPrice(min)} — ${formatPrice(max)}`;
                       })()}
                     </p>
                   </div>

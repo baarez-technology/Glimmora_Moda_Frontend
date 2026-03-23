@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { useAdmin } from '@/context/AdminContext';
-import { User, Mail, Shield, Bell, Save, Key } from 'lucide-react';
+import { User, Mail, Shield, Bell, Save, Key, CheckCircle, AlertTriangle } from 'lucide-react';
 
 // ─── Toggle Component ────────────────────────────────────────────────────────
 
@@ -45,6 +45,16 @@ export default function AdminSettingsPage() {
     newPassword: '',
     confirm: '',
   });
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const toggleNotification = (key: keyof typeof notifications) => {
     setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -52,11 +62,36 @@ export default function AdminSettingsPage() {
 
   const handlePasswordChange = (field: keyof typeof passwords, value: string) => {
     setPasswords((prev) => ({ ...prev, [field]: value }));
+    setPasswordError('');
+    setPasswordSuccess(false);
+  };
+
+  const handlePasswordSubmit = () => {
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (!passwords.current.trim()) {
+      setPasswordError('Current password is required.');
+      return;
+    }
+    if (passwords.newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters.');
+      return;
+    }
+    if (passwords.newPassword !== passwords.confirm) {
+      setPasswordError('New password and confirmation do not match.');
+      return;
+    }
+
+    // Mock success — log and show feedback
+    console.log('[Admin Settings] Password change submitted (mock).');
+    setPasswordSuccess(true);
+    setPasswords({ current: '', newPassword: '', confirm: '' });
+    setTimeout(() => setPasswordSuccess(false), 4000);
   };
 
   const handleSave = () => {
-    // Placeholder save action
-    alert('Settings saved successfully.');
+    showToast('Settings saved successfully.');
   };
 
   const initial = admin?.name?.charAt(0)?.toUpperCase() || 'A';
@@ -199,22 +234,40 @@ export default function AdminSettingsPage() {
                 />
               </div>
             </div>
+
+            {/* Password validation feedback */}
+            {passwordError && (
+              <div className="flex items-center gap-2 mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 max-w-3xl">
+                <AlertTriangle size={14} />
+                <span>{passwordError}</span>
+              </div>
+            )}
+            {passwordSuccess && (
+              <div className="flex items-center gap-2 mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 max-w-3xl">
+                <CheckCircle size={14} />
+                <span>Password changed successfully.</span>
+              </div>
+            )}
+
+            <button
+              onClick={handlePasswordSubmit}
+              className="mt-4 text-xs font-medium text-charcoal-deep border border-charcoal-deep/20 rounded-md px-4 py-2 hover:bg-charcoal-deep hover:text-ivory-cream transition-colors"
+            >
+              Change Password
+            </button>
           </div>
 
-          {/* 2FA Status */}
+          {/* 2FA Status — Coming soon (no backend support) */}
           <div>
             <h3 className="text-sm font-semibold text-charcoal-deep mb-2">Two-Factor Authentication</h3>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 opacity-60">
               <div className="h-8 w-8 rounded-full bg-stone/10 flex items-center justify-center">
                 <Shield size={16} className="text-stone/50" />
               </div>
               <div>
-                <p className="text-sm text-charcoal-deep">2FA is <span className="font-medium text-amber-600">not enabled</span></p>
-                <p className="text-xs text-stone/50">Add an extra layer of security to your account</p>
+                <p className="text-sm text-charcoal-deep">2FA is <span className="font-medium text-stone/60">not available</span></p>
+                <p className="text-xs text-stone/50">Coming soon -- Two-factor authentication will be available in a future update.</p>
               </div>
-              <button className="ml-auto text-xs font-medium text-charcoal-deep border border-charcoal-deep/20 rounded-md px-3 py-1.5 hover:bg-charcoal-deep hover:text-ivory-cream transition-colors">
-                Enable 2FA
-              </button>
             </div>
           </div>
         </section>
@@ -230,6 +283,22 @@ export default function AdminSettingsPage() {
           </button>
         </div>
       </div>
+
+      {/* ── Toast Notification ────────────────────────────────────────────── */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div
+            className={`flex items-center gap-2.5 px-5 py-3 rounded-lg shadow-lg text-sm font-medium ${
+              toast.type === 'success'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-red-600 text-white'
+            }`}
+          >
+            {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

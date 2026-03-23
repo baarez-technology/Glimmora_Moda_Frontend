@@ -39,6 +39,7 @@ import {
   type SourcingOptionItem,
   type NegotiationStatus,
 } from '@/services/sourcing.service';
+import { formatPrice } from '@/lib/currency';
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -660,7 +661,7 @@ export default function SourcingDetailPage() {
           id: `msg-${Date.now()}`,
           sender: 'system' as const,
           senderName: 'System',
-          content: `Price negotiation submitted for "${request.options.find((o) => o.id === optionId)?.title}" — proposed €${proposedPrice.toLocaleString()}.`,
+          content: `Price negotiation submitted for "${request.options.find((o) => o.id === optionId)?.title}" — proposed ${formatPrice(proposedPrice)}.`,
           timestamp: new Date().toISOString(),
         },
       ],
@@ -692,7 +693,7 @@ export default function SourcingDetailPage() {
           id: `msg-${Date.now()}`,
           sender: 'system' as const,
           senderName: 'System',
-          content: `Counter offer of €${option.counterPrice.toLocaleString()} accepted for "${option.title}". Awaiting final confirmation.`,
+          content: `Counter offer of ${formatPrice(option.counterPrice)} accepted for "${option.title}". Awaiting final confirmation.`,
           timestamp: new Date().toISOString(),
         },
       ],

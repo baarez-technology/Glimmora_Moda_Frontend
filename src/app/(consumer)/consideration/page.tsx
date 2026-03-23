@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, X, MapPin, Check, User, Minus, Plus, Trash2 } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
@@ -136,7 +137,7 @@ export default function ConsiderationPage() {
                         {/* Price & Quantity */}
                         <div className="flex items-center justify-between mt-6">
                           <p className="font-display text-xl text-charcoal-deep">
-                            €{(item.product.price * (item.quantity || 1)).toLocaleString()}
+                            {formatPrice(item.product.price * (item.quantity || 1))}
                           </p>
                           <div className="flex items-center gap-3">
                             <button
@@ -199,7 +200,7 @@ export default function ConsiderationPage() {
                         <span className="text-taupe truncate pr-4">
                           {item.product.name}{(item.quantity || 1) > 1 ? ` ×${item.quantity}` : ''}
                         </span>
-                        <span className="text-ivory-cream flex-shrink-0">€{(item.product.price * (item.quantity || 1)).toLocaleString()}</span>
+                        <span className="text-ivory-cream flex-shrink-0">{formatPrice(item.product.price * (item.quantity || 1))}</span>
                       </div>
                     ))}
                   </div>
@@ -208,7 +209,7 @@ export default function ConsiderationPage() {
                   <div className="flex justify-between items-end mb-10">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total</span>
                     <span className="font-display text-3xl text-ivory-cream">
-                      €{total.toLocaleString()}
+                      {formatPrice(total)}
                     </span>
                   </div>
 

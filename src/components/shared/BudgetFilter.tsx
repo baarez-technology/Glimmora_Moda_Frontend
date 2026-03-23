@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DollarSign, Sliders } from 'lucide-react';
+import { getCurrencySymbol } from '@/lib/currency';
 
 interface BudgetFilterProps {
   minPrice?: number;
@@ -18,7 +19,7 @@ export default function BudgetFilter({
   currentMin,
   currentMax,
   onChange,
-  currency = '€'
+  currency
 }: BudgetFilterProps) {
   const [localMin, setLocalMin] = useState(currentMin);
   const [localMax, setLocalMax] = useState(currentMax);
@@ -50,19 +51,21 @@ export default function BudgetFilter({
     onChange(localMin, localMax);
   };
 
+  const sym0 = currency || getCurrencySymbol();
   const formatPrice = (price: number) => {
     if (price >= 1000) {
-      return `${currency}${(price / 1000).toFixed(price % 1000 === 0 ? 0 : 1)}k`;
+      return `${sym0}${(price / 1000).toFixed(price % 1000 === 0 ? 0 : 1)}k`;
     }
-    return `${currency}${price}`;
+    return `${sym0}${price}`;
   };
 
+  const sym = getCurrencySymbol();
   const presets = [
-    { label: 'Under €500', min: minPrice, max: 500 },
-    { label: '€500 - €2k', min: 500, max: 2000 },
-    { label: '€2k - €5k', min: 2000, max: 5000 },
-    { label: '€5k - €10k', min: 5000, max: 10000 },
-    { label: 'Over €10k', min: 10000, max: maxPrice },
+    { label: `Under ${sym}500`, min: minPrice, max: 500 },
+    { label: `${sym}500 - ${sym}2k`, min: 500, max: 2000 },
+    { label: `${sym}2k - ${sym}5k`, min: 2000, max: 5000 },
+    { label: `${sym}5k - ${sym}10k`, min: 5000, max: 10000 },
+    { label: `Over ${sym}10k`, min: 10000, max: maxPrice },
   ];
 
   const minPercent = ((localMin - minPrice) / (maxPrice - minPrice)) * 100;
@@ -140,7 +143,7 @@ export default function BudgetFilter({
         <div>
           <label className="text-xs text-greige block mb-1">Min</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone text-sm">{currency}</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone text-sm">{sym0}</span>
             <input
               type="number"
               value={localMin}
@@ -155,7 +158,7 @@ export default function BudgetFilter({
         <div>
           <label className="text-xs text-greige block mb-1">Max</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone text-sm">{currency}</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone text-sm">{sym0}</span>
             <input
               type="number"
               value={localMax}

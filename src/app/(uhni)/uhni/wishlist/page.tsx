@@ -9,6 +9,7 @@ import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as wishlistService from '@/services/customer-collection.service';
 import { productHref } from '@/services/customer-collection.service';
 import type { WishlistItem } from '@/services/customer-collection.service';
+import { formatPrice } from '@/lib/currency';
 
 export default function UHNIWishlistPage() {
   const { showToast, refreshWishlist, refreshCart } = useApp();
@@ -228,7 +229,7 @@ export default function UHNIWishlistPage() {
                       {/* Price Badge */}
                       <div className="absolute bottom-3 left-3">
                         <span className="text-[9px] tracking-[0.2em] uppercase text-ivory-cream bg-charcoal-deep/80 px-3 py-1.5">
-                          €{item.price.toLocaleString()}
+                          {formatPrice(item.price)}
                         </span>
                       </div>
                     </Link>
@@ -283,7 +284,7 @@ export default function UHNIWishlistPage() {
                             </h3>
                           </Link>
                           <p className="font-display text-lg text-charcoal-deep/70 mt-2">
-                            €{item.price.toLocaleString()}
+                            {formatPrice(item.price)}
                           </p>
                         </div>
                         <button

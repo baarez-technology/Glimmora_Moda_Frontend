@@ -4,6 +4,7 @@ import { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/currency';
 
 interface Product {
   id: string;
@@ -76,7 +77,7 @@ export default function StackedCards({ products }: StackedCardsProps) {
                     {product.name}
                   </h3>
                   <p className="font-body text-sm text-stone">
-                    €{product.price.toLocaleString()}
+                    {formatPrice(product.price)}
                   </p>
                 </div>
               </Link>

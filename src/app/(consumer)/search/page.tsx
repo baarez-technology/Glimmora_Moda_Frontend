@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, X, SlidersHorizontal, ArrowRight } from 'lucide-react';
+import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import * as productService from '@/services/product.service';
 import * as brandService from '@/services/brand.service';
 import * as collectionService from '@/services/collection.service';
@@ -390,7 +391,7 @@ function SearchContent() {
                                   {product.name}
                                 </h3>
                                 <p className="text-sm text-stone mt-2">
-                                  €{product.price.toLocaleString()}
+                                  {formatPrice(product.price)}
                                 </p>
                               </Link>
                             ))}

@@ -7,6 +7,7 @@ import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { fetchBrandBespokeOrders } from '@/services/bespoke.service';
 import type { BespokeOrder } from '@/types/uhni';
 import type { BespokeOrderStatus, BespokeOrderType } from '@/types/uhni';
+import { formatPrice } from '@/lib/currency';
 
 type FilterTab = 'all' | BespokeOrderStatus;
 
@@ -40,7 +41,7 @@ export default function BespokeOrdersPage() {
     return matchesFilter && matchesSearch;
   });
 
-  const formatCurrency = (value: number) => `€${value.toLocaleString()}`;
+  const formatCurrency = (value: number) => formatPrice(value);
 
   const formatDate = (dateString: string) => {
     if (!dateString) return 'TBD';

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { TrendingUp, Target, Sparkles } from 'lucide-react';
 import IntelligencePageWrapper from '@/components/brand/IntelligencePageWrapper';
+import { formatPrice } from '@/lib/currency';
 
 interface ShadowDemandForecast {
   id: string;
@@ -142,7 +143,7 @@ export default function ShadowDemandPage() {
           </div>
           <div className="bg-white border border-sand/50 p-6">
             <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Predicted Revenue</p>
-            <p className="font-display text-2xl text-charcoal-deep">&euro;{(totalPredictedRevenue / 1000).toFixed(0)}K</p>
+            <p className="font-display text-2xl text-charcoal-deep">{formatPrice(totalPredictedRevenue, undefined, true)}</p>
           </div>
         </div>
 
@@ -200,7 +201,7 @@ export default function ShadowDemandPage() {
                   </div>
                   <div>
                     <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Predicted Revenue</p>
-                    <p className="text-sm text-charcoal-deep">&euro;{forecast.predictedRevenue.toLocaleString()}</p>
+                    <p className="text-sm text-charcoal-deep">{formatPrice(forecast.predictedRevenue, forecast.currency)}</p>
                   </div>
                   <div>
                     <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Confidence</p>

@@ -1,77 +1,155 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
   ShoppingCart,
   BarChart3,
   Globe,
-  Package,
-  ArrowUpRight
+  ArrowUpRight,
+  AlertCircle
 } from 'lucide-react';
 import Link from 'next/link';
-import { useBrand } from '@/context/BrandContext';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
 import ExportButton from '@/components/brand/ExportButton';
 import { convertToCSV, downloadCSV, buildFilename } from '@/lib/export-utils';
+import { formatPrice } from '@/lib/currency';
 
-type TimePeriod = '7d' | '30d' | '90d' | '12m';
+type TimePeriod = '7d' | '30d' | '90d' | '1y';
 
-// Scale factors to simulate different data per period
-const PERIOD_SCALE: Record<TimePeriod, { revenue: number; orders: number; change: number }> = {
-  '7d':  { revenue: 0.25, orders: 0.2,  change: 1.4 },
-  '30d': { revenue: 1,    orders: 1,    change: 1 },
-  '90d': { revenue: 2.8,  orders: 2.5,  change: 0.7 },
-  '12m': { revenue: 11,   orders: 10,   change: 0.5 },
+// API accepts: 7d | 30d | 90d | 1y
+const PERIOD_PARAM: Record<TimePeriod, string> = {
+  '7d': '7d',
+  '30d': '30d',
+  '90d': '90d',
+  '1y': '1y',
 };
 
+// Raw API response — kpis have nested { value, change_percentage } structure
+interface ApiAnalytics {
+  brand_id: string;
+  period: string;
+  period_days: number;
+  generated_at: string;
+  kpis: Record<string, unknown>;
+  revenue_trend: { date: string; revenue: number }[];
+  orders_trend: { date: string; orders: number }[];
+  revenue_by_category: { category: string; revenue: number; percentage: number }[];
+  regional_performance: { region: string; revenue: number; orders: number; top_product: string; change_pct: number }[];
+  top_products: { product_id: string; name: string; sku: string; revenue: number; units_sold: number; change_pct: number }[];
+  demand_signals: { id: string; type: string; title: string; description: string; change_pct: number; confidence: number; actionable: boolean; suggested_action?: string }[];
+}
+
+// Safely extract a numeric value from nested KPI objects
+function kpiValue(kpi: unknown): number {
+  if (typeof kpi === 'number') return kpi;
+  if (kpi && typeof kpi === 'object' && 'value' in kpi) {
+    const v = (kpi as Record<string, unknown>).value;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') return parseFloat(v) || 0;
+  }
+  return 0;
+}
+
+function kpiChange(kpi: unknown): number {
+  if (kpi && typeof kpi === 'object') {
+    const obj = kpi as Record<string, unknown>;
+    const cp = obj.change_percentage ?? obj.change_pct ?? 0;
+    if (typeof cp === 'number') return cp;
+    if (typeof cp === 'string') return parseFloat(cp) || 0;
+  }
+  return 0;
+}
+
 export default function AnalyticsPage() {
-  const { analytics } = useBrand();
+  
   const [period, setPeriod] = useState<TimePeriod>('30d');
+  const [analytics, setAnalytics] = useState<ApiAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAnalytics = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const token = localStorage.getItem('moda-brand-token');
+        const res = await window.fetch(`/api/v1/brand/analytics?period=${PERIOD_PARAM[period]}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        if (!res.ok) throw new Error(`Analytics API returned ${res.status}`);
+        const data: ApiAnalytics = await res.json();
+        if (!cancelled) setAnalytics(data);
+      } catch (err) {
+        console.error('[Analytics] Failed to load:', err);
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load analytics');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchAnalytics();
+    return () => { cancelled = true; };
+  }, [period]);
 
   const periodLabels: Record<TimePeriod, string> = {
     '7d': 'Last 7 Days',
     '30d': 'Last 30 Days',
     '90d': 'Last 90 Days',
-    '12m': 'Last 12 Months'
+    '1y': 'Last 12 Months'
   };
 
-  if (!analytics) {
+  if (loading) {
     return (
       <div className="p-8 text-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-stone">Loading analytics...</p>
       </div>
     );
   }
 
-  const scale = PERIOD_SCALE[period];
+  if (error || !analytics) {
+    return (
+      <div className="p-8">
+        <div className="bg-error/10 border border-error/20 p-6 text-center">
+          <AlertCircle size={24} className="mx-auto text-error mb-2" />
+          <p className="text-sm text-error">{error || 'No analytics data available'}</p>
+          <button
+            onClick={() => { setError(null); setLoading(true); }}
+            className="mt-3 px-4 py-2 text-xs text-charcoal-deep border border-sand hover:bg-parchment transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  // Period-adjusted metrics
-  const periodRevenue = Math.round(analytics.revenue.current * scale.revenue);
-  const periodRevenueChange = +(analytics.revenue.changePercent * scale.change).toFixed(1);
-  const periodOrders = Math.round(analytics.orders.totalOrders * scale.orders);
-  const periodOrdersChange = +(analytics.orders.changePercent * scale.change).toFixed(1);
-  const periodAov = periodOrders > 0 ? Math.round(periodRevenue / periodOrders) : 0;
-  const periodAovChange = +(analytics.orders.aovChangePercent * scale.change).toFixed(1);
+  const rawKpis = analytics.kpis || {};
+  const kpis = {
+    total_revenue: kpiValue(rawKpis.revenue ?? rawKpis.total_revenue),
+    revenue_change_pct: kpiChange(rawKpis.revenue ?? rawKpis),
+    total_orders: kpiValue(rawKpis.orders ?? rawKpis.total_orders),
+    orders_change_pct: kpiChange(rawKpis.orders ?? rawKpis),
+    average_order_value: kpiValue(rawKpis.avg_order_value ?? rawKpis.average_order_value),
+    aov_change_pct: kpiChange(rawKpis.avg_order_value ?? rawKpis),
+    return_rate: kpiValue(rawKpis.return_rate),
+  };
 
-  const formatCurrency = (value: number) => {
-    if (value >= 1000000) {
-      return `€${(value / 1000000).toFixed(2)}M`;
-    }
-    if (value >= 1000) {
-      return `€${(value / 1000).toFixed(0)}K`;
-    }
-    return `€${value.toLocaleString()}`;
+  const formatCurrency = (value: number | undefined | null, compact = true) => {
+    return compact ? formatPrice(value, undefined, true) : formatPrice(value);
   };
 
   const periods: { value: TimePeriod; label: string }[] = [
     { value: '7d', label: '7 Days' },
     { value: '30d', label: '30 Days' },
     { value: '90d', label: '90 Days' },
-    { value: '12m', label: '12 Months' }
+    { value: '1y', label: '12 Months' }
   ];
 
   const getDemandSignalColor = (type: string) => {
@@ -91,24 +169,24 @@ export default function AnalyticsPage() {
   };
 
   const exportTopProductsCSV = () => {
-    const rows = analytics.topProducts.map(p => ({
+    const rows = analytics.top_products.map(p => ({
       Product: p.name,
       SKU: p.sku,
-      Revenue: Math.round(p.revenue * scale.revenue),
-      'Units Sold': Math.round(p.units * scale.orders),
-      'Change %': p.changePercent,
+      Revenue: p.revenue,
+      'Units Sold': p.units_sold,
+      'Change %': p.change_pct,
     }));
     const csv = convertToCSV(rows);
     downloadCSV(buildFilename('top-products', periodLabels[period]), csv);
   };
 
   const exportRegionalCSV = () => {
-    const rows = analytics.regionalMetrics.map(r => ({
+    const rows = analytics.regional_performance.map(r => ({
       Region: r.region,
-      Revenue: Math.round(r.revenue * scale.revenue),
+      Revenue: r.revenue,
       Orders: r.orders,
-      'Top Product': r.topProduct,
-      'Change %': +(r.changePercent * scale.change).toFixed(1),
+      'Top Product': r.top_product,
+      'Change %': r.change_pct,
     }));
     const csv = convertToCSV(rows);
     downloadCSV(buildFilename('regional-analytics', periodLabels[period]), csv);
@@ -137,10 +215,6 @@ export default function AnalyticsPage() {
               </button>
             ))}
           </div>
-          <ExportButton options={[
-            { label: 'Export Top Products (CSV)', onClick: exportTopProductsCSV },
-            { label: 'Export Regional Data (CSV)', onClick: exportRegionalCSV },
-          ]} />
         </div>
       </BrandPageHeader>
 
@@ -149,26 +223,26 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             label="Revenue"
-            value={formatCurrency(periodRevenue)}
-            change={periodRevenueChange}
+            value={formatCurrency(kpis.total_revenue)}
+            change={kpis.revenue_change_pct}
             changeLabel="vs previous period"
           />
           <MetricCard
             label="Orders"
-            value={periodOrders.toLocaleString()}
-            change={periodOrdersChange}
+            value={kpis.total_orders.toLocaleString()}
+            change={kpis.orders_change_pct}
             changeLabel="vs previous period"
           />
           <MetricCard
             label="Average Order Value"
-            value={formatCurrency(periodAov)}
-            change={periodAovChange}
+            value={formatCurrency(kpis.average_order_value)}
+            change={kpis.aov_change_pct}
             changeLabel="vs previous period"
           />
           <MetricCard
             label="Return Rate"
-            value={`${analytics.orders.returnRate.toFixed(1)}%`}
-            trend={analytics.orders.returnRate > 3 ? 'down' : 'up'}
+            value={`${kpis.return_rate.toFixed(1)}%`}
+            trend={kpis.return_rate > 3 ? 'down' : 'up'}
           />
         </div>
 
@@ -209,23 +283,26 @@ export default function AnalyticsPage() {
             </div>
             <div className="p-6">
               <div className="space-y-4">
-                {analytics.revenue.breakdown.map(item => (
-                  <div key={item.category}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-charcoal-deep capitalize">{item.category}</span>
-                      <div className="flex items-center gap-4">
-                        <span className="text-sm text-stone">{formatCurrency(Math.round(item.revenue * scale.revenue))}</span>
-                        <span className="text-xs text-taupe w-12 text-right">{item.percentage.toFixed(1)}%</span>
+                {(() => {
+                  const totalRevenue = (analytics.revenue_by_category || []).reduce((s, i) => s + (i.revenue || 0), 0) || 1;
+                  return (analytics.revenue_by_category || []).map(item => {
+                    const pct = totalRevenue > 0 ? ((item.revenue || 0) / totalRevenue) * 100 : 0;
+                    return (
+                      <div key={item.category}>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm text-charcoal-deep capitalize">{item.category}</span>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm text-stone">{formatCurrency(item.revenue)}</span>
+                            <span className="text-xs text-taupe w-12 text-right">{pct.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                        <div className="h-2 bg-parchment overflow-hidden">
+                          <div className="h-full bg-charcoal-deep transition-all" style={{ width: `${pct}%` }} />
+                        </div>
                       </div>
-                    </div>
-                    <div className="h-2 bg-parchment overflow-hidden">
-                      <div
-                        className="h-full bg-charcoal-deep transition-all"
-                        style={{ width: `${item.percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                    );
+                  });
+                })()}
               </div>
             </div>
           </div>
@@ -236,25 +313,28 @@ export default function AnalyticsPage() {
               <h2 className="font-medium text-charcoal-deep">Regional Performance</h2>
             </div>
             <div className="divide-y divide-sand/30">
-              {analytics.regionalMetrics.map(region => (
-                <div key={region.region} className="px-6 py-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-parchment flex items-center justify-center">
-                      <Globe size={18} className="text-stone" />
+              {(analytics.regional_performance || []).map((region: Record<string, unknown>, idx: number) => {
+                const changePct = parseFloat(String(region.change_percentage ?? region.change_pct ?? 0));
+                return (
+                  <div key={String(region.region || idx)} className="px-6 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-parchment flex items-center justify-center">
+                        <Globe size={18} className="text-stone" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-charcoal-deep capitalize">{String(region.region)}</p>
+                        <p className="text-xs text-taupe">{Number(region.orders || 0)} orders</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-charcoal-deep">{region.region}</p>
-                      <p className="text-xs text-taupe">Top: {region.topProduct}</p>
+                    <div className="text-right">
+                      <p className="text-sm text-charcoal-deep">{formatCurrency(Number(region.revenue || 0))}</p>
+                      <p className={`text-xs ${changePct >= 0 ? 'text-success' : 'text-error'}`}>
+                        {changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-charcoal-deep">{formatCurrency(Math.round(region.revenue * scale.revenue))}</p>
-                    <p className={`text-xs ${region.changePercent >= 0 ? 'text-success' : 'text-error'}`}>
-                      {region.changePercent >= 0 ? '+' : ''}{(region.changePercent * scale.change).toFixed(1)}%
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>
@@ -292,37 +372,40 @@ export default function AnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-sand/30">
-                {analytics.topProducts.map((product, index) => (
-                  <tr key={product.id} className="hover:bg-parchment/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-taupe w-5">{index + 1}</span>
-                        <Link
-                          href={`/brand/products/${product.id}`}
-                          className="text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
-                        >
-                          {product.name}
-                        </Link>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-stone">{product.sku}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-sm font-medium text-charcoal-deep">
-                        {formatCurrency(Math.round(product.revenue * scale.revenue))}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-sm text-stone">{Math.round(product.units * scale.orders)}</span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className={`text-sm ${product.changePercent >= 0 ? 'text-success' : 'text-error'}`}>
-                        {product.changePercent >= 0 ? '+' : ''}{product.changePercent.toFixed(1)}%
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {(analytics.top_products || []).map((product: Record<string, unknown>, index: number) => {
+                  const changePct = parseFloat(String(product.change_percentage ?? product.change_pct ?? 0));
+                  return (
+                    <tr key={String(product.product_id || index)} className="hover:bg-parchment/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-taupe w-5">{index + 1}</span>
+                          <Link
+                            href={`/brand/products/${product.product_id}`}
+                            className="text-sm text-charcoal-deep hover:text-gold-muted transition-colors"
+                          >
+                            {String(product.product_name || product.name || '')}
+                          </Link>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-stone">{String(product.sku || '')}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm font-medium text-charcoal-deep">
+                          {formatCurrency(Number(product.revenue || 0))}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="text-sm text-stone">{Number(product.units ?? product.units_sold ?? 0)}</span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className={`text-sm ${changePct >= 0 ? 'text-success' : 'text-error'}`}>
+                          {changePct >= 0 ? '+' : ''}{changePct.toFixed(1)}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -334,42 +417,43 @@ export default function AnalyticsPage() {
             <h2 className="font-medium text-charcoal-deep">Demand Signals</h2>
           </div>
           <div className="divide-y divide-sand/30">
-            {analytics.demandSignals.map(signal => (
-              <div key={signal.id} className="px-6 py-4">
-                <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 flex items-center justify-center ${getDemandSignalColor(signal.type)}`}>
-                    {signal.changePercent >= 0 ? (
-                      <TrendingUp size={18} />
-                    ) : (
-                      <TrendingDown size={18} />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-1">
-                      <p className="font-medium text-charcoal-deep">{signal.title}</p>
-                      <span className={`px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getDemandSignalColor(signal.type)}`}>
-                        {signal.type}
-                      </span>
+            {(analytics.demand_signals || []).map((signal: Record<string, unknown>, idx: number) => {
+              const signalType = String(signal.signal_type || signal.type || 'demand');
+              const changePct = parseFloat(String(signal.change_percentage ?? signal.change_pct ?? 0));
+              const actions = signal.suggested_actions as string[] | undefined;
+              return (
+                <div key={idx} className="px-6 py-4">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 flex items-center justify-center ${getDemandSignalColor(signalType)}`}>
+                      {changePct >= 0 ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                     </div>
-                    <p className="text-sm text-stone">{signal.description}</p>
-                    {signal.actionable && signal.suggestedAction && (
-                      <p className="text-xs text-info mt-2 flex items-center gap-1">
-                        <BarChart3 size={12} />
-                        Suggested: {signal.suggestedAction}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <p className="font-medium text-charcoal-deep">{String(signal.title || '')}</p>
+                        <span className={`px-2 py-0.5 text-[10px] tracking-[0.1em] uppercase ${getDemandSignalColor(signalType)}`}>
+                          {signalType}
+                        </span>
+                      </div>
+                      <p className="text-sm text-stone">{String(signal.subtitle || signal.description || '')}</p>
+                      {actions && actions.length > 0 && (
+                        <p className="text-xs text-info mt-2 flex items-center gap-1">
+                          <BarChart3 size={12} />
+                          {actions[0]}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-medium ${changePct >= 0 ? 'text-success' : 'text-error'}`}>
+                        {changePct >= 0 ? '+' : ''}{changePct}%
                       </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-medium ${signal.changePercent >= 0 ? 'text-success' : 'text-error'}`}>
-                      {signal.changePercent >= 0 ? '+' : ''}{signal.changePercent}%
-                    </p>
-                    <p className="text-xs text-taupe mt-1">
-                      {signal.confidence}% confidence
-                    </p>
+                      <p className="text-xs text-taupe mt-1">
+                        {Number(signal.confidence || 0)}% confidence
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

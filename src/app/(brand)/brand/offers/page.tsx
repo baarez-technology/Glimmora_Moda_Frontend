@@ -8,6 +8,7 @@ import { fetchUhniOffers, type ApiOffer } from '@/services/uhni-offers.service';
 import { fetchProducts, type BackendProduct } from '@/services/brand-product.service';
 import { fetchCollections, type CollectionResponse } from '@/services/brand-collection.service';
 import { useApp } from '@/context/AppContext';
+import { formatPrice } from '@/lib/currency';
 
 type FilterTab = 'all' | 'active' | 'upcoming' | 'expired';
 
@@ -173,7 +174,7 @@ export default function UHNIOffersPage() {
                       ) : (
                         <>
                           <Tag size={14} />
-                          <span className="text-sm font-medium">${offer.discount_value.toLocaleString()} OFF</span>
+                          <span className="text-sm font-medium">{formatPrice(offer.discount_value)} OFF</span>
                         </>
                       )}
                     </div>
