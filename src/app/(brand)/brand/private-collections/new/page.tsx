@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { formatPrice } from '@/lib/currency';
 import { ArrowLeft, Lock, Sparkles, Users, Crown, Loader2 } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import type { PrivateCollectionAccess, UhniCustomer } from '@/types/uhni';
@@ -368,7 +369,7 @@ export default function NewPrivateCollectionPage() {
                           {product.name}
                         </p>
                         {product.price !== undefined && (
-                          <p className="text-xs text-taupe">&euro;{product.price.toLocaleString()}</p>
+                          <p className="text-xs text-taupe">{formatPrice(product.price)}</p>
                         )}
                       </div>
                       <div className={`w-5 h-5 border flex items-center justify-center flex-shrink-0 ${

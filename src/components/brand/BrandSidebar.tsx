@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -36,7 +36,10 @@ import {
   Users,
   TrendingUp,
   Wand2,
-  RotateCcw
+  RotateCcw,
+  Bell,
+  CheckCheck,
+  X
 } from 'lucide-react';
 import { useBrand } from '@/context/BrandContext';
 
@@ -124,6 +127,26 @@ const navigation: NavSection[] = [
   }
 ];
 
+interface SidebarNotification {
+  notification_id: string;
+  notification_type: string;
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+  is_read: boolean;
+  created_at: string;
+}
+
+function timeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + 'm ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs / 24) + 'd ago';
+}
+
 export function BrandSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -131,6 +154,90 @@ export function BrandSidebar() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     Intelligence: true
   });
+
+  // Notifications
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<SidebarNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifs, setLoadingNotifs] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotifications(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const fetchCount = useCallback(async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('moda-brand-token') : null;
+      if (!token) return;
+      const res = await fetch('/api/v1/brand/notifications/count', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.unread ?? 0);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, [fetchCount]);
+
+  const fetchNotifications = async () => {
+    setLoadingNotifs(true);
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('moda-brand-token') : null;
+      if (!token) return;
+      const res = await fetch('/api/v1/brand/notifications?limit=10', {
+        headers: { Authorization: 'Bearer ' + token },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data.notifications || []);
+        setUnreadCount(data.unread ?? 0);
+      }
+    } catch {}
+    finally { setLoadingNotifs(false); }
+  };
+
+  const handleToggleNotifs = () => {
+    const next = !showNotifications;
+    setShowNotifications(next);
+    if (next) fetchNotifications();
+  };
+
+  const handleMarkRead = async (id: string) => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('moda-brand-token') : null;
+      if (!token) return;
+      await fetch('/api/v1/brand/notifications/' + id + '/read', {
+        method: 'PATCH', headers: { Authorization: 'Bearer ' + token },
+      });
+      setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch {}
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('moda-brand-token') : null;
+      if (!token) return;
+      await fetch('/api/v1/brand/notifications/read-all', {
+        method: 'PATCH', headers: { Authorization: 'Bearer ' + token },
+      });
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setUnreadCount(0);
+    } catch {}
+  };
 
   const handleLogout = () => {
     logout();
@@ -162,14 +269,86 @@ export function BrandSidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-sand flex flex-col z-40">
       {/* Logo Section */}
       <div className="p-6 border-b border-sand">
-        <Link href="/brand" className="block">
-          <h1 className="font-display text-xl text-charcoal-deep tracking-wide">
-            ModaGlimmora
-          </h1>
-          <span className="text-[10px] tracking-[0.2em] uppercase text-stone mt-1 block">
-            Brand Portal
-          </span>
-        </Link>
+        <div className="flex items-start justify-between">
+          <Link href="/brand" className="block flex-1">
+            <h1 className="font-display text-xl text-charcoal-deep tracking-wide">
+              ModaGlimmora
+            </h1>
+            <span className="text-[10px] tracking-[0.2em] uppercase text-stone mt-1 block">
+              Brand Portal
+            </span>
+          </Link>
+          <div ref={notifRef} className="relative flex-shrink-0 mt-0.5">
+            <button
+              onClick={handleToggleNotifs}
+              className="relative p-1.5 hover:bg-parchment transition-colors rounded"
+              aria-label="Notifications"
+            >
+              <Bell size={17} strokeWidth={1.5} className="text-charcoal-deep/70" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-[15px] h-[15px] bg-red-500 text-white text-[8px] font-semibold rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            {showNotifications && (
+              <div className="absolute left-0 top-full mt-2 w-80 bg-white shadow-xl border border-sand/50 z-50">
+                <div className="px-4 py-3 border-b border-sand/50 flex items-center justify-between">
+                  <span className="text-xs font-medium tracking-[0.1em] uppercase text-charcoal-deep">Notifications</span>
+                  <div className="flex items-center gap-2">
+                    {unreadCount > 0 && (
+                      <>
+                        <span className="text-[10px] text-gold-soft font-medium">{unreadCount} new</span>
+                        <button onClick={handleMarkAllRead} className="text-[10px] text-stone hover:text-charcoal-deep transition-colors" title="Mark all read">
+                          <CheckCheck size={12} />
+                        </button>
+                      </>
+                    )}
+                    <button onClick={() => setShowNotifications(false)} className="text-stone hover:text-charcoal-deep transition-colors">
+                      <X size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {loadingNotifs ? (
+                    <div className="px-4 py-8 text-center">
+                      <div className="w-5 h-5 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto" />
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <p className="text-xs text-stone">No notifications</p>
+                    </div>
+                  ) : (
+                    notifications.map((n, idx) => (
+                      <div
+                        key={`${n.notification_id}_${idx}`}
+                        onClick={() => !n.is_read && handleMarkRead(n.notification_id)}
+                        className={`px-4 py-3 border-b border-sand/20 last:border-0 hover:bg-parchment/50 transition-colors cursor-pointer ${n.is_read ? '' : 'bg-parchment/30'}`}
+                      >
+                        <div className="flex items-start gap-2.5">
+                          {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />}
+                          <div className={n.is_read ? 'ml-4' : ''}>
+                            <p className="text-xs font-medium text-charcoal-deep">{n.title}</p>
+                            <p className="text-xs text-stone leading-relaxed mt-0.5">{n.body}</p>
+                            <p className="text-[10px] text-taupe mt-1">{timeAgo(n.created_at)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                <Link
+                  href="/brand/notifications"
+                  onClick={() => setShowNotifications(false)}
+                  className="block px-4 py-2.5 text-center text-[10px] tracking-[0.15em] uppercase text-charcoal-deep hover:bg-parchment/50 transition-colors border-t border-sand/50"
+                >
+                  View All Notifications
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Brand Badge */}

@@ -31,7 +31,7 @@ import { useModalAccessibility } from '@/hooks/useModalAccessibility';
 type SettingsTab = 'profile' | 'team' | 'notifications' | 'commerce';
 
 export default function SettingsPage() {
-  const { partner, commerceSettings, updateTaxRule, updateShippingMethod, addShippingMethod, removeShippingMethod, updateCommerceConfig } = useBrand();
+  const { partner, commerceSettings, updateTaxRule, updateShippingMethod, addShippingMethod, removeShippingMethod, updateCommerceConfig, currency: brandCurrency, setCurrency: setBrandCurrency, patchBrandProfile } = useBrand();
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showKey, setShowKey] = useState<string | null>(null);
@@ -43,8 +43,12 @@ export default function SettingsPage() {
   const [newKeyPermissions, setNewKeyPermissions] = useState<('read' | 'write' | 'delete')[]>(['read']);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
-  // Display settings - controlled state
-  const [displayCurrency, setDisplayCurrency] = useState(partner?.settings.display.currency || 'EUR');
+  // Display settings - controlled state (currency synced with BrandContext)
+  const [displayCurrency, setDisplayCurrency] = useState(brandCurrency || partner?.settings.display.currency || 'USD');
+  const handleCurrencyChange = (c: string) => {
+    setDisplayCurrency(c);
+    setBrandCurrency(c);
+  };
   const [displayTimezone, setDisplayTimezone] = useState(partner?.settings.display.timezone || 'Europe/Paris');
   const [displayLanguage, setDisplayLanguage] = useState(partner?.settings.display.language || 'en');
 
@@ -156,13 +160,26 @@ export default function SettingsPage() {
     setTimeout(() => setSavedMessage(null), 3000);
   };
 
-  const handleSaveSettings = () => {
-    console.log('Saving settings:', {
-      display: { currency: displayCurrency, timezone: displayTimezone, language: displayLanguage },
-      notifications: notifSettings,
-      integration: { webhookUrl, syncFrequency },
-    });
-    setSavedMessage('Settings saved successfully');
+  const handleSaveSettings = async () => {
+    try {
+      await patchBrandProfile({
+        currency: displayCurrency,
+        timezone: displayTimezone,
+        language: displayLanguage,
+        email_notification: {
+          order_updates: notifSettings.orderUpdates,
+          inventory_alerts: notifSettings.lowStockAlerts,
+          weekly_reports: notifSettings.weeklyReports,
+        },
+      });
+      // Keep currency context in sync if changed
+      if (displayCurrency !== brandCurrency) {
+        setBrandCurrency(displayCurrency);
+      }
+      setSavedMessage('Settings saved successfully');
+    } catch {
+      setSavedMessage('Failed to save settings. Please try again.');
+    }
     setTimeout(() => setSavedMessage(null), 3000);
   };
 
@@ -274,12 +291,23 @@ export default function SettingsPage() {
                       </label>
                       <select
                         value={displayCurrency}
-                        onChange={(e) => setDisplayCurrency(e.target.value)}
+                        onChange={(e) => handleCurrencyChange(e.target.value)}
                         className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                       >
-                        <option value="EUR">EUR (&euro;)</option>
                         <option value="USD">USD ($)</option>
-                        <option value="GBP">GBP (&pound;)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="INR">INR (₹)</option>
+                        <option value="AED">AED (د.إ)</option>
+                        <option value="JPY">JPY (¥)</option>
+                        <option value="CHF">CHF (Fr)</option>
+                        <option value="CAD">CAD (CA$)</option>
+                        <option value="AUD">AUD (A$)</option>
+                        <option value="SGD">SGD (S$)</option>
+                        <option value="SAR">SAR (﷼)</option>
+                        <option value="KWD">KWD (KD)</option>
+                        <option value="QAR">QAR (QR)</option>
+                        <option value="BHD">BHD (BD)</option>
                       </select>
                     </div>
                     <div>

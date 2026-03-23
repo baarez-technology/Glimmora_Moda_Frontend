@@ -173,6 +173,8 @@ export interface BrandProfileUpdatePayload {
   profile_picture?: string;
   phone_number?: string;
   job_title?: string;
+  language?: string;
+  timezone?: string;
   email_notification?: {
     order_updates?: boolean;
     inventory_alerts?: boolean;

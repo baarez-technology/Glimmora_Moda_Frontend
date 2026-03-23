@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Image, Type, Quote, Clock, Trash2, Loader2 } from 'lucide-react';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
-import { createStory, fetchProductsList } from '@/services/brand-story.service';
-import type { ProductListItem } from '@/services/brand-story.service';
+import { createStory } from '@/services/brand-story.service';
 import StoryProductPicker from '@/components/brand/StoryProductPicker';
 
 type StoryType = 'heritage' | 'craftsmanship' | 'collection' | 'artisan';
@@ -22,8 +21,6 @@ interface ContentSection {
 export default function NewStoryPage() {
   const router = useRouter();
 
-  const [products, setProducts] = useState<ProductListItem[]>([]);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,22 +34,6 @@ export default function NewStoryPage() {
     product_list: [] as string[],
     status: 'draft' as 'draft' | 'published'
   });
-
-  useEffect(() => {
-    loadProducts();
-  }, []);
-
-  const loadProducts = async () => {
-    setIsLoadingProducts(true);
-    try {
-      const data = await fetchProductsList();
-      setProducts(data);
-    } catch {
-      // Products are optional, don't block the form
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -359,10 +340,8 @@ export default function NewStoryPage() {
           </div>
           <div className="p-6">
             <StoryProductPicker
-              products={products}
               selectedIds={formData.product_list}
               onToggle={toggleProduct}
-              isLoading={isLoadingProducts}
             />
           </div>
         </div>

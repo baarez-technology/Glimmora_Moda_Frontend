@@ -507,7 +507,6 @@ export default function StoryDetailPage() {
 
             <div className="flex-1 overflow-y-auto p-6">
               <StoryProductPicker
-                products={products}
                 selectedIds={pendingProductList}
                 onToggle={togglePending}
               />

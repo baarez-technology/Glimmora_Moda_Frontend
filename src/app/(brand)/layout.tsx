@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { BrandProvider, useBrand } from '@/context/BrandContext';
 import { BrandSidebar } from '@/components/brand/BrandSidebar';
-import { BrandTopBar } from '@/components/brand/BrandTopBar';
 import { MaintenanceGate } from '@/components/MaintenanceGate';
 
 function BrandLayoutContent({ children }: { children: React.ReactNode }) {
@@ -50,7 +49,6 @@ function BrandLayoutContent({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen bg-ivory-cream">
         <BrandSidebar />
         <main className="ml-64">
-          <BrandTopBar />
           {children}
         </main>
       </div>

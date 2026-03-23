@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, FileText, Star } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Check, Clock, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, FileText, Star } from 'lucide-react';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -11,6 +11,8 @@ import { useRouter } from 'next/navigation';
 import * as orderManagementService from '@/services/order-management.service';
 import type { CustomerOrder } from '@/services/order-management.service';
 import { formatPrice } from '@/lib/currency';
+import { submitReview, getReviewsByCustomer, type ProductReview } from '@/services/reviews.service';
+import { submitReturnRequest, getReturnForOrder, RETURN_REASONS, type ReturnRequest } from '@/services/returns.service';
 
 interface OrderDetailPageProps {
   params: Promise<{ id: string }>;
@@ -81,6 +83,25 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   const [showSupportModal, setShowSupportModal] = useState(false);
   const [selectedReturnItems, setSelectedReturnItems] = useState<string[]>([]);
 
+  // Per-product review state
+  const [reviewModal, setReviewModal] = useState<CustomerOrder['products'][0] | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewHover, setReviewHover] = useState(0);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewContent, setReviewContent] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [submittedReviews, setSubmittedReviews] = useState<ProductReview[]>([]);
+
+  // Per-product return state
+  const [productReturnModal, setProductReturnModal] = useState<CustomerOrder['products'][0] | null>(null);
+  const [returnReason, setReturnReason] = useState<ReturnRequest['reason']>('wrong_size');
+  const [returnDetails, setReturnDetails] = useState('');
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+
+  useEffect(() => {
+    try { setSubmittedReviews(getReviewsByCustomer()); } catch { /* ignore */ }
+  }, []);
+
   const fetchOrder = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -110,7 +131,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
         else if (showSupportModal) setShowSupportModal(false);
       }
     };
-    if (showTracking || showInvoice || showReturnModal || showSupportModal) {
+    if (showTracking || showInvoice || showReturnModal || showSupportModal || reviewModal || productReturnModal) {
       document.addEventListener('keydown', handleKeyDown);
       return () => document.removeEventListener('keydown', handleKeyDown);
     }
@@ -177,7 +198,6 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
   }
 
   const currency = order.payment_currency || 'USD';
-  const isDelivered = order.delivery_status === 'delivered';
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -246,9 +266,71 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                         {product.color && <span>Color: {product.color}</span>}
                         <span>Qty: {product.quantity}</span>
                       </div>
-                      <p className="mt-2 text-charcoal-deep font-medium">
-                        {formatCurrency(product.product_price, currency)}
-                      </p>
+                      <div className="flex items-center justify-between mt-2">
+                        <p className="text-charcoal-deep font-medium">
+                          {formatCurrency(product.product_price, currency)}
+                        </p>
+                        {product.delivery_status && (
+                          <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1 ${
+                            product.delivery_status === 'delivered' ? 'bg-success/10 text-success' :
+                            product.delivery_status === 'shipped' ? 'bg-charcoal-deep/10 text-charcoal-deep' :
+                            product.delivery_status === 'processing' ? 'bg-gold-muted/10 text-gold-muted' :
+                            product.delivery_status === 'cancelled' ? 'bg-error/10 text-error' :
+                            'bg-parchment text-stone'
+                          }`}>
+                            {product.delivery_status === 'delivered' && <Check size={12} />}
+                            {product.delivery_status === 'shipped' && <Truck size={12} />}
+                            {product.delivery_status === 'processing' && <Clock size={12} />}
+                            {!['delivered','shipped','processing','cancelled'].includes(product.delivery_status) && <Package size={12} />}
+                            {product.delivery_status.charAt(0).toUpperCase() + product.delivery_status.slice(1)}
+                          </span>
+                        )}
+                      </div>
+                      {product.delivery_tracking_number && (
+                        <p className="text-xs text-stone mt-1">Tracking: {product.delivery_tracking_number}</p>
+                      )}
+                      {product.delivery_status === 'delivered' && (
+                        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-sand">
+                          {/* Review button / reviewed state */}
+                          {(() => {
+                            const reviewed = submittedReviews.find(r => order && r.order_id === order.order_id && r.product_id === product.product_id);
+                            return reviewed ? (
+                              <span className="flex items-center gap-1 text-xs text-gold-deep tracking-[0.1em] uppercase">
+                                {[1,2,3,4,5].map(s => (
+                                  <Star key={s} size={10} className={s <= reviewed.rating ? 'fill-gold-muted text-gold-muted' : 'text-sand'} />
+                                ))}
+                                Reviewed
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => { setReviewModal(product); setReviewRating(0); setReviewHover(0); setReviewTitle(''); setReviewContent(''); }}
+                                className="flex items-center gap-1.5 text-xs text-gold-deep hover:text-gold-muted transition-colors tracking-[0.1em] uppercase"
+                              >
+                                <Star size={13} />
+                                Write Review
+                              </button>
+                            );
+                          })()}
+                          {/* Return button / return status */}
+                          {order && (() => {
+                            const ret = getReturnForOrder(`${order.order_id}-${product.product_id}`);
+                            return ret ? (
+                              <span className={`flex items-center gap-1.5 text-xs tracking-[0.1em] uppercase ${ret.status === 'approved' ? 'text-success' : ret.status === 'rejected' ? 'text-error' : 'text-stone'}`}>
+                                <RotateCcw size={13} />
+                                Return {ret.status}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => { setProductReturnModal(product); setReturnReason('wrong_size'); setReturnDetails(''); }}
+                                className="flex items-center gap-1.5 text-xs text-stone hover:text-charcoal-deep transition-colors tracking-[0.1em] uppercase"
+                              >
+                                <RotateCcw size={13} />
+                                Return
+                              </button>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -258,7 +340,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             {/* Actions */}
             <div className="bg-white p-8">
               <h2 className="font-display text-xl text-charcoal-deep mb-8">Need Help?</h2>
-              <div className={`grid gap-4 ${isDelivered ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <button
                   onClick={() => setShowInvoice(true)}
                   className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
@@ -266,28 +348,6 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                   <FileText size={20} className="text-stone" />
                   <span className="text-sm text-charcoal-deep">View Invoice</span>
                 </button>
-                <button
-                  onClick={() => {
-                    if (order.delivery_status === 'delivered') {
-                      setShowReturnModal(true);
-                    } else {
-                      showToast('Returns available after delivery', 'info');
-                    }
-                  }}
-                  className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
-                >
-                  <RotateCcw size={20} className="text-stone" />
-                  <span className="text-sm text-charcoal-deep">Return Items</span>
-                </button>
-                {isDelivered && (
-                  <Link
-                    href={`/profile/reviews?orderId=${order.order_id}`}
-                    className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
-                  >
-                    <Star size={20} className="text-gold-muted" />
-                    <span className="text-sm text-charcoal-deep">Write Review</span>
-                  </Link>
-                )}
                 <button
                   onClick={() => setShowSupportModal(true)}
                   className="flex items-center gap-3 p-5 border border-sand hover:border-charcoal-deep transition-colors"
@@ -526,6 +586,120 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
             >
               Submit Return Request{selectedReturnItems.length > 0 ? ` (${selectedReturnItems.length})` : ''}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Per-product Review Modal */}
+      {reviewModal && order && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setReviewModal(null)}>
+          <div className="bg-white max-w-md w-full p-8" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Write a Review</h3>
+              <button onClick={() => setReviewModal(null)} className="p-2 hover:bg-sand/20 transition-colors"><X size={18} /></button>
+            </div>
+            <div className="flex items-center gap-4 mb-6 p-4 bg-parchment/50">
+              {reviewModal.product_image && (
+                <Image src={reviewModal.product_image} alt={reviewModal.product_name} width={48} height={64} className="object-cover" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-charcoal-deep">{reviewModal.product_name}</p>
+                <p className="text-xs text-stone">Order #{order.order_id}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">Your Rating *</label>
+                <div className="flex items-center gap-1">
+                  {[1,2,3,4,5].map(star => (
+                    <button key={star} type="button" onMouseEnter={() => setReviewHover(star)} onMouseLeave={() => setReviewHover(0)} onClick={() => setReviewRating(star)} className="p-0.5">
+                      <Star size={28} className={`transition-colors ${star <= (reviewHover || reviewRating) ? 'fill-gold-muted text-gold-muted' : 'text-sand fill-transparent'}`} />
+                    </button>
+                  ))}
+                  {reviewRating > 0 && <span className="ml-2 text-sm text-stone">{['','Poor','Fair','Good','Very Good','Excellent'][reviewRating]}</span>}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Review Title</label>
+                <input type="text" value={reviewTitle} onChange={e => setReviewTitle(e.target.value)} placeholder="Summarise your experience..." className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe" />
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Review</label>
+                <textarea value={reviewContent} onChange={e => setReviewContent(e.target.value)} rows={4} placeholder="Share your thoughts on quality, fit, and style..." className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setReviewModal(null)} className="flex-1 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors">Cancel</button>
+              <button
+                onClick={() => {
+                  if (reviewRating === 0) { showToast('Please select a star rating', 'error'); return; }
+                  setSubmittingReview(true);
+                  try {
+                    const review = submitReview({ order_id: order.order_id, product_id: reviewModal.product_id, product_name: reviewModal.product_name, product_image: reviewModal.product_image, brand_name: reviewModal.brand_id || '', rating: reviewRating, title: reviewTitle, content: reviewContent });
+                    setSubmittedReviews(prev => [...prev, review]);
+                    showToast('Thank you for your review!', 'success');
+                    setReviewModal(null);
+                  } catch { showToast('Failed to submit review', 'error'); }
+                  finally { setSubmittingReview(false); }
+                }}
+                disabled={submittingReview || reviewRating === 0}
+                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                {submittingReview ? 'Submitting...' : 'Submit Review'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-product Return Modal */}
+      {productReturnModal && order && (
+        <div className="fixed inset-0 bg-charcoal-deep/60 flex items-center justify-center z-50 p-4" onClick={() => setProductReturnModal(null)}>
+          <div className="bg-white max-w-md w-full p-8" role="dialog" aria-modal="true" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-display text-xl text-charcoal-deep">Request Return</h3>
+              <button onClick={() => setProductReturnModal(null)} className="p-2 hover:bg-sand/20 transition-colors"><X size={18} /></button>
+            </div>
+            <div className="flex items-center gap-4 mb-6 p-4 bg-parchment/50">
+              {productReturnModal.product_image && (
+                <Image src={productReturnModal.product_image} alt={productReturnModal.product_name} width={48} height={64} className="object-cover" />
+              )}
+              <div>
+                <p className="text-sm font-medium text-charcoal-deep">{productReturnModal.product_name}</p>
+                <p className="text-xs text-stone">Order #{order.order_id}</p>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Reason for return *</label>
+                <select value={returnReason} onChange={e => setReturnReason(e.target.value as ReturnRequest['reason'])} className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep">
+                  {RETURN_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Additional details</label>
+                <textarea value={returnDetails} onChange={e => setReturnDetails(e.target.value)} rows={3} placeholder="Describe the issue..." className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe resize-none" />
+              </div>
+              <p className="text-xs text-taupe">Your return request will be reviewed by the brand. You&apos;ll be notified once it&apos;s approved.</p>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button onClick={() => setProductReturnModal(null)} className="flex-1 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep transition-colors">Cancel</button>
+              <button
+                onClick={() => {
+                  setSubmittingReturn(true);
+                  submitReturnRequest({ order_id: order.order_id, product_id: productReturnModal.product_id, product_name: productReturnModal.product_name, product_image: productReturnModal.product_image, brand_name: productReturnModal.brand_id || '', reason: returnReason, reason_details: returnDetails || undefined, refund_amount: productReturnModal.product_price, currency });
+                  showToast('Return request submitted. The brand will review it shortly.', 'success');
+                  setProductReturnModal(null);
+                  setReturnReason('wrong_size');
+                  setReturnDetails('');
+                  setSubmittingReturn(false);
+                }}
+                disabled={submittingReturn}
+                className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+              >
+                {submittingReturn ? 'Submitting...' : 'Submit Request'}
+              </button>
+            </div>
           </div>
         </div>
       )}

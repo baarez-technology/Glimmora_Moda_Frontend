@@ -420,10 +420,8 @@ export default function EditStoryPage() {
           </div>
           <div className="p-6">
             <StoryProductPicker
-              products={products}
               selectedIds={formData.product_list}
               onToggle={toggleProduct}
-              isLoading={false}
             />
           </div>
         </div>
