@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Star, Navigation, Phone } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
 import { getRecommendedProductsPaginated, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
-import { getAllBrandShops, type BrandShopLocation } from '@/services/brand-locations.service';
+import { getAllShopLocations as getAllBrandShops, type BrandShopLocation } from '@/services/brand-locations.service';
 import { getReviewsByBrand, type ProductReview } from '@/services/reviews.service';
 import type { PaginatedProducts } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
@@ -120,7 +120,7 @@ export default function BrandPage({ params }: BrandPageProps) {
         setTimeout(() => setIsLoaded(true), 50);
         // Load shop location and reviews (non-blocking)
         try {
-          const allShops = getAllBrandShops();
+          const allShops = await getAllBrandShops();
           const brandShop = allShops.find(s => s.is_active) || null;
           setShopLocation(brandShop);
         } catch { /* no shops */ }
