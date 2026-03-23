@@ -1,95 +1,118 @@
 /**
  * Brand Shop/Boutique Locations Service
  *
- * Manages brand shop locations using localStorage as a temporary data store.
- * When backend APIs are built, swap localStorage calls with fetch calls.
+ * Calls the real backend APIs via the Next.js proxy.
+ * All paths are relative (/api/v1/...) — never use absolute URLs (see CLAUDE.md).
  */
 
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface BrandShopLocation {
-  id: string;
+  shop_id: string;
   brand_id: string;
   shop_name: string;
-  address_line1: string;
-  address_line2?: string;
+  shop_type: string; // 'flagship' | 'boutique' | 'outlet' | 'popup' | 'department_store'
+  address_line_1: string;
+  address_line_2?: string | null;
   city: string;
-  state: string;
+  state?: string | null;
   country: string;
-  postal_code: string;
+  postal_code?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  opening_hours?: string | null;
+  image_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  is_active: boolean;
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CreateShopLocationPayload = {
+  shop_name: string;
+  shop_type: string;
+  address_line_1: string;
+  address_line_2?: string;
+  city: string;
+  state?: string;
+  country: string;
+  postal_code?: string;
   phone?: string;
   email?: string;
-  latitude: number;
-  longitude: number;
   opening_hours?: string;
-  shop_type: 'flagship' | 'boutique' | 'outlet' | 'popup' | 'department_store';
   image_url?: string;
-  is_active: boolean;
-  created_at: string;
+  latitude?: number;
+  longitude?: number;
+  is_active?: boolean;
+};
+
+export type UpdateShopLocationPayload = Partial<CreateShopLocationPayload>;
+
+// ── Auth helpers ─────────────────────────────────────────────────────
+
+const BASE = '/api/v1/brand/shop-locations';
+
+function getToken(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem('moda-brand-token') || '';
 }
 
-export type CreateShopLocationPayload = Omit<BrandShopLocation, 'id' | 'created_at'>;
-export type UpdateShopLocationPayload = Partial<Omit<BrandShopLocation, 'id' | 'created_at'>>;
-
-// ── localStorage helpers ─────────────────────────────────────────────
-
-const LS_KEY = 'moda-brand-shops';
-
-function readAll(): BrandShopLocation[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) || '[]');
-  } catch {
-    return [];
-  }
-}
-
-function writeAll(locations: BrandShopLocation[]): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(LS_KEY, JSON.stringify(locations));
+function authHeaders(): Record<string, string> {
+  return {
+    Authorization: `Bearer ${getToken()}`,
+    'Content-Type': 'application/json',
+  };
 }
 
 // ── CRUD Functions ───────────────────────────────────────────────────
 
 /** Get all shop locations for the current brand */
-export function getAllShopLocations(): BrandShopLocation[] {
-  return readAll();
+export async function getAllShopLocations(): Promise<BrandShopLocation[]> {
+  const res = await fetch(BASE, { headers: authHeaders() });
+  if (!res.ok) throw new Error(`Failed to fetch shop locations: ${res.status}`);
+  const data = await res.json();
+  return data.shop_locations ?? [];
 }
 
 /** Add a new shop location */
-export function addShopLocation(data: CreateShopLocationPayload): BrandShopLocation {
-  const locations = readAll();
-  const newLocation: BrandShopLocation = {
-    ...data,
-    id: Date.now().toString(36),
-    created_at: new Date().toISOString(),
-  };
-  locations.unshift(newLocation);
-  writeAll(locations);
-  return newLocation;
+export async function addShopLocation(payload: CreateShopLocationPayload): Promise<BrandShopLocation> {
+  const res = await fetch(BASE, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to add shop location: ${res.status}`);
+  return res.json();
 }
 
 /** Update an existing shop location */
-export function updateShopLocation(id: string, data: UpdateShopLocationPayload): BrandShopLocation {
-  const locations = readAll();
-  const idx = locations.findIndex(loc => loc.id === id);
-  if (idx === -1) throw new Error(`Shop location not found: ${id}`);
-  locations[idx] = { ...locations[idx], ...data };
-  writeAll(locations);
-  return locations[idx];
+export async function updateShopLocation(id: string, payload: UpdateShopLocationPayload): Promise<BrandShopLocation> {
+  const res = await fetch(`${BASE}/${id}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to update shop location: ${res.status}`);
+  return res.json();
 }
 
-/** Delete a shop location */
-export function deleteShopLocation(id: string): void {
-  const locations = readAll();
-  const filtered = locations.filter(loc => loc.id !== id);
-  if (filtered.length === locations.length) throw new Error(`Shop location not found: ${id}`);
-  writeAll(filtered);
+/** Hard delete a shop location */
+export async function deleteShopLocation(id: string): Promise<void> {
+  const res = await fetch(`${BASE}/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to delete shop location: ${res.status}`);
 }
 
-// ── Consumer Function ────────────────────────────────────────────────
-
-/** Get ALL shops across all brands (for consumer map view) */
-export function getAllBrandShops(): BrandShopLocation[] {
-  return readAll().filter(loc => loc.is_active);
+/** Set a shop location as the default */
+export async function makeDefaultShopLocation(id: string): Promise<BrandShopLocation> {
+  const res = await fetch(`${BASE}/${id}/make-default`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to set default shop location: ${res.status}`);
+  return res.json();
 }
