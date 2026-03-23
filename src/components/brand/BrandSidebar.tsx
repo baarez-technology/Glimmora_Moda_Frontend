@@ -128,10 +128,11 @@ const navigation: NavSection[] = [
 ];
 
 interface SidebarNotification {
-  id: string;
+  notification_id: string;
+  notification_type: string;
   title: string;
-  message: string;
-  type: string;
+  body: string;
+  data?: Record<string, string>;
   is_read: boolean;
   created_at: string;
 }
@@ -221,7 +222,7 @@ export function BrandSidebar() {
       await fetch('/api/v1/brand/notifications/' + id + '/read', {
         method: 'PATCH', headers: { Authorization: 'Bearer ' + token },
       });
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
       setUnreadCount(prev => Math.max(0, prev - 1));
     } catch {}
   };
@@ -319,17 +320,17 @@ export function BrandSidebar() {
                       <p className="text-xs text-stone">No notifications</p>
                     </div>
                   ) : (
-                    notifications.map(n => (
+                    notifications.map((n, idx) => (
                       <div
-                        key={n.id}
-                        onClick={() => !n.is_read && handleMarkRead(n.id)}
+                        key={`${n.notification_id}_${idx}`}
+                        onClick={() => !n.is_read && handleMarkRead(n.notification_id)}
                         className={`px-4 py-3 border-b border-sand/20 last:border-0 hover:bg-parchment/50 transition-colors cursor-pointer ${n.is_read ? '' : 'bg-parchment/30'}`}
                       >
                         <div className="flex items-start gap-2.5">
                           {!n.is_read && <span className="w-1.5 h-1.5 rounded-full bg-gold-soft mt-1.5 flex-shrink-0" />}
                           <div className={n.is_read ? 'ml-4' : ''}>
                             <p className="text-xs font-medium text-charcoal-deep">{n.title}</p>
-                            <p className="text-xs text-stone leading-relaxed mt-0.5">{n.message}</p>
+                            <p className="text-xs text-stone leading-relaxed mt-0.5">{n.body}</p>
                             <p className="text-[10px] text-taupe mt-1">{timeAgo(n.created_at)}</p>
                           </div>
                         </div>

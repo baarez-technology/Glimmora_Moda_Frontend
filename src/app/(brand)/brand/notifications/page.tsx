@@ -5,10 +5,12 @@ import { Bell, CheckCheck, Loader2 } from 'lucide-react';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 
 interface Notification {
-  id: string;
+  notification_id: string;
+  brand_id: string;
+  notification_type: string;
   title: string;
-  message: string;
-  type: string;
+  body: string;
+  data?: Record<string, string>;
   is_read: boolean;
   created_at: string;
 }
@@ -57,7 +59,7 @@ export default function NotificationsPage() {
       method: 'PATCH',
       headers: { 'Authorization': `Bearer ${token}` },
     }).catch(() => {});
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+    setNotifications(prev => prev.map(n => n.notification_id === id ? { ...n, is_read: true } : n));
   };
 
   const handleMarkAllRead = async () => {
@@ -109,26 +111,64 @@ export default function NotificationsPage() {
           </div>
         ) : (
           <div className="bg-white border border-sand/50 divide-y divide-sand/30">
-            {notifications.map(n => (
+            {notifications.map((n, idx) => (
               <div
-                key={n.id}
-                onClick={() => !n.is_read && handleMarkRead(n.id)}
-                className={`px-6 py-4 hover:bg-parchment/30 transition-colors cursor-pointer flex items-start gap-4 ${n.is_read ? '' : 'bg-parchment/20'}`}
+                key={`${n.notification_id}_${idx}`}
+                onClick={() => !n.is_read && handleMarkRead(n.notification_id)}
+                className={`px-6 py-5 hover:bg-parchment/30 transition-colors cursor-pointer flex items-start gap-4 ${n.is_read ? '' : 'bg-parchment/20'}`}
               >
-                <div className="flex-shrink-0 mt-1">
-                  {!n.is_read ? (
-                    <span className="w-2 h-2 rounded-full bg-gold-soft block" />
-                  ) : (
-                    <span className="w-2 h-2 rounded-full bg-transparent block" />
-                  )}
+                {/* Unread dot */}
+                <div className="flex-shrink-0 mt-1.5">
+                  <span className={`w-2 h-2 rounded-full block ${n.is_read ? 'bg-sand' : 'bg-gold-soft'}`} />
                 </div>
+
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${n.is_read ? 'text-stone' : 'text-charcoal-deep font-medium'}`}>{n.title}</p>
-                  <p className="text-xs text-stone mt-1 leading-relaxed">{n.message}</p>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-[10px] text-taupe">{formatDate(n.created_at)}</span>
-                    <span className="text-[10px] px-2 py-0.5 bg-parchment text-stone tracking-[0.1em] uppercase">{n.type}</span>
+                  {/* Title + type badge */}
+                  <div className="flex items-start justify-between gap-3">
+                    <p className={`text-sm leading-snug ${n.is_read ? 'text-stone' : 'text-charcoal-deep font-medium'}`}>
+                      {n.title}
+                    </p>
+                    <span className="text-[10px] px-2 py-0.5 bg-parchment text-stone tracking-[0.1em] uppercase flex-shrink-0">
+                      {n.notification_type.replace(/_/g, ' ')}
+                    </span>
                   </div>
+
+                  {/* Body */}
+                  <p className="text-xs text-charcoal-deep/80 mt-1.5 leading-relaxed">{n.body}</p>
+
+                  {/* Data fields rendered as readable text */}
+                  {n.data && Object.keys(n.data).length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                      {n.data.order_id && (
+                        <span className="text-[11px] text-stone">Order: <span className="font-medium text-charcoal-deep">#{n.data.order_id.slice(-6).toUpperCase()}</span></span>
+                      )}
+                      {n.data.product_id && (
+                        <span className="text-[11px] text-stone">Product ID: <span className="font-medium text-charcoal-deep">{n.data.product_id.slice(-6).toUpperCase()}</span></span>
+                      )}
+                      {n.data.city && n.data.country && (
+                        <span className="text-[11px] text-stone">Location: <span className="font-medium text-charcoal-deep">{n.data.city}, {n.data.country}</span></span>
+                      )}
+                      {n.data.units && n.data.threshold && (
+                        <span className="text-[11px] text-stone">Stock: <span className="font-medium text-charcoal-deep">{n.data.units} / {n.data.threshold} units</span></span>
+                      )}
+                      {n.data.criticality && (
+                        <span className={`text-[10px] px-2 py-0.5 tracking-[0.1em] uppercase ${
+                          n.data.criticality === 'high' ? 'bg-error/10 text-error' :
+                          n.data.criticality === 'medium' ? 'bg-gold-soft/20 text-stone' :
+                          'bg-sand/40 text-stone'
+                        }`}>{n.data.criticality}</span>
+                      )}
+                      {n.data.amount && (
+                        <span className="text-[11px] text-stone">Amount: <span className="font-medium text-charcoal-deep">{n.data.amount}</span></span>
+                      )}
+                      {n.data.regions && (
+                        <span className="text-[11px] text-stone">Regions restocked: <span className="font-medium text-charcoal-deep">{n.data.regions}</span></span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Date */}
+                  <p className="text-[10px] text-taupe mt-2">{formatDate(n.created_at)}</p>
                 </div>
               </div>
             ))}
