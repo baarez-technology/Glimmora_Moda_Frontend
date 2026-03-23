@@ -56,7 +56,7 @@ const BASE = '/api/v1/brand/shop-locations';
 
 function getToken(): string {
   if (typeof window === 'undefined') return '';
-  return localStorage.getItem('moda-brand-token') || '';
+  return localStorage.getItem('moda-brand-token') || localStorage.getItem('moda-user-token') || '';
 }
 
 function authHeaders(): Record<string, string> {

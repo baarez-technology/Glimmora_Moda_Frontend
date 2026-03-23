@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, MessageCircle, FileText, Star } from 'lucide-react';
+import { ArrowLeft, Package, Truck, Check, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, FileText, Star } from 'lucide-react';
 import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -216,58 +216,6 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Order Timeline */}
-            <div className="bg-white p-8">
-              <h2 className="font-display text-xl text-charcoal-deep mb-8">Order Timeline</h2>
-              <div className="relative">
-                {timeline.map((step, index) => (
-                  <div key={index} className="flex gap-4 pb-6 last:pb-0">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-8 h-8 flex items-center justify-center ${
-                        step.completed ? 'bg-charcoal-deep text-ivory-cream' : 'bg-sand text-taupe'
-                      }`}>
-                        {step.completed ? <Check size={14} /> : <div className="w-2 h-2 bg-taupe" />}
-                      </div>
-                      {index < timeline.length - 1 && (
-                        <div className={`w-0.5 flex-1 mt-2 ${
-                          step.completed ? 'bg-charcoal-deep' : 'bg-sand'
-                        }`} />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-2">
-                      <p className={`font-medium ${step.completed ? 'text-charcoal-deep' : 'text-taupe'}`}>
-                        {step.status}
-                      </p>
-                      {step.date && (
-                        <p className="text-sm text-stone">
-                          {step.date} at {step.time}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {order.delivery_tracking_number && (
-                <div className="mt-8 pt-8 border-t border-sand">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Tracking Number</p>
-                      <p className="font-mono text-charcoal-deep mt-1">
-                        {order.delivery_tracking_number}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowTracking(!showTracking)}
-                      className="text-sm text-charcoal-deep hover:text-gold-muted transition-colors tracking-[0.1em] uppercase"
-                    >
-                      {showTracking ? 'Hide Tracking' : 'Track Package'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
             {/* Order Items */}
             <div className="bg-white p-8">
               <h2 className="font-display text-xl text-charcoal-deep mb-8">Items</h2>
@@ -598,19 +546,6 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
               How can we help you with order #{order.order_id}?
             </p>
             <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setShowSupportModal(false);
-                  router.push('/concierge');
-                }}
-                className="w-full flex items-center gap-3 p-4 border border-sand hover:border-charcoal-deep transition-colors text-left"
-              >
-                <MessageCircle size={20} className="text-stone" />
-                <div>
-                  <p className="text-sm font-medium text-charcoal-deep">Chat with AGI Concierge</p>
-                  <p className="text-xs text-stone">Get instant help from our AI assistant</p>
-                </div>
-              </button>
               <button
                 onClick={() => {
                   setShowSupportModal(false);
