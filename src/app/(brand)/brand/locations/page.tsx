@@ -11,6 +11,7 @@ import {
   Mail,
   Clock,
   Globe,
+  Star,
 } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import {
@@ -18,6 +19,7 @@ import {
   addShopLocation,
   updateShopLocation,
   deleteShopLocation,
+  makeDefaultShopLocation,
   type BrandShopLocation,
 } from '@/services/brand-locations.service';
 
@@ -41,9 +43,9 @@ const SHOP_TYPE_BADGES: Record<string, string> = {
 
 const emptyForm = {
   shop_name: '',
-  shop_type: 'boutique' as BrandShopLocation['shop_type'],
-  address_line1: '',
-  address_line2: '',
+  shop_type: 'boutique' as string,
+  address_line_1: '',
+  address_line_2: '',
   city: '',
   state: '',
   country: '',
@@ -59,14 +61,24 @@ const emptyForm = {
 
 export default function BrandLocationsPage() {
   const [locations, setLocations] = useState<BrandShopLocation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadLocations = useCallback(() => {
-    setLocations(getAllShopLocations());
+  const loadLocations = useCallback(async () => {
+    try {
+      const data = await getAllShopLocations();
+      setLocations(data);
+    } catch (err) {
+      console.error('Failed to load locations:', err);
+      setError('Failed to load shop locations.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -83,78 +95,90 @@ export default function BrandLocationsPage() {
     setForm({
       shop_name: loc.shop_name,
       shop_type: loc.shop_type,
-      address_line1: loc.address_line1,
-      address_line2: loc.address_line2 || '',
+      address_line_1: loc.address_line_1,
+      address_line_2: loc.address_line_2 || '',
       city: loc.city,
-      state: loc.state,
+      state: loc.state || '',
       country: loc.country,
-      postal_code: loc.postal_code,
+      postal_code: loc.postal_code || '',
       phone: loc.phone || '',
       email: loc.email || '',
       opening_hours: loc.opening_hours || '',
-      latitude: loc.latitude.toString(),
-      longitude: loc.longitude.toString(),
+      latitude: loc.latitude?.toString() || '',
+      longitude: loc.longitude?.toString() || '',
       image_url: loc.image_url || '',
       is_active: loc.is_active,
     });
-    setEditingId(loc.id);
+    setEditingId(loc.shop_id);
     setShowForm(true);
   };
 
-  const handleSubmit = () => {
-    if (!form.shop_name || !form.address_line1 || !form.city || !form.country) return;
+  const handleSubmit = async () => {
+    if (!form.shop_name || !form.address_line_1 || !form.city || !form.country) return;
     setSubmitting(true);
+    setError(null);
 
     const payload = {
-      brand_id: 'current-brand',
       shop_name: form.shop_name,
       shop_type: form.shop_type,
-      address_line1: form.address_line1,
-      address_line2: form.address_line2 || undefined,
+      address_line_1: form.address_line_1,
+      address_line_2: form.address_line_2 || undefined,
       city: form.city,
-      state: form.state,
+      state: form.state || undefined,
       country: form.country,
-      postal_code: form.postal_code,
+      postal_code: form.postal_code || undefined,
       phone: form.phone || undefined,
       email: form.email || undefined,
       opening_hours: form.opening_hours || undefined,
-      latitude: parseFloat(form.latitude) || 0,
-      longitude: parseFloat(form.longitude) || 0,
+      latitude: form.latitude ? parseFloat(form.latitude) : undefined,
+      longitude: form.longitude ? parseFloat(form.longitude) : undefined,
       image_url: form.image_url || undefined,
       is_active: form.is_active,
     };
 
     try {
       if (editingId) {
-        updateShopLocation(editingId, payload);
+        await updateShopLocation(editingId, payload);
       } else {
-        addShopLocation(payload);
+        await addShopLocation(payload);
       }
-      loadLocations();
+      await loadLocations();
+      resetForm();
     } catch (err) {
       console.error('Failed to save location:', err);
+      setError('Failed to save location. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
-
-    resetForm();
-    setSubmitting(false);
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     try {
-      deleteShopLocation(id);
-      setLocations(prev => prev.filter(l => l.id !== id));
+      await deleteShopLocation(id);
+      setLocations(prev => prev.filter(l => l.shop_id !== id));
     } catch (err) {
       console.error('Failed to delete location:', err);
+      setError('Failed to delete location. Please try again.');
     }
     setDeleteConfirm(null);
   };
 
-  const handleToggleActive = (loc: BrandShopLocation) => {
+  const handleToggleActive = async (loc: BrandShopLocation) => {
     try {
-      updateShopLocation(loc.id, { is_active: !loc.is_active });
-      loadLocations();
+      await updateShopLocation(loc.shop_id, { is_active: !loc.is_active });
+      await loadLocations();
     } catch (err) {
       console.error('Failed to toggle active status:', err);
+    }
+  };
+
+  const handleMakeDefault = async (id: string) => {
+    try {
+      await makeDefaultShopLocation(id);
+      await loadLocations();
+    } catch (err) {
+      console.error('Failed to set default:', err);
+      setError('Failed to set default location. Please try again.');
     }
   };
 
@@ -164,9 +188,9 @@ export default function BrandLocationsPage() {
   const countriesCount = new Set(locations.map(l => l.country)).size;
 
   const formatAddress = (loc: BrandShopLocation) => {
-    const parts = [loc.address_line1];
-    if (loc.address_line2) parts.push(loc.address_line2);
-    parts.push(`${loc.city}${loc.state ? ', ' + loc.state : ''} ${loc.postal_code}`);
+    const parts = [loc.address_line_1];
+    if (loc.address_line_2) parts.push(loc.address_line_2);
+    parts.push(`${loc.city}${loc.state ? ', ' + loc.state : ''}${loc.postal_code ? ' ' + loc.postal_code : ''}`);
     parts.push(loc.country);
     return parts;
   };
@@ -190,6 +214,12 @@ export default function BrandLocationsPage() {
       />
 
       <div className="p-8 space-y-8">
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Summary Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white border border-sand/50 p-6">
@@ -235,7 +265,7 @@ export default function BrandLocationsPage() {
                   <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Shop Type *</label>
                   <select
                     value={form.shop_type}
-                    onChange={e => setForm(prev => ({ ...prev, shop_type: e.target.value as BrandShopLocation['shop_type'] }))}
+                    onChange={e => setForm(prev => ({ ...prev, shop_type: e.target.value }))}
                     className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep"
                   >
                     {SHOP_TYPES.map(t => (
@@ -247,8 +277,8 @@ export default function BrandLocationsPage() {
                   <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Address Line 1 *</label>
                   <input
                     type="text"
-                    value={form.address_line1}
-                    onChange={e => setForm(prev => ({ ...prev, address_line1: e.target.value }))}
+                    value={form.address_line_1}
+                    onChange={e => setForm(prev => ({ ...prev, address_line_1: e.target.value }))}
                     placeholder="30 Avenue Montaigne"
                     className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
                   />
@@ -257,8 +287,8 @@ export default function BrandLocationsPage() {
                   <label className="block text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Address Line 2</label>
                   <input
                     type="text"
-                    value={form.address_line2}
-                    onChange={e => setForm(prev => ({ ...prev, address_line2: e.target.value }))}
+                    value={form.address_line_2}
+                    onChange={e => setForm(prev => ({ ...prev, address_line_2: e.target.value }))}
                     placeholder="Suite 200 (optional)"
                     className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep placeholder:text-taupe"
                   />
@@ -385,7 +415,7 @@ export default function BrandLocationsPage() {
               <div className="flex gap-3">
                 <button
                   onClick={handleSubmit}
-                  disabled={submitting || !form.shop_name || !form.address_line1 || !form.city || !form.country}
+                  disabled={submitting || !form.shop_name || !form.address_line_1 || !form.city || !form.country}
                   className="px-6 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-[0.15em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingId ? 'Update Location' : 'Add Location'}
@@ -402,7 +432,11 @@ export default function BrandLocationsPage() {
         )}
 
         {/* Location Cards */}
-        {locations.length === 0 && !showForm ? (
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-stone text-sm">Loading locations...</p>
+          </div>
+        ) : locations.length === 0 && !showForm ? (
           <div className="text-center py-12">
             <MapPin size={48} className="mx-auto text-taupe/40 mb-4" />
             <p className="text-stone">No shop locations added yet</p>
@@ -411,15 +445,20 @@ export default function BrandLocationsPage() {
         ) : (
           <div className="space-y-4">
             {locations.map(loc => (
-              <div key={loc.id} className="bg-white border border-sand/50 p-6">
+              <div key={loc.shop_id} className="bg-white border border-sand/50 p-6">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <div className="flex items-center gap-3 mb-2">
                       <MapPin size={18} className="text-stone" />
                       <h3 className="font-display text-lg text-charcoal-deep">{loc.shop_name}</h3>
-                      <span className={`px-3 py-0.5 text-[10px] tracking-[0.15em] uppercase ${SHOP_TYPE_BADGES[loc.shop_type]}`}>
-                        {SHOP_TYPE_LABELS[loc.shop_type]}
+                      <span className={`px-3 py-0.5 text-[10px] tracking-[0.15em] uppercase ${SHOP_TYPE_BADGES[loc.shop_type] ?? 'bg-stone/10 text-stone'}`}>
+                        {SHOP_TYPE_LABELS[loc.shop_type] ?? loc.shop_type}
                       </span>
+                      {loc.is_default && (
+                        <span className="px-3 py-0.5 text-[10px] tracking-[0.15em] uppercase bg-amber-50 text-amber-700 flex items-center gap-1">
+                          <Star size={10} className="fill-amber-700" /> Default
+                        </span>
+                      )}
                       <span className={`px-3 py-0.5 text-[10px] tracking-[0.15em] uppercase ${
                         loc.is_active ? 'bg-green-100 text-green-700' : 'bg-stone/10 text-stone'
                       }`}>
@@ -428,6 +467,16 @@ export default function BrandLocationsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Set as Default */}
+                    {!loc.is_default && (
+                      <button
+                        onClick={() => handleMakeDefault(loc.shop_id)}
+                        className="px-3 py-1 text-xs tracking-[0.1em] uppercase border border-amber-400 text-amber-700 hover:bg-amber-50 transition-colors"
+                        title="Set as default"
+                      >
+                        Set Default
+                      </button>
+                    )}
                     {/* Active/Inactive Toggle */}
                     <button
                       onClick={() => handleToggleActive(loc)}
@@ -446,10 +495,10 @@ export default function BrandLocationsPage() {
                     >
                       <Pencil size={14} />
                     </button>
-                    {deleteConfirm === loc.id ? (
+                    {deleteConfirm === loc.shop_id ? (
                       <div className="flex items-center gap-1">
                         <button
-                          onClick={() => handleDelete(loc.id)}
+                          onClick={() => handleDelete(loc.shop_id)}
                           className="px-3 py-1 bg-error text-ivory-cream text-xs hover:bg-error/80 transition-colors"
                         >
                           Confirm
@@ -463,7 +512,7 @@ export default function BrandLocationsPage() {
                       </div>
                     ) : (
                       <button
-                        onClick={() => setDeleteConfirm(loc.id)}
+                        onClick={() => setDeleteConfirm(loc.shop_id)}
                         className="p-2 text-stone hover:text-error hover:bg-error/5 transition-colors"
                         title="Delete"
                       >
@@ -500,10 +549,12 @@ export default function BrandLocationsPage() {
                       {loc.opening_hours}
                     </span>
                   )}
-                  <span className="flex items-center gap-1.5">
-                    <Globe size={13} className="text-taupe" />
-                    {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
-                  </span>
+                  {loc.latitude != null && loc.longitude != null && (
+                    <span className="flex items-center gap-1.5">
+                      <Globe size={13} className="text-taupe" />
+                      {loc.latitude.toFixed(4)}, {loc.longitude.toFixed(4)}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
