@@ -1,56 +1,49 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { formatPrice } from '@/lib/currency';
-import { ArrowLeft, Palette, Sparkles, Target, MapPin, Compass, Pencil, Save, X, Briefcase, Users, Sun, Star, Plane } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palette } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { setUserContext, getStoredUserToken } from '@/services/auth.service';
 import { invalidateRecommendationsCache } from '@/services/recommendation.service';
-import type { FashionIdentity } from '@/types';
+import { getCurrencySymbol } from '@/lib/currency';
 
-// Must match the onboarding IDs and backend API expectations
-const ALL_OCCASIONS = [
-  { id: 'professional', label: 'Professional', icon: Briefcase },
-  { id: 'social', label: 'Social Events', icon: Users },
-  { id: 'casual', label: 'Casual Daily', icon: Sun },
-  { id: 'formal', label: 'Formal', icon: Star },
-  { id: 'travel', label: 'Travel', icon: Plane },
-  { id: 'art', label: 'Art & Culture', icon: Palette },
+type Step = 'occasions' | 'aesthetics' | 'budget' | 'complete';
+
+const STEPS: Step[] = ['occasions', 'aesthetics', 'budget', 'complete'];
+
+const occasionOptions = [
+  { id: 'professional', label: 'Professional', desc: 'Business meetings & work', icon: Briefcase },
+  { id: 'social', label: 'Social Events', desc: 'Dinners & gatherings', icon: Users },
+  { id: 'casual', label: 'Casual Daily', desc: 'Everyday elegance', icon: Sun },
+  { id: 'formal', label: 'Formal', desc: 'Galas & black tie', icon: Star },
+  { id: 'travel', label: 'Travel', desc: 'Refined journeys', icon: Plane },
+  { id: 'art', label: 'Art & Culture', desc: 'Galleries & theater', icon: Palette },
 ];
 
-const ALL_AESTHETICS = [
-  { id: 'minimal', label: 'Minimal & Structured' },
-  { id: 'classic', label: 'Classic & Timeless' },
-  { id: 'artistic', label: 'Artistic & Expressive' },
-  { id: 'contemporary', label: 'Bold & Contemporary' },
+const aestheticOptions = [
+  { id: 'minimal', label: 'Minimal & Structured', desc: 'Clean lines, refined simplicity' },
+  { id: 'classic', label: 'Classic & Timeless', desc: 'Enduring elegance, heritage pieces' },
+  { id: 'artistic', label: 'Artistic & Expressive', desc: 'Bold statements, creative vision' },
+  { id: 'contemporary', label: 'Bold & Contemporary', desc: 'Modern edge, fashion-forward' },
 ];
-
-const CONFIDENCE_OPTIONS: { value: FashionIdentity['confidenceLevel']; label: string; description: string }[] = [
-  { value: 'decisive', label: 'Decisive', description: 'You know exactly what you want' },
-  { value: 'guided', label: 'Guided', description: 'You appreciate thoughtful recommendations' },
-  { value: 'advisory', label: 'Advisory', description: 'You prefer expert curation' }
-];
-
-type EditingSection = 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'locations' | null;
 
 export default function StyleDNAPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
   const { fashionIdentity, updateFashionIdentity, showToast } = useApp();
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [editingSection, setEditingSection] = useState<EditingSection>(null);
 
-  // Draft state for editing
-  const [draftOccasions, setDraftOccasions] = useState<string[]>([]);
-  const [draftAesthetics, setDraftAesthetics] = useState<string[]>([]);
-  const [draftConfidence, setDraftConfidence] = useState<FashionIdentity['confidenceLevel']>('guided');
-  const [draftBudgetMin, setDraftBudgetMin] = useState(0);
-  const [draftBudgetMax, setDraftBudgetMax] = useState(0);
-  const [draftPrimaryLocation, setDraftPrimaryLocation] = useState('');
-  const [draftTravelDestinations, setDraftTravelDestinations] = useState('');
+  const [currentStep, setCurrentStep] = useState<Step>('occasions');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  const [selections, setSelections] = useState({
+    occasions: [] as string[],
+    aesthetics: [] as string[],
+    budgetRange: undefined as { min: number; max: number } | undefined,
+  });
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -58,520 +51,338 @@ export default function StyleDNAPage() {
     }
   }, [isAuthenticated, isHydrated, router]);
 
+  // Pre-fill from existing identity
   useEffect(() => {
-    if (isHydrated && isAuthenticated) {
-      setIsLoaded(true);
-    }
-  }, [isHydrated, isAuthenticated]);
+    if (!isHydrated || !isAuthenticated) return;
+    const validOccasionIds = occasionOptions.map(o => o.id);
+    const validAestheticIds = aestheticOptions.map(a => a.id);
+    setSelections({
+      occasions: (fashionIdentity?.occasions || []).filter(id => validOccasionIds.includes(id)),
+      aesthetics: (fashionIdentity?.aesthetics || []).filter(id => validAestheticIds.includes(id)),
+      budgetRange: fashionIdentity?.budgetRange,
+    });
+    setIsLoaded(true);
+  }, [isHydrated, isAuthenticated, fashionIdentity]);
 
-  const startEditing = useCallback((section: EditingSection) => {
-    if (!fashionIdentity) return;
-    switch (section) {
-      case 'occasions':
-        // Filter to only valid IDs to prevent ghost entries
-        setDraftOccasions(fashionIdentity.occasions.filter(id => ALL_OCCASIONS.some(o => o.id === id)));
-        break;
-      case 'aesthetics':
-        setDraftAesthetics(fashionIdentity.aesthetics.filter(id => ALL_AESTHETICS.some(a => a.id === id)));
-        break;
-      case 'confidence':
-        setDraftConfidence(fashionIdentity.confidenceLevel);
-        break;
-      case 'budget':
-        setDraftBudgetMin(fashionIdentity.budgetRange?.min ?? 0);
-        setDraftBudgetMax(fashionIdentity.budgetRange?.max ?? 1000);
-        break;
-      case 'locations':
-        setDraftPrimaryLocation(fashionIdentity.primaryLocation);
-        setDraftTravelDestinations(fashionIdentity.travelDestinations.join(', '));
-        break;
-    }
-    setEditingSection(section);
-  }, [fashionIdentity]);
+  const budgetOptions = [
+    { id: 'no-limit', label: 'No preference', desc: 'Show me everything', range: { min: 0, max: 1000000 } },
+    { id: 'under-1000', label: `Up to ${getCurrencySymbol()}1,000`, desc: 'Per piece', range: { min: 0, max: 1000 } },
+    { id: '1000-5000', label: `${getCurrencySymbol()}1,000 — ${getCurrencySymbol()}5,000`, desc: 'Per piece', range: { min: 1000, max: 5000 } },
+    { id: '5000-plus', label: `${getCurrencySymbol()}5,000+`, desc: 'Investment pieces', range: { min: 5000, max: 1000000 } },
+  ] as const;
 
-  const cancelEditing = () => {
-    setEditingSection(null);
+  const stepIndex = STEPS.indexOf(currentStep);
+
+  const prevStep = () => {
+    if (stepIndex > 0) setCurrentStep(STEPS[stepIndex - 1]);
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && editingSection) {
-        setEditingSection(null);
+  const nextStep = async () => {
+    if (currentStep === 'budget') {
+      // Save and advance to complete
+      const updated = {
+        occasions: selections.occasions,
+        aesthetics: selections.aesthetics,
+        budgetRange: selections.budgetRange,
+        confidenceLevel: fashionIdentity?.confidenceLevel ?? 'guided' as const,
+        primaryLocation: fashionIdentity?.primaryLocation ?? '',
+        travelDestinations: fashionIdentity?.travelDestinations ?? [],
+      };
+      updateFashionIdentity(updated);
+
+      const token = getStoredUserToken();
+      if (token) {
+        setIsSaving(true);
+        try {
+          await setUserContext({
+            occasions: updated.occasions,
+            aesthetics: updated.aesthetics,
+            minimum_budget: updated.budgetRange?.min ?? 0,
+            maximum_budget: updated.budgetRange?.max ?? 0,
+          });
+          invalidateRecommendationsCache();
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : 'Failed to save preferences', 'error');
+        } finally {
+          setIsSaving(false);
+        }
       }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [editingSection]);
-
-  const saveSection = useCallback(async (section: EditingSection) => {
-    if (!fashionIdentity || !section) return;
-
-    let updated: FashionIdentity;
-
-    switch (section) {
-      case 'occasions':
-        if (draftOccasions.length === 0) {
-          showToast('Please select at least one occasion', 'error');
-          return;
-        }
-        updated = { ...fashionIdentity, occasions: draftOccasions };
-        break;
-      case 'aesthetics':
-        if (draftAesthetics.length === 0) {
-          showToast('Please select at least one aesthetic', 'error');
-          return;
-        }
-        updated = { ...fashionIdentity, aesthetics: draftAesthetics };
-        break;
-      case 'confidence':
-        updated = { ...fashionIdentity, confidenceLevel: draftConfidence };
-        break;
-      case 'budget':
-        if (draftBudgetMin < 0 || draftBudgetMax < 0) {
-          showToast('Budget values must be positive', 'error');
-          return;
-        }
-        if (draftBudgetMin >= draftBudgetMax) {
-          showToast('Maximum must be greater than minimum', 'error');
-          return;
-        }
-        updated = { ...fashionIdentity, budgetRange: { min: draftBudgetMin, max: draftBudgetMax } };
-        break;
-      case 'locations':
-        if (!draftPrimaryLocation.trim()) {
-          showToast('Primary location is required', 'error');
-          return;
-        }
-        updated = {
-          ...fashionIdentity,
-          primaryLocation: draftPrimaryLocation.trim(),
-          travelDestinations: draftTravelDestinations
-            .split(',')
-            .map(d => d.trim())
-            .filter(Boolean)
-        };
-        break;
-      default:
-        return;
+      setCurrentStep('complete');
+      return;
     }
-
-    // Update local state + localStorage
-    updateFashionIdentity(updated);
-    setEditingSection(null);
-
-    // Sync occasions/aesthetics/budget to the backend so recommendations update
-    const token = getStoredUserToken();
-    if (token) {
-      try {
-        await setUserContext({
-          occasions: updated.occasions,
-          aesthetics: updated.aesthetics,
-          minimum_budget: updated.budgetRange?.min ?? 0,
-          maximum_budget: updated.budgetRange?.max ?? 0,
-        });
-        // Clear cached recommendations so next page visit gets fresh results
-        invalidateRecommendationsCache();
-      } catch (err) {
-        console.log('[style-dna] Failed to sync preferences to backend:', err);
-      }
+    if (stepIndex < STEPS.length - 1) {
+      setCurrentStep(STEPS[stepIndex + 1]);
     }
-  }, [fashionIdentity, draftOccasions, draftAesthetics, draftConfidence, draftBudgetMin, draftBudgetMax, draftPrimaryLocation, draftTravelDestinations, updateFashionIdentity, showToast]);
-
-  const toggleOccasion = (occasion: string) => {
-    setDraftOccasions(prev =>
-      prev.includes(occasion)
-        ? prev.filter(o => o !== occasion)
-        : [...prev, occasion]
-    );
   };
 
-  const toggleAesthetic = (aesthetic: string) => {
-    setDraftAesthetics(prev =>
-      prev.includes(aesthetic)
-        ? prev.filter(a => a !== aesthetic)
-        : [...prev, aesthetic]
-    );
-  };
+  const toggleOccasion = (id: string) =>
+    setSelections(prev => ({
+      ...prev,
+      occasions: prev.occasions.includes(id) ? prev.occasions.filter(o => o !== id) : [...prev.occasions, id],
+    }));
+
+  const toggleAesthetic = (id: string) =>
+    setSelections(prev => ({
+      ...prev,
+      aesthetics: prev.aesthetics.includes(id) ? prev.aesthetics.filter(a => a !== id) : [...prev.aesthetics, id],
+    }));
 
   if (!isHydrated || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-stone text-sm">Loading style DNA...</p>
-        </div>
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
-  const confidenceLevels = {
-    decisive: { label: 'Decisive', description: 'You know exactly what you want', color: 'bg-success/10 text-success' },
-    guided: { label: 'Guided', description: 'You appreciate thoughtful recommendations', color: 'bg-info/10 text-info' },
-    advisory: { label: 'Advisory', description: 'You prefer expert curation', color: 'bg-warning/10 text-warning' }
-  };
-
-  const confidenceInfo = fashionIdentity?.confidenceLevel
-    ? confidenceLevels[fashionIdentity.confidenceLevel]
-    : null;
-
-  const EditButton = ({ section }: { section: EditingSection }) => (
-    <button
-      onClick={() => startEditing(section)}
-      className="p-2 hover:bg-sand/20 transition-colors text-stone hover:text-charcoal-deep"
-      title={`Edit ${section}`}
-    >
-      <Pencil size={16} />
-    </button>
-  );
-
-  const SaveCancelButtons = ({ section }: { section: EditingSection }) => (
-    <div className="flex gap-3 mt-6">
-      <button
-        onClick={cancelEditing}
-        className="flex items-center gap-2 px-5 py-2.5 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-wider uppercase"
-      >
-        <X size={14} />
-        Cancel
-      </button>
-      <button
-        onClick={() => saveSection(section)}
-        className="flex items-center gap-2 px-5 py-2.5 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-wider uppercase"
-      >
-        <Save size={14} />
-        Save
-      </button>
-    </div>
-  );
-
   return (
-    <div className="min-h-screen bg-ivory-cream">
-      {/* Header */}
-      <div className="bg-charcoal-deep">
-        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
-          <Link
-            href="/profile"
-            className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
-          >
-            <ArrowLeft size={16} />
-            Back to Profile
-          </Link>
-
-          <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-4">
-              Personal Style
-            </span>
-            <h1 className="font-display text-[clamp(2rem,4vw,3rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
-              Style DNA
-            </h1>
+    <div className="min-h-screen bg-ivory-cream flex flex-col">
+      {/* Progress bar */}
+      {currentStep !== 'complete' && (
+        <div className="fixed top-0 left-0 right-0 z-50">
+          <div className="h-1 bg-sand">
+            <div
+              className="h-full bg-gold-muted transition-all duration-700 ease-out"
+              style={{ width: `${((stepIndex) / 3) * 100}%` }}
+            />
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Content */}
-      <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 space-y-8 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-        {!fashionIdentity ? (
-          <div className="bg-white p-12 text-center">
-            <Sparkles size={40} className="text-gold-soft mx-auto mb-4" />
-            <h2 className="font-display text-2xl text-charcoal-deep mb-3">Discover Your Style DNA</h2>
-            <p className="text-stone mb-8 max-w-md mx-auto">
-              Take our style quiz to unlock personalized recommendations tailored to your unique preferences.
-            </p>
-            <Link
-              href="/onboarding"
-              className="inline-flex items-center gap-3 px-8 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors"
-            >
-              <Sparkles size={18} />
-              <span className="text-sm tracking-wider uppercase">Take Style Quiz</span>
-            </Link>
-          </div>
-        ) : (
-          <>
-            {/* Occasion Preferences */}
-            <div className="bg-white p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                    <Target size={18} className="text-charcoal-deep" />
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl text-charcoal-deep">Occasion Preferences</h2>
-                    <p className="text-sm text-stone">Your lifestyle occasions</p>
-                  </div>
-                </div>
-                {editingSection !== 'occasions' && <EditButton section="occasions" />}
+      <div className="flex-1 flex items-center justify-center px-8 py-16 lg:py-24">
+        <div className="max-w-2xl w-full">
+
+          {/* ============================================
+              OCCASIONS
+              ============================================ */}
+          {currentStep === 'occasions' && (
+            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 01 of 03
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  What occasions do you dress for?
+                </h2>
+                <p className="text-stone">Select all that apply</p>
               </div>
 
-              {editingSection === 'occasions' ? (
-                <div>
-                  <div className="flex flex-wrap gap-3">
-                    {ALL_OCCASIONS.map(option => (
-                      <button
-                        key={option.id}
-                        onClick={() => toggleOccasion(option.id)}
-                        className={`px-4 py-2 text-sm tracking-[0.05em] transition-colors border ${
-                          draftOccasions.includes(option.id)
-                            ? 'bg-charcoal-deep text-ivory-cream border-charcoal-deep'
-                            : 'bg-parchment text-stone border-sand hover:border-charcoal-deep hover:text-charcoal-deep'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <SaveCancelButtons section="occasions" />
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3">
-                  {fashionIdentity.occasions.map(occasion => (
-                    <span
-                      key={occasion}
-                      className="px-4 py-2 bg-parchment text-charcoal-deep text-sm tracking-[0.05em] capitalize"
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {occasionOptions.map((option) => {
+                  const Icon = option.icon;
+                  const isSelected = selections.occasions.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleOccasion(option.id)}
+                      className={`p-6 text-left transition-all duration-300 border ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
                     >
-                      {ALL_OCCASIONS.find(o => o.id === occasion)?.label || occasion}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Aesthetics */}
-            <div className="bg-white p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                    <Palette size={18} className="text-charcoal-deep" />
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl text-charcoal-deep">Style Aesthetics</h2>
-                    <p className="text-sm text-stone">Your design language</p>
-                  </div>
-                </div>
-                {editingSection !== 'aesthetics' && <EditButton section="aesthetics" />}
-              </div>
-
-              {editingSection === 'aesthetics' ? (
-                <div>
-                  <div className="flex flex-wrap gap-3">
-                    {ALL_AESTHETICS.map(option => (
-                      <button
-                        key={option.id}
-                        onClick={() => toggleAesthetic(option.id)}
-                        className={`px-4 py-2 text-sm tracking-[0.05em] transition-colors border ${
-                          draftAesthetics.includes(option.id)
-                            ? 'bg-charcoal-deep text-ivory-cream border-charcoal-deep'
-                            : 'bg-gold-soft/10 text-stone border-gold-soft/30 hover:border-charcoal-deep hover:text-charcoal-deep'
-                        }`}
-                      >
+                      <Icon size={20} className={`mb-4 ${isSelected ? 'text-gold-soft' : 'text-taupe'}`} />
+                      <span className={`font-display text-lg block mb-1 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
                         {option.label}
-                      </button>
-                    ))}
-                  </div>
-                  <SaveCancelButtons section="aesthetics" />
-                </div>
-              ) : (
-                <div className="flex flex-wrap gap-3">
-                  {fashionIdentity.aesthetics.map(aesthetic => (
-                    <span
-                      key={aesthetic}
-                      className="px-4 py-2 bg-gold-soft/10 text-gold-deep text-sm tracking-[0.05em] capitalize"
+                      </span>
+                      <span className={`text-xs ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-between mt-12">
+                <Link
+                  href="/profile"
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back to Profile</span>
+                </Link>
+                <button
+                  onClick={nextStep}
+                  disabled={selections.occasions.length === 0}
+                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">Continue</span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================
+              AESTHETICS
+              ============================================ */}
+          {currentStep === 'aesthetics' && (
+            <div className="transition-all duration-700 opacity-100 translate-y-0">
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 02 of 03
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  Which aesthetic resonates with you?
+                </h2>
+                <p className="text-stone">Select all that appeal to you</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {aestheticOptions.map((option) => {
+                  const isSelected = selections.aesthetics.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => toggleAesthetic(option.id)}
+                      className={`p-8 text-left transition-all duration-300 border ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
                     >
-                      {ALL_AESTHETICS.find(a => a.id === aesthetic)?.label || aesthetic}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Confidence Level */}
-            <div className="bg-white p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                    <Compass size={18} className="text-charcoal-deep" />
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl text-charcoal-deep">Shopping Confidence</h2>
-                    <p className="text-sm text-stone">How you like to shop</p>
-                  </div>
-                </div>
-                {editingSection !== 'confidence' && <EditButton section="confidence" />}
+                      <span className={`font-display text-xl block mb-2 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                        {option.label}
+                      </span>
+                      <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {editingSection === 'confidence' ? (
-                <div>
-                  <div className="space-y-3">
-                    {CONFIDENCE_OPTIONS.map(option => (
-                      <button
-                        key={option.value}
-                        onClick={() => setDraftConfidence(option.value)}
-                        className={`w-full flex items-center gap-4 px-5 py-4 border transition-colors text-left ${
-                          draftConfidence === option.value
-                            ? 'border-charcoal-deep bg-charcoal-deep/5'
-                            : 'border-sand hover:border-charcoal-deep/50'
-                        }`}
-                      >
-                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          draftConfidence === option.value
-                            ? 'border-charcoal-deep'
-                            : 'border-stone/40'
-                        }`}>
-                          {draftConfidence === option.value && (
-                            <div className="w-2 h-2 rounded-full bg-charcoal-deep" />
-                          )}
-                        </div>
-                        <div>
-                          <span className="text-sm font-medium text-charcoal-deep">{option.label}</span>
-                          <span className="text-xs text-stone ml-2">— {option.description}</span>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <SaveCancelButtons section="confidence" />
-                </div>
-              ) : (
-                confidenceInfo && (
-                  <div className={`inline-flex items-center gap-3 px-5 py-3 ${confidenceInfo.color}`}>
-                    <span className="text-sm font-medium">{confidenceInfo.label}</span>
-                    <span className="text-xs opacity-80">— {confidenceInfo.description}</span>
-                  </div>
-                )
-              )}
+              <div className="flex justify-between mt-12">
+                <button
+                  onClick={prevStep}
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
+                </button>
+                <button
+                  onClick={nextStep}
+                  disabled={selections.aesthetics.length === 0}
+                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">Continue</span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                  </span>
+                </button>
+              </div>
             </div>
+          )}
 
-            {/* Budget Range */}
-            <div className="bg-white p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                    <Sparkles size={18} className="text-charcoal-deep" />
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl text-charcoal-deep">Budget Range</h2>
-                    <p className="text-sm text-stone">Your comfort zone</p>
-                  </div>
-                </div>
-                {editingSection !== 'budget' && <EditButton section="budget" />}
+          {/* ============================================
+              BUDGET
+              ============================================ */}
+          {currentStep === 'budget' && (
+            <div className="transition-all duration-700 opacity-100 translate-y-0">
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 03 of 03
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  Investment comfort range?
+                </h2>
+                <p className="text-stone">Optional — helps personalize suggestions</p>
               </div>
 
-              {editingSection === 'budget' ? (
-                <div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Minimum (&euro;)</label>
-                      <input
-                        type="number"
-                        value={draftBudgetMin}
-                        onChange={e => setDraftBudgetMin(Number(e.target.value))}
-                        min={0}
-                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Maximum (&euro;)</label>
-                      <input
-                        type="number"
-                        value={draftBudgetMax}
-                        onChange={e => setDraftBudgetMax(Number(e.target.value))}
-                        min={0}
-                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                      />
-                    </div>
-                  </div>
-                  <SaveCancelButtons section="budget" />
-                </div>
-              ) : (
-                fashionIdentity.budgetRange ? (
-                  <div className="text-center">
-                    <p className="font-display text-2xl text-charcoal-deep">
-                      {(() => {
-                        const { min, max } = fashionIdentity.budgetRange;
-                        if (min === 0 && max >= 1000000) return 'No Preference';
-                        if (min === 0 && max <= 1000) return `Up to ${formatPrice(max)}`;
-                        if (min >= 5000 && max >= 1000000) return `${formatPrice(min)}+`;
-                        return `${formatPrice(min)} — ${formatPrice(max)}`;
-                      })()}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-stone">No budget range set. Click edit to add one.</p>
-                )
-              )}
-            </div>
-
-            {/* Location */}
-            <div className="bg-white p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-                    <MapPin size={18} className="text-charcoal-deep" />
-                  </div>
-                  <div>
-                    <h2 className="font-display text-xl text-charcoal-deep">Lifestyle Locations</h2>
-                    <p className="text-sm text-stone">Where you wear your style</p>
-                  </div>
-                </div>
-                {editingSection !== 'locations' && <EditButton section="locations" />}
+              <div className="space-y-4">
+                {budgetOptions.map((option) => {
+                  const isSelected = JSON.stringify(selections.budgetRange) === JSON.stringify(option.range);
+                  return (
+                    <button
+                      key={option.id}
+                      onClick={() => setSelections(prev => ({ ...prev, budgetRange: option.range }))}
+                      className={`w-full p-6 text-left transition-all duration-300 border flex items-center justify-between ${
+                        isSelected
+                          ? 'border-charcoal-deep bg-charcoal-deep'
+                          : 'border-sand hover:border-charcoal-deep bg-transparent'
+                      }`}
+                    >
+                      <span className={`font-display text-xl ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
+                        {option.label}
+                      </span>
+                      <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
+                        {option.desc}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
-              {editingSection === 'locations' ? (
-                <div>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Primary Location</label>
-                      <input
-                        type="text"
-                        value={draftPrimaryLocation}
-                        onChange={e => setDraftPrimaryLocation(e.target.value)}
-                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] tracking-[0.2em] uppercase text-stone mb-2">Travel Destinations (comma-separated)</label>
-                      <input
-                        type="text"
-                        value={draftTravelDestinations}
-                        onChange={e => setDraftTravelDestinations(e.target.value)}
-                        placeholder="Paris, Milan, Tokyo"
-                        className="w-full px-4 py-3 border border-sand bg-ivory-cream focus:outline-none focus:border-charcoal-deep transition-colors"
-                      />
-                    </div>
-                  </div>
-                  <SaveCancelButtons section="locations" />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between py-3 border-b border-sand">
-                    <span className="text-sm text-stone">Primary Location</span>
-                    <span className="text-sm font-medium text-charcoal-deep">{fashionIdentity.primaryLocation}</span>
-                  </div>
-                  {fashionIdentity.travelDestinations.length > 0 && (
-                    <div className="pt-2">
-                      <p className="text-[10px] tracking-[0.2em] uppercase text-stone mb-3">Travel Destinations</p>
-                      <div className="flex flex-wrap gap-2">
-                        {fashionIdentity.travelDestinations.map(dest => (
-                          <span key={dest} className="px-3 py-1.5 bg-parchment text-sm text-charcoal-deep">
-                            {dest}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              <div className="flex justify-between mt-12">
+                <button
+                  onClick={prevStep}
+                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Back</span>
+                </button>
+                <button
+                  onClick={nextStep}
+                  disabled={isSaving}
+                  className="group inline-flex items-center gap-4 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </span>
+                  <span className="w-12 h-12 bg-charcoal-deep flex items-center justify-center group-hover:bg-noir transition-all duration-300">
+                    {isSaving ? (
+                      <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Check size={16} className="text-ivory-cream" />
+                    )}
+                  </span>
+                </button>
+              </div>
             </div>
+          )}
 
-            {/* Retake Quiz */}
-            <div className="text-center pt-4">
-              <Link
-                href="/onboarding"
-                className="inline-flex items-center gap-3 px-6 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors"
-              >
-                <Sparkles size={16} />
-                <span className="text-sm tracking-wider uppercase">Retake Style Quiz</span>
-              </Link>
+          {/* ============================================
+              COMPLETE
+              ============================================ */}
+          {currentStep === 'complete' && (
+            <div className="text-center transition-all duration-1000 opacity-100 translate-y-0">
+              <div className="w-20 h-20 bg-charcoal-deep flex items-center justify-center mx-auto mb-10">
+                <Check size={32} className="text-gold-soft" />
+              </div>
+
+              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-6">
+                Preferences Saved
+              </span>
+
+              <h2 className="font-display text-[clamp(2rem,5vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-8">
+                Your Style Profile<br />is Updated
+              </h2>
+
+              <p className="text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
+                We'll curate recommendations that resonate with your updated preferences.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link
+                  href="/discover"
+                  className="group inline-flex items-center justify-center gap-4 py-4 px-8 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase">Start Exploring</span>
+                  <ArrowRight size={16} />
+                </Link>
+                <Link
+                  href="/profile"
+                  className="group inline-flex items-center justify-center gap-4 py-4 px-8 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300"
+                >
+                  <span className="text-sm tracking-[0.15em] uppercase">Back to Profile</span>
+                </Link>
+              </div>
             </div>
-          </>
-        )}
+          )}
+
+        </div>
       </div>
     </div>
   );
