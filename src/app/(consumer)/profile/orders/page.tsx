@@ -8,9 +8,17 @@ import { formatPrice } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import * as orderManagementService from '@/services/order-management.service';
-import { submitReturnRequest, getReturnForOrder, RETURN_REASONS, type ReturnRequest } from '@/services/returns.service';
-import { submitReview, getReviewsByCustomer, type ProductReview } from '@/services/reviews.service';
+import { createReturnOrder, getMyReturnOrders, type ApiReturnOrder } from '@/services/return-order.service';
+import { createReview, getMyReviews, type ApiReview } from '@/services/review.service';
 import type { CustomerOrder } from '@/services/order-management.service';
+
+const RETURN_REASONS = [
+  { value: 'wrong_size', label: 'Wrong size' },
+  { value: 'defective', label: 'Defective / damaged' },
+  { value: 'not_as_described', label: 'Not as described' },
+  { value: 'changed_mind', label: 'Changed my mind' },
+  { value: 'other', label: 'Other' },
+];
 
 export default function OrdersPage() {
   const { isAuthenticated, isHydrated } = useAuth();
@@ -19,9 +27,10 @@ export default function OrdersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoaded, setIsLoaded] = useState(false);
   const [returnModal, setReturnModal] = useState<{ order: CustomerOrder; product: CustomerOrder['products'][0] } | null>(null);
-  const [returnReason, setReturnReason] = useState<ReturnRequest['reason']>('wrong_size');
+  const [returnReason, setReturnReason] = useState('wrong_size');
   const [returnDetails, setReturnDetails] = useState('');
   const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [myReturnOrders, setMyReturnOrders] = useState<ApiReturnOrder[]>([]);
 
   // Review state
   const [reviewModal, setReviewModal] = useState<{ order: CustomerOrder; product: CustomerOrder['products'][0] } | null>(null);
@@ -30,10 +39,11 @@ export default function OrdersPage() {
   const [reviewTitle, setReviewTitle] = useState('');
   const [reviewContent, setReviewContent] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
-  const [submittedReviews, setSubmittedReviews] = useState<ProductReview[]>([]);
+  const [myReviews, setMyReviews] = useState<ApiReview[]>([]);
 
   useEffect(() => {
-    try { setSubmittedReviews(getReviewsByCustomer()); } catch { /* ignore */ }
+    getMyReviews().then(setMyReviews).catch(() => {});
+    getMyReturnOrders().then(setMyReturnOrders).catch(() => {});
   }, []);
 
   const fetchOrders = useCallback(async () => {
@@ -222,7 +232,7 @@ export default function OrdersPage() {
                               </span>
                             )}
                             {product.delivery_status === 'delivered' && (() => {
-                              const reviewed = submittedReviews.find(r => r.order_id === order.order_id && r.product_id === product.product_id);
+                              const reviewed = myReviews.find(r => r.order_id === order.order_id && r.product_id === product.product_id);
                               return reviewed ? (
                                 <span className="flex items-center gap-1 text-xs text-gold-deep tracking-[0.1em] uppercase">
                                   {[1,2,3,4,5].map(s => (
@@ -246,8 +256,9 @@ export default function OrdersPage() {
                                 </button>
                               );
                             })()}
-                            {product.delivery_status === 'delivered' && (
-                              !getReturnForOrder(`${order.order_id}-${product.product_id}`) ? (
+                            {product.delivery_status === 'delivered' && (() => {
+                              const ret = myReturnOrders.find(r => r.order_id === order.order_id && r.product_id === product.product_id);
+                              return !ret ? (
                                 <button
                                   onClick={() => setReturnModal({ order, product })}
                                   className="flex items-center gap-1 text-xs text-stone hover:text-charcoal-deep transition-colors tracking-[0.1em] uppercase"
@@ -257,15 +268,15 @@ export default function OrdersPage() {
                                 </button>
                               ) : (
                                 <span className={`flex items-center gap-1 text-xs tracking-[0.1em] uppercase ${
-                                  getReturnForOrder(`${order.order_id}-${product.product_id}`)?.status === 'approved' ? 'text-success' :
-                                  getReturnForOrder(`${order.order_id}-${product.product_id}`)?.status === 'rejected' ? 'text-error' :
+                                  ret.status === 'accepted' ? 'text-success' :
+                                  ret.status === 'declined' ? 'text-error' :
                                   'text-gold-deep'
                                 }`}>
                                   <RotateCcw size={12} />
-                                  Return {getReturnForOrder(`${order.order_id}-${product.product_id}`)?.status}
+                                  Return {ret.status}
                                 </span>
-                              )
-                            )}
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -406,25 +417,22 @@ export default function OrdersPage() {
                 Cancel
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   if (reviewRating === 0) { showToast('Please select a star rating', 'error'); return; }
                   setSubmittingReview(true);
                   try {
-                    const review = submitReview({
+                    const review = await createReview({
                       order_id: reviewModal.order.order_id,
                       product_id: reviewModal.product.product_id,
-                      product_name: reviewModal.product.product_name,
-                      product_image: reviewModal.product.product_image,
-                      brand_name: reviewModal.product.brand_id || '',
                       rating: reviewRating,
-                      title: reviewTitle,
-                      content: reviewContent,
+                      review_title: reviewTitle,
+                      review_description: reviewContent,
                     });
-                    setSubmittedReviews(prev => [...prev, review]);
+                    setMyReviews(prev => [...prev, review]);
                     showToast('Thank you for your review!', 'success');
                     setReviewModal(null);
-                  } catch {
-                    showToast('Failed to submit review', 'error');
+                  } catch (err) {
+                    showToast(err instanceof Error ? err.message : 'Failed to submit review', 'error');
                   } finally {
                     setSubmittingReview(false);
                   }
@@ -465,7 +473,7 @@ export default function OrdersPage() {
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Reason for return *</label>
                 <select
                   value={returnReason}
-                  onChange={e => setReturnReason(e.target.value as ReturnRequest['reason'])}
+                  onChange={e => setReturnReason(e.target.value)}
                   className="w-full px-4 py-3 border border-sand text-sm focus:outline-none focus:border-charcoal-deep transition-colors"
                 >
                   {RETURN_REASONS.map(r => (
@@ -498,24 +506,25 @@ export default function OrdersPage() {
                 Cancel
               </button>
               <button
-                onClick={() => {
+                onClick={async () => {
                   setSubmittingReturn(true);
-                  submitReturnRequest({
-                    order_id: returnModal.order.order_id,
-                    product_id: returnModal.product.product_id,
-                    product_name: returnModal.product.product_name,
-                    product_image: returnModal.product.product_image,
-                    brand_name: returnModal.product.brand_id || '',
-                    reason: returnReason,
-                    reason_details: returnDetails || undefined,
-                    refund_amount: returnModal.product.product_price,
-                    currency: returnModal.order.payment_currency,
-                  });
-                  showToast('Return request submitted. The brand will review it shortly.', 'success');
-                  setReturnModal(null);
-                  setReturnReason('wrong_size');
-                  setReturnDetails('');
-                  setSubmittingReturn(false);
+                  try {
+                    const ret = await createReturnOrder({
+                      order_id: returnModal.order.order_id,
+                      product_id: returnModal.product.product_id,
+                      reason_for_return: returnReason,
+                      details: returnDetails || undefined,
+                    });
+                    setMyReturnOrders(prev => [...prev, ret]);
+                    showToast('Return request submitted. The brand will review it shortly.', 'success');
+                    setReturnModal(null);
+                    setReturnReason('wrong_size');
+                    setReturnDetails('');
+                  } catch (err) {
+                    showToast(err instanceof Error ? err.message : 'Failed to submit return request', 'error');
+                  } finally {
+                    setSubmittingReturn(false);
+                  }
                 }}
                 disabled={submittingReturn}
                 className="flex-1 px-6 py-3 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/currency';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin, Star } from 'lucide-react';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin, Star, RotateCcw } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
@@ -141,6 +141,12 @@ export default function ProfilePage() {
       icon: Star,
       title: 'My Reviews',
       subtitle: 'Rate your purchases',
+    },
+    {
+      href: '/profile/returns',
+      icon: RotateCcw,
+      title: 'My Returns',
+      subtitle: 'Track return requests',
     },
     {
       href: '/calendar',
