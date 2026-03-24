@@ -6,8 +6,10 @@ import Link from 'next/link';
 import {
   ArrowLeft, Package, Truck, CheckCircle, XCircle,
   AlertCircle, Clock, MapPin, Mail, Phone, User,
-  ChevronDown, Loader2
+  ChevronDown, Loader2, Star, RotateCcw, Trash2
 } from 'lucide-react';
+import { getBrandReviews, deleteBrandReview, type BrandApiReview } from '@/services/brand-review.service';
+import { getBrandReturnOrders, updateBrandReturnOrderStatus, type BrandApiReturnOrder } from '@/services/brand-return-order.service';
 import { BrandPageHeader, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import {
   fetchBrandOrderDetail, updateBrandOrderStatus,
@@ -69,6 +71,10 @@ export default function OrderDetailPage() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  const [orderReviews, setOrderReviews] = useState<BrandApiReview[]>([]);
+  const [orderReturnOrders, setOrderReturnOrders] = useState<BrandApiReturnOrder[]>([]);
+  const [updatingReturnId, setUpdatingReturnId] = useState<string | null>(null);
+
   const loadOrder = async () => {
     setIsLoading(true);
     setError(null);
@@ -83,6 +89,28 @@ export default function OrderDetailPage() {
   };
 
   useEffect(() => { loadOrder(); }, [orderId]);
+
+  useEffect(() => {
+    if (!orderId) return;
+    getBrandReviews().then(all => setOrderReviews(all.filter(r => r.order_id === orderId))).catch(() => {});
+    getBrandReturnOrders().then(all => setOrderReturnOrders(all.filter(r => r.order_id === orderId))).catch(() => {});
+  }, [orderId]);
+
+  const handleReturnStatus = async (returnOrderId: string, status: 'accepted' | 'declined') => {
+    setUpdatingReturnId(returnOrderId);
+    try {
+      const updated = await updateBrandReturnOrderStatus(returnOrderId, status);
+      setOrderReturnOrders(prev => prev.map(r => r.return_order_id === returnOrderId ? updated : r));
+    } catch { /* silent */ }
+    finally { setUpdatingReturnId(null); }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    try {
+      await deleteBrandReview(reviewId);
+      setOrderReviews(prev => prev.filter(r => r.review_id !== reviewId));
+    } catch { /* silent */ }
+  };
 
   const handleStatusUpdate = async (newStatus: DeliveryStatus) => {
     if (!order) return;
@@ -329,6 +357,123 @@ export default function OrderDetailPage() {
                   )}
                 </div>
               </div>
+            </div>
+            {/* Customer Reviews */}
+            <div className="bg-white border border-sand/50">
+              <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
+                <Star size={18} className="text-stone" />
+                <h2 className="font-medium text-charcoal-deep">Customer Reviews</h2>
+                <span className="ml-auto text-xs text-taupe">{orderReviews.length} review{orderReviews.length !== 1 ? 's' : ''}</span>
+              </div>
+              {orderReviews.length === 0 ? (
+                <div className="px-6 py-8 text-center text-sm text-taupe">No reviews for this order yet</div>
+              ) : (
+                <div className="divide-y divide-sand/30">
+                  {orderReviews.map(review => {
+                    const product = order.products.find(p => p.product_id === review.product_id);
+                    return (
+                      <div key={review.review_id} className="px-6 py-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            {/* Product */}
+                            <div className="flex items-center gap-2 mb-2">
+                              {product?.product_image && (
+                                <img src={product.product_image} alt={product.product_name} className="w-8 h-8 object-cover flex-shrink-0" />
+                              )}
+                              <span className="text-xs font-medium text-charcoal-deep">{product?.product_name ?? `Product #${review.product_id.slice(-6).toUpperCase()}`}</span>
+                            </div>
+                            {/* Stars + title */}
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(s => (
+                                  <Star key={s} size={13} className={s <= review.rating ? 'fill-gold-muted text-gold-muted' : 'text-sand fill-transparent'} />
+                                ))}
+                              </div>
+                              <span className="text-xs text-stone font-medium">{review.review_title}</span>
+                            </div>
+                            <p className="text-sm text-charcoal-deep/80 leading-relaxed">{review.review_description}</p>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-xs text-taupe">{review.customer_name}</span>
+                              <span className="text-xs text-taupe">{new Date(review.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteReview(review.review_id)}
+                            className="p-1.5 text-taupe hover:text-error transition-colors flex-shrink-0"
+                            title="Delete review"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Return Requests */}
+            <div className="bg-white border border-sand/50">
+              <div className="px-6 py-4 border-b border-sand/50 flex items-center gap-3">
+                <RotateCcw size={18} className="text-stone" />
+                <h2 className="font-medium text-charcoal-deep">Return Requests</h2>
+                <span className="ml-auto text-xs text-taupe">{orderReturnOrders.length} request{orderReturnOrders.length !== 1 ? 's' : ''}</span>
+              </div>
+              {orderReturnOrders.length === 0 ? (
+                <div className="px-6 py-8 text-center text-sm text-taupe">No return requests for this order</div>
+              ) : (
+                <div className="divide-y divide-sand/30">
+                  {orderReturnOrders.map(ret => {
+                    const product = order.products.find(p => p.product_id === ret.product_id);
+                    return (
+                    <div key={ret.return_order_id} className="px-6 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          {/* Product */}
+                          <div className="flex items-center gap-2 mb-2">
+                            {product?.product_image && (
+                              <img src={product.product_image} alt={product.product_name} className="w-8 h-8 object-cover flex-shrink-0" />
+                            )}
+                            <span className="text-xs font-medium text-charcoal-deep">{product?.product_name ?? `Product #${ret.product_id.slice(-6).toUpperCase()}`}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[10px] px-2 py-0.5 tracking-[0.1em] uppercase ${
+                              ret.status === 'accepted' ? 'bg-success/10 text-success' :
+                              ret.status === 'declined' ? 'bg-error/10 text-error' :
+                              'bg-gold-soft/20 text-gold-deep'
+                            }`}>{ret.status}</span>
+                            <span className="text-xs text-stone">{ret.reason_for_return.replace(/_/g, ' ')}</span>
+                          </div>
+                          {ret.details && <p className="text-sm text-charcoal-deep/80 leading-relaxed">{ret.details}</p>}
+                          <div className="flex items-center gap-3 mt-2">
+                            <span className="text-xs text-taupe">{ret.customer_name}</span>
+                            <span className="text-xs text-taupe">{new Date(ret.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          </div>
+                        </div>
+                        {ret.status === 'pending' && (
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => handleReturnStatus(ret.return_order_id, 'accepted')}
+                              disabled={updatingReturnId === ret.return_order_id}
+                              className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleReturnStatus(ret.return_order_id, 'declined')}
+                              disabled={updatingReturnId === ret.return_order_id}
+                              className="px-3 py-1.5 text-[10px] tracking-[0.1em] uppercase bg-error/10 text-error hover:bg-error/20 transition-colors disabled:opacity-50"
+                            >
+                              Decline
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 

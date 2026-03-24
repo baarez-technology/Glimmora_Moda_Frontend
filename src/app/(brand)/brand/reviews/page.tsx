@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { Star, MessageSquare } from 'lucide-react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Star, MessageSquare, Trash2, Loader2 } from 'lucide-react';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
 import { MetricCard } from '@/components/brand/MetricCard';
-import { getReviewsByBrand } from '@/services/reviews.service';
-import type { ProductReview } from '@/services/reviews.service';
+import { getBrandReviews, deleteBrandReview, type BrandApiReview } from '@/services/brand-review.service';
+import { fetchBrandProducts } from '@/services/private-collection.service';
+import Link from 'next/link';
+
+type ProductMap = Record<string, { name: string; imageUrl: string }>;
 
 function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
   return (
@@ -28,20 +31,37 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
 type RatingFilter = 'all' | 1 | 2 | 3 | 4 | 5;
 
 export default function BrandReviewsPage() {
-  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviews, setReviews] = useState<BrandApiReview[]>([]);
+  const [productMap, setProductMap] = useState<ProductMap>({});
   const [isLoading, setIsLoading] = useState(true);
   const [ratingFilter, setRatingFilter] = useState<RatingFilter>('all');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadReviews = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const data = getReviewsByBrand();
+      const [data, productsRes] = await Promise.all([
+        getBrandReviews(),
+        fetchBrandProducts({ page_number: 1 }),
+      ]);
       setReviews(data);
-    } catch {
-      // silently fail
-    } finally {
-      setIsLoading(false);
-    }
+      const map: ProductMap = {};
+      for (const p of productsRes.items) map[p.id] = { name: p.name, imageUrl: p.imageUrl };
+      setProductMap(map);
+    } catch { /* silent */ }
+    finally { setIsLoading(false); }
   }, []);
+
+  useEffect(() => { loadReviews(); }, [loadReviews]);
+
+  const handleDelete = async (reviewId: string) => {
+    setDeletingId(reviewId);
+    try {
+      await deleteBrandReview(reviewId);
+      setReviews(prev => prev.filter(r => r.review_id !== reviewId));
+    } catch { /* silent */ }
+    finally { setDeletingId(null); }
+  };
 
   // Computed metrics
   const totalReviews = reviews.length;
@@ -176,40 +196,70 @@ export default function BrandReviewsPage() {
             {/* Review Cards */}
             {filteredReviews.length > 0 ? (
               <div className="space-y-4">
-                {filteredReviews.map((review) => (
+                {filteredReviews.map((review) => {
+                  const prod = productMap[review.product_id];
+                  return (
                   <div
-                    key={review.id}
+                    key={review.review_id}
                     className="bg-white border border-sand/50 p-6"
                   >
+                    {/* Product row */}
+                    <div className="flex items-center gap-3 mb-4 pb-4 border-b border-sand/30">
+                      <div className="w-12 h-12 bg-parchment flex-shrink-0 overflow-hidden">
+                        {prod?.imageUrl
+                          ? <img src={prod.imageUrl} alt={prod.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-taupe text-xs">?</div>
+                        }
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-charcoal-deep">{prod?.name ?? `Product #${review.product_id.slice(-6).toUpperCase()}`}</p>
+                        <Link href={`/brand/orders/${review.order_id}`} className="text-xs text-taupe hover:text-charcoal-deep underline underline-offset-2 transition-colors">
+                          Order #{review.order_id.slice(-6).toUpperCase()}
+                        </Link>
+                      </div>
+                    </div>
+
                     <div className="flex items-start justify-between gap-4 mb-3">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-parchment rounded-full flex items-center justify-center text-sm text-stone font-medium">
-                          {(review.customer_name || 'V')[0].toUpperCase()}
+                        <div className="w-9 h-9 bg-parchment rounded-full flex items-center justify-center text-sm text-stone font-medium overflow-hidden">
+                          {review.customer_profile_picture
+                            ? <img src={review.customer_profile_picture} alt={review.customer_name} className="w-full h-full object-cover" />
+                            : (review.customer_name || 'V')[0].toUpperCase()
+                          }
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-charcoal-deep">
-                            {review.customer_name || 'Verified Customer'}
-                          </p>
-                          <p className="text-xs text-stone">
-                            {review.product_name}
-                          </p>
-                        </div>
+                        <p className="text-sm font-medium text-charcoal-deep">
+                          {review.customer_name || 'Verified Customer'}
+                        </p>
                       </div>
-                      <span className="text-xs text-stone whitespace-nowrap">
-                        {formatDate(review.created_at)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-stone whitespace-nowrap">
+                          {formatDate(review.created_at)}
+                        </span>
+                        <button
+                          onClick={() => handleDelete(review.review_id)}
+                          disabled={deletingId === review.review_id}
+                          className="p-1.5 text-taupe hover:text-error transition-colors disabled:opacity-40"
+                          title="Delete review"
+                        >
+                          {deletingId === review.review_id
+                            ? <Loader2 size={14} className="animate-spin" />
+                            : <Trash2 size={14} />
+                          }
+                        </button>
+                      </div>
                     </div>
 
                     <StarRating rating={review.rating} />
 
                     <h4 className="text-sm font-medium text-charcoal-deep mt-3">
-                      {review.title}
+                      {review.review_title}
                     </h4>
                     <p className="text-sm text-stone mt-1 leading-relaxed">
-                      {review.content}
+                      {review.review_description}
                     </p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-16 bg-white border border-sand/50">

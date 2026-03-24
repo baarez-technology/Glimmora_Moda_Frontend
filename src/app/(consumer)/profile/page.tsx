@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { formatPrice } from '@/lib/currency';
 import { useRouter } from 'next/navigation';
-import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin, Star } from 'lucide-react';
+import { User as UserIcon, ShoppingBag, Settings, ArrowRight, Calendar, Package, Crown, Phone, Mail, MessageCircle, Layers, MapPin, Star, RotateCcw } from 'lucide-react';
 import * as userService from '@/services/user.service';
 import * as authService from '@/services/auth.service';
 import { useApp } from '@/context/AppContext';
@@ -141,6 +141,12 @@ export default function ProfilePage() {
       icon: Star,
       title: 'My Reviews',
       subtitle: 'Rate your purchases',
+    },
+    {
+      href: '/profile/returns',
+      icon: RotateCcw,
+      title: 'My Returns',
+      subtitle: 'Track return requests',
     },
     {
       href: '/calendar',
@@ -306,7 +312,7 @@ export default function ProfilePage() {
                     </h2>
                   </div>
                   <Link
-                    href="/profile/preferences"
+                    href="/profile/style-dna"
                     className="text-sm tracking-[0.1em] uppercase text-stone hover:text-charcoal-deep transition-colors"
                   >
                     Update
@@ -337,16 +343,6 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    <div>
-                      <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-3">Confidence</p>
-                      <p className="font-display text-xl text-charcoal-deep capitalize">{user.fashionIdentity.confidenceLevel}</p>
-                    </div>
-
-                    <div>
-                      <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-3">Location</p>
-                      <p className="font-display text-xl text-charcoal-deep">{user.fashionIdentity.primaryLocation}</p>
-                    </div>
-
                     {user.fashionIdentity.budgetRange && (
                       <div className="md:col-span-2 pt-6 border-t border-sand/50">
                         <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-3">Investment Range</p>
@@ -366,7 +362,7 @@ export default function ProfilePage() {
                   <div className="py-16 text-center bg-parchment">
                     <p className="text-stone mb-8">Complete your style profile for personalized recommendations</p>
                     <Link
-                      href="/profile/preferences"
+                      href="/profile/style-dna"
                       className="group inline-flex items-center gap-4"
                     >
                       <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">
