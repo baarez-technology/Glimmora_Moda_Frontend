@@ -71,6 +71,7 @@ export default function PasswordPage() {
     if (!currentPassword) newErrors.currentPassword = 'Current password is required';
     if (!newPassword) newErrors.newPassword = 'New password is required';
     else if (newPassword.length < 8) newErrors.newPassword = 'Password must be at least 8 characters';
+    else if (newPassword.length > 128) newErrors.newPassword = 'Password must be no longer than 128 characters';
     if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your new password';
     else if (newPassword !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     setErrors(newErrors);

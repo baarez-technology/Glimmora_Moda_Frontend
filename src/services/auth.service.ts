@@ -491,7 +491,13 @@ export async function changeUserPassword(payload: {
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Failed to change password' }));
-    throw new Error(err.detail || `Failed to change password (${res.status})`);
+    const detail = err.detail;
+    const message = Array.isArray(detail)
+      ? detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join(', ')
+      : typeof detail === 'string'
+        ? detail
+        : `Failed to change password (${res.status})`;
+    throw new Error(message);
   }
 
   return res.json();

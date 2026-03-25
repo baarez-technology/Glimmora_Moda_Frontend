@@ -12,6 +12,7 @@ import { signInWithGoogle, signInWithApple } from '@/lib/firebase';
 type RegisterRole = 'consumer' | 'uhni';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+const NAME_REGEX = /^[a-zA-Z\s'-]+$/;
 
 const PASSWORD_RULES = [
   { regex: /.{8,}/, label: 'At least 8 characters' },
@@ -34,7 +35,7 @@ function RegisterForm() {
   const [isSocialLoading, setIsSocialLoading] = useState<'google' | 'apple' | null>(null);
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<RegisterRole>('consumer');
-  const [touched, setTouched] = useState({ email: false, password: false });
+  const [touched, setTouched] = useState({ firstName: false, lastName: false, email: false, password: false });
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -47,6 +48,14 @@ function RegisterForm() {
   }, []);
 
   // Validation
+  const firstNameError = touched.firstName && formData.firstName.length > 0 && !NAME_REGEX.test(formData.firstName)
+    ? 'First name should contain only letters'
+    : null;
+
+  const lastNameError = touched.lastName && formData.lastName.length > 0 && !NAME_REGEX.test(formData.lastName)
+    ? 'Last name should contain only letters'
+    : null;
+
   const emailError = touched.email && formData.email.length > 0 && !EMAIL_REGEX.test(formData.email)
     ? 'Please enter a valid email address'
     : null;
@@ -56,14 +65,16 @@ function RegisterForm() {
 
   const isFormValid =
     formData.firstName.trim().length > 0 &&
+    NAME_REGEX.test(formData.firstName) &&
     formData.lastName.trim().length > 0 &&
+    NAME_REGEX.test(formData.lastName) &&
     EMAIL_REGEX.test(formData.email) &&
     failedPasswordRules.length === 0 &&
     agreeTerms;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setTouched({ email: true, password: true });
+    setTouched({ firstName: true, lastName: true, email: true, password: true });
 
     if (!isFormValid) return;
 
@@ -202,9 +213,15 @@ function RegisterForm() {
                   type="text"
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onBlur={() => setTouched(t => ({ ...t, firstName: true }))}
+                  className={`w-full px-5 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                    firstNameError ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                  }`}
                   required
                 />
+                {firstNameError && (
+                  <p className="text-xs text-error mt-2">{firstNameError}</p>
+                )}
               </div>
               <div>
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
@@ -214,9 +231,15 @@ function RegisterForm() {
                   type="text"
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  onBlur={() => setTouched(t => ({ ...t, lastName: true }))}
+                  className={`w-full px-5 py-4 bg-transparent border text-charcoal-deep placeholder:text-taupe focus:outline-none transition-colors ${
+                    lastNameError ? 'border-error focus:border-error' : 'border-sand focus:border-charcoal-deep'
+                  }`}
                   required
                 />
+                {lastNameError && (
+                  <p className="text-xs text-error mt-2">{lastNameError}</p>
+                )}
               </div>
             </div>
 
