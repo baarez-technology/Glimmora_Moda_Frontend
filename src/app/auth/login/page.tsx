@@ -559,11 +559,11 @@ function LoginForm() {
                 </div>
               )}
               {selectedTier !== 'admin' && (
-                <div className="flex justify-end mt-3">
+                <div className="flex justify-start mt-3">
                   <button
                     type="button"
                     onClick={openForgotModal}
-                    className="text-xs text-charcoal-deep underline underline-offset-2 hover:text-gold-muted transition-colors tracking-wide"
+                    className="text-xs text-charcoal-deep hover:text-gold-muted transition-colors tracking-wide"
                   >
                     Forgot Password?
                   </button>
