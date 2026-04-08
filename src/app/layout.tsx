@@ -18,7 +18,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-ivory-cream">
+      <body className="min-h-screen bg-ivory-cream" suppressHydrationWarning>
         <AuthProvider>
           <AppProvider>
             <ConditionalLayout>
