@@ -315,6 +315,228 @@ function LoginForm() {
   };
 
   // 2FA verification screen
+  // ── Forgot Password inline flow ──────────────────────────────────────────
+  if (forgotOpen) {
+    const stepIndex = forgotStep === 'email' ? 0 : forgotStep === 'otp' ? 1 : 2;
+    const stepTitle = forgotStep === 'email' ? 'Reset Password' : forgotStep === 'otp' ? 'Check Your Email' : 'New Password';
+    const stepSub = forgotStep === 'email'
+      ? `Enter the email for your ${isBrandFlow ? 'brand' : ''} account and we'll send a verification code.`
+      : forgotStep === 'otp'
+      ? `We sent a 6-digit code to ${forgotEmail}. Enter it below.`
+      : 'Choose a strong new password for your account.';
+
+    return (
+      <div className="min-h-screen bg-ivory-cream flex">
+        {/* Left — branding panel */}
+        <div className="hidden lg:block lg:w-1/2 bg-charcoal-deep relative overflow-hidden">
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30"
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80)' }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-charcoal-deep/95 to-charcoal-deep/60" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="max-w-md px-12 text-center">
+              <Link href="/" className="inline-block mb-8">
+                <h2 className="font-display text-3xl tracking-[0.15em] uppercase text-ivory-cream hover:text-gold-soft transition-colors">
+                  ModaGlimmora
+                </h2>
+              </Link>
+              <p className="text-[10px] tracking-[0.5em] uppercase text-gold-soft mb-6">
+                Account Recovery
+              </p>
+              {/* Step progress */}
+              <div className="flex gap-3 justify-center mb-8">
+                {['Email', 'Verify', 'Reset'].map((label, i) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div className={`flex flex-col items-center gap-1`}>
+                      <div className={`w-7 h-7 flex items-center justify-center text-xs font-medium transition-all duration-300 ${
+                        i < stepIndex ? 'bg-gold-soft text-charcoal-deep' : i === stepIndex ? 'bg-ivory-cream text-charcoal-deep' : 'border border-sand/40 text-sand/60'
+                      }`}>
+                        {i < stepIndex ? '✓' : i + 1}
+                      </div>
+                      <span className={`text-[9px] tracking-[0.2em] uppercase ${i === stepIndex ? 'text-ivory-cream' : 'text-sand/50'}`}>{label}</span>
+                    </div>
+                    {i < 2 && <div className={`w-8 h-px mb-4 ${i < stepIndex ? 'bg-gold-soft/60' : 'bg-sand/20'}`} />}
+                  </div>
+                ))}
+              </div>
+              <p className="text-sand/70 text-sm leading-relaxed">
+                Your account security is our priority. This process takes less than a minute.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Right — form panel */}
+        <div className="flex-1 flex items-center justify-center px-8 py-16 lg:px-16">
+          <div className="w-full max-w-md">
+            {/* Mobile logo */}
+            <div className="lg:hidden text-center mb-8">
+              <Link href="/"><h1 className="font-display text-2xl tracking-[0.15em] uppercase text-charcoal-deep">ModaGlimmora</h1></Link>
+            </div>
+
+            {/* Back link */}
+            <button
+              type="button"
+              onClick={closeForgotModal}
+              className="flex items-center gap-2 text-stone hover:text-charcoal-deep transition-colors text-xs tracking-[0.15em] uppercase mb-10"
+            >
+              <span>←</span> Back to Sign In
+            </button>
+
+            {/* Title */}
+            <div className="mb-10">
+              <p className="text-[10px] tracking-[0.3em] uppercase text-stone mb-2">
+                Step {stepIndex + 1} of 3
+              </p>
+              <h1 className="font-display text-[clamp(2rem,4vw,2.8rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-3">
+                {stepTitle}
+              </h1>
+              <p className="text-stone text-sm leading-relaxed">{stepSub}</p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="flex gap-1.5 mb-8">
+              {[0, 1, 2].map(i => (
+                <div key={i} className={`h-0.5 flex-1 transition-all duration-500 ${i <= stepIndex ? 'bg-charcoal-deep' : 'bg-sand'}`} />
+              ))}
+            </div>
+
+            {forgotError && (
+              <div className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm mb-6">
+                {forgotError}
+              </div>
+            )}
+
+            <div className="space-y-6">
+              {/* Step 1 — Email */}
+              {forgotStep === 'email' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleForgotSendOtp(); }}
+                      placeholder={isBrandFlow ? 'partner@brand.com' : 'your@email.com'}
+                      className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleForgotSendOtp}
+                    disabled={forgotLoading}
+                    className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    {forgotLoading
+                      ? <><div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" /><span className="text-sm tracking-[0.15em] uppercase">Sending...</span></>
+                      : <><span className="text-sm tracking-[0.15em] uppercase">Send Verification Code</span><ArrowRight size={16} /></>
+                    }
+                  </button>
+                </>
+              )}
+
+              {/* Step 2 — OTP */}
+              {forgotStep === 'otp' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                      Verification Code
+                    </label>
+                    <input
+                      type="text"
+                      value={forgotOtp}
+                      onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleForgotVerifyOtp(); }}
+                      placeholder="000000"
+                      maxLength={6}
+                      className="w-full px-5 py-5 bg-transparent border border-sand text-charcoal-deep text-center text-3xl tracking-[0.8em] font-mono focus:outline-none focus:border-charcoal-deep transition-colors"
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleForgotVerifyOtp}
+                    disabled={forgotLoading || forgotOtp.length < 6}
+                    className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    {forgotLoading
+                      ? <><div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" /><span className="text-sm tracking-[0.15em] uppercase">Verifying...</span></>
+                      : <><span className="text-sm tracking-[0.15em] uppercase">Verify Code</span><ArrowRight size={16} /></>
+                    }
+                  </button>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-stone">Didn&apos;t receive it?</span>
+                    <button
+                      type="button"
+                      onClick={handleForgotResend}
+                      disabled={forgotResendCooldown > 0 || forgotLoading}
+                      className="text-xs text-charcoal-deep hover:text-gold-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {forgotResendCooldown > 0 ? `Resend in ${forgotResendCooldown}s` : 'Resend Code'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* Step 3 — New Password */}
+              {forgotStep === 'reset' && (
+                <>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                      New Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={forgotShowPassword ? 'text' : 'password'}
+                        value={forgotNewPassword}
+                        onChange={(e) => setForgotNewPassword(e.target.value)}
+                        placeholder="Enter new password"
+                        className="w-full px-5 py-4 pr-14 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                        autoFocus
+                      />
+                      <button type="button" onClick={() => setForgotShowPassword(s => !s)} className="absolute right-5 top-1/2 -translate-y-1/2 text-taupe hover:text-charcoal-deep transition-colors">
+                        {forgotShowPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3">
+                      Confirm Password
+                    </label>
+                    <input
+                      type={forgotShowPassword ? 'text' : 'password'}
+                      value={forgotConfirmPassword}
+                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') handleForgotResetPassword(); }}
+                      placeholder="Confirm new password"
+                      className="w-full px-5 py-4 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleForgotResetPassword}
+                    disabled={forgotLoading}
+                    className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+                  >
+                    {forgotLoading
+                      ? <><div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" /><span className="text-sm tracking-[0.15em] uppercase">Resetting...</span></>
+                      : <><span className="text-sm tracking-[0.15em] uppercase">Reset Password</span><ArrowRight size={16} /></>
+                    }
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (requires2FA) {
     return (
       <div className="min-h-screen bg-ivory-cream flex">
@@ -728,190 +950,6 @@ function LoginForm() {
                 </button>
               </div>
             </>
-          )}
-
-          {/* ── Forgot Password Modal ── */}
-          {forgotOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-charcoal-deep/60 backdrop-blur-sm px-4">
-              <div className="w-full max-w-md bg-ivory-cream border border-sand shadow-2xl">
-                {/* Header */}
-                <div className="flex items-center justify-between px-8 py-6 border-b border-sand">
-                  <div>
-                    <p className="text-[10px] tracking-[0.3em] uppercase text-stone mb-1">
-                      {isBrandFlow ? 'Brand Account' : 'Account'} Recovery
-                    </p>
-                    <h2 className="font-display text-xl text-charcoal-deep">
-                      {forgotStep === 'email' ? 'Reset Password' : forgotStep === 'otp' ? 'Enter Verification Code' : 'Set New Password'}
-                    </h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={closeForgotModal}
-                    className="text-stone hover:text-charcoal-deep transition-colors text-xl leading-none"
-                    aria-label="Close"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {/* Step indicator */}
-                <div className="flex px-8 pt-5 gap-2">
-                  {(['email', 'otp', 'reset'] as const).map((s, i) => (
-                    <div
-                      key={s}
-                      className={`h-0.5 flex-1 transition-colors duration-300 ${
-                        i <= ['email', 'otp', 'reset'].indexOf(forgotStep) ? 'bg-charcoal-deep' : 'bg-sand'
-                      }`}
-                    />
-                  ))}
-                </div>
-
-                <div className="px-8 py-6 space-y-5">
-                  {forgotError && (
-                    <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
-                      {forgotError}
-                    </div>
-                  )}
-
-                  {/* Step 1 — Email */}
-                  {forgotStep === 'email' && (
-                    <>
-                      <p className="text-sm text-stone">
-                        Enter your registered email address. We&apos;ll send a verification code to reset your password.
-                      </p>
-                      <div>
-                        <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                          Email Address
-                        </label>
-                        <input
-                          type="email"
-                          value={forgotEmail}
-                          onChange={(e) => setForgotEmail(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleForgotSendOtp(); }}
-                          placeholder="your@email.com"
-                          className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                          autoFocus
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleForgotSendOtp}
-                        disabled={forgotLoading}
-                        className="w-full py-3 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {forgotLoading ? (
-                          <><div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" /><span className="text-sm tracking-[0.15em] uppercase">Sending...</span></>
-                        ) : (
-                          <span className="text-sm tracking-[0.15em] uppercase">Send Verification Code</span>
-                        )}
-                      </button>
-                    </>
-                  )}
-
-                  {/* Step 2 — OTP */}
-                  {forgotStep === 'otp' && (
-                    <>
-                      <p className="text-sm text-stone">
-                        A 6-digit code was sent to <span className="text-charcoal-deep font-medium">{forgotEmail}</span>.
-                      </p>
-                      <div>
-                        <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                          Verification Code
-                        </label>
-                        <input
-                          type="text"
-                          value={forgotOtp}
-                          onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleForgotVerifyOtp(); }}
-                          placeholder="000000"
-                          maxLength={6}
-                          className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep text-center text-2xl tracking-[0.6em] font-mono focus:outline-none focus:border-charcoal-deep transition-colors"
-                          autoFocus
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleForgotVerifyOtp}
-                        disabled={forgotLoading || forgotOtp.length < 6}
-                        className="w-full py-3 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {forgotLoading ? (
-                          <><div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" /><span className="text-sm tracking-[0.15em] uppercase">Verifying...</span></>
-                        ) : (
-                          <span className="text-sm tracking-[0.15em] uppercase">Verify Code</span>
-                        )}
-                      </button>
-                      <div className="text-center">
-                        <button
-                          type="button"
-                          onClick={handleForgotResend}
-                          disabled={forgotResendCooldown > 0 || forgotLoading}
-                          className="text-xs text-stone hover:text-charcoal-deep transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {forgotResendCooldown > 0 ? `Resend in ${forgotResendCooldown}s` : 'Resend Code'}
-                        </button>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Step 3 — New Password */}
-                  {forgotStep === 'reset' && (
-                    <>
-                      <p className="text-sm text-stone">
-                        Create a new password for your account.
-                      </p>
-                      <div>
-                        <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                          New Password
-                        </label>
-                        <div className="relative">
-                          <input
-                            type={forgotShowPassword ? 'text' : 'password'}
-                            value={forgotNewPassword}
-                            onChange={(e) => setForgotNewPassword(e.target.value)}
-                            placeholder="New password"
-                            className="w-full px-4 py-3 pr-12 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                            autoFocus
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setForgotShowPassword(s => !s)}
-                            className="absolute right-4 top-1/2 -translate-y-1/2 text-taupe hover:text-charcoal-deep transition-colors"
-                          >
-                            {forgotShowPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                          </button>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                          Confirm Password
-                        </label>
-                        <input
-                          type={forgotShowPassword ? 'text' : 'password'}
-                          value={forgotConfirmPassword}
-                          onChange={(e) => setForgotConfirmPassword(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') handleForgotResetPassword(); }}
-                          placeholder="Confirm new password"
-                          className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleForgotResetPassword}
-                        disabled={forgotLoading}
-                        className="w-full py-3 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {forgotLoading ? (
-                          <><div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" /><span className="text-sm tracking-[0.15em] uppercase">Resetting...</span></>
-                        ) : (
-                          <span className="text-sm tracking-[0.15em] uppercase">Reset Password</span>
-                        )}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
           )}
 
           <p className="text-center text-stone mt-10">
