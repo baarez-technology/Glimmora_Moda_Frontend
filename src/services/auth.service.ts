@@ -602,6 +602,70 @@ export async function verify2FALogin(pre_auth_token: string, totp_code: string):
 // Firebase Social Auth (Google / Apple)
 // ============================================
 
+// ============================================
+// Forgot / Reset Password
+// ============================================
+
+/** Send OTP to email for brand or consumer/uhni */
+export async function forgotPasswordRequest(email: string, isBrand: boolean): Promise<{ message: string }> {
+  const url = isBrand ? '/api/v1/auth/forgot-password' : '/api/v1/user/auth/forgot-password';
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Request failed' }));
+    throw new Error(err.detail || `Request failed (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Resend OTP */
+export async function forgotPasswordResend(email: string, isBrand: boolean): Promise<{ message: string }> {
+  const url = isBrand ? '/api/v1/auth/forgot-password/resend' : '/api/v1/user/auth/forgot-password/resend';
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Resend failed' }));
+    throw new Error(err.detail || `Resend failed (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Verify OTP — returns reset_token */
+export async function forgotPasswordVerify(email: string, otp: string, isBrand: boolean): Promise<{ reset_token: string }> {
+  const url = isBrand ? '/api/v1/auth/forgot-password/verify' : '/api/v1/user/auth/forgot-password/verify';
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Invalid OTP' }));
+    throw new Error(err.detail || `Verification failed (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Reset password using verified OTP */
+export async function resetPassword(email: string, otp: string, new_password: string, isBrand: boolean): Promise<{ message: string }> {
+  const url = isBrand ? '/api/v1/auth/reset-password' : '/api/v1/user/auth/reset-password';
+  const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, otp, new_password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Reset failed' }));
+    throw new Error(err.detail || `Reset failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function socialSignIn(
   provider: 'google' | 'apple',
   idToken: string,
