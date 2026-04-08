@@ -7,8 +7,10 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { getAllBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 import { formatPrice } from '@/lib/currency';
+import { useApp } from '@/context/AppContext';
 
 export default function HomePage() {
+  const { currency } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -273,7 +275,7 @@ export default function HomePage() {
                     </h3>
                   </div>
                   <p className="font-body text-sm text-stone">
-                    {formatPrice(featuredProducts[0].price)}
+                    {formatPrice(featuredProducts[0].price, currency)}
                   </p>
                 </div>
               </Link>
@@ -303,7 +305,7 @@ export default function HomePage() {
                     {product.name}
                   </h3>
                   <p className="font-body text-xs text-charcoal-warm mt-1">
-                    {formatPrice(product.price)}
+                    {formatPrice(product.price, currency)}
                   </p>
                 </Link>
               ))}

@@ -13,10 +13,11 @@ import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 function DiscoverContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { isUHNI } = useApp();
+  const { isUHNI, currency } = useApp();
   const occasionParam = searchParams.get('occasion');
   const moodParam = searchParams.get('mood');
   const brandIdParam = searchParams.get('brandId');
+  const tabParam = searchParams.get('tab') as 'all' | 'products' | 'brands' | 'stories' | null;
   const resultsRef = useRef<HTMLDivElement>(null);
 
   // UHNI users have their own discover page
@@ -26,7 +27,10 @@ function DiscoverContent() {
 
   const [isLoaded, setIsLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'all' | 'products' | 'brands' | 'stories'>('all');
+  const validTabs = ['all', 'products', 'brands', 'stories'] as const;
+  // Derive activeTab directly from URL — no useState, always in sync with back/forward
+  const activeTab: 'all' | 'products' | 'brands' | 'stories' =
+    tabParam && (validTabs as readonly string[]).includes(tabParam) ? tabParam : 'all';
   const [budgetRange, setBudgetRange] = useState<string | null>(null);
   const [selectedOccasions, setSelectedOccasions] = useState<string[]>(occasionParam ? [occasionParam] : []);
   const [selectedMoods, setSelectedMoods] = useState<string[]>(moodParam ? [moodParam] : []);
@@ -342,7 +346,11 @@ function DiscoverContent() {
               ].map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  onClick={() => {
+                    const params = new URLSearchParams(searchParams.toString());
+                    if (tab.id === 'all') params.delete('tab'); else params.set('tab', tab.id);
+                    router.push(`/discover?${params.toString()}`);
+                  }}
                   className={`relative text-sm tracking-[0.15em] uppercase transition-all duration-300 ${
                     activeTab === tab.id
                       ? 'text-charcoal-deep'
@@ -517,7 +525,7 @@ function DiscoverContent() {
                         {product.name}
                       </h3>
                       <p className="text-sm text-stone">
-                        {formatPrice(product.price)}
+                        {formatPrice(product.price, currency)}
                       </p>
                     </div>
                   </Link>
@@ -734,7 +742,7 @@ function DiscoverContent() {
                 {filteredBrands.length > 6 && (
                   <div className="mt-12 lg:mt-16 text-center">
                     <button
-                      onClick={() => setActiveTab('brands')}
+                      onClick={() => router.push('/discover?tab=brands')}
                       className="group inline-flex items-center gap-4"
                     >
                       <span className="text-sm tracking-[0.15em] uppercase text-ivory-cream/60 group-hover:text-ivory-cream transition-colors">
@@ -909,7 +917,7 @@ function DiscoverContent() {
                   {activeTab === 'all' && filteredStories.length > 3 && (
                     <div className="mt-12 text-center">
                       <button
-                        onClick={() => setActiveTab('stories')}
+                        onClick={() => router.push('/discover?tab=stories')}
                         className="group inline-flex items-center gap-4"
                       >
                         <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep/60 group-hover:text-charcoal-deep transition-colors">

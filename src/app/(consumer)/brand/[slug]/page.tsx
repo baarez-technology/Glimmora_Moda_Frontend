@@ -10,7 +10,7 @@ import { getAllShopLocations as getAllBrandShops, type BrandShopLocation } from 
 import { getReviewsByBrand, type ProductReview } from '@/services/reviews.service';
 import type { PaginatedProducts } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import type { Product, Brand, BrandStory, Collection } from '@/types';
 
 interface BrandPageProps {
@@ -20,6 +20,7 @@ interface BrandPageProps {
 export default function BrandPage({ params }: BrandPageProps) {
   const { slug } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const brandIdParam = searchParams.get('brandId');
   const [brand, setBrand] = useState<Brand | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -193,13 +194,13 @@ export default function BrandPage({ params }: BrandPageProps) {
 
         {/* Back Button */}
         <div className="absolute top-8 left-8 z-10">
-          <Link
-            href="/discover"
+          <button
+            onClick={() => router.back()}
             className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
           >
             <ArrowLeft size={16} />
             <span className="tracking-wider">Back</span>
-          </Link>
+          </button>
         </div>
 
         <div className={`absolute bottom-0 left-0 right-0 p-8 md:p-16 lg:p-24 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -726,7 +727,7 @@ export default function BrandPage({ params }: BrandPageProps) {
             Discover More Maisons
           </h2>
           <Link
-            href="/discover"
+            href="/discover?tab=brands"
             className="inline-flex items-center gap-3 px-10 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
           >
             Explore All Brands

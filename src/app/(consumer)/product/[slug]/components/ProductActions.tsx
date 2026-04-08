@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, DollarSign, X, Crown, TrendingDown, Flag } from 'lucide-react';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
+import { useApp } from '@/context/AppContext';
 import { submitProductReport, hasReportedProduct, REPORT_REASONS, type ReportReason } from '@/services/reports.service';
 import type { Product, ProductVariant } from '@/types';
 import type { PricingTier } from '@/types/pricing-tiers';
@@ -66,6 +67,7 @@ export default function ProductActions({
   hasPriceAlert,
   onSetPriceAlert
 }: ProductActionsProps) {
+  const { currency } = useApp();
   const router = useRouter();
   const [showNegotiateModal, setShowNegotiateModal] = useState(false);
   const [negotiatePrice, setNegotiatePrice] = useState('');
@@ -493,7 +495,7 @@ export default function ProductActions({
                     <p className="text-sm text-charcoal-deep font-medium">{product.name}</p>
                     <p className="text-xs text-taupe">{product.brandName}</p>
                     <p className="text-lg font-display text-charcoal-deep mt-1">
-                      {formatPrice(product.price)}
+                      {formatPrice(product.price, currency)}
                     </p>
                   </div>
 
@@ -579,7 +581,7 @@ export default function ProductActions({
                 <p className="text-sm text-charcoal-deep font-medium">{product.name}</p>
                 <p className="text-xs text-taupe">{product.brandName}</p>
                 <p className="text-lg font-display text-charcoal-deep mt-1">
-                  Current: {formatPrice(product.price)}
+                  Current: {formatPrice(product.price, currency)}
                 </p>
               </div>
 

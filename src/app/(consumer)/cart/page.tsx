@@ -14,7 +14,7 @@ import type { CartItem } from '@/services/customer-collection.service';
 
 export default function CartPage() {
   const { isAuthenticated, isHydrated } = useAuth();
-  const { showToast, refreshCart: syncHeaderCart } = useApp();
+  const { showToast, refreshCart: syncHeaderCart, currency } = useApp();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -216,7 +216,7 @@ export default function CartPage() {
                       {/* Price & Quantity */}
                       <div className="flex items-center justify-between mt-6">
                         <p className="font-display text-xl text-charcoal-deep">
-                          {formatPrice(item.price * item.quantity)}
+                          {formatPrice(item.price * item.quantity, currency)}
                         </p>
                         <div className="flex items-center gap-3">
                           <button
@@ -260,7 +260,7 @@ export default function CartPage() {
                           {item.product_name}{item.quantity > 1 ? ` ×${item.quantity}` : ''}
                         </span>
                         <span className="text-ivory-cream flex-shrink-0">
-                          {formatPrice(item.price * item.quantity)}
+                          {formatPrice(item.price * item.quantity, currency)}
                         </span>
                       </div>
                     ))}
@@ -270,7 +270,7 @@ export default function CartPage() {
                   <div className="space-y-3 border-b border-ivory-cream/10 pb-6 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Subtotal</span>
-                      <span className="text-ivory-cream">{formatPrice(total)}</span>
+                      <span className="text-ivory-cream">{formatPrice(total, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Shipping</span>
@@ -282,7 +282,7 @@ export default function CartPage() {
                   <div className="flex justify-between items-end mb-10">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total</span>
                     <span className="font-display text-3xl text-ivory-cream">
-                      {formatPrice(total)}
+                      {formatPrice(total, currency)}
                     </span>
                   </div>
 

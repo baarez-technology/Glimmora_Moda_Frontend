@@ -20,7 +20,7 @@ type Step = 'details' | 'confirmation';
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { considerations, clearConsiderations, addOrder, cartItems, clearAllCart, showToast } = useApp();
+  const { considerations, clearConsiderations, addOrder, cartItems, clearAllCart, showToast, currency } = useApp();
   const { isAuthenticated, isHydrated, userData: authUserData } = useAuth();
   const [currentStep, setCurrentStep] = useState<Step>('details');
   const [placedOrder, setPlacedOrder] = useState<CustomerOrder | null>(null);
@@ -647,7 +647,7 @@ export default function CheckoutPage() {
                   <div className="space-y-3">
                     {[
                       { id: 'standard', label: 'Standard Delivery', desc: '3-5 business days', price: 'Free' },
-                      { id: 'express', label: 'Express Delivery', desc: '1-2 business days', price: formatPrice(15) },
+                      { id: 'express', label: 'Express Delivery', desc: '1-2 business days', price: formatPrice(15, currency) },
                     ].map(method => (
                       <button
                         key={method.id}
@@ -713,7 +713,7 @@ export default function CheckoutPage() {
                     </>
                   ) : (
                     <>
-                      <span className="text-sm tracking-[0.15em] uppercase">Complete Purchase — {formatPrice(total)}</span>
+                      <span className="text-sm tracking-[0.15em] uppercase">Complete Purchase — {formatPrice(total, currency)}</span>
                       <ArrowRight size={16} />
                     </>
                   )}
@@ -734,7 +734,7 @@ export default function CheckoutPage() {
                         <div className="flex-1">
                           <p className="text-[9px] tracking-[0.2em] uppercase text-taupe mb-1">{item.product.brandName}</p>
                           <p className="text-sm text-ivory-cream mb-1">{item.product.name}</p>
-                          <p className="text-sm text-ivory-cream">{formatPrice(item.product.price)}</p>
+                          <p className="text-sm text-ivory-cream">{formatPrice(item.product.price, currency)}</p>
                         </div>
                       </div>
                     ))}
@@ -743,11 +743,11 @@ export default function CheckoutPage() {
                   <div className="space-y-3 border-b border-ivory-cream/10 pb-6 mb-6">
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Subtotal</span>
-                      <span className="text-ivory-cream">{formatPrice(total)}</span>
+                      <span className="text-ivory-cream">{formatPrice(total, currency)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-taupe">Shipping</span>
-                      <span className="text-gold-soft">{deliveryMethod === 'express' ? formatPrice(15) : 'Complimentary'}</span>
+                      <span className="text-gold-soft">{deliveryMethod === 'express' ? formatPrice(15, currency) : 'Complimentary'}</span>
                     </div>
                   </div>
 

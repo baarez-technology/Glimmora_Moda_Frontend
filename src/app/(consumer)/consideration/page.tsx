@@ -10,7 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 
 export default function ConsiderationPage() {
-  const { considerations, removeFromConsiderations, updateQuantity, clearConsiderations } = useApp();
+  const { considerations, removeFromConsiderations, updateQuantity, clearConsiderations, currency } = useApp();
   const { isAuthenticated, isHydrated } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [activeHover, setActiveHover] = useState<number | null>(null);
@@ -137,7 +137,7 @@ export default function ConsiderationPage() {
                         {/* Price & Quantity */}
                         <div className="flex items-center justify-between mt-6">
                           <p className="font-display text-xl text-charcoal-deep">
-                            {formatPrice(item.product.price * (item.quantity || 1))}
+                            {formatPrice(item.product.price * (item.quantity || 1), currency)}
                           </p>
                           <div className="flex items-center gap-3">
                             <button
@@ -200,7 +200,7 @@ export default function ConsiderationPage() {
                         <span className="text-taupe truncate pr-4">
                           {item.product.name}{(item.quantity || 1) > 1 ? ` ×${item.quantity}` : ''}
                         </span>
-                        <span className="text-ivory-cream flex-shrink-0">{formatPrice(item.product.price * (item.quantity || 1))}</span>
+                        <span className="text-ivory-cream flex-shrink-0">{formatPrice(item.product.price * (item.quantity || 1), currency)}</span>
                       </div>
                     ))}
                   </div>
@@ -209,7 +209,7 @@ export default function ConsiderationPage() {
                   <div className="flex justify-between items-end mb-10">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total</span>
                     <span className="font-display text-3xl text-ivory-cream">
-                      {formatPrice(total)}
+                      {formatPrice(total, currency)}
                     </span>
                   </div>
 
