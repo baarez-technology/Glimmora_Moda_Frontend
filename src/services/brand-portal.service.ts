@@ -12,14 +12,14 @@ import type {
 } from '@/types/brand-portal';
 import type {
   BespokeOrder, PriceNegotiation, PrivateCollection,
-  SourcingRequest, UHNIPriceOffer
+  SourcingRequest,
 } from '@/types/uhni';
 import {
   mockBrandPartner, mockBrandProducts, mockBrandCollections,
   mockGlobalInventory, mockBrandAnalytics, mockRecentActivity,
   mockBrandOrders, mockBespokeOrders, mockPriceNegotiations,
   mockPrivateCollections, mockBrandSourcingRequests,
-  mockHeritageEvents, mockBrandStories, mockUHNIOffers,
+  mockHeritageEvents, mockBrandStories,
   mockStylingSessions
 } from '@/data/brand-portal';
 
@@ -412,26 +412,6 @@ export async function deleteBrandStory(id: string): Promise<ApiResponse<void>> {
   return apiRequest<void>(`/api/brand-portal/stories/${id}`, {
     method: 'DELETE',
     mockHandler: () => undefined as void,
-  });
-}
-
-// ============================================
-// UHNI Offers
-// ============================================
-
-export async function getUHNIOffers(): Promise<ApiResponse<UHNIPriceOffer[]>> {
-  return apiRequest<UHNIPriceOffer[]>('/api/brand-portal/uhni-offers', {
-    mockHandler: () => mockUHNIOffers,
-  });
-}
-
-export async function createUHNIOffer(
-  offer: Omit<UHNIPriceOffer, 'id'>
-): Promise<ApiResponse<UHNIPriceOffer>> {
-  return apiRequest<UHNIPriceOffer>('/api/brand-portal/uhni-offers', {
-    method: 'POST',
-    body: offer,
-    mockHandler: () => ({ ...offer, id: generateMockId('offer') }),
   });
 }
 

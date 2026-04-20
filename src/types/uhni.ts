@@ -339,29 +339,6 @@ export interface PriceNegotiation {
   expiresAt: string;
 }
 
-export interface UHNIPriceOffer {
-  id: string;
-  type: 'product' | 'collection' | 'brand';
-  targetId: string;
-  targetName: string;
-  targetImage?: string;
-  discountType: 'percentage' | 'fixed';
-  discountValue: number;
-  validFrom: string;
-  validUntil: string;
-  claimed: boolean;
-  conditions?: string[];
-  targetClientIds?: string[];
-  isPrivate?: boolean;
-  claimedBy?: string[];
-  claimedCount?: number;
-  maxClaims?: number;
-  originalPrice?: number;
-  productSlug?: string;
-  brandName?: string;
-  productImage?: string;
-}
-
 export interface UHNIPriceAlert {
   id: string;
   productId: string;
@@ -374,18 +351,9 @@ export interface UHNIPriceAlert {
   createdAt: string;
 }
 
-export interface UHNIPricingTier {
-  tier: 'standard' | 'preferred' | 'uhni';
-  label: string;
-  description: string;
-  benefits: string[];
-  averageDiscount?: number;
-}
-
 export interface UHNIPricingSummary {
   lifetimeSavings: number;
   activeNegotiations: number;
-  pendingOffers: number;
   priceAlertsSet: number;
 }
 
@@ -675,22 +643,3 @@ export interface CollectionAccessRequest {
   reviewNote?: string;
 }
 
-// ============================================
-// Claimed Offers
-// ============================================
-
-export interface ClaimedOffer {
-  id: string;
-  offerId: string;
-  offerTitle: string;
-  brandName: string;
-  productId?: string;
-  productName?: string;
-  productSlug?: string;
-  originalPrice: number;
-  discountedPrice: number;
-  discountLabel: string;
-  claimedAt: string;
-  expiresAt: string;
-  status: 'active' | 'used' | 'expired';
-}

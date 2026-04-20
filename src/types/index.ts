@@ -151,9 +151,7 @@ export {
   type NegotiationStatus,
   type NegotiationAction,
   type PriceNegotiation,
-  type UHNIPriceOffer,
   type UHNIPriceAlert,
-  type UHNIPricingTier,
   type UHNIPricingSummary,
   // Enhanced G-SAIL
   type AvailabilitySearchStatus,
@@ -196,8 +194,6 @@ export {
   // Collection Invitation & Access
   type CollectionInvitation,
   type CollectionAccessRequest,
-  // Claimed Offers
-  type ClaimedOffer
 } from './uhni';
 
 // ============================================

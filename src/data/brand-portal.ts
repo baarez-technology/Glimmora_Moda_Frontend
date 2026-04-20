@@ -25,7 +25,6 @@ import type {
   PriceNegotiation,
   PrivateCollection,
   SourcingRequest,
-  UHNIPriceOffer
 } from '@/types/uhni';
 
 // ============================================
@@ -2200,24 +2199,7 @@ export const mockBrandStories: BrandStory[] = [
   }
 ];
 
-// ============================================
-// UHNI PRICE OFFERS DATA
-// ============================================
-
-// ────────────────────────────────────────────────────────────
-// 9 UHNI offers — brand management perspective
-//
-// These match shared-store.ts (runtime primary) and uhni.ts (client fallback).
-// Brand portal uses FIXED dates (not Date.now()) because brands review history.
-//
-// OFFER TYPES:  product, collection, brand
-// DISCOUNT TYPES:  percentage, fixed
-// STATES:  active, claimed, expiring-soon, nearly-full, private, upcoming, expired
-//
-// FLOW: Brand creates offer → UHNI client sees it → claims → offer wallet
-//       Brand tracks claims, can set limits, private targeting, conditions
-// ────────────────────────────────────────────────────────────
-export const mockUHNIOffers: UHNIPriceOffer[] = [
+export const _removedUHNIOffers = [
 
   // ── 1. PRODUCT — active, unclaimed, percentage discount ───────────
   {
@@ -2522,10 +2504,6 @@ export function getHeritageEventById(id: string): HeritageEvent | undefined {
 
 export function getBrandStoryById(id: string): BrandStory | undefined {
   return mockBrandStories.find(s => s.id === id);
-}
-
-export function getUHNIOfferById(id: string): UHNIPriceOffer | undefined {
-  return mockUHNIOffers.find(o => o.id === id);
 }
 
 export function getStylingSessionById(id: string): StylingSession | undefined {

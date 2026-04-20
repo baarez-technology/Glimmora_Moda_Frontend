@@ -353,7 +353,6 @@ export type {
   SourcingRequestType,
   SourcingOption,
   SourcingNote,
-  UHNIPriceOffer,
   UserTier,
   CollectionAccessRequest,
   CollectionInvitation

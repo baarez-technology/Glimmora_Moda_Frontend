@@ -1,15 +1,13 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity, BespokeDetailedSpec, PriceNegotiation, CollectionInvitation, ConciergeAppointment, ConciergeTask, ConciergeTaskInput, ClaimedOffer } from '@/types';
-import type { UHNIPriceOffer } from '@/types/uhni';
+import type { Product, ConsiderationItem, WardrobeItem, CalendarEvent, UserTier, PersonalConcierge, AutonomousShoppingSettings, SourcingRequest, BespokeOrder, AutonomousActivity, FashionIdentity, BespokeDetailedSpec, PriceNegotiation, CollectionInvitation, ConciergeAppointment, ConciergeTask, ConciergeTaskInput } from '@/types';
 import type { PricingTier, PriceAlert, TierUpgradeRequest } from '@/types/pricing-tiers';
 import type { StylingSession, StylingSessionRequest } from '@/types/brand-portal';
 import { generateOutfitSuggestions } from '@/lib/outfit-intelligence';
 import * as calendarService from '@/services/calendar.service';
 import * as productService from '@/services/product.service';
 import { useAuth } from './AuthContext';
-import { getSharedOffers, subscribeToOffers, updateSharedOfferClaimCount } from '@/lib/shared-store';
 import { getSharedSessions, addSharedSession, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
 
 // Import focused hooks
@@ -168,9 +166,6 @@ interface AppContextType {
   conciergeTasks: ConciergeTask[];
   addConciergeTask: (input: ConciergeTaskInput) => ConciergeTask;
   completeConciergeTask: (taskId: string) => void;
-  uhniOffers: UHNIPriceOffer[];
-  claimedOffers: ClaimedOffer[];
-  claimOffer: (offer: UHNIPriceOffer) => void;
   stylingSessions: StylingSession[];
   bookStylingSession: (request: StylingSessionRequest) => StylingSession;
   cancelStylingSession: (sessionId: string) => void;
@@ -490,108 +485,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     showToast(`Access request sent for ${collectionName}`, 'success');
   }, [showToast]);
 
-  // UHNI Offers (shared store)
-  const [sharedUhniOffers, setSharedUhniOffers] = useState<UHNIPriceOffer[]>(getSharedOffers());
-  const [claimedOffers, setClaimedOffers] = useState<ClaimedOffer[]>([]);
-
-  useEffect(() => {
-    const unsubscribe = subscribeToOffers(offers => {
-      setSharedUhniOffers(offers);
-    });
-    return unsubscribe;
-  }, []);
-
-  const visibleOffers = useMemo(() => {
-    return sharedUhniOffers.filter(offer => {
-      const now = new Date();
-      const validFrom = new Date(offer.validFrom);
-      const validUntil = new Date(offer.validUntil);
-      if (now < validFrom || now > validUntil) return false;
-      if (offer.isPrivate && offer.targetClientIds?.length) {
-        return offer.targetClientIds.includes('uhni-user');
-      }
-      return true;
-    });
-  }, [sharedUhniOffers]);
-
-  const computeDiscountedPrice = (
-    originalPrice: number,
-    discountType: 'percentage' | 'fixed',
-    discountValue: number
-  ): number => {
-    if (discountType === 'percentage') {
-      return Math.round(originalPrice * (1 - discountValue / 100));
-    }
-    return Math.max(0, originalPrice - discountValue);
-  };
-
-  const handleClaimOffer = useCallback((offer: UHNIPriceOffer) => {
-    if (claimedOffers.some(c => c.offerId === offer.id)) {
-      showToast('You have already claimed this offer', 'info');
-      return;
-    }
-    if (offer.maxClaims && offer.maxClaims > 0) {
-      if ((offer.claimedCount || 0) >= offer.maxClaims) {
-        showToast('This offer has reached its claim limit', 'error');
-        return;
-      }
-    }
-
-    const discountLabel = offer.discountType === 'percentage'
-      ? `${offer.discountValue}% off`
-      : `€${offer.discountValue} off`;
-
-    const originalPrice = offer.originalPrice || 0;
-    const discountedPrice = computeDiscountedPrice(
-      originalPrice, offer.discountType, offer.discountValue
-    );
-
-    const claimed: ClaimedOffer = {
-      id: `claimed-${Date.now()}`,
-      offerId: offer.id,
-      offerTitle: `${discountLabel} — ${offer.targetName}`,
-      brandName: offer.brandName || '',
-      productId: offer.type === 'product' ? offer.targetId : undefined,
-      productName: offer.type === 'product' ? offer.targetName : undefined,
-      productSlug: offer.productSlug,
-      originalPrice,
-      discountedPrice,
-      discountLabel,
-      claimedAt: new Date().toISOString(),
-      expiresAt: offer.validUntil,
-      status: 'active',
-    };
-
-    setClaimedOffers(prev => [claimed, ...prev]);
-    updateSharedOfferClaimCount(offer.id);
-
-    if (offer.type === 'product' && offer.targetId && offer.productSlug) {
-      addToConsiderations(
-        {
-          id: offer.targetId,
-          name: offer.targetName,
-          price: discountedPrice,
-          images: offer.productImage
-            ? [{ url: offer.productImage, alt: offer.targetName }]
-            : [],
-          slug: offer.productSlug,
-          brandName: offer.brandName || '',
-        } as unknown as Product,
-        {},
-        `${discountLabel} offer applied`
-      );
-      showToast(
-        `Offer claimed — ${offer.targetName} added at ${discountLabel}`,
-        'success'
-      );
-    } else {
-      showToast(
-        `Offer claimed — ${discountLabel} saved to your offer wallet`,
-        'success'
-      );
-    }
-  }, [claimedOffers, showToast, addToConsiderations]);
-
   // Styling Sessions (shared store)
   const [sharedStylingSessions, setSharedStylingSessions] = useState<StylingSession[]>(getSharedSessions());
 
@@ -897,9 +790,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       conciergeTasks: localConciergeTasks,
       addConciergeTask,
       completeConciergeTask,
-      uhniOffers: visibleOffers,
-      claimedOffers,
-      claimOffer: handleClaimOffer,
       stylingSessions: mySessions,
       bookStylingSession,
       cancelStylingSession,
