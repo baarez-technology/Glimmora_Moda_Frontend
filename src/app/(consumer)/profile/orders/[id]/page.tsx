@@ -4,7 +4,7 @@ import { use, useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, Package, Truck, Check, Clock, MapPin, CreditCard, HelpCircle, Printer, RotateCcw, X, FileText, Star } from 'lucide-react';
-import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice, downloadInvoice } from '@/components/shared/InvoiceDocument';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -207,7 +207,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
     );
   }
 
-  const currency = order.payment_currency || 'USD';
+  const currency = order.payment_currency || 'INR';
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -530,10 +530,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 Print Invoice
               </button>
               <button
-                onClick={() => {
-                  printInvoice();
-                  showToast("Use 'Save as PDF' in the print dialog to download", 'info');
-                }}
+                onClick={() => downloadInvoice(`order-${order.order_id}.pdf`)}
                 className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
               >
                 <FileText size={16} />

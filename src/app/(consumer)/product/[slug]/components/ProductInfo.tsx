@@ -68,8 +68,13 @@ export default function ProductInfo({
       <p className="text-lg text-stone mb-8">{product.tagline}</p>
 
       {/* Price */}
-      <div className="font-display text-2xl text-charcoal-deep mb-4">
-        {formatPrice(product.price)}
+      <div className="font-display text-2xl text-charcoal-deep mb-4 flex items-baseline gap-3">
+        {formatPrice(product.price, product.currency)}
+        {product.originalPrice != null && product.originalPrice > product.price && (
+          <span className="text-base text-stone line-through">
+            {formatPrice(product.originalPrice, product.currency)}
+          </span>
+        )}
       </div>
 
       {/* Personalization Badge — temporarily disabled for production */}

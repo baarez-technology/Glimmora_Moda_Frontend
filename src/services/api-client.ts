@@ -118,7 +118,8 @@ async function simulateDelay(): Promise<void> {
 }
 
 function buildUrl(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
-  const url = new URL(endpoint, config.baseUrl || 'http://localhost:3000');
+  const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const url = new URL(endpoint, base);
   if (params) {
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) url.searchParams.set(key, String(value));

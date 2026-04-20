@@ -41,6 +41,9 @@ export interface RecommendedProduct {
   brand_id: string;
   brand_name: string;
   price: number;
+  offer_price?: number;
+  discount_percentage?: number;
+  currency?: string;
   collection_name: string;
   occasions: string[];
   aesthetics: string[];
@@ -50,6 +53,7 @@ export interface RecommendedProduct {
   fabrics: string;
   is_low_stock: boolean;
   image_url: string;
+  sizes?: string[];
   created_at: number;
 }
 

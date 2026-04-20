@@ -8,7 +8,7 @@ import { ArrowRight, Lock, Truck, Check, MapPin, Plus, CreditCard, Shield, Downl
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice, downloadInvoice } from '@/components/shared/InvoiceDocument';
 import { useCountries, useStates, useCities } from '@/hooks/useGeoData';
 import * as addressService from '@/services/address.service';
 import * as orderManagementService from '@/services/order-management.service';
@@ -192,7 +192,7 @@ export default function CheckoutPage() {
         payment_tax: 0,
         payment_shipping: 0,
         payment_amount: total,
-        payment_currency: 'USD',
+        payment_currency: currency,
       };
 
       const createdOrder = await orderManagementService.createOrder(payload);
@@ -308,13 +308,13 @@ export default function CheckoutPage() {
                             {' · '}Qty: {product.quantity}
                           </p>
                         </div>
-                        <p className="text-sm text-charcoal-deep flex-shrink-0">${product.product_price.toLocaleString()}</p>
+                        <p className="text-sm text-charcoal-deep flex-shrink-0">{formatPrice(product.product_price, placedOrder.payment_currency || currency)}</p>
                       </div>
                     ))}
                   </div>
                   <div className="pt-4 border-t border-sand/50 flex justify-between">
                     <span className="text-sm text-stone">Total</span>
-                    <span className="font-display text-xl text-charcoal-deep">${placedOrder.payment_amount.toLocaleString()}</span>
+                    <span className="font-display text-xl text-charcoal-deep">{formatPrice(placedOrder.payment_amount, placedOrder.payment_currency || currency)}</span>
                   </div>
                 </div>
 
@@ -373,10 +373,7 @@ export default function CheckoutPage() {
                     View Invoice
                   </button>
                   <button
-                    onClick={() => {
-                      printInvoice();
-                      showToast("Use 'Save as PDF' in the print dialog", 'info');
-                    }}
+                    onClick={() => downloadInvoice(`order-${placedOrder.order_id}.pdf`)}
                     className="flex items-center gap-2 px-5 py-3 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors text-sm tracking-[0.1em] uppercase"
                   >
                     <Download size={16} />
@@ -753,7 +750,7 @@ export default function CheckoutPage() {
 
                   <div className="flex justify-between items-end mb-8">
                     <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Total</span>
-                    <span className="font-display text-3xl text-ivory-cream">{formatPrice(total + (deliveryMethod === 'express' ? 15 : 0))}</span>
+                    <span className="font-display text-3xl text-ivory-cream">{formatPrice(total + (deliveryMethod === 'express' ? 15 : 0), currency)}</span>
                   </div>
 
                   <div className="space-y-3 pt-6 border-t border-ivory-cream/10">
@@ -801,14 +798,14 @@ export default function CheckoutPage() {
                 detail: [p.size ? `Size: ${p.size}` : '', p.color ? `Color: ${p.color}` : ''].filter(Boolean).join(' · '),
                 quantity: p.quantity,
                 unitPrice: p.product_price,
-                currency: placedOrder.payment_currency || 'USD',
+                currency: placedOrder.payment_currency || currency,
               }))}
               subtotal={placedOrder.payment_amount - placedOrder.payment_tax - placedOrder.payment_shipping}
               shippingAmount={placedOrder.payment_shipping}
               taxRate={placedOrder.payment_tax > 0 ? 0.20 : 0}
               taxAmount={placedOrder.payment_tax}
               total={placedOrder.payment_amount}
-              currency={placedOrder.payment_currency || 'USD'}
+              currency={placedOrder.payment_currency || currency}
               paymentStatus="paid"
             />
 
@@ -821,10 +818,7 @@ export default function CheckoutPage() {
                 Print
               </button>
               <button
-                onClick={() => {
-                  printInvoice();
-                  showToast("Use 'Save as PDF' in the print dialog", 'info');
-                }}
+                onClick={downloadInvoice}
                 className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
               >
                 <Download size={16} />

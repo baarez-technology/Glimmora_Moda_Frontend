@@ -204,8 +204,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Currency state — reactive across app
   const [currency, setCurrencyState] = useState('EUR');
   useEffect(() => {
+    // 1. Prefer explicit user choice stored in moda-currency
     const stored = typeof window !== 'undefined' ? localStorage.getItem('moda-currency') : null;
-    if (stored) setCurrencyState(stored);
+    if (stored) {
+      setCurrencyState(stored);
+    } else {
+      // 2. Fall back to the currency from the logged-in user's profile
+      try {
+        const rawUser = localStorage.getItem('moda-user-data');
+        if (rawUser) {
+          const userData = JSON.parse(rawUser);
+          if (userData?.currency) {
+            setCurrencyState(userData.currency);
+            localStorage.setItem('moda-currency', userData.currency);
+          }
+        }
+      } catch { /* ignore */ }
+    }
     const handleChange = () => {
       const updated = localStorage.getItem('moda-currency') || 'EUR';
       setCurrencyState(updated);

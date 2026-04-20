@@ -275,7 +275,7 @@ export default function HomePage() {
                     </h3>
                   </div>
                   <p className="font-body text-sm text-stone">
-                    {formatPrice(featuredProducts[0].price, currency)}
+                    {formatPrice(featuredProducts[0].price, featuredProducts[0].currency || currency)}
                   </p>
                 </div>
               </Link>
@@ -305,7 +305,7 @@ export default function HomePage() {
                     {product.name}
                   </h3>
                   <p className="font-body text-xs text-charcoal-warm mt-1">
-                    {formatPrice(product.price, currency)}
+                    {formatPrice(product.price, product.currency || currency)}
                   </p>
                 </Link>
               ))}

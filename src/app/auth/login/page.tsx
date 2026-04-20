@@ -892,7 +892,7 @@ function LoginForm() {
               ) : (
                 <>
                   <span className="text-sm tracking-[0.15em] uppercase">
-                    {selectedTier === 'admin' ? 'Access Console' : selectedTier === 'brand' ? 'Access Portal' : 'Sign In'}
+                    {selectedTier === 'admin' ? 'Access Console' : selectedTier === 'brand' ? 'Access Portal' : 'Login'}
                   </span>
                   <ArrowRight size={16} />
                 </>

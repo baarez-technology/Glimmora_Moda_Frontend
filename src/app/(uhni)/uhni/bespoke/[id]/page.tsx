@@ -11,7 +11,7 @@ import {
 import { useApp } from '@/context/AppContext';
 import type { BespokeOrderStatus } from '@/types';
 import type { BespokeOrder } from '@/types/uhni';
-import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice, downloadInvoice } from '@/components/shared/InvoiceDocument';
 import { formatPrice } from '@/lib/currency';
 
 function formatMsgTime(iso: string) {
@@ -468,7 +468,7 @@ export default function BespokeOrderDetailPage() {
                 Print Invoice
               </button>
               <button
-                onClick={printInvoice}
+                onClick={() => downloadInvoice(`order-${order.id}.pdf`)}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
               >
                 <Download size={16} />

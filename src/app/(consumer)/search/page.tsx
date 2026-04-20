@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search, X, SlidersHorizontal, ArrowRight } from 'lucide-react';
@@ -15,10 +15,21 @@ type SearchTab = 'all' | 'products' | 'brands' | 'stories' | 'collections';
 
 function SearchContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const initialQuery = searchParams.get('q') || '';
 
   const [query, setQuery] = useState(initialQuery);
-  const [activeTab, setActiveTab] = useState<SearchTab>('all');
+  const activeTab = (searchParams.get('tab') as SearchTab) || 'all';
+
+  const setActiveTab = (tab: SearchTab) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === 'all') {
+      params.delete('tab');
+    } else {
+      params.set('tab', tab);
+    }
+    router.replace(`/search?${params.toString()}`);
+  };
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50000]);
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);

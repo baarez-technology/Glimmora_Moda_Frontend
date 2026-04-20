@@ -57,7 +57,36 @@ export function generateInvoiceNumber(orderId: string, date: string): string {
 }
 
 export function printInvoice() {
+  document.body.classList.add('printing-invoice');
   window.print();
+  document.body.classList.remove('printing-invoice');
+}
+
+export async function downloadInvoice(filename = 'invoice.pdf') {
+  const el = document.querySelector<HTMLElement>('.invoice-print-area');
+  if (!el) return;
+
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import('html2canvas'),
+    import('jspdf'),
+  ]);
+
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+  const imgData = canvas.toDataURL('image/png');
+
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const imgH = (canvas.height * pageW) / canvas.width;
+
+  let y = 0;
+  while (y < imgH) {
+    if (y > 0) pdf.addPage();
+    pdf.addImage(imgData, 'PNG', 0, -y, pageW, imgH);
+    y += pageH;
+  }
+
+  pdf.save(filename);
 }
 
 function formatCurrency(amount: number, currency: string): string {

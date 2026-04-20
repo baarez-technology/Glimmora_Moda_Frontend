@@ -6,6 +6,7 @@ import { X, RotateCcw, Eye, Sparkles, Upload, ImageIcon, Loader2 } from 'lucide-
 import Image from 'next/image';
 import { uploadImageFile, virtualTryOn } from '@/services/upload.service';
 import { Product, BodyVisualizationConfig } from '@/types';
+import { useApp } from '@/context/AppContext';
 
 interface BodyVisualizationProps {
   product: Product;
@@ -19,6 +20,8 @@ export default function BodyVisualization({
   isOpen,
   onClose,
 }: BodyVisualizationProps) {
+  const { addToCart, showToast } = useApp();
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -261,9 +264,28 @@ export default function BodyVisualization({
 
               {/* Actions */}
               <div className="pt-4 border-t border-stone/20 space-y-2">
-                <button className="w-full flex items-center justify-center gap-2 py-3 bg-charcoal-deep text-ivory-cream rounded-lg hover:bg-charcoal-deep/90 transition-colors">
-                  <Sparkles className="w-4 h-4" />
-                  <span className="text-sm tracking-wider">Add to Outfit</span>
+                <button
+                  onClick={async () => {
+                    setIsAddingToCart(true);
+                    try {
+                      const color = product.variants?.find(v => v.type === 'color')?.value || '';
+                      const size = product.variants?.find(v => v.type === 'size')?.value || '';
+                      await addToCart({ product_id: product.id, color, size, quantity: 1 });
+                    } catch {
+                      showToast('Failed to add to cart', 'error');
+                    } finally {
+                      setIsAddingToCart(false);
+                    }
+                  }}
+                  disabled={isAddingToCart}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-charcoal-deep text-ivory-cream rounded-lg hover:bg-charcoal-deep/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isAddingToCart ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" />
+                  )}
+                  <span className="text-sm tracking-wider">{isAddingToCart ? 'Adding...' : 'Add to Cart'}</span>
                 </button>
 
                 {/* Upload Your Image */}

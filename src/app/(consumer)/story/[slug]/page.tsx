@@ -3,7 +3,8 @@
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Clock, Share2, Bookmark, BookmarkCheck, ArrowRight } from 'lucide-react';
+import { Clock, Share2, Bookmark, BookmarkCheck, ArrowRight, ArrowLeft } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import * as brandService from '@/services/brand.service';
 import * as productService from '@/services/product.service';
@@ -21,6 +22,7 @@ export default function StoryPage({ params }: StoryPageProps) {
   const { slug } = use(params);
   const searchParams = useSearchParams();
   const storyIdParam = searchParams.get('storyId');
+  const router = useRouter();
   const { showToast } = useApp();
   const [story, setStory] = useState<BrandStory | null>(null);
   const [brand, setBrand] = useState<Brand | null>(null);
@@ -159,6 +161,16 @@ export default function StoryPage({ params }: StoryPageProps) {
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-noir/90 via-noir/40 to-noir/10" />
+
+        {/* Back Button */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-6 left-6 z-10 flex items-center gap-2 text-ivory-cream/70 hover:text-ivory-cream transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-xs tracking-[0.2em] uppercase">Back</span>
+        </button>
 
         {/* Hero Content */}
         <div className="absolute inset-0 flex flex-col justify-end">

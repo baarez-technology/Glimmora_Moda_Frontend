@@ -24,7 +24,7 @@ import { useBrand } from '@/context/BrandContext';
 import { useApp } from '@/context/AppContext';
 import { BrandPageHeader, SecondaryButton, PrimaryButton } from '@/components/brand/BrandPageHeader';
 import type { BespokeOrderStatus, BespokeOrderType } from '@/types/uhni';
-import InvoiceDocument, { generateInvoiceNumber, printInvoice } from '@/components/shared/InvoiceDocument';
+import InvoiceDocument, { generateInvoiceNumber, printInvoice, downloadInvoice } from '@/components/shared/InvoiceDocument';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 
 export default function BespokeOrderDetailPage() {
@@ -809,7 +809,7 @@ export default function BespokeOrderDetailPage() {
                 Print Invoice
               </button>
               <button
-                onClick={printInvoice}
+                onClick={() => downloadInvoice(`order-${order.id}.pdf`)}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 border border-sand text-stone text-sm tracking-[0.1em] uppercase hover:border-charcoal-deep hover:text-charcoal-deep transition-colors"
               >
                 <FileText size={16} />

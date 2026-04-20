@@ -120,8 +120,8 @@ function mapToProduct(raw: RecommendedProduct): Product {
     tagline: '',
     description: '',
     narrative: '',
-    price: raw.price,
-    currency: 'INR',
+    price: raw.offer_price ?? raw.price,
+    currency: (raw.currency as string) || 'INR',
     images: imageUrl
       ? [{ id: '1', url: imageUrl, alt: raw.product_name, type: 'hero' as const }]
       : [{ id: '1', url: PLACEHOLDER_IMAGE, alt: raw.product_name, type: 'hero' as const }],
@@ -605,6 +605,7 @@ interface ApiProductDetail {
   } | null;
   occasions: string[];
   aesthetics: string[];
+  currency?: string;
   is_low_stock: boolean;
   is_active: boolean;
   created_at: string | { $date: string };
@@ -863,9 +864,9 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     tagline: raw.tagline || '',
     description: raw.product_description || '',
     narrative: '',
-    price: raw.price,
-    originalPrice: undefined,
-    currency: 'EUR',
+    price: raw.offer_price ?? raw.price,
+    originalPrice: raw.offer_price != null && raw.offer_price !== raw.price ? raw.price : undefined,
+    currency: raw.currency || 'INR',
     images: imageUrls.map((url, i) => ({
       id: String(i + 1),
       url,

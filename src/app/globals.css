@@ -250,3 +250,20 @@ body {
   background-color: var(--champagne);
   color: var(--noir);
 }
+
+/* Invoice print isolation */
+@media print {
+  body.printing-invoice * { visibility: hidden; }
+  body.printing-invoice .invoice-print-area,
+  body.printing-invoice .invoice-print-area * { visibility: visible; }
+  body.printing-invoice .invoice-print-area {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: white;
+    padding: 40px;
+    box-sizing: border-box;
+  }
+  @page { margin: 20mm; size: A4; }
+}
