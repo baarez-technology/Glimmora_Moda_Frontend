@@ -74,8 +74,6 @@ export interface BackendProduct {
   collection_name: string;
   sku: string;
   price: number;
-  offer_price: number;
-  discount_percentage: number;
   product_image: string | null;
   product_images?: string[];
   sizes: string[];
@@ -271,8 +269,6 @@ export interface ProductUpdatePayload {
   collection_name?: string;
   sku?: string;
   price?: number;
-  offer_price?: number;
-  discount_percentage?: number;
   sizes?: string[];
   product_image?: string;
   product_images?: string[];

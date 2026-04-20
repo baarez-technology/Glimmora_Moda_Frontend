@@ -690,15 +690,9 @@ export default function WardrobePage() {
                             {mp.product_name}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            {mp.discount_percentage > 0 && (
-                              <span className="text-xs text-taupe line-through">{formatPrice(mp.price)}</span>
-                            )}
                             <span className="text-sm font-medium text-charcoal-deep">
-                              {formatPrice(mp.offer_price || mp.price)}
+                              {formatPrice(mp.price)}
                             </span>
-                            {mp.discount_percentage > 0 && (
-                              <span className="text-xs text-success">-{mp.discount_percentage}%</span>
-                            )}
                           </div>
                           <p className="text-[9px] text-stone mt-1">
                             {Math.round(gap.product_match_score * 100)}% match
