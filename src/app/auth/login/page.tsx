@@ -49,6 +49,9 @@ function LoginForm() {
   const [preAuthToken, setPreAuthToken] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [is2FAVerifying, setIs2FAVerifying] = useState(false);
+  const [otpAttempts, setOtpAttempts] = useState(0);
+  const [otpLockedUntil, setOtpLockedUntil] = useState<number | null>(null);
+  const [otpLockSeconds, setOtpLockSeconds] = useState(0);
 
   // Forgot password modal state
   type ForgotStep = 'email' | 'otp' | 'reset';
@@ -152,10 +155,26 @@ function LoginForm() {
 
   useEffect(() => {
     setIsLoaded(true);
-    // Read admin-managed platform config
     setRegistrationOpen(isRegistrationEnabled());
     setBrandOnboardingOpen(isBrandOnboardingEnabled());
-  }, []);
+    if (searchParams.get('reason') === 'session_expired') {
+      showToast('Your session expired. Please sign in again.', 'error');
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!otpLockedUntil) return;
+    const interval = setInterval(() => {
+      const remaining = Math.ceil((otpLockedUntil - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setOtpLockedUntil(null);
+        setOtpLockSeconds(0);
+      } else {
+        setOtpLockSeconds(remaining);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [otpLockedUntil]);
 
   // Complete login after successful auth (shared by normal + 2FA flows)
   const completeLogin = (data: UserTokenResponse) => {
@@ -184,16 +203,24 @@ function LoginForm() {
 
   // Handle 2FA verification
   const handle2FAVerify = async () => {
-    if (totpCode.length < 6) return;
+    if (totpCode.length < 6 || otpLockedUntil) return;
     setIs2FAVerifying(true);
     setLoginError(null);
     try {
       const data = await verify2FALogin(preAuthToken, totpCode);
+      setOtpAttempts(0);
+      setOtpLockedUntil(null);
       completeLogin(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Invalid code';
       setLoginError(message);
       showToast(message, 'error');
+      const newAttempts = otpAttempts + 1;
+      setOtpAttempts(newAttempts);
+      if (newAttempts >= 5) {
+        const lockMs = Math.pow(2, newAttempts - 5) * 16000;
+        setOtpLockedUntil(Date.now() + lockMs);
+      }
     } finally {
       setIs2FAVerifying(false);
     }
@@ -610,11 +637,21 @@ function LoginForm() {
                   autoFocus
                   onKeyDown={(e) => { if (e.key === 'Enter') handle2FAVerify(); }}
                 />
+                {otpAttempts > 0 && !otpLockedUntil && (
+                  <p className="text-xs text-amber-600 text-center mt-2">
+                    {Math.max(0, 5 - otpAttempts)} of 5 attempts remaining
+                  </p>
+                )}
+                {otpLockedUntil && (
+                  <p className="text-xs text-red-600 text-center mt-2">
+                    Too many attempts. Try again in {otpLockSeconds}s
+                  </p>
+                )}
               </div>
 
               <button
                 onClick={handle2FAVerify}
-                disabled={totpCode.length < 6 || is2FAVerifying}
+                disabled={totpCode.length < 6 || is2FAVerifying || !!otpLockedUntil}
                 className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-3"
               >
                 {is2FAVerifying ? (
@@ -628,7 +665,7 @@ function LoginForm() {
               </button>
 
               <button
-                onClick={() => { setRequires2FA(false); setTotpCode(''); setPreAuthToken(''); setLoginError(null); }}
+                onClick={() => { setRequires2FA(false); setTotpCode(''); setPreAuthToken(''); setLoginError(null); setOtpAttempts(0); setOtpLockedUntil(null); }}
                 className="w-full text-center text-stone hover:text-charcoal-deep transition-colors text-sm"
               >
                 Back to login

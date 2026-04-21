@@ -179,6 +179,12 @@ export async function apiRequest<T>(
     });
 
     if (!response.ok) {
+      if (response.status === 401 && typeof window !== 'undefined') {
+        const current = window.location.pathname;
+        if (!current.startsWith('/auth')) {
+          window.location.href = `/auth/login?redirect=${encodeURIComponent(current)}&reason=session_expired`;
+        }
+      }
       const errorBody = await response.json().catch(() => ({}));
       throw new ApiError(
         errorBody.code || 'HTTP_ERROR',
