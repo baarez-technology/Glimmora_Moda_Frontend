@@ -1,6 +1,6 @@
 'use client';
 
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Info } from 'lucide-react';
 
 interface MetricCardProps {
   label: string;
@@ -11,6 +11,7 @@ interface MetricCardProps {
   prefix?: string;
   suffix?: string;
   size?: 'default' | 'large';
+  heuristicNote?: string;
 }
 
 export function MetricCard({
@@ -21,7 +22,8 @@ export function MetricCard({
   trend,
   prefix = '',
   suffix = '',
-  size = 'default'
+  size = 'default',
+  heuristicNote,
 }: MetricCardProps) {
   // Determine trend from change if not provided
   const effectiveTrend = trend ?? (change !== undefined ? (change > 0 ? 'up' : change < 0 ? 'down' : 'neutral') : undefined);
@@ -72,6 +74,12 @@ export function MetricCard({
           <span className="text-xs text-taupe ml-1">
             {changeLabel}
           </span>
+        </div>
+      )}
+      {heuristicNote && (
+        <div className="flex items-start gap-1 mt-2">
+          <Info size={10} className="text-amber-500 mt-0.5 flex-shrink-0" />
+          <p className="text-[10px] text-amber-600 leading-tight">{heuristicNote}</p>
         </div>
       )}
     </div>

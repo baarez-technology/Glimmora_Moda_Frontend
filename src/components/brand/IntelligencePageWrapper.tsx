@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Info } from 'lucide-react';
 
 interface IntelligencePageWrapperProps {
   title: string;
@@ -13,6 +13,7 @@ interface IntelligencePageWrapperProps {
   children: ReactNode;
   isLoading?: boolean;
   error?: string | null;
+  showHeuristicBanner?: boolean;
 }
 
 export default function IntelligencePageWrapper({
@@ -22,6 +23,7 @@ export default function IntelligencePageWrapper({
   children,
   isLoading,
   error,
+  showHeuristicBanner = true,
 }: IntelligencePageWrapperProps) {
   return (
     <div>
@@ -41,6 +43,23 @@ export default function IntelligencePageWrapper({
           </div>
         </div>
       </div>
+
+      {/* Heuristic Disclaimer Banner */}
+      {showHeuristicBanner && (
+        <div className="mx-8 mt-4 flex items-start gap-3 p-4 bg-amber-50 border border-amber-200">
+          <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-amber-800 mb-0.5 flex items-center gap-1">
+              <Info size={11} />
+              Heuristic Indicators
+            </p>
+            <p className="text-xs text-amber-700">
+              These metrics are based on behavioral proxies and are being refined with machine learning.
+              Use as directional guidance only — not as definitive business intelligence.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div>

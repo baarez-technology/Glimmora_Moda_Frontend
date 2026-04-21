@@ -129,6 +129,7 @@ export default function BoutiquesPage() {
                   <div>
                     <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Footfall</p>
                     <p className="text-sm font-medium text-charcoal-deep">{formatNumber(boutique.footfall)}</p>
+                    <p className="text-[9px] text-amber-600 italic mt-0.5">Estimated from online views — requires POS data</p>
                   </div>
                 </div>
               </div>

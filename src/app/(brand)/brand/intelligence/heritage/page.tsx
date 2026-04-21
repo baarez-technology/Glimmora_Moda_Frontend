@@ -119,7 +119,7 @@ export default function HeritagePage() {
   return (
     <IntelligencePageWrapper
       title="Heritage Preservation AI"
-      subtitle="Catalog, preserve, and digitize brand heritage assets with AI assistance"
+      subtitle="Catalog, preserve, and digitize brand heritage assets"
       acronym="HPAI™"
       isLoading={isLoading}
     >
