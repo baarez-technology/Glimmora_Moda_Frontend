@@ -68,8 +68,11 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`text-2xl font-display ${getScoreColor(fitConfidence.overallScore)}`}>
-            {fitConfidence.overallScore}%
+          <div className="text-right">
+            <div className={`text-2xl font-display ${getScoreColor(fitConfidence.overallScore)}`}>
+              {fitConfidence.overallScore}%
+            </div>
+            <p className="text-[9px] text-stone/60 tracking-wider">estimate</p>
           </div>
           <ChevronDown
             size={20}
@@ -81,11 +84,20 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
       {/* Expanded Content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-sand pt-4">
+          {/* Disclaimer */}
+          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+            <AlertCircle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700">
+              Size recommendation is an estimate. Check the brand&apos;s size guide for exact measurements before ordering.
+            </p>
+          </div>
+
           {/* Size Recommendation */}
           <div className="flex items-center justify-between mb-4 p-3 bg-parchment rounded-lg">
             <div>
               <p className="text-sm text-greige">Recommended Size</p>
               <p className="font-display text-lg text-charcoal-deep">{fitConfidence.suggestedSize}</p>
+              <p className="text-[10px] text-stone/60 mt-0.5">Estimated — verify with brand size chart</p>
             </div>
             {selectedSize === fitConfidence.suggestedSize ? (
               <div className="flex items-center gap-2 text-success text-sm">
