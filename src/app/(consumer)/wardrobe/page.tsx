@@ -212,6 +212,7 @@ export default function WardrobePage() {
               <div className="py-8 pl-8">
                 <p className="font-display text-3xl text-charcoal-deep mb-1">{formatPrice(stats.totalValue)}</p>
                 <p className="text-[10px] tracking-[0.3em] uppercase text-taupe">Collection Value</p>
+                <p className="text-[9px] text-taupe/60 italic mt-1">Based on original purchase prices</p>
               </div>
             </div>
           </div>
