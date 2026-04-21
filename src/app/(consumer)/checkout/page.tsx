@@ -27,6 +27,7 @@ export default function CheckoutPage() {
   const [orderItems, setOrderItems] = useState<ConsiderationItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [showInvoice, setShowInvoice] = useState(false);
 
   // Saved addresses
@@ -151,6 +152,7 @@ export default function CheckoutPage() {
     }
 
     setIsPlacingOrder(true);
+    setOrderError(null);
     try {
       // Build products
       const orderProducts = hasCartItems
@@ -209,7 +211,9 @@ export default function CheckoutPage() {
       showToast('Order placed successfully!', 'success');
       setCurrentStep('confirmation');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Failed to place order', 'error');
+      const msg = err instanceof Error ? err.message : 'Failed to place order';
+      setOrderError(msg);
+      showToast(msg, 'error');
     } finally {
       setIsPlacingOrder(false);
     }
@@ -696,6 +700,28 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Processing Warning */}
+                {isPlacingOrder && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm text-center">
+                    Order is being processed — please do not close this window.
+                  </div>
+                )}
+
+                {/* Payment Error */}
+                {orderError && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 text-sm">
+                    <p className="font-medium text-red-700 mb-1">Payment could not be completed</p>
+                    <p className="text-red-600 text-xs mb-2">{orderError}</p>
+                    <p className="text-stone text-xs">
+                      Need help?{' '}
+                      <a href="mailto:support@modaglimmora.com" className="underline hover:text-charcoal-deep">
+                        Contact support
+                      </a>
+                      {placedOrder && ` — Reference: ${placedOrder.order_id}`}
+                    </p>
+                  </div>
+                )}
 
                 {/* Place Order Button */}
                 <button
