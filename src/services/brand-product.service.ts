@@ -259,6 +259,16 @@ export interface ProductCreatePayload {
   price: number;
   sizes?: string[];
   product_image?: string;
+  // SOW 41P.3
+  iv_eligible?: boolean;
+  commerce_eligible?: boolean;
+  heritage_tags?: string[];
+  craft_tags?: string[];
+  editorial_narrative?: string;
+  // SOW 41P.4
+  visibility_scope?: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
+  experience_mode?: 'commerce' | 'story_only' | 'experience_iv' | 'concierge';
+  commerce_action?: 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
 }
 
 export interface ProductUpdatePayload {

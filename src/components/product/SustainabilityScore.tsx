@@ -146,7 +146,7 @@ export default function SustainabilityScore({
           </div>
           <div className="text-left">
             <p className="font-medium text-charcoal-deep">Sustainability Score</p>
-            <p className="text-sm text-stone">{gradeInfo.label} environmental performance</p>
+            <p className="text-sm text-stone">{gradeInfo.label} environmental performance · <span className="italic text-stone/60">Estimated</span></p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -247,6 +247,13 @@ export default function SustainabilityScore({
               score={score.breakdown.transport}
               description="Carbon-efficient logistics"
             />
+          </div>
+
+          {/* Disclaimer */}
+          <div className="px-5 pb-2">
+            <p className="text-[10px] text-stone/50 italic">
+              Estimated sustainability data — not verified by a third-party auditor. Figures are AI-generated approximations.
+            </p>
           </div>
 
           {/* Source Link */}
