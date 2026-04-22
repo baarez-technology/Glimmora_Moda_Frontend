@@ -28,6 +28,7 @@ export default function CheckoutPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [orderAttempted, setOrderAttempted] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
 
   // Saved addresses
@@ -213,6 +214,7 @@ export default function CheckoutPage() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to place order';
       setOrderError(msg);
+      setOrderAttempted(true);
       showToast(msg, 'error');
     } finally {
       setIsPlacingOrder(false);
@@ -718,20 +720,25 @@ export default function CheckoutPage() {
                   <div className="mb-4 p-4 bg-red-50 border border-red-200 text-sm">
                     <p className="font-medium text-red-700 mb-1">Payment could not be completed</p>
                     <p className="text-red-600 text-xs mb-2">{orderError}</p>
-                    <p className="text-stone text-xs">
+                    <p className="text-stone text-xs mb-2">
                       Need help?{' '}
                       <a href="mailto:support@modaglimmora.com" className="underline hover:text-charcoal-deep">
                         Contact support
                       </a>
                       {placedOrder && ` — Reference: ${placedOrder.order_id}`}
                     </p>
+                    {orderAttempted && (
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1">
+                        Please refresh the page before retrying to avoid duplicate orders.
+                      </p>
+                    )}
                   </div>
                 )}
 
                 {/* Place Order Button */}
                 <button
                   onClick={handleCompletePurchase}
-                  disabled={isPlacingOrder}
+                  disabled={isPlacingOrder || orderAttempted}
                   className="w-full py-5 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-3 transition-all duration-300 hover:bg-noir disabled:opacity-50"
                 >
                   {isPlacingOrder ? (
@@ -739,6 +746,8 @@ export default function CheckoutPage() {
                       <div className="w-5 h-5 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
                       <span className="text-sm tracking-[0.15em] uppercase">Placing Order...</span>
                     </>
+                  ) : orderAttempted ? (
+                    <span className="text-sm tracking-[0.15em] uppercase">Refresh page to retry</span>
                   ) : (
                     <>
                       <span className="text-sm tracking-[0.15em] uppercase">Complete Purchase — {formatPrice(total, currency)}</span>
