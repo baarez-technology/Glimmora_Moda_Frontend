@@ -88,6 +88,21 @@ export interface BackendProduct {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // SOW 41P.3 — extended classification fields
+  iv_eligible: boolean;
+  commerce_eligible: boolean;
+  heritage_tags: string[];
+  craft_tags: string[];
+  editorial_narrative: string;
+  video_assets: string[];
+  motion_assets: string[];
+  // SOW 41P.4 — visibility & commerce control
+  visibility_scope: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
+  experience_mode: 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard';
+  pricing_visibility: 'visible' | 'hidden' | 'redacted';
+  commerce_action_type: 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
+  allowed_countries: string[] | null;
+  pricing_redacted: boolean;
 }
 
 // ─── Parsing Helpers ────────────────────────────────────────────────────────
