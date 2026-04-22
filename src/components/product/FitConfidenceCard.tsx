@@ -96,7 +96,11 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
           <div className="flex items-center justify-between mb-4 p-3 bg-parchment rounded-lg">
             <div>
               <p className="text-sm text-greige">Recommended Size</p>
-              <p className="font-display text-lg text-charcoal-deep">{fitConfidence.suggestedSize}</p>
+              {fitConfidence.confidenceInterval?.sizeRange ? (
+                <p className="font-display text-lg text-charcoal-deep">{fitConfidence.confidenceInterval.sizeRange}</p>
+              ) : (
+                <p className="font-display text-lg text-charcoal-deep">{fitConfidence.suggestedSize}</p>
+              )}
               <p className="text-[10px] text-stone/60 mt-0.5">Estimated — verify with brand size chart</p>
             </div>
             {selectedSize === fitConfidence.suggestedSize ? (
@@ -108,6 +112,17 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
               <span className="text-sm text-gold-deep">Select this size</span>
             )}
           </div>
+
+          {/* Low confidence warning */}
+          {fitConfidence.confidenceInterval?.lowConfidenceFlag && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-red-700">Low confidence prediction</p>
+                <p className="text-xs text-red-600 mt-0.5">{fitConfidence.confidenceInterval.explanation || 'Limited data available for this product. We strongly recommend checking the brand size guide.'}</p>
+              </div>
+            </div>
+          )}
 
           {/* Available Sizes */}
           {fitConfidence.availableSizes && fitConfidence.availableSizes.length > 0 && (
