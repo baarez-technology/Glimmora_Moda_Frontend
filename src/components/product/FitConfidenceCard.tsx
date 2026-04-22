@@ -253,6 +253,21 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
             </p>
           )}
 
+          {/* Measurement staleness prompt */}
+          {bodyTwin?.updatedAt && (() => {
+            const monthsOld = (Date.now() - new Date(bodyTwin.updatedAt).getTime()) / (1000 * 60 * 60 * 24 * 30);
+            if (monthsOld < 6) return null;
+            return (
+              <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700">
+                  Your measurements were last updated {Math.floor(monthsOld)} months ago.{' '}
+                  <Link href="/profile/body-twin" className="underline hover:text-amber-900">Update them</Link> for more accurate fit predictions.
+                </p>
+              </div>
+            );
+          })()}
+
           {/* Body Twin Link */}
           {!bodyTwin && !fitConfidence.bodyTwinUsed && (
             <Link
