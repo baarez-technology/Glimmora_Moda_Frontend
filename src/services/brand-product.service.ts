@@ -303,6 +303,16 @@ export interface ProductUpdatePayload {
   is_low_stock?: boolean;
   performance_metrics?: Record<string, unknown>;
   ai_data?: Record<string, unknown>;
+  // SOW 41P.3
+  iv_eligible?: boolean;
+  commerce_eligible?: boolean;
+  heritage_tags?: string[];
+  craft_tags?: string[];
+  editorial_narrative?: string;
+  // SOW 41P.4
+  visibility_scope?: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
+  experience_mode?: 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard';
+  commerce_action_type?: 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
 }
 
 export interface RegionalStockAddPayload {

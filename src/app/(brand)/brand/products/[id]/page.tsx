@@ -61,7 +61,20 @@ export default function ProductDetailPage() {
     experienceMode: 'standard' as ExperienceMode,
     pricingVisibility: 'visible' as PricingVisibility,
     commerceAction: 'add_to_considerations' as CommerceAction,
+    // SOW 41P.3
+    iv_eligible: true,
+    commerce_eligible: true,
+    heritage_tags: [] as string[],
+    craft_tags: [] as string[],
+    editorial_narrative: '',
+    // SOW 41P.4
+    visibility_scope: 'public' as 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted',
+    experience_mode: 'commerce' as 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard',
+    commerce_action_type: 'purchase' as 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect',
   });
+
+  const [heritageTagInput, setHeritageTagInput] = useState('');
+  const [craftTagInput, setCraftTagInput] = useState('');
 
   const [productImages, setProductImages] = useState<string[]>([]);
   const [images, setImages] = useState<ProductImage[]>([]);
@@ -88,6 +101,19 @@ export default function ProductDetailPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const markDirty = () => setHasChanges(true);
+
+  const handleAddTag = (type: 'heritage_tags' | 'craft_tags', input: string, setInput: (v: string) => void) => {
+    const val = input.trim().toLowerCase();
+    if (!val || formData[type].includes(val)) return;
+    setFormData(prev => ({ ...prev, [type]: [...prev[type], val] }));
+    setInput('');
+    markDirty();
+  };
+
+  const handleRemoveTag = (type: 'heritage_tags' | 'craft_tags', tag: string) => {
+    setFormData(prev => ({ ...prev, [type]: prev[type].filter(t => t !== tag) }));
+    markDirty();
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -127,13 +153,23 @@ export default function ProductDetailPage() {
         product_category: data.product_category || '',
         product_description: data.product_description,
         tagline: data.tagline,
-        narrative: '',
+        narrative: data.editorial_narrative || '',
         status: data.status,
-        ivEnabled: false,
-        visibility: 'public' as ProductVisibility,
-        experienceMode: 'standard' as ExperienceMode,
-        pricingVisibility: 'visible' as PricingVisibility,
-        commerceAction: 'add_to_considerations' as CommerceAction,
+        ivEnabled: data.iv_eligible ?? true,
+        visibility: (data.visibility_scope as ProductVisibility) || 'public',
+        experienceMode: (data.experience_mode as ExperienceMode) || 'standard',
+        pricingVisibility: (data.pricing_visibility as PricingVisibility) || 'visible',
+        commerceAction: (data.commerce_action_type as CommerceAction) || 'add_to_considerations',
+        // SOW 41P.3
+        iv_eligible: data.iv_eligible ?? true,
+        commerce_eligible: data.commerce_eligible ?? true,
+        heritage_tags: data.heritage_tags || [],
+        craft_tags: data.craft_tags || [],
+        editorial_narrative: data.editorial_narrative || '',
+        // SOW 41P.4
+        visibility_scope: data.visibility_scope || 'public',
+        experience_mode: data.experience_mode || 'commerce',
+        commerce_action_type: data.commerce_action_type || 'purchase',
       });
       setProductImages(data.product_images ? [...data.product_images] : []);
       setImages([]);
@@ -233,6 +269,16 @@ export default function ProductDetailPage() {
         product_images: productImages,
         sizes,
         color_based_images_mapping: colorMapping,
+        // SOW 41P.3
+        iv_eligible: formData.iv_eligible,
+        commerce_eligible: formData.commerce_eligible,
+        heritage_tags: formData.heritage_tags,
+        craft_tags: formData.craft_tags,
+        editorial_narrative: formData.editorial_narrative,
+        // SOW 41P.4
+        visibility_scope: formData.visibility_scope,
+        experience_mode: formData.experience_mode,
+        commerce_action_type: formData.commerce_action_type,
       });
       setProduct(updated);
       // Re-parse after save
@@ -764,6 +810,95 @@ export default function ProductDetailPage() {
                     rows={4}
                     className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                   />
+                </div>
+              </div>
+            </section>
+
+            {/* SOW 41P.3 — Product Classification */}
+            <section className="bg-white border border-sand/50 p-6 space-y-6">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">Product Classification</h2>
+
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.iv_eligible} onChange={e => { setFormData(p => ({ ...p, iv_eligible: e.target.checked })); markDirty(); }} className="rounded border-sand" />
+                  <span className="text-sm text-charcoal-deep">IV Eligible</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={formData.commerce_eligible} onChange={e => { setFormData(p => ({ ...p, commerce_eligible: e.target.checked })); markDirty(); }} className="rounded border-sand" />
+                  <span className="text-sm text-charcoal-deep">Commerce Eligible</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Editorial Narrative</label>
+                <textarea value={formData.editorial_narrative} onChange={e => { setFormData(p => ({ ...p, editorial_narrative: e.target.value })); markDirty(); }} rows={4} className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none" placeholder="Long-form brand story or editorial context..." />
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Heritage Tags</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {formData.heritage_tags.map(tag => (
+                    <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-sand text-stone text-xs">
+                      {tag}
+                      <button type="button" onClick={() => handleRemoveTag('heritage_tags', tag)} className="text-stone hover:text-red-500 ml-1"><X size={10} /></button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input value={heritageTagInput} onChange={e => setHeritageTagInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag('heritage_tags', heritageTagInput, setHeritageTagInput))} placeholder="e.g. hand-embroidered" className="flex-1 px-4 py-2 bg-transparent border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep" />
+                  <button type="button" onClick={() => handleAddTag('heritage_tags', heritageTagInput, setHeritageTagInput)} className="px-4 py-2 border border-sand text-sm text-stone hover:bg-sand transition-colors">Add</button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Craft Tags</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {formData.craft_tags.map(tag => (
+                    <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-sand text-stone text-xs">
+                      {tag}
+                      <button type="button" onClick={() => handleRemoveTag('craft_tags', tag)} className="text-stone hover:text-red-500 ml-1"><X size={10} /></button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input value={craftTagInput} onChange={e => setCraftTagInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag('craft_tags', craftTagInput, setCraftTagInput))} placeholder="e.g. block-print" className="flex-1 px-4 py-2 bg-transparent border border-sand text-sm text-charcoal-deep focus:outline-none focus:border-charcoal-deep" />
+                  <button type="button" onClick={() => handleAddTag('craft_tags', craftTagInput, setCraftTagInput)} className="px-4 py-2 border border-sand text-sm text-stone hover:bg-sand transition-colors">Add</button>
+                </div>
+              </div>
+            </section>
+
+            {/* SOW 41P.4 — Visibility Settings */}
+            <section className="bg-white border border-sand/50 p-6 space-y-4">
+              <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">Visibility Settings</h2>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Visibility Scope</label>
+                  <select value={formData.visibility_scope} onChange={e => { setFormData(p => ({ ...p, visibility_scope: e.target.value as typeof formData.visibility_scope })); markDirty(); }} className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer">
+                    <option value="public">Public</option>
+                    <option value="logged_in">Logged In Only</option>
+                    <option value="uhni_only">UHNI Only</option>
+                    <option value="geo_restricted">Geo Restricted</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Experience Mode</label>
+                  <select value={formData.experience_mode} onChange={e => { setFormData(p => ({ ...p, experience_mode: e.target.value as typeof formData.experience_mode })); markDirty(); }} className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer">
+                    <option value="commerce">Commerce</option>
+                    <option value="story_only">Story Only</option>
+                    <option value="experience_iv">Experience + IV</option>
+                    <option value="concierge">Concierge</option>
+                    <option value="standard">Standard</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">Commerce Action</label>
+                  <select value={formData.commerce_action_type} onChange={e => { setFormData(p => ({ ...p, commerce_action_type: e.target.value as typeof formData.commerce_action_type })); markDirty(); }} className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer">
+                    <option value="purchase">Purchase</option>
+                    <option value="add_to_cart">Add to Cart</option>
+                    <option value="request_to_buy">Request to Buy</option>
+                    <option value="concierge">Concierge Handoff</option>
+                    <option value="redirect">Redirect</option>
+                  </select>
                 </div>
               </div>
             </section>
