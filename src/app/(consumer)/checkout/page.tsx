@@ -287,6 +287,11 @@ export default function CheckoutPage() {
                   Order <span className="font-medium text-charcoal-deep">#{placedOrder.order_id}</span> has been confirmed.
                   A confirmation email has been sent to <span className="font-medium text-charcoal-deep">{placedOrder.customer_email}</span>.
                 </p>
+                {placedOrder.payment_currency && placedOrder.payment_currency !== currency && (
+                  <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2">
+                    Note: Your order was processed in <strong>{placedOrder.payment_currency}</strong>. Prices were displayed in <strong>{currency}</strong>.
+                  </p>
+                )}
               </div>
 
               <div className="grid md:grid-cols-2 gap-6 mb-8">
