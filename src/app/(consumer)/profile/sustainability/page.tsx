@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Leaf, Droplets, Globe, Award, TrendingUp, Settings } from 'lucide-react';
+import { ArrowLeft, Leaf, Droplets, Globe, Award, TrendingUp, Settings, AlertCircle } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -163,6 +163,13 @@ export default function SustainabilityPage() {
 
       {/* Content */}
       <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 space-y-8 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+        {/* Disclaimer */}
+        <div className="flex items-start gap-2 p-4 bg-amber-50 border border-amber-200">
+          <AlertCircle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-amber-700">
+            Sustainability scores are estimated from wardrobe composition and AI-generated product data — not verified by third-party auditors. Use as directional guidance only.
+          </p>
+        </div>
         {/* Overall Score */}
         <div className="bg-white p-8">
           <div className="flex items-center gap-3 mb-8">

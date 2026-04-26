@@ -12,9 +12,7 @@ import type {
   BespokeOrder,
   AutonomousActivity,
   PriceNegotiation,
-  UHNIPriceOffer,
   UHNIPriceAlert,
-  UHNIPricingTier,
   UHNIPricingSummary,
   UHNIAvailabilitySearch,
   GlobalNetworkStats,
@@ -38,9 +36,7 @@ import {
   mockBespokeOrders,
   mockAutonomousActivity,
   mockPriceNegotiations,
-  mockPriceOffers,
   mockPriceAlerts,
-  mockPricingTiers,
   mockPricingSummary,
   mockUHNIAvailabilitySearches,
   mockGlobalNetworkStats,
@@ -154,21 +150,9 @@ export async function getPriceNegotiations(): Promise<ApiResponse<PriceNegotiati
   });
 }
 
-export async function getPriceOffers(): Promise<ApiResponse<UHNIPriceOffer[]>> {
-  return apiRequest<UHNIPriceOffer[]>('/api/uhni/pricing/offers', {
-    mockHandler: () => mockPriceOffers,
-  });
-}
-
 export async function getPriceAlerts(): Promise<ApiResponse<UHNIPriceAlert[]>> {
   return apiRequest<UHNIPriceAlert[]>('/api/uhni/pricing/alerts', {
     mockHandler: () => mockPriceAlerts,
-  });
-}
-
-export async function getPricingTiers(): Promise<ApiResponse<UHNIPricingTier[]>> {
-  return apiRequest<UHNIPricingTier[]>('/api/uhni/pricing/tiers', {
-    mockHandler: () => mockPricingTiers,
   });
 }
 
@@ -196,17 +180,6 @@ export async function declineNegotiation(id: string): Promise<ApiResponse<PriceN
       const negotiation = mockPriceNegotiations.find(n => n.id === id);
       if (!negotiation) throw new ApiError('NOT_FOUND', `Negotiation ${id} not found`, 404);
       return { ...negotiation, status: 'declined' as const };
-    },
-  });
-}
-
-export async function claimOffer(id: string): Promise<ApiResponse<UHNIPriceOffer>> {
-  return apiRequest<UHNIPriceOffer>(`/api/uhni/pricing/offers/${id}/claim`, {
-    method: 'POST',
-    mockHandler: () => {
-      const offer = mockPriceOffers.find(o => o.id === id);
-      if (!offer) throw new Error(`Offer ${id} not found`);
-      return { ...offer, claimed: true };
     },
   });
 }

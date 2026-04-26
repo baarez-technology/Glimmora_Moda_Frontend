@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Sparkles, ChevronRight, AlertCircle, TrendingUp, ShoppingBag } from 'lucide-react';
+import { Sparkles, ChevronRight, AlertCircle, TrendingUp, ShoppingBag, X } from 'lucide-react';
 import type { WardrobeAnalysis, WardrobeGap } from '@/types';
 import { formatPrice } from '@/lib/currency';
 
@@ -13,6 +13,11 @@ interface WardrobeGapAnalysisProps {
 
 export default function WardrobeGapAnalysis({ analysis }: WardrobeGapAnalysisProps) {
   const [selectedGap, setSelectedGap] = useState<string | null>(null);
+  const [dismissedGaps, setDismissedGaps] = useState<Set<string>>(new Set());
+
+  const handleDismissGap = (gapId: string) => {
+    setDismissedGaps(prev => new Set(prev).add(gapId));
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -113,11 +118,16 @@ export default function WardrobeGapAnalysis({ analysis }: WardrobeGapAnalysisPro
       <div className="p-6 border-b border-sand">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-medium text-charcoal-deep">Identified Gaps</h3>
-          <span className="text-sm text-stone">{analysis.gaps.length} items suggested</span>
+          <span className="text-sm text-stone">{analysis.gaps.length - dismissedGaps.size} items suggested</span>
+        </div>
+
+        <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4 text-xs text-amber-700">
+          <AlertCircle size={13} className="mt-0.5 flex-shrink-0 text-amber-600" />
+          Suggestions are AI-generated based on style patterns — not grounded in your full purchase history. Use as inspiration.
         </div>
 
         <div className="space-y-4">
-          {analysis.gaps.map((gap) => (
+          {analysis.gaps.filter(gap => !dismissedGaps.has(gap.id)).map((gap) => (
             <div
               key={gap.id}
               className={`border rounded-xl overflow-hidden transition-all ${
@@ -136,9 +146,19 @@ export default function WardrobeGapAnalysis({ analysis }: WardrobeGapAnalysisPro
                       <p className="text-sm text-stone">{gap.reason}</p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs border ${getPriorityColor(gap.priority)}`}>
-                    {getPriorityLabel(gap.priority)}
-                  </span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`px-3 py-1 rounded-full text-xs border ${getPriorityColor(gap.priority)}`}>
+                      {getPriorityLabel(gap.priority)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={e => { e.stopPropagation(); handleDismissGap(gap.id); }}
+                      title="Not relevant"
+                      className="p-1 text-stone/40 hover:text-stone hover:bg-sand rounded transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
                 </div>
               </button>
 

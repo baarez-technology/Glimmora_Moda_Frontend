@@ -97,12 +97,12 @@ export default function SilentCartPage() {
 
   const selectedTotal = Array.from(selectedItems).reduce((sum, idx) => {
     const p = gaps[idx]?.matched_product;
-    return sum + (p ? (p.offer_price || p.price) : 0);
+    return sum + (p ? (p.price) : 0);
   }, 0);
 
   const fullCartValue = gaps.reduce((sum, g) => {
     const p = g.matched_product;
-    return sum + (p ? (p.offer_price || p.price) : 0);
+    return sum + (p ? (p.price) : 0);
   }, 0);
 
   const handleMoveToConsiderations = useCallback(() => {
@@ -120,7 +120,7 @@ export default function SilentCartPage() {
         tagline: p.tagline || '',
         description: p.product_description || '',
         narrative: '',
-        price: p.offer_price || p.price,
+        price: p.price,
         currency: 'EUR',
         images: (p.image_urls?.length ? p.image_urls : p.product_image ? [p.product_image] : []).map((url, i) => ({
           id: String(i + 1),
@@ -290,7 +290,7 @@ export default function SilentCartPage() {
                           </p>
                         </Link>
                         <p className="text-sm font-semibold text-[#1A1A1A]">
-                          &euro;{(p.offer_price || p.price).toLocaleString()}
+                          &euro;{(p.price).toLocaleString()}
                         </p>
                       </div>
                     </div>

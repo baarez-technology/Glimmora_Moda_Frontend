@@ -14,6 +14,7 @@ import {
   CheckCircle,
   Clock,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import {
   fetchServiceHealth,
@@ -99,6 +100,28 @@ export default function SystemHealthPage() {
   const [errors, setErrors] = useState<ErrorLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [reindexing, setReindexing] = useState(false);
+  const [reindexStatus, setReindexStatus] = useState<'idle' | 'success' | 'error'>('idle');
+
+  const handleReindex = async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('moda-brand-token') : null;
+    if (!token) return;
+    setReindexing(true);
+    setReindexStatus('idle');
+    try {
+      const res = await fetch('/api/v1/products/index', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incremental: false }),
+      });
+      setReindexStatus(res.ok ? 'success' : 'error');
+    } catch {
+      setReindexStatus('error');
+    } finally {
+      setReindexing(false);
+      setTimeout(() => setReindexStatus('idle'), 4000);
+    }
+  };
 
   async function loadAllData() {
     setLoading(true);
@@ -133,6 +156,18 @@ export default function SystemHealthPage() {
               <Clock size={12} />
               Last refresh: {lastRefresh.toLocaleTimeString()}
             </span>
+            <button
+              onClick={handleReindex}
+              disabled={reindexing}
+              className={`flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                reindexStatus === 'success' ? 'bg-emerald-100 text-emerald-800' :
+                reindexStatus === 'error' ? 'bg-red-100 text-red-800' :
+                'bg-charcoal-deep text-ivory-cream hover:bg-noir'
+              }`}
+            >
+              <Search size={14} className={reindexing ? 'animate-pulse' : ''} />
+              {reindexing ? 'Reindexing…' : reindexStatus === 'success' ? 'Reindexed ✓' : reindexStatus === 'error' ? 'Failed — retry' : 'Reindex Search'}
+            </button>
             <button
               onClick={loadAllData}
               disabled={loading}

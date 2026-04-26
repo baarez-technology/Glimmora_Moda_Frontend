@@ -48,7 +48,7 @@ export default function BrandConciergePage() {
   return (
     <IntelligencePageWrapper
       title="Brand Concierge Configuration"
-      subtitle="Configure and monitor your AI-powered brand concierge experience"
+      subtitle="Configure and monitor your brand concierge experience"
       phase={1}
       status="live"
       backendNote="Requires WebSocket or SSE for real-time chat. Endpoints: GET/PUT /api/intelligence/concierge"

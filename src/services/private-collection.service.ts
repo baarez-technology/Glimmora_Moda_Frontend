@@ -68,7 +68,6 @@ export interface ApiProduct {
   product_image?: string;
   product_category?: string;
   price?: number;
-  offer_price?: number;
   tagline?: string;
   [key: string]: unknown;
 }
@@ -123,7 +122,7 @@ export function mapApiProduct(p: ApiProduct): { id: string; name: string; imageU
     id: p.product_id,
     name: p.product_name,
     imageUrl: p.product_image || '',
-    price: p.offer_price ?? p.price,
+    price: p.price,
     category: p.product_category,
   };
 }

@@ -37,7 +37,20 @@ export default function NewProductPage() {
     product_description: '',
     tagline: '',
     status: 'draft' as BrandProductStatus,
+    // SOW 41P.3
+    iv_eligible: false,
+    commerce_eligible: true,
+    heritage_tags: [] as string[],
+    craft_tags: [] as string[],
+    editorial_narrative: '',
+    // SOW 41P.4
+    visibility_scope: 'public' as 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted',
+    experience_mode: 'commerce' as 'commerce' | 'story_only' | 'experience_iv' | 'concierge',
+    commerce_action: 'add_to_cart' as 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect',
   });
+
+  const [heritageTagInput, setHeritageTagInput] = useState('');
+  const [craftTagInput, setCraftTagInput] = useState('');
 
   const updateField = useCallback(<K extends keyof typeof formData>(key: K, value: (typeof formData)[K]) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -76,6 +89,19 @@ export default function NewProductPage() {
     }
   };
 
+  const handleAddTag = (type: 'heritage_tags' | 'craft_tags', input: string, setInput: (v: string) => void) => {
+    const val = input.trim().toLowerCase();
+    if (!val || formData[type].includes(val)) return;
+    setFormData(prev => ({ ...prev, [type]: [...prev[type], val] }));
+    setInput('');
+    setIsDirty(true);
+  };
+
+  const handleRemoveTag = (type: 'heritage_tags' | 'craft_tags', tag: string) => {
+    setFormData(prev => ({ ...prev, [type]: prev[type].filter(t => t !== tag) }));
+    setIsDirty(true);
+  };
+
   // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,6 +129,14 @@ export default function NewProductPage() {
         product_description: formData.product_description,
         ...(sizes.length > 0 ? { sizes } : {}),
         ...(coverImage ? { product_image: coverImage } : {}),
+        iv_eligible: formData.iv_eligible,
+        commerce_eligible: formData.commerce_eligible,
+        heritage_tags: formData.heritage_tags,
+        craft_tags: formData.craft_tags,
+        editorial_narrative: formData.editorial_narrative,
+        visibility_scope: formData.visibility_scope,
+        experience_mode: formData.experience_mode,
+        commerce_action: formData.commerce_action,
       });
 
       setIsDirty(false);
@@ -318,6 +352,160 @@ export default function NewProductPage() {
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
                   placeholder="Describe the product, its heritage, and unique qualities..."
                 />
+              </div>
+            </div>
+          </section>
+
+          {/* SOW 41P.3 — Product Classification */}
+          <section className="bg-white border border-sand/50 p-6 space-y-6 mt-8">
+            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+              Product Classification
+            </h2>
+
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.iv_eligible}
+                  onChange={e => updateField('iv_eligible', e.target.checked)}
+                  className="rounded border-sand"
+                />
+                <span className="text-sm text-charcoal-deep">IV Eligible</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.commerce_eligible}
+                  onChange={e => updateField('commerce_eligible', e.target.checked)}
+                  className="rounded border-sand"
+                />
+                <span className="text-sm text-charcoal-deep">Commerce Eligible</span>
+              </label>
+            </div>
+
+            <div>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                Editorial Narrative
+              </label>
+              <textarea
+                value={formData.editorial_narrative}
+                onChange={e => updateField('editorial_narrative', e.target.value)}
+                rows={4}
+                className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors resize-none"
+                placeholder="Long-form brand story or editorial context for this product..."
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                Heritage Tags
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.heritage_tags.map(tag => (
+                  <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-sand text-stone text-xs">
+                    {tag}
+                    <button type="button" onClick={() => handleRemoveTag('heritage_tags', tag)} className="text-stone hover:text-red-500 ml-1">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={heritageTagInput}
+                  onChange={e => setHeritageTagInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag('heritage_tags', heritageTagInput, setHeritageTagInput))}
+                  placeholder="e.g. hand-embroidered"
+                  className="flex-1 px-4 py-2 bg-transparent border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep"
+                />
+                <button type="button" onClick={() => handleAddTag('heritage_tags', heritageTagInput, setHeritageTagInput)} className="px-4 py-2 border border-sand text-sm text-stone hover:bg-sand transition-colors">
+                  Add
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                Craft Tags
+              </label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {formData.craft_tags.map(tag => (
+                  <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-sand text-stone text-xs">
+                    {tag}
+                    <button type="button" onClick={() => handleRemoveTag('craft_tags', tag)} className="text-stone hover:text-red-500 ml-1">
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={craftTagInput}
+                  onChange={e => setCraftTagInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddTag('craft_tags', craftTagInput, setCraftTagInput))}
+                  placeholder="e.g. block-print"
+                  className="flex-1 px-4 py-2 bg-transparent border border-sand text-sm text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep"
+                />
+                <button type="button" onClick={() => handleAddTag('craft_tags', craftTagInput, setCraftTagInput)} className="px-4 py-2 border border-sand text-sm text-stone hover:bg-sand transition-colors">
+                  Add
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* SOW 41P.4 — Visibility Settings */}
+          <section className="bg-white border border-sand/50 p-6 space-y-6 mt-8">
+            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+              Visibility Settings
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                  Visibility Scope
+                </label>
+                <select
+                  value={formData.visibility_scope}
+                  onChange={e => updateField('visibility_scope', e.target.value as typeof formData.visibility_scope)}
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
+                >
+                  <option value="public">Public</option>
+                  <option value="logged_in">Logged In Only</option>
+                  <option value="uhni_only">UHNI Only</option>
+                  <option value="geo_restricted">Geo Restricted</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                  Experience Mode
+                </label>
+                <select
+                  value={formData.experience_mode}
+                  onChange={e => updateField('experience_mode', e.target.value as typeof formData.experience_mode)}
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
+                >
+                  <option value="commerce">Commerce</option>
+                  <option value="story_only">Story Only</option>
+                  <option value="experience_iv">Experience + IV</option>
+                  <option value="concierge">Concierge</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                  Commerce Action
+                </label>
+                <select
+                  value={formData.commerce_action}
+                  onChange={e => updateField('commerce_action', e.target.value as typeof formData.commerce_action)}
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
+                >
+                  <option value="add_to_cart">Add to Cart</option>
+                  <option value="request_to_buy">Request to Buy</option>
+                  <option value="concierge">Concierge Handoff</option>
+                  <option value="redirect">Redirect</option>
+                </select>
               </div>
             </div>
           </section>

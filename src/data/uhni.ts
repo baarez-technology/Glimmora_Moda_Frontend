@@ -8,9 +8,7 @@ import type {
   AutonomousActivity,
   PrivateCollection,
   PriceNegotiation,
-  UHNIPriceOffer,
   UHNIPriceAlert,
-  UHNIPricingTier,
   UHNIPricingSummary,
   UHNIAvailabilitySearch,
   GlobalNetworkStats,
@@ -788,13 +786,7 @@ export const mockPriceNegotiations: PriceNegotiation[] = [
   },
 ];
 
-// ============================================
-// UHNI PRICE OFFERS (service fallback — primary source is shared-store.ts)
-// ============================================
-// These match the offers in shared-store.ts but use fixed dates for service-level mock.
-// The shared store uses dynamic dates (Date.now()) for realistic "active/expiring" display.
-
-export const mockPriceOffers: UHNIPriceOffer[] = [
+export const _removedOffers = [
   // Active product offer — 15% off Lady Dior
   {
     id: 'offer-001',
@@ -989,41 +981,10 @@ export const mockPriceAlerts: UHNIPriceAlert[] = [
   },
 ];
 
-export const mockPricingTiers: UHNIPricingTier[] = [
-  {
-    tier: 'standard',
-    label: 'Standard',
-    description: 'Standard retail pricing with seasonal promotions',
-    benefits: ['Access to public sales', 'Standard shipping rates', 'General customer service']
-  },
-  {
-    tier: 'preferred',
-    label: 'Preferred',
-    description: 'Enhanced pricing with loyalty benefits',
-    benefits: ['Early access to sales', 'Free standard shipping', 'Priority customer service', 'Birthday discount (5%)'],
-    averageDiscount: 5
-  },
-  {
-    tier: 'uhni',
-    label: 'UHNI Private',
-    description: 'Exclusive pricing with concierge negotiation',
-    benefits: [
-      'Private negotiation on any item',
-      'Pre-release pricing locks',
-      'Bundle discount optimization',
-      'Complimentary global shipping',
-      'Dedicated concierge pricing support',
-      'Price match guarantee across regions'
-    ],
-    averageDiscount: 12
-  }
-];
-
 export const mockPricingSummary: UHNIPricingSummary = {
   lifetimeSavings: 47850,
   activeNegotiations: 4,
-  pendingOffers: 7,
-  priceAlertsSet: 4
+  priceAlertsSet: 4,
 };
 
 // ============================================

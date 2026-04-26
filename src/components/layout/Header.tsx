@@ -78,14 +78,14 @@ export default function Header() {
     setUnreadCount(0);
   };
 
-  // Poll notification count — TODO: re-enable once backend implements /api/v1/customer/notifications/count
-  // useEffect(() => {
-  //   if (isAuthenticated) {
-  //     fetchNotifCount();
-  //     const interval = setInterval(fetchNotifCount, 60000);
-  //     return () => clearInterval(interval);
-  //   }
-  // }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Poll notification count every 60s — backend endpoint confirmed: GET /api/v1/customer/notifications/count
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchNotifCount();
+      const interval = setInterval(fetchNotifCount, 60000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogout = () => {
     setIsAccountOpen(false);

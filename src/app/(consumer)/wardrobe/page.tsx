@@ -212,6 +212,7 @@ export default function WardrobePage() {
               <div className="py-8 pl-8">
                 <p className="font-display text-3xl text-charcoal-deep mb-1">{formatPrice(stats.totalValue)}</p>
                 <p className="text-[10px] tracking-[0.3em] uppercase text-taupe">Collection Value</p>
+                <p className="text-[9px] text-taupe/60 italic mt-1">Based on original purchase prices</p>
               </div>
             </div>
           </div>
@@ -690,15 +691,9 @@ export default function WardrobePage() {
                             {mp.product_name}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            {mp.discount_percentage > 0 && (
-                              <span className="text-xs text-taupe line-through">{formatPrice(mp.price)}</span>
-                            )}
                             <span className="text-sm font-medium text-charcoal-deep">
-                              {formatPrice(mp.offer_price || mp.price)}
+                              {formatPrice(mp.price)}
                             </span>
-                            {mp.discount_percentage > 0 && (
-                              <span className="text-xs text-success">-{mp.discount_percentage}%</span>
-                            )}
                           </div>
                           <p className="text-[9px] text-stone mt-1">
                             {Math.round(gap.product_match_score * 100)}% match

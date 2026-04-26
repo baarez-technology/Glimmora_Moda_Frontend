@@ -29,12 +29,10 @@ import type {
   SourcingRequestStatus,
   SourcingOption,
   SourcingMessage,
-  UHNIPriceOffer
 } from '@/types/uhni';
 import * as brandPortalService from '@/services/brand-portal.service';
 import * as bespokeService from '@/services/bespoke.service';
 import * as privateCollectionService from '@/services/private-collection.service';
-import { addSharedOffer } from '@/lib/shared-store';
 import { getSharedSessions, addSharedSession as addSessionToStore, updateSharedSessionStatus, subscribeToSessions } from '@/lib/shared-sessions-store';
 import { getUhniSourcingRequests, subscribeToSourcingChanges, writeBrandOptionToUhni, writeBrandNegotiationResponse, writeBrandMessage, writeBrandStatusUpdate } from '@/lib/shared-sourcing-store';
 import type { BrandLoginResponse } from '@/services/auth.service';
@@ -169,10 +167,6 @@ interface BrandContextType {
   updateBrandStory: (id: string, updates: Partial<BrandStory>) => void;
   deleteBrandStory: (id: string) => void;
 
-  uhniOffers: UHNIPriceOffer[];
-  getUHNIOfferById: (id: string) => UHNIPriceOffer | undefined;
-  createUHNIOffer: (offer: Omit<UHNIPriceOffer, 'id'>) => UHNIPriceOffer;
-
   stylingSessions: StylingSession[];
   getStylingSessionById: (id: string) => StylingSession | undefined;
   updateStylingSessionStatus: (id: string, status: StylingSession['status'], extras?: Partial<StylingSession>) => void;
@@ -219,7 +213,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [sourcingRequests, setSourcingRequests] = useState<SourcingRequest[]>([]);
   const [heritageEvents, setHeritageEvents] = useState<HeritageEvent[]>([]);
   const [brandStories, setBrandStories] = useState<BrandStory[]>([]);
-  const [uhniOffers, setUhniOffers] = useState<UHNIPriceOffer[]>([]);
   const [stylingSessions, setStylingSessions] = useState<StylingSession[]>([]);
   const [sharedSessionsList, setSharedSessionsList] = useState<StylingSession[]>(getSharedSessions());
 
@@ -388,7 +381,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setSourcingRequests([]);
         setHeritageEvents([]);
         setBrandStories([]);
-        setUhniOffers([]);
         setStylingSessions([]);
       }
     } catch (err) {
@@ -1088,21 +1080,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     brandPortalService.deleteBrandStory(id).catch(console.error);
   }, []);
 
-  const getUHNIOfferById = useCallback((id: string): UHNIPriceOffer | undefined => {
-    return uhniOffers.find(o => o.id === id);
-  }, [uhniOffers]);
-
-  const createUHNIOffer = useCallback((offer: Omit<UHNIPriceOffer, 'id'>): UHNIPriceOffer => {
-    const newOffer: UHNIPriceOffer = {
-      ...offer,
-      id: `offer-${Date.now()}`
-    };
-    setUhniOffers(prev => [newOffer, ...prev]);
-    addSharedOffer(newOffer);
-    brandPortalService.createUHNIOffer(offer).catch(console.error);
-    return newOffer;
-  }, []);
-
   const getStylingSessionById = useCallback((id: string): StylingSession | undefined => {
     return stylingSessions.find(s => s.id === id);
   }, [stylingSessions]);
@@ -1232,9 +1209,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         createBrandStory,
         updateBrandStory,
         deleteBrandStory,
-        uhniOffers,
-        getUHNIOfferById,
-        createUHNIOffer,
         stylingSessions: mergedStylingSessions,
         getStylingSessionById,
         updateStylingSessionStatus,

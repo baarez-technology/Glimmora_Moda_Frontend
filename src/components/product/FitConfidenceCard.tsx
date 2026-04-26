@@ -68,8 +68,11 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`text-2xl font-display ${getScoreColor(fitConfidence.overallScore)}`}>
-            {fitConfidence.overallScore}%
+          <div className="text-right">
+            <div className={`text-2xl font-display ${getScoreColor(fitConfidence.overallScore)}`}>
+              {fitConfidence.overallScore}%
+            </div>
+            <p className="text-[9px] text-stone/60 tracking-wider">estimate</p>
           </div>
           <ChevronDown
             size={20}
@@ -81,11 +84,24 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
       {/* Expanded Content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-sand pt-4">
+          {/* Disclaimer */}
+          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
+            <AlertCircle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+            <p className="text-xs text-amber-700">
+              Size recommendation is an estimate. Check the brand&apos;s size guide for exact measurements before ordering.
+            </p>
+          </div>
+
           {/* Size Recommendation */}
           <div className="flex items-center justify-between mb-4 p-3 bg-parchment rounded-lg">
             <div>
               <p className="text-sm text-greige">Recommended Size</p>
-              <p className="font-display text-lg text-charcoal-deep">{fitConfidence.suggestedSize}</p>
+              {fitConfidence.confidenceInterval?.sizeRange ? (
+                <p className="font-display text-lg text-charcoal-deep">{fitConfidence.confidenceInterval.sizeRange}</p>
+              ) : (
+                <p className="font-display text-lg text-charcoal-deep">{fitConfidence.suggestedSize}</p>
+              )}
+              <p className="text-[10px] text-stone/60 mt-0.5">Estimated — verify with brand size chart</p>
             </div>
             {selectedSize === fitConfidence.suggestedSize ? (
               <div className="flex items-center gap-2 text-success text-sm">
@@ -96,6 +112,17 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
               <span className="text-sm text-gold-deep">Select this size</span>
             )}
           </div>
+
+          {/* Low confidence warning */}
+          {fitConfidence.confidenceInterval?.lowConfidenceFlag && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg mb-4">
+              <AlertCircle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium text-red-700">Low confidence prediction</p>
+                <p className="text-xs text-red-600 mt-0.5">{fitConfidence.confidenceInterval.explanation || 'Limited data available for this product. We strongly recommend checking the brand size guide.'}</p>
+              </div>
+            </div>
+          )}
 
           {/* Available Sizes */}
           {fitConfidence.availableSizes && fitConfidence.availableSizes.length > 0 && (
@@ -225,6 +252,21 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
               Fit Engine {fitConfidence.fitEngineVersion}
             </p>
           )}
+
+          {/* Measurement staleness prompt */}
+          {bodyTwin?.updatedAt && (() => {
+            const monthsOld = (Date.now() - new Date(bodyTwin.updatedAt).getTime()) / (1000 * 60 * 60 * 24 * 30);
+            if (monthsOld < 6) return null;
+            return (
+              <div className="mt-3 flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertCircle size={13} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-amber-700">
+                  Your measurements were last updated {Math.floor(monthsOld)} months ago.{' '}
+                  <Link href="/profile/body-twin" className="underline hover:text-amber-900">Update them</Link> for more accurate fit predictions.
+                </p>
+              </div>
+            );
+          })()}
 
           {/* Body Twin Link */}
           {!bodyTwin && !fitConfidence.bodyTwinUsed && (

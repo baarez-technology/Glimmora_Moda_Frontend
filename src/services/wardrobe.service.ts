@@ -43,8 +43,6 @@ export interface GapMatchedProduct {
   sku: string;
   status: string;
   price: number;
-  offer_price: number;
-  discount_percentage: number;
   sizes: string[];
   collection_name: string;
   product_category: string;

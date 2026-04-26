@@ -234,7 +234,17 @@ export async function brandChangePassword(payload: {
   return res.json();
 }
 
-export function brandLogout(): void {
+export async function brandLogout(): Promise<void> {
+  const token = localStorage.getItem('moda-brand-token');
+  const refreshToken = localStorage.getItem('moda-brand-refresh-token');
+  // Fire-and-forget: blacklist tokens on server, then clear locally regardless
+  if (token) {
+    fetchWithTimeout('/api/v1/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).catch(() => {});
+  }
   localStorage.removeItem('moda-brand-token');
   localStorage.removeItem('moda-brand-refresh-token');
   localStorage.removeItem('moda-brand-data');
@@ -379,7 +389,17 @@ export function getStoredUserToken(): string | null {
   }
 }
 
-export function userLogout(): void {
+export async function userLogout(): Promise<void> {
+  const token = localStorage.getItem('moda-user-token');
+  const refreshToken = localStorage.getItem('moda-user-refresh-token');
+  // Fire-and-forget: blacklist tokens on server, then clear locally regardless
+  if (token) {
+    fetchWithTimeout('/api/v1/user/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    }).catch(() => {});
+  }
   localStorage.removeItem('moda-user-token');
   localStorage.removeItem('moda-user-refresh-token');
   localStorage.removeItem('moda-user-data');

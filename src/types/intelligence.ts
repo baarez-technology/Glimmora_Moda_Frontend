@@ -70,6 +70,13 @@ export interface FitConfidence {
     shoulderAlignment: string | null;
     sleeveLengthEstimate: string | null;
   };
+  confidenceInterval?: {
+    sizeRange: string;
+    lowerBoundPercent: number;
+    upperBoundPercent: number;
+    lowConfidenceFlag: boolean;
+    explanation: string;
+  };
   sizeNotes: string[];
   returnRisk: 'low' | 'medium' | 'high';
   returnRiskScore: number;

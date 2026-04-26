@@ -74,8 +74,6 @@ export interface BackendProduct {
   collection_name: string;
   sku: string;
   price: number;
-  offer_price: number;
-  discount_percentage: number;
   product_image: string | null;
   product_images?: string[];
   sizes: string[];
@@ -90,6 +88,21 @@ export interface BackendProduct {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // SOW 41P.3 — extended classification fields
+  iv_eligible: boolean;
+  commerce_eligible: boolean;
+  heritage_tags: string[];
+  craft_tags: string[];
+  editorial_narrative: string;
+  video_assets: string[];
+  motion_assets: string[];
+  // SOW 41P.4 — visibility & commerce control
+  visibility_scope: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
+  experience_mode: 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard';
+  pricing_visibility: 'visible' | 'hidden' | 'redacted';
+  commerce_action_type: 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
+  allowed_countries: string[] | null;
+  pricing_redacted: boolean;
 }
 
 // ─── Parsing Helpers ────────────────────────────────────────────────────────
@@ -261,6 +274,16 @@ export interface ProductCreatePayload {
   price: number;
   sizes?: string[];
   product_image?: string;
+  // SOW 41P.3
+  iv_eligible?: boolean;
+  commerce_eligible?: boolean;
+  heritage_tags?: string[];
+  craft_tags?: string[];
+  editorial_narrative?: string;
+  // SOW 41P.4
+  visibility_scope?: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
+  experience_mode?: 'commerce' | 'story_only' | 'experience_iv' | 'concierge';
+  commerce_action?: 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
 }
 
 export interface ProductUpdatePayload {
@@ -271,8 +294,6 @@ export interface ProductUpdatePayload {
   collection_name?: string;
   sku?: string;
   price?: number;
-  offer_price?: number;
-  discount_percentage?: number;
   sizes?: string[];
   product_image?: string;
   product_images?: string[];
@@ -282,6 +303,16 @@ export interface ProductUpdatePayload {
   is_low_stock?: boolean;
   performance_metrics?: Record<string, unknown>;
   ai_data?: Record<string, unknown>;
+  // SOW 41P.3
+  iv_eligible?: boolean;
+  commerce_eligible?: boolean;
+  heritage_tags?: string[];
+  craft_tags?: string[];
+  editorial_narrative?: string;
+  // SOW 41P.4
+  visibility_scope?: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
+  experience_mode?: 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard';
+  commerce_action_type?: 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
 }
 
 export interface RegionalStockAddPayload {

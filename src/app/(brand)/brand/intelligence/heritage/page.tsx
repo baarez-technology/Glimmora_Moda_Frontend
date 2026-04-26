@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Archive, Clock, Plus, X, Pencil, Trash2 } from 'lucide-react';
+import { Archive, Clock, Plus, X, Pencil, Trash2, Info } from 'lucide-react';
 import { brandIntelligenceService } from '@/services';
 import { createHeritageAsset, updateHeritageAsset, deleteHeritageAsset } from '@/services/brand-intelligence.service';
 import type { HeritageAsset, DigitalStatus } from '@/types/brand-intelligence';
@@ -119,7 +119,7 @@ export default function HeritagePage() {
   return (
     <IntelligencePageWrapper
       title="Heritage Preservation AI"
-      subtitle="Catalog, preserve, and digitize brand heritage assets with AI assistance"
+      subtitle="Catalog, preserve, and digitize brand heritage assets"
       acronym="HPAI™"
       isLoading={isLoading}
     >
@@ -137,6 +137,10 @@ export default function HeritagePage() {
           <div className="bg-white border border-sand/50 p-6">
             <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Avg Preservation Score</p>
             <p className="font-display text-2xl text-charcoal-deep">{avgPreservation}</p>
+            <div className="flex items-center gap-1 mt-1">
+              <Info size={10} className="text-amber-500 flex-shrink-0" />
+              <p className="text-[10px] text-amber-600">Heuristic estimate</p>
+            </div>
           </div>
           <div className="bg-white border border-sand/50 p-6">
             <p className="text-[10px] tracking-[0.15em] uppercase text-stone mb-1">Digitization Complete</p>
