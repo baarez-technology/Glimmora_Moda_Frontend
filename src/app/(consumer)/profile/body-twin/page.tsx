@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, User, Check, ChevronRight, ChevronLeft, Shield, Save, Pencil, Plus, Ruler, Shirt, Move, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Check, ChevronRight, ChevronLeft, Shield, Save, Pencil, Plus, Ruler, Shirt, Move, Loader2, AlertCircle } from 'lucide-react';
 import { getDigitalBodyTwin, createDigitalBodyTwin, updateDigitalBodyTwin } from '@/services/digital-body-twin.service';
 import { useApp } from '@/context/AppContext';
 import type { DigitalBodyTwin } from '@/types';
@@ -43,8 +43,26 @@ function BodyTwinView({ bodyTwin, onEdit }: { bodyTwin: DigitalBodyTwin; onEdit:
   const m = bodyTwin.measurements;
   const hasMeasurements = m && Object.values(m).some(v => v !== undefined && v !== null);
 
+  const daysSinceUpdate = bodyTwin.updatedAt
+    ? Math.floor((Date.now() - new Date(bodyTwin.updatedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const isStale = daysSinceUpdate !== null && daysSinceUpdate > 90;
+
   return (
     <div className="space-y-8">
+      {/* Staleness warning */}
+      {isStale && (
+        <div className="flex items-start gap-2 p-4 bg-amber-50 border border-amber-200">
+          <AlertCircle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-xs font-medium text-amber-800">Measurements may be outdated</p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Last updated {daysSinceUpdate} days ago. Update your measurements for accurate fit recommendations.
+            </p>
+            <button onClick={onEdit} className="text-xs text-amber-800 underline mt-1">Update now</button>
+          </div>
+        </div>
+      )}
       {/* Silhouette & General Fit */}
       <div className="bg-white p-8 lg:p-10">
         <div className="flex items-center gap-3 mb-6">

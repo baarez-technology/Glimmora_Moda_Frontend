@@ -89,6 +89,12 @@ export default function ProductActions({
   const selectionIncomplete = needsSize || needsColor;
   const canSetPriceAlert = pricingTier === 'preferred' || pricingTier === 'uhni';
 
+  // SOW 41P.4 — commerce_action / experience_mode enforcement
+  const isCommerceEligible = product.commerceEligible !== false;
+  const isBespokeOnly = product.experienceMode === 'bespoke_only';
+  const isRequestAccess = product.commerceAction === 'request_access';
+  const showCartButton = isCommerceEligible && !isBespokeOnly && product.commerceAction !== 'add_to_considerations';
+
   return (
     <>
       {/* IV™ Button - See How It Looks */}
@@ -148,7 +154,26 @@ export default function ProductActions({
 
       {/* Main Actions */}
       <div className="space-y-4">
+        {/* Bespoke-only / not commerce-eligible state */}
+        {(isBespokeOnly || !isCommerceEligible) && (
+          <div className="p-4 bg-parchment border border-sand/50 text-center">
+            <p className="text-xs text-stone mb-3">
+              {isBespokeOnly
+                ? 'This piece is available through bespoke consultation only.'
+                : 'This piece is not available for direct purchase.'}
+            </p>
+            <button
+              onClick={onShowConcierge}
+              className="w-full py-4 px-6 bg-charcoal-deep text-ivory-cream flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-warm"
+            >
+              <MessageCircle size={16} />
+              <span className="text-sm tracking-[0.15em] uppercase">Enquire via Concierge</span>
+            </button>
+          </div>
+        )}
+
         {/* Add to Considerations + Add to Cart — side by side */}
+        {isCommerceEligible && !isBespokeOnly && (
         <div className="flex gap-3">
           {inConsiderations ? (
             <button
@@ -170,26 +195,31 @@ export default function ProductActions({
             </button>
           )}
 
-          {inCart ? (
-            <button
-              disabled
-              className="group flex-1 py-4 px-4 bg-gold-muted/10 border border-gold-muted/30 text-gold-deep flex items-center justify-center gap-2"
-            >
-              <Check size={16} />
-              <span className="text-sm tracking-[0.1em] uppercase">In Cart</span>
-            </button>
-          ) : (
-            <button
-              onClick={onAddToCart}
-              disabled={selectionIncomplete}
-              className="group flex-1 py-4 px-4 border-2 border-charcoal-deep text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-deep hover:text-ivory-cream disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-charcoal-deep"
-              title={selectionIncomplete ? 'Please select size and color first' : ''}
-            >
-              <ShoppingBag size={16} />
-              <span className="text-sm tracking-[0.1em] uppercase">Add to Cart</span>
-            </button>
+          {showCartButton && (
+            inCart ? (
+              <button
+                disabled
+                className="group flex-1 py-4 px-4 bg-gold-muted/10 border border-gold-muted/30 text-gold-deep flex items-center justify-center gap-2"
+              >
+                <Check size={16} />
+                <span className="text-sm tracking-[0.1em] uppercase">In Cart</span>
+              </button>
+            ) : (
+              <button
+                onClick={isRequestAccess ? onShowConcierge : onAddToCart}
+                disabled={selectionIncomplete && !isRequestAccess}
+                className="group flex-1 py-4 px-4 border-2 border-charcoal-deep text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-deep hover:text-ivory-cream disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-charcoal-deep"
+                title={selectionIncomplete && !isRequestAccess ? 'Please select size and color first' : ''}
+              >
+                <ShoppingBag size={16} />
+                <span className="text-sm tracking-[0.1em] uppercase">
+                  {isRequestAccess ? 'Request Access' : 'Add to Cart'}
+                </span>
+              </button>
+            )
           )}
         </div>
+        )}
 
         {/* Helper text when selection is incomplete */}
         {selectionIncomplete && !inConsiderations && !inCart && (

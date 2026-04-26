@@ -171,12 +171,20 @@ export async function apiRequest<T>(
       };
     }
 
-    // Real API mode
-    const response = await fetch(buildUrl(endpoint, params), {
-      method,
-      headers: buildHeaders(),
-      body: body ? JSON.stringify(body) : undefined,
-    });
+    // Real API mode — 10s timeout via AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10_000);
+    let response: Response;
+    try {
+      response = await fetch(buildUrl(endpoint, params), {
+        method,
+        headers: buildHeaders(),
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       if (response.status === 401 && typeof window !== 'undefined') {
