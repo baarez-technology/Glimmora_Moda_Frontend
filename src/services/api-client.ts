@@ -107,6 +107,18 @@ export function getApiConfig(): Readonly<ApiClientConfig> {
 }
 
 // ============================================
+// Request Deduplication
+// ============================================
+
+// Tracks in-flight GET requests by cache key so concurrent identical calls share one fetch
+const pendingRequests = new Map<string, Promise<ApiResponse<unknown>>>();
+
+function getDedupeKey(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
+  const sorted = params ? Object.entries(params).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join('&') : '';
+  return `${endpoint}?${sorted}`;
+}
+
+// ============================================
 // Internal Helpers
 // ============================================
 
@@ -160,18 +172,43 @@ export async function apiRequest<T>(
 ): Promise<ApiResponse<T>> {
   const { method = 'GET', body, params, mockHandler } = options;
 
-  try {
-    if (config.mode === 'mock') {
-      await simulateDelay();
-      const data = await mockHandler();
-      return {
-        data,
-        success: true,
-        timestamp: new Date().toISOString(),
-      };
+  if (config.mode === 'mock') {
+    await simulateDelay();
+    const data = await mockHandler();
+    return {
+      data,
+      success: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  // Deduplicate concurrent identical GET requests
+  if (method === 'GET') {
+    const key = getDedupeKey(endpoint, params);
+    const existing = pendingRequests.get(key);
+    if (existing) return existing as Promise<ApiResponse<T>>;
+    const promise = executeRequest<T>(endpoint, method, body, params).finally(() => pendingRequests.delete(key));
+    pendingRequests.set(key, promise as Promise<ApiResponse<unknown>>);
+    return promise;
+  }
+
+  return executeRequest<T>(endpoint, method, body, params);
+}
+
+async function executeRequest<T>(
+  endpoint: string,
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  body: unknown,
+  params: Record<string, string | number | boolean | undefined> | undefined,
+): Promise<ApiResponse<T>> {
+  const maxAttempts = method === 'GET' ? 3 : 1;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise(resolve => setTimeout(resolve, 300 * 2 ** (attempt - 1)));
     }
 
-    // Real API mode — 10s timeout via AbortController
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10_000);
     let response: Response;
@@ -182,8 +219,17 @@ export async function apiRequest<T>(
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      lastError = fetchErr;
+      continue;
     } finally {
       clearTimeout(timeoutId);
+    }
+
+    if (response.status >= 500 && attempt < maxAttempts - 1) {
+      lastError = new ApiError('SERVER_ERROR', `Server error ${response.status}`, response.status);
+      continue;
     }
 
     if (!response.ok) {
@@ -194,12 +240,14 @@ export async function apiRequest<T>(
         }
       }
       const errorBody = await response.json().catch(() => ({}));
-      throw new ApiError(
+      const err = new ApiError(
         errorBody.code || 'HTTP_ERROR',
         errorBody.message || `Request failed with status ${response.status}`,
         response.status,
         errorBody.details
       );
+      config.onError?.(err);
+      throw err;
     }
 
     const responseData = await response.json();
@@ -208,18 +256,13 @@ export async function apiRequest<T>(
       success: true,
       timestamp: new Date().toISOString(),
     };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      config.onError?.(error);
-      throw error;
-    }
-    const apiError = new ApiError(
-      'NETWORK_ERROR',
-      error instanceof Error ? error.message : 'An unexpected error occurred'
-    );
-    config.onError?.(apiError);
-    throw apiError;
   }
+
+  const finalError = lastError instanceof ApiError
+    ? lastError
+    : new ApiError('NETWORK_ERROR', lastError instanceof Error ? lastError.message : 'Request failed after retries');
+  config.onError?.(finalError);
+  throw finalError;
 }
 
 // ============================================

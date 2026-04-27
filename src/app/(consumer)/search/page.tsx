@@ -13,6 +13,16 @@ import type { Product, Brand, BrandStory, Collection } from '@/types';
 
 type SearchTab = 'all' | 'products' | 'brands' | 'stories' | 'collections';
 
+function logSearchClick(query: string, productId: string, position: number) {
+  try {
+    fetch('/api/v1/search/signal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, product_id: productId, position, action: 'click' }),
+    }).catch(() => undefined);
+  } catch { /* fire-and-forget — never block navigation */ }
+}
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -380,6 +390,7 @@ function SearchContent() {
                                 className="group"
                                 onMouseEnter={() => setActiveHover(index)}
                                 onMouseLeave={() => setActiveHover(null)}
+                                onClick={() => logSearchClick(query, product.id, index)}
                               >
                                 <div className="relative aspect-[3/4] overflow-hidden bg-parchment mb-5">
                                   <Image

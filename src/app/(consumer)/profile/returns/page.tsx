@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, Package, RotateCcw, X } from 'lucide-react';
+import { ArrowLeft, Package, RotateCcw, X, Ruler } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useApp } from '@/context/AppContext';
 import { getMyReturnOrders, deleteReturnOrder, type ApiReturnOrder } from '@/services/return-order.service';
@@ -82,6 +82,7 @@ export default function ConsumerReturnsPage() {
 
   const pending = returns.filter(r => r.status === 'pending');
   const resolved = returns.filter(r => r.status !== 'pending');
+  const hasWrongSizeReturn = returns.some(r => r.reason_for_return === 'wrong_size');
 
   return (
     <div className="min-h-screen bg-ivory-cream">
@@ -117,6 +118,24 @@ export default function ConsumerReturnsPage() {
                 <div className="h-3 bg-sand/20 rounded w-48" />
               </div>
             ))}
+          </div>
+        )}
+
+        {!isLoading && hasWrongSizeReturn && (
+          <div className="mb-6 bg-amber-50 border border-amber-200 p-5 flex items-start gap-4">
+            <Ruler size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800 mb-1">You returned an item due to wrong size</p>
+              <p className="text-sm text-amber-700 mb-3">
+                Updating your body measurements helps our fit recommendations improve for future orders.
+              </p>
+              <Link
+                href="/profile/body-twin"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-700 text-white text-xs tracking-[0.1em] uppercase hover:bg-amber-800 transition-colors"
+              >
+                Update Measurements
+              </Link>
+            </div>
           </div>
         )}
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut, User, Crown, AlertTriangle, Sun, Moon, Monitor, Search, ChevronDown, Smartphone } from 'lucide-react';
+import { ArrowLeft, Bell, Lock, Globe, Trash2, Shield, LogOut, User, Crown, AlertTriangle, Search, ChevronDown, Smartphone } from 'lucide-react';
 import Image from 'next/image';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -108,7 +108,6 @@ export default function SettingsPage() {
   const [showDeleteFinal, setShowDeleteFinal] = useState(false);
   const [language, setLanguage] = useState('en');
   const [currency, setCurrency] = useState('EUR');
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
   const [langSearch, setLangSearch] = useState('');
   const [currencySearch, setCurrencySearch] = useState('');
   const [showLangDropdown, setShowLangDropdown] = useState(false);
@@ -137,10 +136,8 @@ export default function SettingsPage() {
       try {
         const savedLang = localStorage.getItem('moda-language');
         const savedCurrency = localStorage.getItem('moda-currency');
-        const savedTheme = localStorage.getItem('moda-theme') as 'light' | 'dark' | 'system' | null;
         if (savedLang) setLanguage(savedLang);
         if (savedCurrency) setCurrency(savedCurrency);
-        if (savedTheme) setTheme(savedTheme);
       } catch { /* ignore */ }
     }
   }, [isHydrated, isAuthenticated]);
@@ -287,17 +284,6 @@ export default function SettingsPage() {
     } finally {
       setTwoFALoading(false);
     }
-  };
-
-  const handleThemeChange = (newTheme: 'light' | 'dark' | 'system') => {
-    setTheme(newTheme);
-    localStorage.setItem('moda-theme', newTheme);
-    if (newTheme === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', newTheme);
-    }
-    showToast(`Theme set to ${newTheme}`, 'success');
   };
 
   const clearAllUserData = () => {
@@ -840,41 +826,10 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Appearance */}
-        <div className="bg-white p-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
-              <Sun size={18} className="text-charcoal-deep" />
-            </div>
-            <div>
-              <h2 className="font-display text-xl text-charcoal-deep">Appearance</h2>
-              <p className="text-sm text-stone">Choose your preferred theme</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {([
-              { value: 'light' as const, label: 'Light', icon: Sun },
-              { value: 'dark' as const, label: 'Dark', icon: Moon },
-              { value: 'system' as const, label: 'System', icon: Monitor },
-            ]).map((option) => (
-              <button
-                key={option.value}
-                onClick={() => handleThemeChange(option.value)}
-                className={`flex flex-col items-center gap-3 p-6 border-2 transition-all ${
-                  theme === option.value
-                    ? 'border-charcoal-deep bg-parchment'
-                    : 'border-sand hover:border-charcoal-deep'
-                }`}
-              >
-                <option.icon size={24} className={theme === option.value ? 'text-charcoal-deep' : 'text-stone'} />
-                <span className={`text-sm ${theme === option.value ? 'text-charcoal-deep font-medium' : 'text-stone'}`}>
-                  {option.label}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Appearance — commented out until dark mode is implemented */}
+        {/* <div className="bg-white p-8">
+          ...theme selector...
+        </div> */}
 
         {/* Sign Out */}
         <div className="bg-white p-8">

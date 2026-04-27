@@ -7,14 +7,17 @@ import { ArrowLeft, Crown, Star, Gift, TrendingUp, Lock, Check } from 'lucide-re
 import { useApp } from '@/context/AppContext';
 import { getCurrencySymbol } from '@/lib/currency';
 import { useAuth } from '@/context/AuthContext';
+import * as loyaltyService from '@/services/loyalty.service';
 
 export default function LoyaltyPage() {
   const router = useRouter();
   const { isAuthenticated, isHydrated } = useAuth();
-  const { userTier, orders, showToast, currency } = useApp();
+  const { userTier: contextTier, showToast, currency } = useApp();
   const [isLoaded, setIsLoaded] = useState(false);
   const [redeemedRewards, setRedeemedRewards] = useState<string[]>([]);
   const [spentPoints, setSpentPoints] = useState(0);
+  const [serverLoyalty, setServerLoyalty] = useState<loyaltyService.LoyaltyResponse | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -23,15 +26,22 @@ export default function LoyaltyPage() {
   }, [isAuthenticated, isHydrated, router]);
 
   useEffect(() => {
-    if (isHydrated && isAuthenticated) {
-      setIsLoaded(true);
-      try {
-        const savedRedeemed = localStorage.getItem('moda-redeemed-rewards');
-        const savedSpent = localStorage.getItem('moda-spent-points');
-        if (savedRedeemed) setRedeemedRewards(JSON.parse(savedRedeemed));
-        if (savedSpent) setSpentPoints(parseInt(savedSpent, 10) || 0);
-      } catch { /* ignore */ }
-    }
+    if (!isHydrated || !isAuthenticated) return;
+    setIsLoaded(true);
+    let cancelled = false;
+    loyaltyService.getLoyalty()
+      .then(data => {
+        if (cancelled) return;
+        setServerLoyalty(data);
+        setRedeemedRewards(data.redeemedRewards || []);
+        setSpentPoints(data.spentPoints || 0);
+        setLoadError(null);
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setLoadError(err instanceof Error ? err.message : 'Failed to load loyalty data');
+      });
+    return () => { cancelled = true; };
   }, [isHydrated, isAuthenticated]);
 
   const tierInfo = useMemo(() => {
@@ -64,29 +74,43 @@ export default function LoyaltyPage() {
         nextThreshold: null,
       }
     };
-    return tiers[userTier as keyof typeof tiers] || tiers.standard;
-  }, [userTier]);
+    const activeTier = serverLoyalty?.tier || contextTier;
+    return tiers[activeTier as keyof typeof tiers] || tiers.standard;
+  }, [contextTier, serverLoyalty]);
 
-  // Calculate points from orders
-  const totalSpent = useMemo(() => {
-    return orders.reduce((sum, order) => sum + (order.total || 0), 0);
-  }, [orders]);
-
-  const earnedPoints = Math.round(totalSpent * tierInfo.pointsMultiplier);
-  const points = earnedPoints - spentPoints;
+  const totalSpent = serverLoyalty?.totalSpent ?? 0;
+  const earnedPoints = serverLoyalty?.earnedPoints ?? Math.round(totalSpent * tierInfo.pointsMultiplier);
+  const points = serverLoyalty?.availablePoints ?? (earnedPoints - spentPoints);
   const progressToNext = tierInfo.nextThreshold
     ? Math.min(100, Math.round((totalSpent / tierInfo.nextThreshold) * 100))
     : 100;
 
-  const handleRedeem = (rewardName: string, rewardPoints: number) => {
+  // Reward catalog mirrors backend `_REWARD_CATALOGUE` in app/routes/loyalty.py
+  const rewardIdMap: Record<string, string> = {
+    '10% Off Next Purchase': 'reward_10_percent_off',
+    'Free Express Shipping': 'reward_free_shipping',
+    'Priority VIP Support': 'reward_priority_support',
+    'Concierge Styling Call': 'reward_concierge_call',
+  };
+
+  const handleRedeem = async (rewardName: string, rewardPoints: number) => {
     if (points < rewardPoints) return;
-    const newSpent = spentPoints + rewardPoints;
-    const newRedeemed = [...redeemedRewards, rewardName];
-    setSpentPoints(newSpent);
-    setRedeemedRewards(newRedeemed);
-    localStorage.setItem('moda-spent-points', String(newSpent));
-    localStorage.setItem('moda-redeemed-rewards', JSON.stringify(newRedeemed));
-    showToast(`Redeemed: ${rewardName}`, 'success');
+    const rewardId = rewardIdMap[rewardName];
+    if (!rewardId) {
+      showToast('Reward unavailable', 'error');
+      return;
+    }
+    try {
+      const result = await loyaltyService.redeemReward(rewardId);
+      setRedeemedRewards(result.redeemedRewards);
+      setSpentPoints((serverLoyalty?.earnedPoints ?? earnedPoints) - result.remainingPoints);
+      // Refresh full snapshot so derived totals stay correct.
+      const fresh = await loyaltyService.getLoyalty().catch(() => null);
+      if (fresh) setServerLoyalty(fresh);
+      showToast(`Redeemed: ${rewardName}`, 'success');
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Redemption failed', 'error');
+    }
   };
 
   const TierIcon = tierInfo.icon;
@@ -111,12 +135,20 @@ export default function LoyaltyPage() {
   const rewards = [
     { name: '10% Off Next Purchase', points: 500, available: points >= 500 },
     { name: 'Free Express Shipping', points: 250, available: points >= 250 },
-    { name: 'Exclusive Preview Access', points: 1000, available: points >= 1000 },
-    { name: 'Private Styling Session', points: 2500, available: points >= 2500 },
+    { name: 'Priority VIP Support', points: 1000, available: points >= 1000 },
+    { name: 'Concierge Styling Call', points: 2500, available: points >= 2500 },
   ];
 
   return (
     <div className="min-h-screen bg-ivory-cream">
+      {loadError && (
+        <div className="bg-amber-50 border-b border-amber-200 px-8 py-3">
+          <div className="max-w-[1200px] mx-auto flex items-start gap-3">
+            <span className="text-amber-600 text-sm mt-0.5">⚠</span>
+            <p className="text-amber-800 text-sm">{loadError}</p>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="bg-charcoal-deep">
         <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
@@ -240,7 +272,7 @@ export default function LoyaltyPage() {
           </div>
           <div className="space-y-6">
             {benefits.map(tier => {
-              const isCurrentTier = tier.tier === userTier;
+              const isCurrentTier = tier.tier === (serverLoyalty?.tier || contextTier);
               return (
                 <div key={tier.tier} className={`p-4 ${isCurrentTier ? 'bg-gold-soft/5 border border-gold-soft/20' : 'bg-parchment/50'}`}>
                   <p className={`text-sm font-medium mb-3 capitalize ${isCurrentTier ? 'text-gold-deep' : 'text-charcoal-deep'}`}>

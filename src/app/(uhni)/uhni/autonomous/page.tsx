@@ -138,6 +138,15 @@ export default function AutonomousCommercePage() {
 
   return (
     <div className="min-h-screen bg-ivory-cream">
+      {/* Autonomous backend not yet live — settings save locally but orders do not execute */}
+      <div className="bg-amber-50 border-b border-amber-200 px-8 py-3">
+        <div className="max-w-[1200px] mx-auto flex items-start gap-3">
+          <span className="text-amber-600 text-sm mt-0.5">⚠</span>
+          <p className="text-amber-800 text-sm">
+            <strong>Autonomous purchasing is not yet live.</strong> You can configure your settings, but the AI agent backend required to execute automatic purchases is under development. No orders will be placed automatically until this feature launches.
+          </p>
+        </div>
+      </div>
       {/* Header */}
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">

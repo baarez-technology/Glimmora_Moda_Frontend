@@ -131,11 +131,17 @@ export async function getOrderById(orderId: string): Promise<CustomerOrder> {
   return res.json();
 }
 
-/** POST /api/v1/customer/orders — place a new order */
-export async function createOrder(payload: CreateOrderPayload): Promise<CustomerOrder> {
+/** POST /api/v1/customer/orders — place a new order. Pass idempotencyKey
+ *  to dedupe network retries (backend honors `Idempotency-Key` for 24h). */
+export async function createOrder(
+  payload: CreateOrderPayload,
+  idempotencyKey?: string,
+): Promise<CustomerOrder> {
+  const headers = authHeaders();
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
   const res = await fetchWithTimeout(`/api/v1/customer/orders`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers,
     body: JSON.stringify(payload),
   });
 

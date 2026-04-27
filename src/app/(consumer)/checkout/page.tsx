@@ -30,6 +30,14 @@ export default function CheckoutPage() {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [orderAttempted, setOrderAttempted] = useState(false);
   const [showInvoice, setShowInvoice] = useState(false);
+  // Stable idempotency key per checkout session — reused on retry so backend
+  // dedupes duplicate POSTs from network retries / double-click.
+  const [idempotencyKey, setIdempotencyKey] = useState<string>('');
+  useEffect(() => {
+    if (!idempotencyKey && typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      setIdempotencyKey(crypto.randomUUID());
+    }
+  }, [idempotencyKey]);
 
   // Saved addresses
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddress[]>([]);
@@ -198,9 +206,14 @@ export default function CheckoutPage() {
         payment_currency: currency,
       };
 
-      const createdOrder = await orderManagementService.createOrder(payload);
+      const key = idempotencyKey || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined);
+      const createdOrder = await orderManagementService.createOrder(payload, key);
       setPlacedOrder(createdOrder);
       setOrderItems([...considerations]);
+      // Rotate key after success so next checkout gets a fresh one.
+      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        setIdempotencyKey(crypto.randomUUID());
+      }
 
       // Clear cart/considerations
       if (hasCartItems) {
