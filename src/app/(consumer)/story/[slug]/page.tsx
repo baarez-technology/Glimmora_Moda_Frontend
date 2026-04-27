@@ -339,9 +339,14 @@ export default function StoryPage({ params }: StoryPageProps) {
                     <h3 className="font-display text-lg text-charcoal-deep leading-tight group-hover:text-charcoal-warm transition-colors">
                       {product.name}
                     </h3>
-                    <p className="text-sm text-stone">
-                      {formatPrice(product.price)}
-                    </p>
+                    {/* Only show price/commerce for standard commerce-eligible products */}
+                    {product.experienceMode === 'standard' && product.commerceEligible ? (
+                      <p className="text-sm text-stone">{formatPrice(product.price)}</p>
+                    ) : product.experienceMode === 'bespoke_only' ? (
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Bespoke — Enquire via Concierge</p>
+                    ) : (
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe">Story Experience</p>
+                    )}
                   </div>
                 </Link>
               ))}

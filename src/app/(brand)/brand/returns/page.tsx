@@ -65,6 +65,13 @@ export default function BrandReturnsPage() {
 
   const pendingCount = returns.filter(r => r.status === 'pending').length;
 
+  // Reason breakdown for analytics
+  const reasonCounts = returns.reduce<Record<string, number>>((acc, r) => {
+    const key = r.reason_for_return || 'other';
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
   return (
     <div>
       <BrandPageHeader
@@ -73,6 +80,29 @@ export default function BrandReturnsPage() {
       />
 
       <div className="p-8 space-y-6">
+
+        {/* Return reason breakdown */}
+        {!loading && returns.length > 0 && (
+          <div className="bg-white border border-sand/50 p-6">
+            <h3 className="text-[10px] tracking-[0.2em] uppercase text-stone mb-4">Return Reasons Breakdown</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(reasonCounts).sort(([, a], [, b]) => b - a).map(([reason, count]) => (
+                <div key={reason} className="bg-parchment p-4">
+                  <p className="font-display text-2xl text-charcoal-deep mb-1">{count}</p>
+                  <p className="text-xs text-stone">{REASON_LABELS[reason] || reason}</p>
+                  <div className="mt-2 h-1 bg-sand/40">
+                    <div className="h-full bg-charcoal-deep" style={{ width: `${Math.round((count / returns.length) * 100)}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {reasonCounts['wrong_size'] > 0 && (
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-4 py-2 mt-4">
+                <strong>{reasonCounts['wrong_size']} wrong size returns</strong> — consider reviewing your size guide accuracy. Fit confidence data may be miscalibrated for affected products.
+              </p>
+            )}
+          </div>
+        )}
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit">
           {([

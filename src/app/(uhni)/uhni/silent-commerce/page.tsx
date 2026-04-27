@@ -150,6 +150,15 @@ export default function SilentCommercePage() {
 
   return (
     <div className="min-h-screen bg-ivory-cream">
+      {/* Silent/Invisible commerce backend not yet live */}
+      <div className="bg-amber-50 border-b border-amber-200 px-8 py-3">
+        <div className="max-w-[1200px] mx-auto flex items-start gap-3">
+          <span className="text-amber-600 text-sm mt-0.5">⚠</span>
+          <p className="text-amber-800 text-sm">
+            <strong>Silent Commerce is under development.</strong> Ambient product discovery and discreet autonomous transactions require backend AI services that are not yet live. Items shown are illustrative.
+          </p>
+        </div>
+      </div>
       {/* Header */}
       <div className="bg-charcoal-deep">
         <div className="max-w-[1200px] mx-auto px-8 md:px-16 lg:px-24 py-12">

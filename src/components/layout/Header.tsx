@@ -172,7 +172,7 @@ export default function Header() {
                     <div className="space-y-3">
                       {brands.map((brand) => (
                         <Link
-                          key={brand.id}
+                          key={brand.id || brand.slug || brand.name}
                           href={`/brand/${brand.slug}?brandId=${brand.id}`}
                           role="menuitem"
                           className="block text-charcoal-deep hover:text-gold-muted transition-colors"
@@ -259,9 +259,9 @@ export default function Header() {
                           <p className="text-xs text-stone">No notifications yet</p>
                         </div>
                       ) : (
-                        notifications.map(n => (
+                        notifications.map((n, i) => (
                           <div
-                            key={n.id}
+                            key={n.id || n.created_at || i}
                             onClick={() => !n.is_read && markNotifRead(n.id)}
                             className={`px-4 py-3 border-b border-sand/20 last:border-0 hover:bg-parchment/50 cursor-pointer ${n.is_read ? '' : 'bg-parchment/30'}`}
                           >
@@ -395,7 +395,7 @@ export default function Header() {
                 <div className="space-y-3 pl-4">
                   {brands.map((brand) => (
                     <Link
-                      key={brand.id}
+                      key={brand.id || brand.slug || brand.name}
                       href={`/brand/${brand.slug}?brandId=${brand.id}`}
                       className="block font-display text-xl text-charcoal-deep"
                       onClick={() => setIsMenuOpen(false)}

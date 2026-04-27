@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, ArrowRight, Crown, Bell, Star, Clock, Calendar, MapPin, Users, ChevronRight, Settings, Check, X, Sparkles, Award, Lock, Unlock } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
+import * as vipService from '@/services/vip-alerts.service';
 
 interface VIPAlert {
   id: string;
@@ -123,14 +124,37 @@ export default function VIPAccessPage() {
   const [filter, setFilter] = useState<'all' | 'product_launch' | 'private_sale' | 'event'>('all');
   const [alerts, setAlerts] = useState<VIPAlert[]>([]);
 
-  // Load persisted read/dismiss state on mount
+  // Load alerts from backend; fall back to local defaults on error so the
+  // page is still usable when the API is unavailable.
   useEffect(() => {
-    const { readIds, dismissedIds } = loadVIPState();
-    const hydrated = defaultAlerts
-      .filter(a => !dismissedIds.includes(a.id))
-      .map(a => ({ ...a, read: a.read || readIds.includes(a.id) }));
-    setAlerts(hydrated);
-    setIsLoaded(true);
+    let cancelled = false;
+    vipService.listVipAlerts()
+      .then(serverAlerts => {
+        if (cancelled) return;
+        if (serverAlerts && serverAlerts.length > 0) {
+          setAlerts(serverAlerts as VIPAlert[]);
+        } else {
+          // Empty backend — keep showing the local defaults during early rollout.
+          const { readIds, dismissedIds } = loadVIPState();
+          setAlerts(
+            defaultAlerts
+              .filter(a => !dismissedIds.includes(a.id))
+              .map(a => ({ ...a, read: a.read || readIds.includes(a.id) })),
+          );
+        }
+        setIsLoaded(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const { readIds, dismissedIds } = loadVIPState();
+        setAlerts(
+          defaultAlerts
+            .filter(a => !dismissedIds.includes(a.id))
+            .map(a => ({ ...a, read: a.read || readIds.includes(a.id) })),
+        );
+        setIsLoaded(true);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   // Redirect non-UHNI users
@@ -152,21 +176,19 @@ export default function VIPAccessPage() {
   }
 
   const handleMarkAsRead = (id: string) => {
-    const updated = alerts.map(alert =>
-      alert.id === id ? { ...alert, read: true } : alert
-    );
-    setAlerts(updated);
+    setAlerts(alerts.map(a => a.id === id ? { ...a, read: true } : a));
     const state = loadVIPState();
     if (!state.readIds.includes(id)) state.readIds.push(id);
     saveVIPState(state.readIds, state.dismissedIds);
+    vipService.markRead(id).catch(() => { /* non-blocking */ });
   };
 
   const handleMarkAllAsRead = () => {
-    const updated = alerts.map(alert => ({ ...alert, read: true }));
-    setAlerts(updated);
+    setAlerts(alerts.map(a => ({ ...a, read: true })));
     const state = loadVIPState();
     const allIds = [...new Set([...state.readIds, ...alerts.map(a => a.id)])];
     saveVIPState(allIds, state.dismissedIds);
+    vipService.markAllRead().catch(() => { /* non-blocking */ });
     showToast('All alerts marked as read', 'success');
   };
 
@@ -175,6 +197,7 @@ export default function VIPAccessPage() {
     const state = loadVIPState();
     if (!state.dismissedIds.includes(id)) state.dismissedIds.push(id);
     saveVIPState(state.readIds, state.dismissedIds);
+    vipService.dismissAlert(id).catch(() => { /* non-blocking */ });
     showToast('Alert dismissed', 'success');
   };
 

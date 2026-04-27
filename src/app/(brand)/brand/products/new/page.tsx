@@ -21,6 +21,11 @@ export default function NewProductPage() {
   // Sizes state
   const [sizes, setSizes] = useState<string[]>([]);
   const [sizeInput, setSizeInput] = useState('');
+  // Materials state (SOW 41P.3 material_variants)
+  const [materials, setMaterials] = useState<string[]>([]);
+  const [materialInput, setMaterialInput] = useState('');
+  // Video assets (SOW 41P.3)
+  const [videoUrl, setVideoUrl] = useState('');
 
   useEffect(() => {
     fetchCollectionNames()
@@ -89,6 +94,15 @@ export default function NewProductPage() {
     }
   };
 
+  // ── Materials ───────────────────────────────────────────
+  const handleAddMaterial = () => {
+    const val = materialInput.trim();
+    if (!val || materials.includes(val)) return;
+    setMaterials(prev => [...prev, val]);
+    setMaterialInput('');
+    setIsDirty(true);
+  };
+
   const handleAddTag = (type: 'heritage_tags' | 'craft_tags', input: string, setInput: (v: string) => void) => {
     const val = input.trim().toLowerCase();
     if (!val || formData[type].includes(val)) return;
@@ -128,7 +142,9 @@ export default function NewProductPage() {
         tagline: formData.tagline,
         product_description: formData.product_description,
         ...(sizes.length > 0 ? { sizes } : {}),
+        ...(materials.length > 0 ? { material_variants: materials } : {}),
         ...(coverImage ? { product_image: coverImage } : {}),
+        ...(videoUrl.trim() ? { video_assets: [{ url: videoUrl.trim(), thumbnail: '', duration_seconds: 0 }] } : {}),
         iv_eligible: formData.iv_eligible,
         commerce_eligible: formData.commerce_eligible,
         heritage_tags: formData.heritage_tags,
@@ -319,6 +335,55 @@ export default function NewProductPage() {
                 ))}
               </div>
             )}
+          </section>
+
+          {/* Materials (SOW 41P.3 material_variants) */}
+          <section className="bg-white border border-sand/50 p-6 space-y-6 mt-8">
+            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+              Materials
+            </h2>
+            <div className="flex items-center gap-3">
+              <input
+                type="text"
+                value={materialInput}
+                onChange={e => setMaterialInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleAddMaterial())}
+                className="flex-1 px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                placeholder="e.g., Full-grain leather, Silk lining, Merino wool..."
+              />
+              <button type="button" onClick={handleAddMaterial} disabled={!materialInput.trim()}
+                className="inline-flex items-center gap-2 px-5 py-3 bg-charcoal-deep text-ivory-cream text-xs tracking-wider uppercase hover:bg-noir transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Plus size={14} /> Add
+              </button>
+            </div>
+            {materials.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {materials.map(mat => (
+                  <span key={mat} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-parchment border border-sand/50 text-sm text-charcoal-deep">
+                    {mat}
+                    <button type="button" onClick={() => { setMaterials(p => p.filter(m => m !== mat)); setIsDirty(true); }}
+                      className="text-taupe hover:text-error transition-colors">
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Video Assets (SOW 41P.3) */}
+          <section className="bg-white border border-sand/50 p-6 space-y-4 mt-8">
+            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
+              Video Asset
+            </h2>
+            <p className="text-xs text-stone">Paste a video URL (hosted on S3, Cloudinary, or CDN). Full upload pipeline coming soon.</p>
+            <input
+              type="url"
+              value={videoUrl}
+              onChange={e => { setVideoUrl(e.target.value); setIsDirty(true); }}
+              className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+              placeholder="https://cdn.example.com/product-video.mp4"
+            />
           </section>
 
           {/* Description */}

@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Bell, ShoppingBag, TrendingUp, Sparkles, Calendar, Tag } from 'lucide-react';
+import { ArrowLeft, Bell, ShoppingBag, TrendingUp, Sparkles, Calendar, Tag, BellRing } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { registerPushSubscription } from '@/services/push-notification.service';
 
 interface NotificationPrefs {
   orders: boolean;
@@ -44,6 +45,8 @@ export default function NotificationsPage() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultPrefs);
   const [isHydratedLocal, setIsHydratedLocal] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [pushRequesting, setPushRequesting] = useState(false);
 
   useEffect(() => {
     if (isHydrated && !isAuthenticated) {
@@ -60,7 +63,32 @@ export default function NotificationsPage() {
   useEffect(() => {
     setPrefs(loadPrefs());
     setIsHydratedLocal(true);
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushPermission(Notification.permission);
+    } else {
+      setPushPermission('unsupported');
+    }
   }, []);
+
+  const requestPushPermission = async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    setPushRequesting(true);
+    try {
+      const result = await Notification.requestPermission();
+      setPushPermission(result);
+      if (result === 'granted') {
+        const ok = await registerPushSubscription();
+        showToast(
+          ok ? 'Push notifications enabled' : 'Permission granted, but subscription failed',
+          ok ? 'success' : 'error',
+        );
+      } else {
+        showToast('Push notifications blocked — enable in browser settings', 'error');
+      }
+    } finally {
+      setPushRequesting(false);
+    }
+  };
 
   useEffect(() => {
     if (isHydratedLocal) {
@@ -130,6 +158,42 @@ export default function NotificationsPage() {
 
       {/* Content */}
       <div className={`max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12 space-y-8 transition-all duration-700 delay-200 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+
+        {/* Push notification permission */}
+        {pushPermission !== 'unsupported' && pushPermission !== 'granted' && (
+          <div className="bg-white p-6 border border-sand flex items-start gap-4">
+            <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center flex-shrink-0">
+              <BellRing size={18} className="text-charcoal-deep" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-charcoal-deep mb-1">Enable Browser Notifications</p>
+              <p className="text-sm text-stone mb-4">
+                Get real-time alerts for orders, restock, and exclusive events directly in your browser — even when you&apos;re not on the site.
+              </p>
+              {pushPermission === 'denied' ? (
+                <p className="text-xs text-error">
+                  Notifications are blocked in your browser settings. To enable, click the lock icon in your browser&apos;s address bar and allow notifications for this site.
+                </p>
+              ) : (
+                <button
+                  onClick={requestPushPermission}
+                  disabled={pushRequesting}
+                  className="px-5 py-2.5 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.1em] uppercase hover:bg-noir transition-colors disabled:opacity-50"
+                >
+                  {pushRequesting ? 'Requesting…' : 'Enable Push Notifications'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {pushPermission === 'granted' && (
+          <div className="bg-white p-4 border border-sand flex items-center gap-3">
+            <span className="text-success">✓</span>
+            <p className="text-sm text-charcoal-deep">Push notifications are enabled for this browser.</p>
+          </div>
+        )}
+
         <div className="bg-white p-8">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-charcoal-deep/5 flex items-center justify-center">
