@@ -20,6 +20,8 @@ import {
   resolveSecurityAlert,
   fetchGDPRRequests,
   processGDPRRequest,
+  fetchSecuritySummary,
+  type SecuritySummary,
 } from '@/services/admin.service';
 import type {
   AuditLogEntry,
@@ -126,6 +128,7 @@ export default function SecurityCompliancePage() {
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
   const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
   const [gdprRequests, setGDPRRequests] = useState<GDPRRequest[]>([]);
+  const [summary, setSummary] = useState<SecuritySummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -136,16 +139,18 @@ export default function SecurityCompliancePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [alertsRes, auditRes, gdprRes] = await Promise.all([
+      const [alertsRes, auditRes, gdprRes, summaryRes] = await Promise.all([
         fetchSecurityAlerts(),
         fetchAuditLog(
           auditActionFilter !== 'all' ? { action: auditActionFilter } : undefined
         ),
         fetchGDPRRequests(),
+        fetchSecuritySummary(),
       ]);
       if (alertsRes.data) setAlerts(alertsRes.data);
       if (auditRes.data) setAuditLog(auditRes.data);
       if (gdprRes.data) setGDPRRequests(gdprRes.data);
+      setSummary(summaryRes);
     } catch {
       // silent
     } finally {
@@ -213,6 +218,34 @@ export default function SecurityCompliancePage() {
       />
 
       <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
+        {/* Live Security Summary (24h) */}
+        {summary && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white border border-sand/50 rounded-lg p-5">
+              <p className="text-xs text-stone/60 uppercase tracking-wider">Failed OTP (24h)</p>
+              <p className="text-2xl font-semibold text-charcoal-deep mt-1">{summary.failedOtpAttempts24h}</p>
+            </div>
+            <div className="bg-white border border-sand/50 rounded-lg p-5">
+              <p className="text-xs text-stone/60 uppercase tracking-wider">Failed Logins (24h)</p>
+              <p className="text-2xl font-semibold text-charcoal-deep mt-1">{summary.failedLoginAttempts24h}</p>
+            </div>
+            <div className="bg-white border border-sand/50 rounded-lg p-5">
+              <p className="text-xs text-stone/60 uppercase tracking-wider">JWT Blacklist</p>
+              <p className="text-2xl font-semibold text-charcoal-deep mt-1">{summary.activeJwtBlacklist}</p>
+            </div>
+            <div className="bg-white border border-sand/50 rounded-lg p-5">
+              <p className="text-xs text-stone/60 uppercase tracking-wider">Suspicious IPs</p>
+              <p className="text-2xl font-semibold text-charcoal-deep mt-1">{summary.suspiciousIps.length}</p>
+              {summary.suspiciousIps.length > 0 && (
+                <p className="text-xs text-stone/50 font-mono mt-1 truncate" title={summary.suspiciousIps.join(', ')}>
+                  {summary.suspiciousIps.slice(0, 3).join(', ')}
+                  {summary.suspiciousIps.length > 3 ? '…' : ''}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Tabs */}
         <div className="bg-white border border-sand/50 rounded-lg p-1 inline-flex gap-1">
           {tabs.map((tab) => {

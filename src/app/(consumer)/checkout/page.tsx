@@ -304,7 +304,8 @@ export default function CheckoutPage() {
                 </p>
                 {placedOrder.payment_currency && placedOrder.payment_currency !== currency && (
                   <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2">
-                    Note: Your order was processed in <strong>{placedOrder.payment_currency}</strong>. Prices were displayed in <strong>{currency}</strong>.
+                    Note: Your order was processed in <strong>{placedOrder.payment_currency}</strong>. Prices were displayed in <strong>{placedOrder.display_currency || currency}</strong>
+                    {placedOrder.exchange_rate ? <> (rate {placedOrder.exchange_rate.toFixed(4)})</> : null}.
                   </p>
                 )}
               </div>
@@ -871,7 +872,7 @@ export default function CheckoutPage() {
                 Print
               </button>
               <button
-                onClick={downloadInvoice}
+                onClick={() => { void downloadInvoice(); }}
                 className="flex-1 px-6 py-3 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase flex items-center justify-center gap-2"
               >
                 <Download size={16} />

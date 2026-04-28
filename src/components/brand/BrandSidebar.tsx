@@ -20,7 +20,6 @@ import {
   Search,
   Clock,
   BookOpen,
-  Gift,
   Calendar,
   Brain,
   Activity,
@@ -87,7 +86,6 @@ const navigation: NavSection[] = [
     items: [
       { label: 'Heritage', href: '/brand/heritage', icon: Clock },
       { label: 'Stories', href: '/brand/stories', icon: BookOpen },
-      { label: 'UHNI Offers', href: '/brand/offers', icon: Gift }
     ]
   },
   {

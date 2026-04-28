@@ -48,10 +48,19 @@ export default function NewProductPage() {
     heritage_tags: [] as string[],
     craft_tags: [] as string[],
     editorial_narrative: '',
-    // SOW 41P.4
-    visibility_scope: 'public' as 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted',
-    experience_mode: 'commerce' as 'commerce' | 'story_only' | 'experience_iv' | 'concierge',
-    commerce_action: 'add_to_cart' as 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect',
+    // SOW 41P.4 — backend accepts both legacy and Section-1 spec vocab.
+    visibility_scope: 'public' as
+      | 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted'
+      | 'private' | 'invite_only',
+    experience_mode: 'commerce' as
+      | 'commerce' | 'story_only' | 'experience_iv' | 'concierge'
+      | 'standard' | 'iv_immersive' | 'bespoke_only',
+    pricing_visibility: 'visible' as
+      | 'visible' | 'hidden' | 'redacted'
+      | 'on_request' | 'private',
+    commerce_action: 'add_to_cart' as
+      | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect'
+      | 'add_to_considerations' | 'request_access' | 'direct_purchase',
   });
 
   const [heritageTagInput, setHeritageTagInput] = useState('');
@@ -152,6 +161,7 @@ export default function NewProductPage() {
         editorial_narrative: formData.editorial_narrative,
         visibility_scope: formData.visibility_scope,
         experience_mode: formData.experience_mode,
+        pricing_visibility: formData.pricing_visibility,
         commerce_action: formData.commerce_action,
       });
 
@@ -536,7 +546,9 @@ export default function NewProductPage() {
                 >
                   <option value="public">Public</option>
                   <option value="logged_in">Logged In Only</option>
+                  <option value="invite_only">Invite Only</option>
                   <option value="uhni_only">UHNI Only</option>
+                  <option value="private">Private</option>
                   <option value="geo_restricted">Geo Restricted</option>
                 </select>
               </div>
@@ -550,10 +562,30 @@ export default function NewProductPage() {
                   onChange={e => updateField('experience_mode', e.target.value as typeof formData.experience_mode)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
                 >
+                  <option value="standard">Standard</option>
                   <option value="commerce">Commerce</option>
                   <option value="story_only">Story Only</option>
                   <option value="experience_iv">Experience + IV</option>
+                  <option value="iv_immersive">IV Immersive</option>
+                  <option value="bespoke_only">Bespoke Only</option>
                   <option value="concierge">Concierge</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+                  Pricing Visibility
+                </label>
+                <select
+                  value={formData.pricing_visibility}
+                  onChange={e => updateField('pricing_visibility', e.target.value as typeof formData.pricing_visibility)}
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
+                >
+                  <option value="visible">Visible</option>
+                  <option value="hidden">Hidden</option>
+                  <option value="on_request">On Request</option>
+                  <option value="private">Private</option>
+                  <option value="redacted">Redacted</option>
                 </select>
               </div>
 
@@ -567,7 +599,10 @@ export default function NewProductPage() {
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
                 >
                   <option value="add_to_cart">Add to Cart</option>
+                  <option value="add_to_considerations">Add to Considerations</option>
                   <option value="request_to_buy">Request to Buy</option>
+                  <option value="request_access">Request Access</option>
+                  <option value="direct_purchase">Direct Purchase</option>
                   <option value="concierge">Concierge Handoff</option>
                   <option value="redirect">Redirect</option>
                 </select>

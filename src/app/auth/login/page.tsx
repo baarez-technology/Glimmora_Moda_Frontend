@@ -6,8 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2, Shield } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
-import { brandLogin, userLogin, storeUserAuth, socialSignIn, verify2FALogin, forgotPasswordRequest, forgotPasswordResend, forgotPasswordVerify, resetPassword } from '@/services/auth.service';
-import type { UserTokenResponse } from '@/services/auth.service';
+import { brandLogin, userLogin, storeUserAuth, socialSignIn, verify2FALogin, forgotPasswordRequest, forgotPasswordResend, forgotPasswordVerify, resetPassword, superadminLogin, superadminVerify2FALogin, storeSuperadminAuth } from '@/services/auth.service';
+import type { UserTokenResponse, SuperAdminLoginResponse } from '@/services/auth.service';
 import { signInWithGoogle, signInWithApple } from '@/lib/firebase';
 import { getAdminUser } from '@/data/admin';
 import { isRegistrationEnabled, isBrandOnboardingEnabled } from '@/lib/platform-config';
@@ -46,6 +46,7 @@ function LoginForm() {
   const [touched, setTouched] = useState({ email: false, password: false });
   // 2FA state
   const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFAMode, setTwoFAMode] = useState<'user' | 'superadmin'>('user');
   const [preAuthToken, setPreAuthToken] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [is2FAVerifying, setIs2FAVerifying] = useState(false);
@@ -201,12 +202,42 @@ function LoginForm() {
     }
   };
 
+  // Mirrors completeLogin for the superadmin flow.
+  const completeSuperadminLogin = (data: SuperAdminLoginResponse) => {
+    if (!data.access_token || !data.admin) {
+      setLoginError('Login response missing token');
+      return;
+    }
+    storeSuperadminAuth(data);
+    // Keep the legacy admin-context flag in sync so existing admin layout/guards
+    // continue to work without changes.
+    try {
+      const adminUser = getAdminUser();
+      adminUser.email = data.admin.email;
+      adminUser.name = data.admin.name || adminUser.name;
+      adminUser.lastActive = new Date().toISOString();
+      localStorage.setItem('moda-admin-auth', 'true');
+      localStorage.setItem('moda-admin-data', JSON.stringify(adminUser));
+    } catch {
+      /* non-fatal — admin layout will recover from missing legacy data */
+    }
+    showToast('Welcome to the Admin Console.', 'success');
+    router.replace('/admin');
+  };
+
   // Handle 2FA verification
   const handle2FAVerify = async () => {
     if (totpCode.length < 6 || otpLockedUntil) return;
     setIs2FAVerifying(true);
     setLoginError(null);
     try {
+      if (twoFAMode === 'superadmin') {
+        const data = await superadminVerify2FALogin(preAuthToken, totpCode);
+        setOtpAttempts(0);
+        setOtpLockedUntil(null);
+        completeSuperadminLogin(data);
+        return;
+      }
       const data = await verify2FALogin(preAuthToken, totpCode);
       setOtpAttempts(0);
       setOtpLockedUntil(null);
@@ -247,13 +278,20 @@ function LoginForm() {
 
     if (selectedTier === 'admin') {
       try {
-        const adminUser = getAdminUser();
-        adminUser.email = formData.email;
-        adminUser.lastActive = new Date().toISOString();
-        localStorage.setItem('moda-admin-auth', 'true');
-        localStorage.setItem('moda-admin-data', JSON.stringify(adminUser));
-        showToast('Welcome to the Admin Console.', 'success');
-        router.push('/admin');
+        const data = await superadminLogin({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (data.requires_2fa && data.pre_auth_token) {
+          setPreAuthToken(data.pre_auth_token);
+          setTwoFAMode('superadmin');
+          setRequires2FA(true);
+          setIsSubmitting(false);
+          return;
+        }
+
+        completeSuperadminLogin(data);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Login failed';
         setLoginError(message);
@@ -294,6 +332,7 @@ function LoginForm() {
         // Check if 2FA is required
         if (data.requires_2fa && data.pre_auth_token) {
           setPreAuthToken(data.pre_auth_token);
+          setTwoFAMode('user');
           setRequires2FA(true);
           setIsSubmitting(false);
           return;
@@ -665,7 +704,7 @@ function LoginForm() {
               </button>
 
               <button
-                onClick={() => { setRequires2FA(false); setTotpCode(''); setPreAuthToken(''); setLoginError(null); setOtpAttempts(0); setOtpLockedUntil(null); }}
+                onClick={() => { setRequires2FA(false); setTwoFAMode('user'); setTotpCode(''); setPreAuthToken(''); setLoginError(null); setOtpAttempts(0); setOtpLockedUntil(null); }}
                 className="w-full text-center text-stone hover:text-charcoal-deep transition-colors text-sm"
               >
                 Back to login

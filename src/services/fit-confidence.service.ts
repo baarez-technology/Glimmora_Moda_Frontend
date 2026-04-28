@@ -52,6 +52,13 @@ interface FitConfidenceApiResponse {
     level: 'low' | 'medium' | 'high';
     risk_score_percent: number;
   };
+  confidence_interval?: {
+    size_range: string;
+    lower_bound_percent: number;
+    upper_bound_percent: number;
+    low_confidence_flag: boolean;
+    explanation: string;
+  };
   body_twin_used: boolean;
   fit_engine_version: string;
   created_at: string;
@@ -73,6 +80,15 @@ function mapToFitConfidence(api: FitConfidenceApiResponse): FitConfidence {
       shoulderAlignment: api.measurement_analysis.shoulder_alignment,
       sleeveLengthEstimate: api.measurement_analysis.sleeve_length_estimate,
     },
+    confidenceInterval: api.confidence_interval
+      ? {
+          sizeRange: api.confidence_interval.size_range,
+          lowerBoundPercent: api.confidence_interval.lower_bound_percent,
+          upperBoundPercent: api.confidence_interval.upper_bound_percent,
+          lowConfidenceFlag: api.confidence_interval.low_confidence_flag,
+          explanation: api.confidence_interval.explanation,
+        }
+      : undefined,
     sizeNotes: api.fit_notes,
     returnRisk: api.return_risk.level,
     returnRiskScore: api.return_risk.risk_score_percent,

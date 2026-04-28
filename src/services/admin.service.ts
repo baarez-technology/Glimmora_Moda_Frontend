@@ -422,3 +422,49 @@ export async function fetchErrorLog(): Promise<ApiResponse<ErrorLogEntry[]>> {
     mockHandler: () => [...getErrorLog()],
   });
 }
+
+// ============================================
+// Security Summary (Section 11 — real backend)
+// ============================================
+
+export interface SecuritySummaryEvent {
+  type: string;
+  userId: string;
+  ip: string;
+  timestamp: string;
+}
+
+export interface SecuritySummary {
+  failedOtpAttempts24h: number;
+  failedLoginAttempts24h: number;
+  activeJwtBlacklist: number;
+  suspiciousIps: string[];
+  recentEvents: SecuritySummaryEvent[];
+}
+
+function getAdminToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return (
+      localStorage.getItem('moda-superadmin-token') ||
+      localStorage.getItem('moda-admin-token') ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSecuritySummary(): Promise<SecuritySummary | null> {
+  const token = getAdminToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch('/api/v1/admin/security/summary', { headers });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}

@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Sparkles, ChevronRight, AlertCircle, TrendingUp, ShoppingBag, X } from 'lucide-react';
 import type { WardrobeAnalysis, WardrobeGap } from '@/types';
 import { formatPrice } from '@/lib/currency';
+import { dismissWardrobeGap } from '@/services/wardrobe.service';
 
 interface WardrobeGapAnalysisProps {
   analysis: WardrobeAnalysis;
@@ -17,6 +18,9 @@ export default function WardrobeGapAnalysis({ analysis }: WardrobeGapAnalysisPro
 
   const handleDismissGap = (gapId: string) => {
     setDismissedGaps(prev => new Set(prev).add(gapId));
+    void dismissWardrobeGap(gapId).catch(err => {
+      console.warn('[wardrobe] dismiss gap failed:', err);
+    });
   };
 
   const getPriorityColor = (priority: string) => {

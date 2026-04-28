@@ -492,7 +492,6 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     setSourcingRequests([]);
     setHeritageEvents([]);
     setBrandStories([]);
-    setUhniOffers([]);
     setStylingSessions([]);
     clearBrandTokens();
   }, []);

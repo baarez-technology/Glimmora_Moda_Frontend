@@ -41,7 +41,6 @@ export interface BrandDashboardPayload {
   sourcingRequests: SourcingRequest[];
   heritageEvents: HeritageEvent[];
   brandStories: BrandStory[];
-  uhniOffers: UHNIPriceOffer[];
   stylingSessions: StylingSession[];
 }
 
@@ -61,7 +60,6 @@ export async function getBrandDashboardData(): Promise<ApiResponse<BrandDashboar
       sourcingRequests: mockBrandSourcingRequests,
       heritageEvents: mockHeritageEvents,
       brandStories: mockBrandStories,
-      uhniOffers: mockUHNIOffers,
       stylingSessions: mockStylingSessions,
     }),
   });
