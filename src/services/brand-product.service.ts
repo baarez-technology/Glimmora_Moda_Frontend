@@ -94,15 +94,47 @@ export interface BackendProduct {
   heritage_tags: string[];
   craft_tags: string[];
   editorial_narrative: string;
-  video_assets: string[];
+  // Either bare URLs (legacy) or rich objects (Section 1 spec).
+  video_assets: Array<string | VideoAsset>;
   motion_assets: string[];
-  // SOW 41P.4 — visibility & commerce control
-  visibility_scope: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
-  experience_mode: 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard';
-  pricing_visibility: 'visible' | 'hidden' | 'redacted';
-  commerce_action_type: 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
+  // SOW 41P.4 — visibility & commerce control. Backend accepts both the
+  // internal vocab (`logged_in`/`uhni_only`/`commerce`) and the frontend
+  // spec vocab (`private`/`invite_only`/`iv_immersive`/`bespoke_only`).
+  visibility_scope:
+    | 'public'
+    | 'logged_in'
+    | 'uhni_only'
+    | 'geo_restricted'
+    | 'private'
+    | 'invite_only';
+  experience_mode:
+    | 'commerce'
+    | 'story_only'
+    | 'experience_iv'
+    | 'concierge'
+    | 'standard'
+    | 'iv_immersive'
+    | 'bespoke_only';
+  pricing_visibility: 'visible' | 'hidden' | 'redacted' | 'on_request' | 'private';
+  commerce_action_type:
+    | 'purchase'
+    | 'add_to_cart'
+    | 'request_to_buy'
+    | 'concierge'
+    | 'redirect'
+    | 'add_to_considerations'
+    | 'request_access'
+    | 'direct_purchase';
+  // Section 1 spec uses `commerce_action` as the canonical name.
+  commerce_action?: BackendProduct['commerce_action_type'];
   allowed_countries: string[] | null;
   pricing_redacted: boolean;
+}
+
+export interface VideoAsset {
+  url: string;
+  thumbnail: string;
+  duration_seconds: number;
 }
 
 // ─── Parsing Helpers ────────────────────────────────────────────────────────
@@ -280,10 +312,12 @@ export interface ProductCreatePayload {
   heritage_tags?: string[];
   craft_tags?: string[];
   editorial_narrative?: string;
-  // SOW 41P.4
-  visibility_scope?: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
-  experience_mode?: 'commerce' | 'story_only' | 'experience_iv' | 'concierge';
-  commerce_action?: 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
+  video_assets?: Array<string | VideoAsset>;
+  // SOW 41P.4 — accepts both legacy internal vocab and Section-1 spec vocab.
+  visibility_scope?: BackendProduct['visibility_scope'];
+  experience_mode?: BackendProduct['experience_mode'];
+  pricing_visibility?: BackendProduct['pricing_visibility'];
+  commerce_action?: BackendProduct['commerce_action_type'];
 }
 
 export interface ProductUpdatePayload {
@@ -309,10 +343,13 @@ export interface ProductUpdatePayload {
   heritage_tags?: string[];
   craft_tags?: string[];
   editorial_narrative?: string;
-  // SOW 41P.4
-  visibility_scope?: 'public' | 'logged_in' | 'uhni_only' | 'geo_restricted';
-  experience_mode?: 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard';
-  commerce_action_type?: 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect';
+  video_assets?: Array<string | VideoAsset>;
+  // SOW 41P.4 — accepts both legacy internal vocab and Section-1 spec vocab.
+  visibility_scope?: BackendProduct['visibility_scope'];
+  experience_mode?: BackendProduct['experience_mode'];
+  pricing_visibility?: BackendProduct['pricing_visibility'];
+  commerce_action_type?: BackendProduct['commerce_action_type'];
+  commerce_action?: BackendProduct['commerce_action_type'];
 }
 
 export interface RegionalStockAddPayload {

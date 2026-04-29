@@ -54,6 +54,8 @@ export interface CustomerOrder {
   payment_shipping: number;
   payment_amount: number;
   payment_currency: string;
+  display_currency?: string;
+  exchange_rate?: number;
 }
 
 export interface CreateOrderProductPayload {

@@ -117,6 +117,19 @@ export async function getWardrobeGapAnalysis(regenerate = false): Promise<Wardro
   return res.json();
 }
 
+/** POST /api/v1/wardrobe/gap/dismiss — dismiss a single gap so it stops appearing */
+export async function dismissWardrobeGap(gapId: string): Promise<void> {
+  const res = await fetch('/api/v1/wardrobe/gap/dismiss', {
+    method: 'POST',
+    headers: getUserAuthHeaders(),
+    body: JSON.stringify({ gapId }),
+  });
+  if (!res.ok && res.status !== 204) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to dismiss gap' }));
+    throw new Error(err.detail || `Dismiss gap failed (${res.status})`);
+  }
+}
+
 /** Custom error for 404 (no cached analysis) */
 export class NotFoundError extends Error {
   constructor(message: string) {

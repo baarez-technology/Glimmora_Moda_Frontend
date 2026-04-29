@@ -704,3 +704,65 @@ export async function socialSignIn(
 
   return res.json();
 }
+
+// ─── SuperAdmin Auth ─────────────────────────────────────────────────────────
+
+export interface SuperAdminLoginResponse {
+  requires_2fa: boolean;
+  access_token?: string;
+  refresh_token?: string;
+  pre_auth_token?: string;
+  message?: string;
+  admin?: {
+    superadmin_id: string;
+    name: string;
+    email: string;
+    role: string;
+    profile_picture?: string | null;
+    currency?: string;
+    timezone?: string;
+    language?: string;
+    is_active: boolean;
+    is_2fa_enabled: boolean;
+  };
+}
+
+export async function superadminLogin(
+  credentials: { email: string; password: string }
+): Promise<SuperAdminLoginResponse> {
+  const res = await fetchWithTimeout('/api/v1/superadmin/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(credentials),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Login failed' }));
+    throw new Error(err.detail || `Login failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function superadminVerify2FALogin(
+  pre_auth_token: string,
+  totp_code: string,
+): Promise<SuperAdminLoginResponse> {
+  const res = await fetchWithTimeout('/api/v1/superadmin/auth/2fa/verify-login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pre_auth_token, totp_code }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Invalid code' }));
+    throw new Error(err.detail || `Verification failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export function storeSuperadminAuth(data: SuperAdminLoginResponse): void {
+  if (!data.access_token || !data.admin) return;
+  localStorage.setItem('moda-superadmin-token', data.access_token);
+  if (data.refresh_token) {
+    localStorage.setItem('moda-superadmin-refresh-token', data.refresh_token);
+  }
+  localStorage.setItem('moda-superadmin-data', JSON.stringify(data.admin));
+}
