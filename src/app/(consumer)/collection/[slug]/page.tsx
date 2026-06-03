@@ -162,7 +162,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
           ============================================ */}
       <section className="relative h-[50vh] min-h-[350px] max-h-[500px] w-full overflow-hidden">
         <Image
-          src={collection?.heroImage || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80'}
+          src={collection?.heroImage || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&q=80'}
           alt={collection?.name || 'All Products'}
           fill
           className={`object-cover transition-all duration-[2s] ease-out ${isLoaded ? 'scale-100' : 'scale-110'}`}

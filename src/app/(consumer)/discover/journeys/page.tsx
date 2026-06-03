@@ -34,7 +34,7 @@ const journeyTypeConfig: Record<string, {
   eras: {
     icon: <History className="w-8 h-8" />,
     gradient: 'from-purple-500 to-violet-500',
-    bgImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800',
+    bgImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
     description: 'Travel through time and fashion history'
   },
   icons: {

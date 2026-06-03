@@ -397,7 +397,7 @@ function LoginForm() {
         <div className="hidden lg:block lg:w-1/2 bg-charcoal-deep relative overflow-hidden">
           <div
             className="absolute inset-0 bg-cover bg-center opacity-30"
-            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80)' }}
+            style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1600&q=85)' }}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-charcoal-deep/95 to-charcoal-deep/60" />
           <div className="absolute inset-0 flex items-center justify-center">
@@ -611,7 +611,7 @@ function LoginForm() {
           <div
             className="absolute inset-0 bg-cover bg-center opacity-40"
             style={{
-              backgroundImage: 'url(https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80)'
+              backgroundImage: 'url(https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1600&q=85)'
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-r from-charcoal-deep/90 to-charcoal-deep/50" />
@@ -723,7 +723,7 @@ function LoginForm() {
         <div
           className="absolute inset-0 bg-cover bg-center opacity-40"
           style={{
-            backgroundImage: 'url(https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80)'
+            backgroundImage: 'url(https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1600&q=85)'
           }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-charcoal-deep/90 to-charcoal-deep/50" />

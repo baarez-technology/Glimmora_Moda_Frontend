@@ -235,7 +235,11 @@ async function executeRequest<T>(
     if (!response.ok) {
       if (response.status === 401 && typeof window !== 'undefined') {
         const current = window.location.pathname;
-        if (!current.startsWith('/auth')) {
+        // Skip auto-redirect on auth pages and the public landing page —
+        // landing fires no auth-required calls, but any leaked one (e.g. stale
+        // Header API call) must not bounce anonymous visitors to /auth/login.
+        const isPublicPath = current === '/' || current.startsWith('/auth');
+        if (!isPublicPath) {
           window.location.href = `/auth/login?redirect=${encodeURIComponent(current)}&reason=session_expired`;
         }
       }

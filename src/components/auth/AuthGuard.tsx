@@ -8,6 +8,14 @@ interface AuthGuardProps {
   children: React.ReactNode;
 }
 
+// Public paths — accessible to unauthenticated visitors.
+// The page component is responsible for rendering anonymous vs authenticated views.
+const PUBLIC_PATHS = ['/'];
+
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.includes(pathname);
+}
+
 export default function AuthGuard({ children }: AuthGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -15,7 +23,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   const [clientReady, setClientReady] = useState(false);
   const [hasToken, setHasToken] = useState(false);
 
-  // Check localStorage on client mount only (not during SSR)
   useEffect(() => {
     try {
       setHasToken(!!localStorage.getItem('moda-user-token'));
@@ -25,7 +32,6 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     setClientReady(true);
   }, []);
 
-  // Re-check token when auth state changes
   useEffect(() => {
     if (isAuthenticated) {
       setHasToken(true);
@@ -33,19 +39,19 @@ export default function AuthGuard({ children }: AuthGuardProps) {
   }, [isAuthenticated]);
 
   const effectivelyAuthenticated = isAuthenticated || hasToken;
+  const publicPath = isPublicPath(pathname);
 
-  // Redirect to login if not authenticated
   useEffect(() => {
     if (!clientReady || !isHydrated) return;
     if (isLoggingOut) return;
+    if (publicPath) return;
 
     if (!effectivelyAuthenticated) {
       const redirectUrl = encodeURIComponent(pathname);
       router.replace(`/auth/login?redirect=${redirectUrl}`);
     }
-  }, [clientReady, isHydrated, effectivelyAuthenticated, isLoggingOut, pathname, router]);
+  }, [clientReady, isHydrated, effectivelyAuthenticated, isLoggingOut, pathname, router, publicPath]);
 
-  // Show loading until both client and auth are ready
   if (!clientReady || !isHydrated) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
@@ -57,8 +63,7 @@ export default function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // Not authenticated — show brief loading while redirect happens
-  if (!effectivelyAuthenticated) {
+  if (!publicPath && !effectivelyAuthenticated) {
     return (
       <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
         <div className="text-center">

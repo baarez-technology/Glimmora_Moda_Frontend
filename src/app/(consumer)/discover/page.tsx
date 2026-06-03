@@ -291,7 +291,7 @@ function DiscoverContent() {
           ============================================ */}
       <section className="relative h-[60vh] min-h-[400px] max-h-[600px] w-full overflow-hidden">
         <Image
-          src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=90"
+          src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&q=90"
           alt="Discover"
           fill
           className={`object-cover transition-all duration-[2s] ease-out ${isLoaded ? 'scale-100' : 'scale-110'}`}

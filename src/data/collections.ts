@@ -13,7 +13,7 @@ export const collections: Collection[] = [
     season: 'Autumn/Winter',
     year: 2024,
     description: 'A celebration of Dior\'s tailoring heritage with contemporary vision.',
-    heroImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920&q=80',
     products: products.filter(p => p.brandId === 'dior')
   },
   {
