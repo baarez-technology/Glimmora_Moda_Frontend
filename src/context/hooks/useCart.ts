@@ -65,8 +65,15 @@ export function useCart({ showToast }: UseCartProps) {
     if (cartLoaded && !force) return;
     try {
       const items = await getCart();
-      setCartItems(items);
-      writeSessionCache(CART_CACHE_KEY, items);
+      // Preserve any locally-stored items (added when the BE rejected the
+      // product_id) — they have no server record so the BE list never includes
+      // them and a naive replace would wipe them out.
+      setCartItems(prev => {
+        const localItems = prev.filter(i => i.cart_id.startsWith('local-'));
+        const merged = [...items, ...localItems];
+        writeSessionCache(CART_CACHE_KEY, merged);
+        return merged;
+      });
       setCartLoaded(true);
     } catch {
       // API unavailable — keep whatever we have from sessionStorage
@@ -145,12 +152,16 @@ export function useCart({ showToast }: UseCartProps) {
     }
   }, [showToast]);
 
-  /** Force-refresh cart from API (e.g. after an update) */
+  /** Force-refresh cart from API (e.g. after an update). Preserves local items. */
   const refreshCart = useCallback(async () => {
     try {
       const items = await getCart();
-      setCartItems(items);
-      writeSessionCache(CART_CACHE_KEY, items);
+      setCartItems(prev => {
+        const localItems = prev.filter(i => i.cart_id.startsWith('local-'));
+        const merged = [...items, ...localItems];
+        writeSessionCache(CART_CACHE_KEY, merged);
+        return merged;
+      });
       setCartLoaded(true);
     } catch {
       /* silent */
