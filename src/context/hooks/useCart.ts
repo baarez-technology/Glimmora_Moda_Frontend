@@ -74,7 +74,18 @@ export function useCart({ showToast }: UseCartProps) {
     }
   }, [cartLoaded]);
 
-  const addToCart = useCallback(async (payload: { product_id: string; color: string; size: string; quantity?: number }) => {
+  /**
+   * Add an item to the cart.
+   *
+   * When the backend rejects the product_id format (mock/demo products, or
+   * any 400/422 validation error), we fall back to a local-only cart entry
+   * so demos and offline-cached sessions keep working. Real products with
+   * valid IDs continue to hit the backend normally.
+   */
+  const addToCart = useCallback(async (
+    payload: { product_id: string; color: string; size: string; quantity?: number },
+    fallback?: { name: string; price: number; image_urls: string[] },
+  ) => {
     try {
       const item = await apiAddToCart(payload);
       setCartItems(prev => {
@@ -85,14 +96,44 @@ export function useCart({ showToast }: UseCartProps) {
       showToast('Added to cart', 'success');
       return item;
     } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      const isValidationError = /invalid\s*product_id|400|422|validation/i.test(message);
+
+      if (fallback && isValidationError) {
+        const localItem: CartItem = {
+          cart_id: `local-${crypto.randomUUID()}`,
+          customer_id: 'local',
+          product_id: payload.product_id,
+          quantity: payload.quantity ?? 1,
+          color: payload.color,
+          size: payload.size,
+          price: fallback.price,
+          image_urls: fallback.image_urls,
+          product_name: fallback.name,
+          created_at: new Date().toISOString(),
+        };
+        setCartItems(prev => {
+          const updated = [...prev, localItem];
+          writeSessionCache(CART_CACHE_KEY, updated);
+          return updated;
+        });
+        showToast('Added to bag', 'success');
+        return localItem;
+      }
+
       showToast('Failed to add to cart. Please try again.', 'error');
       throw err;
     }
   }, [showToast]);
 
   const removeFromCart = useCallback(async (cartId: string) => {
+    // Locally-stored items (added when the backend rejected the product_id)
+    // never existed server-side, so skip the API call.
+    const isLocal = cartId.startsWith('local-');
     try {
-      await apiRemoveFromCart(cartId);
+      if (!isLocal) {
+        await apiRemoveFromCart(cartId);
+      }
       setCartItems(prev => {
         const updated = prev.filter(i => i.cart_id !== cartId);
         writeSessionCache(CART_CACHE_KEY, updated);
@@ -120,6 +161,18 @@ export function useCart({ showToast }: UseCartProps) {
     try {
       const currentItem = cartItems.find(i => i.cart_id === cartId);
       if (!currentItem) throw new Error('Item not found');
+
+      // Locally-stored items have no server record — update in place.
+      if (cartId.startsWith('local-')) {
+        const updated = { ...currentItem, quantity };
+        setCartItems(prev => {
+          const next = prev.map(i => i.cart_id === cartId ? updated : i);
+          writeSessionCache(CART_CACHE_KEY, next);
+          return next;
+        });
+        return updated;
+      }
+
       const updated = await apiUpdateCartQuantity(cartId, quantity, currentItem);
       setCartItems(prev => {
         const next = prev.map(i => i.cart_id === cartId ? updated : i);

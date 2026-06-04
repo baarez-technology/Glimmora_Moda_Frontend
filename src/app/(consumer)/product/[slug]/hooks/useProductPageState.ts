@@ -240,12 +240,19 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     setColorError(false);
 
     try {
-      await addToCart({
-        product_id: product.id,
-        color: selectedColor || '',
-        size: selectedSize || '',
-        quantity,
-      });
+      await addToCart(
+        {
+          product_id: product.id,
+          color: selectedColor || '',
+          size: selectedSize || '',
+          quantity,
+        },
+        {
+          name: product.name,
+          price: product.price,
+          image_urls: product.images.map(img => img.url),
+        },
+      );
       refreshCart();
     } catch {
       // Toast already shown by the hook

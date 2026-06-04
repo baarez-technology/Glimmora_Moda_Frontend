@@ -58,7 +58,10 @@ interface AppContextType {
   // Cart (API-backed, session-cached)
   cartItems: CartItem[];
   cartCount: number;
-  addToCart: (payload: { product_id: string; color: string; size: string; quantity?: number }) => Promise<CartItem>;
+  addToCart: (
+    payload: { product_id: string; color: string; size: string; quantity?: number },
+    fallback?: { name: string; price: number; image_urls: string[] },
+  ) => Promise<CartItem>;
   removeFromCart: (cartId: string) => Promise<void>;
   updateCartQuantity: (cartId: string, quantity: number) => Promise<CartItem | undefined>;
   clearAllCart: () => Promise<void>;

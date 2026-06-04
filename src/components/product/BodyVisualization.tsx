@@ -270,7 +270,14 @@ export default function BodyVisualization({
                     try {
                       const color = product.variants?.find(v => v.type === 'color')?.value || '';
                       const size = product.variants?.find(v => v.type === 'size')?.value || '';
-                      await addToCart({ product_id: product.id, color, size, quantity: 1 });
+                      await addToCart(
+                        { product_id: product.id, color, size, quantity: 1 },
+                        {
+                          name: product.name,
+                          price: product.price,
+                          image_urls: product.images.map(img => img.url),
+                        },
+                      );
                     } catch {
                       showToast('Failed to add to cart', 'error');
                     } finally {
