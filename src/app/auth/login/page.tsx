@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, Eye, EyeOff, Crown, ShoppingBag, Building2, Shield } from 'lucide-react';
@@ -54,10 +54,28 @@ function LoginForm() {
   const [otpLockedUntil, setOtpLockedUntil] = useState<number | null>(null);
   const [otpLockSeconds, setOtpLockSeconds] = useState(0);
 
-  // Forgot password modal state
+  // Forgot password modal state — URL-driven via ?forgot=email|otp|reset so
+  // browser back/forward navigates between the steps naturally.
   type ForgotStep = 'email' | 'otp' | 'reset';
-  const [forgotOpen, setForgotOpen] = useState(false);
-  const [forgotStep, setForgotStep] = useState<ForgotStep>('email');
+  const forgotParam = searchParams.get('forgot');
+  const forgotOpen = forgotParam === 'email' || forgotParam === 'otp' || forgotParam === 'reset';
+  const forgotStep: ForgotStep = forgotParam === 'otp' || forgotParam === 'reset' ? forgotParam : 'email';
+
+  const buildLoginUrl = useCallback((forgot: ForgotStep | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (forgot) {
+      params.set('forgot', forgot);
+    } else {
+      params.delete('forgot');
+    }
+    const qs = params.toString();
+    return `/auth/login${qs ? `?${qs}` : ''}`;
+  }, [searchParams]);
+
+  const setForgotStep = useCallback((step: ForgotStep) => {
+    router.push(buildLoginUrl(step));
+  }, [router, buildLoginUrl]);
+
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtp, setForgotOtp] = useState('');
   const [forgotNewPassword, setForgotNewPassword] = useState('');
@@ -73,14 +91,12 @@ function LoginForm() {
     setForgotNewPassword('');
     setForgotConfirmPassword('');
     setForgotError(null);
-    setForgotStep('email');
-    setForgotOpen(true);
+    router.push(buildLoginUrl('email'));
   };
 
   const closeForgotModal = () => {
-    setForgotOpen(false);
-    setForgotStep('email');
     setForgotError(null);
+    router.push(buildLoginUrl(null));
   };
 
   const isBrandFlow = selectedTier === 'brand';
