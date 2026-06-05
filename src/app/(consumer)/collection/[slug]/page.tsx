@@ -10,6 +10,7 @@ import * as brandService from '@/services/brand.service';
 import { getCollections, getRecommendedProductsPaginated, getRecommendedBrands } from '@/services/recommendation.service';
 import { notFound, useSearchParams } from 'next/navigation';
 import type { Product, Brand, Collection } from '@/types';
+import { productHref } from '@/services/customer-collection.service';
 
 interface CollectionPageProps {
   params: Promise<{ slug: string }>;
@@ -241,7 +242,7 @@ export default function CollectionPage({ params }: CollectionPageProps) {
                 {displayProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}`}
+                    href={productHref(product.id, product.name)}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}

@@ -7,6 +7,7 @@ import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { getAllBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 import { formatPrice } from '@/lib/currency';
+import { productHref } from '@/services/customer-collection.service';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import LandingPage from '@/components/landing/LandingPage';
@@ -96,7 +97,7 @@ export default function HomePage() {
         {/* Background Image - Full Bleed */}
         <div className="absolute inset-0">
           <Image
-            src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1920&q=90"
+            src="https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1920&q=90"
             alt="Luxury Fashion"
             fill
             sizes="100vw"
@@ -270,7 +271,7 @@ export default function HomePage() {
             {/* Left - Large Featured Product */}
             {featuredProducts[0] && (
               <Link
-                href={`/product/${featuredProducts[0].slug}?productId=${featuredProducts[0].id}`}
+                href={productHref(featuredProducts[0].id, featuredProducts[0].name)}
                 className="group"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-5">
@@ -303,7 +304,7 @@ export default function HomePage() {
               {featuredProducts.slice(1, 5).map((product) => (
                 <Link
                   key={product.id}
-                  href={`/product/${product.slug}?productId=${product.id}`}
+                  href={productHref(product.id, product.name)}
                   className="group"
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-3">

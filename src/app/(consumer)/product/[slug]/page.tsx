@@ -7,7 +7,6 @@ import { ArrowRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import * as productService from '@/services/product.service';
 import { getProductDetail, getRecommendedBrands, getProductAIInsights, type ProductAIInsights } from '@/services/recommendation.service';
-import { notFound } from 'next/navigation';
 import OutfitSuggestions from '@/components/product/OutfitSuggestions';
 import { useProductPageState, useProductIntelligence } from './hooks/useProductPageState';
 import {
@@ -312,7 +311,42 @@ export default function ProductPage({ params }: ProductPageProps) {
   }
 
   if (!product) {
-    notFound();
+    // Show a friendly in-app message instead of the jarring Next.js 404 page.
+    // Helps when a card was rendered from stale/partial data on Discover or the
+    // home grid and the detail fetch fails — user can recover without losing
+    // context of where they were.
+    return (
+      <div className="min-h-screen bg-ivory-cream flex items-center justify-center px-8">
+        <div className="text-center max-w-md">
+          <span className="text-[10px] tracking-[0.4em] uppercase text-gold-deep block mb-4">
+            Piece Unavailable
+          </span>
+          <h1 className="font-display text-3xl md:text-4xl text-charcoal-deep leading-tight mb-4">
+            We couldn&rsquo;t find this piece.
+          </h1>
+          <p className="text-sm text-stone leading-relaxed mb-10">
+            It may have been retired, reassigned to a private collection, or
+            momentarily unavailable. The maison still awaits — explore more
+            pieces from the collection.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/discover"
+              className="inline-flex items-center justify-center gap-3 py-4 px-8 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors duration-300 text-sm tracking-[0.15em] uppercase"
+            >
+              Back to Discover
+              <ArrowRight size={14} />
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center gap-3 py-4 px-8 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-colors duration-300 text-sm tracking-[0.15em] uppercase"
+            >
+              Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return <ProductPageContent product={product} aiInsights={aiInsights} />;

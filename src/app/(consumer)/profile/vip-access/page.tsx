@@ -48,75 +48,6 @@ function saveVIPState(readIds: string[], dismissedIds: string[]) {
   } catch { /* ignore */ }
 }
 
-const defaultAlerts: VIPAlert[] = [
-  {
-    id: '1',
-    type: 'product_launch',
-    title: 'Exclusive First Access: Hermès Spring Collection',
-    description: 'Be among the first to shop the new Spring/Summer collection. Limited pieces available with priority access for UHNI members.',
-    brand: 'Hermès',
-    priority: 'urgent',
-    image: 'https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=600',
-    expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
-    actionLabel: 'Shop Now',
-    actionUrl: '/discover',
-    metadata: {
-      discount: 'VIP Early Access'
-    },
-    read: false,
-    createdAt: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: '2',
-    type: 'event',
-    title: 'Private Viewing: Bottega Veneta Atelier',
-    description: 'Invitation-only showcase of the new collection with the creative director. Personalized styling session included.',
-    brand: 'Bottega Veneta',
-    priority: 'high',
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600',
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    actionLabel: 'RSVP',
-    actionUrl: '#',
-    metadata: {
-      location: 'Paris Flagship',
-      date: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-      availableSpots: 3
-    },
-    read: false,
-    createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: '3',
-    type: 'private_sale',
-    title: 'Private Sale: Chanel Classics',
-    description: 'Curated selection of classic flap bags and timeless pieces. 48-hour exclusive access before public release.',
-    brand: 'Chanel',
-    priority: 'high',
-    image: 'https://images.unsplash.com/photo-1594633313593-bab3825d0caf?w=600',
-    expiresAt: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-    actionLabel: 'View Collection',
-    actionUrl: '/discover',
-    metadata: {
-      discount: 'Member Pricing'
-    },
-    read: true,
-    createdAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
-  },
-  {
-    id: '4',
-    type: 'collection_preview',
-    title: 'Pre-Order: Fall/Winter 2025 Preview',
-    description: 'Preview and pre-order from multiple maisons before the official launch. Guaranteed allocation for reserved pieces.',
-    brand: 'Multiple Brands',
-    priority: 'normal',
-    expiresAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    actionLabel: 'Preview',
-    actionUrl: '/discover',
-    read: true,
-    createdAt: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
-  }
-];
-
 export default function VIPAccessPage() {
   const router = useRouter();
   const { isUHNI, isHydrated, showToast } = useApp();
@@ -124,34 +55,26 @@ export default function VIPAccessPage() {
   const [filter, setFilter] = useState<'all' | 'product_launch' | 'private_sale' | 'event'>('all');
   const [alerts, setAlerts] = useState<VIPAlert[]>([]);
 
-  // Load alerts from backend; fall back to local defaults on error so the
-  // page is still usable when the API is unavailable.
+  // Load alerts from backend. No mock fallback — showing hardcoded "Hermès
+  // Spring Collection"–style fake data when the API is empty or down erodes
+  // trust on a VIP surface. A clean empty state is the correct UX.
   useEffect(() => {
     let cancelled = false;
     vipService.listVipAlerts()
       .then(serverAlerts => {
         if (cancelled) return;
-        if (serverAlerts && serverAlerts.length > 0) {
-          setAlerts(serverAlerts as VIPAlert[]);
-        } else {
-          // Empty backend — keep showing the local defaults during early rollout.
-          const { readIds, dismissedIds } = loadVIPState();
-          setAlerts(
-            defaultAlerts
-              .filter(a => !dismissedIds.includes(a.id))
-              .map(a => ({ ...a, read: a.read || readIds.includes(a.id) })),
-          );
-        }
+        const { readIds, dismissedIds } = loadVIPState();
+        const items = (serverAlerts as VIPAlert[] | null | undefined) ?? [];
+        setAlerts(
+          items
+            .filter(a => !dismissedIds.includes(a.id))
+            .map(a => ({ ...a, read: a.read || readIds.includes(a.id) })),
+        );
         setIsLoaded(true);
       })
       .catch(() => {
         if (cancelled) return;
-        const { readIds, dismissedIds } = loadVIPState();
-        setAlerts(
-          defaultAlerts
-            .filter(a => !dismissedIds.includes(a.id))
-            .map(a => ({ ...a, read: a.read || readIds.includes(a.id) })),
-        );
+        setAlerts([]);
         setIsLoaded(true);
       });
     return () => { cancelled = true; };

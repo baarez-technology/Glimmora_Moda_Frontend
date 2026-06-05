@@ -26,6 +26,7 @@ export default function NewProductPage() {
   const [materialInput, setMaterialInput] = useState('');
   // Video assets (SOW 41P.3)
   const [videoUrl, setVideoUrl] = useState('');
+  const [motionUrl, setMotionUrl] = useState('');
 
   useEffect(() => {
     fetchCollectionNames()
@@ -154,6 +155,7 @@ export default function NewProductPage() {
         ...(materials.length > 0 ? { material_variants: materials } : {}),
         ...(coverImage ? { product_image: coverImage } : {}),
         ...(videoUrl.trim() ? { video_assets: [{ url: videoUrl.trim(), thumbnail: '', duration_seconds: 0 }] } : {}),
+        ...(motionUrl.trim() ? { motion_assets: [motionUrl.trim()] } : {}),
         iv_eligible: formData.iv_eligible,
         commerce_eligible: formData.commerce_eligible,
         heritage_tags: formData.heritage_tags,
@@ -381,19 +383,39 @@ export default function NewProductPage() {
             )}
           </section>
 
-          {/* Video Assets (SOW 41P.3) */}
-          <section className="bg-white border border-sand/50 p-6 space-y-4 mt-8">
+          {/* Video & Motion Assets (SOW 41P.3) */}
+          <section className="bg-white border border-sand/50 p-6 space-y-6 mt-8">
             <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-              Video Asset
+              Video &amp; Motion Assets
             </h2>
-            <p className="text-xs text-stone">Paste a video URL (hosted on S3, Cloudinary, or CDN). Full upload pipeline coming soon.</p>
-            <input
-              type="url"
-              value={videoUrl}
-              onChange={e => { setVideoUrl(e.target.value); setIsDirty(true); }}
-              className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-              placeholder="https://cdn.example.com/product-video.mp4"
-            />
+
+            <div className="space-y-2">
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep">
+                Video URL
+              </label>
+              <p className="text-xs text-stone">Paste a video URL (hosted on S3, Cloudinary, or CDN). Full upload pipeline coming soon.</p>
+              <input
+                type="url"
+                value={videoUrl}
+                onChange={e => { setVideoUrl(e.target.value); setIsDirty(true); }}
+                className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                placeholder="https://cdn.example.com/product-video.mp4"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep">
+                Motion / Animation URL
+              </label>
+              <p className="text-xs text-stone">Animated GIF, Lottie JSON, or short WebM loop for product cards. Optional.</p>
+              <input
+                type="url"
+                value={motionUrl}
+                onChange={e => { setMotionUrl(e.target.value); setIsDirty(true); }}
+                className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                placeholder="https://cdn.example.com/product-motion.gif"
+              />
+            </div>
           </section>
 
           {/* Description */}

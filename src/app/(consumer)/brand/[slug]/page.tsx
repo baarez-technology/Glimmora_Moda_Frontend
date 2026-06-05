@@ -12,6 +12,7 @@ import type { PaginatedProducts } from '@/services/recommendation.service';
 import { notFound } from 'next/navigation';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Product, Brand, BrandStory, Collection } from '@/types';
+import { productHref } from '@/services/customer-collection.service';
 
 interface BrandPageProps {
   params: Promise<{ slug: string }>;
@@ -433,7 +434,7 @@ export default function BrandPage({ params }: BrandPageProps) {
                 {products.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}`}
+                    href={productHref(product.id, product.name)}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
