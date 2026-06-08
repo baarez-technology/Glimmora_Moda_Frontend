@@ -27,6 +27,7 @@ import { useApp } from '@/context/AppContext';
 import type { Brand } from '@/types';
 import type { StylingSessionType, StylingSession } from '@/types/brand-portal';
 import * as brandService from '@/services/brand.service';
+import { createStylingSession } from '@/services/styling-session.service';
 
 type TabValue = 'sessions' | 'book';
 type BookingStep = 1 | 2 | 3;
@@ -41,6 +42,8 @@ export default function StylingSessionsPage() {
   const brandParam = searchParams.get('brand');
   const [activeTab, setActiveTab] = useState<TabValue>(tabParam === 'book' ? 'book' : 'sessions');
   const [cancelSessionId, setCancelSessionId] = useState<string | null>(null);
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
 
   // Booking state
   const [bookingStep, setBookingStep] = useState<BookingStep>(1);
@@ -160,34 +163,55 @@ export default function StylingSessionsPage() {
     setBookingStep(2);
   };
 
-  const handleBookSession = () => {
+  const handleBookSession = async () => {
     if (!bookingForm.date || !bookingForm.time || !bookingForm.brandId) return;
 
-    const scheduledAt = new Date(`${bookingForm.date}T${bookingForm.time}`).toISOString();
-    bookStylingSession({
-      brandId: bookingForm.brandId,
-      brandName: bookingForm.brandName,
-      type: bookingForm.type,
-      scheduledAt,
-      duration: bookingForm.duration,
-      notes: bookingForm.notes,
-      contextInfo: bookingForm.contextInfo,
-      customerTier: 'uhni',
-    });
+    setIsBooking(true);
+    setBookingError(null);
 
-    // Reset form
-    setBookingForm({
-      brandId: '',
-      brandName: '',
-      type: 'virtual',
-      date: '',
-      time: '',
-      duration: 60,
-      notes: '',
-      contextInfo: '',
-    });
-    setBookingStep(1);
-    setActiveTab('sessions');
+    try {
+      // POST to the real backend: /api/v1/customer/styling-sessions
+      await createStylingSession({
+        brand_id: bookingForm.brandId,
+        preferred_date: bookingForm.date,
+        preferred_time: bookingForm.time,
+        duration: String(bookingForm.duration),
+        notes: bookingForm.notes || undefined,
+        location: bookingForm.type === 'in_store' ? 'in_store' : bookingForm.type === 'home' ? 'home' : undefined,
+      });
+
+      // Mirror into local/shared state so the UI reflects immediately
+      const scheduledAt = new Date(`${bookingForm.date}T${bookingForm.time}`).toISOString();
+      bookStylingSession({
+        brandId: bookingForm.brandId,
+        brandName: bookingForm.brandName,
+        type: bookingForm.type,
+        scheduledAt,
+        duration: bookingForm.duration,
+        notes: bookingForm.notes,
+        contextInfo: bookingForm.contextInfo,
+        customerTier: 'uhni',
+      });
+
+      // Reset form and return to sessions tab
+      setBookingForm({
+        brandId: '',
+        brandName: '',
+        type: 'virtual',
+        date: '',
+        time: '',
+        duration: 60,
+        notes: '',
+        contextInfo: '',
+      });
+      setBookingStep(1);
+      setActiveTab('sessions');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to book session. Please try again.';
+      setBookingError(message);
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   const handleCancelSession = (sessionId: string) => {
@@ -771,19 +795,35 @@ export default function StylingSessionsPage() {
                   </div>
                 </div>
 
+                {/* Error state */}
+                {bookingError && (
+                  <div className="mt-4 p-4 bg-error/10 text-error text-sm">
+                    {bookingError}
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-4 mt-6">
                   <button
-                    onClick={() => setBookingStep(2)}
-                    className="flex-1 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase"
+                    onClick={() => { setBookingStep(2); setBookingError(null); }}
+                    disabled={isBooking}
+                    className="flex-1 py-4 border border-sand text-charcoal-deep hover:border-charcoal-deep transition-colors text-sm tracking-[0.15em] uppercase disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Back
                   </button>
                   <button
                     onClick={handleBookSession}
-                    className="flex-1 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase"
+                    disabled={isBooking}
+                    className="flex-1 py-4 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-colors text-sm tracking-[0.15em] uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
-                    Confirm Booking
+                    {isBooking ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
+                        Booking...
+                      </>
+                    ) : (
+                      'Confirm Booking'
+                    )}
                   </button>
                 </div>
               </div>
