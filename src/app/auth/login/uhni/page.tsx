@@ -9,6 +9,14 @@ function UHNILoginRedirect() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    // Auth guard: if the user is already authenticated, send them home instead
+    // of looping them back through the login page (BUG_23 fix).
+    const userToken = localStorage.getItem('moda-user-token');
+    if (userToken) {
+      router.replace('/uhni');
+      return;
+    }
+
     // Redirect to unified login page, preserving any redirect parameter
     const redirect = searchParams.get('redirect');
     const targetUrl = redirect

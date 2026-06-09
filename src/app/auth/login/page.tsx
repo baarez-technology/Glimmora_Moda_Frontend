@@ -30,7 +30,7 @@ function LoginForm() {
   const redirectUrl = searchParams.get('redirect') || '/';
   const initialMode = searchParams.get('mode');
   const { showToast, setUserRole: setAppUserRole } = useApp();
-  const { setUserData } = useAuth();
+  const { setUserData, isAuthenticated, isHydrated, userData } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedTier, setSelectedTier] = useState<LoginTier>(
@@ -177,6 +177,30 @@ function LoginForm() {
     return () => clearInterval(interval);
   }, [otpLockedUntil]);
 
+  // Auth guard: redirect already-authenticated users away from the login page.
+  // This preserves the security intent of the original router.replace while
+  // allowing Back-button navigation to work normally for unauthenticated users.
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated) return;
+    // Determine the correct home based on auth type stored in localStorage.
+    // Priority: superadmin > brand > user (uhni or consumer).
+    if (typeof window !== 'undefined') {
+      const superadminToken = localStorage.getItem('moda-superadmin-token');
+      const brandToken = localStorage.getItem('moda-brand-token');
+      if (superadminToken) {
+        router.replace('/admin');
+        return;
+      }
+      if (brandToken) {
+        router.replace('/brand');
+        return;
+      }
+    }
+    // Regular user — route by role
+    const dest = userData?.role === 'uhni' ? '/uhni' : '/';
+    router.replace(dest);
+  }, [isHydrated, isAuthenticated, userData, router]);
+
   // Complete login after successful auth (shared by normal + 2FA flows)
   const completeLogin = (data: UserTokenResponse) => {
     if (!data.user || !data.access_token || !data.refresh_token) return;
@@ -196,9 +220,9 @@ function LoginForm() {
       if (redirectUrl && redirectUrl !== '/') {
         localStorage.setItem('moda-post-onboarding-redirect', redirectUrl);
       }
-      router.replace('/onboarding');
+      router.push('/onboarding');
     } else {
-      router.replace(redirectUrl);
+      router.push(redirectUrl);
     }
   };
 
@@ -222,7 +246,7 @@ function LoginForm() {
       /* non-fatal — admin layout will recover from missing legacy data */
     }
     showToast('Welcome to the Admin Console.', 'success');
-    router.replace('/admin');
+    router.push('/admin');
   };
 
   // Handle 2FA verification

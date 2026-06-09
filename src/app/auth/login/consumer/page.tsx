@@ -9,6 +9,18 @@ function ConsumerLoginRedirect() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    // Auth guard: if the user is already authenticated, send them home instead
+    // of looping them back through the login page (BUG_23 fix).
+    const userToken = localStorage.getItem('moda-user-token');
+    const userData = localStorage.getItem('moda-user-data');
+    if (userToken && userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        router.replace(parsed?.role === 'uhni' ? '/uhni' : '/');
+        return;
+      } catch { /* fall through to normal redirect */ }
+    }
+
     // Redirect to unified login page, preserving any redirect parameter
     const redirect = searchParams.get('redirect');
     const targetUrl = redirect
