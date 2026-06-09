@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowLeft, Lock, Sparkles, Calendar, Eye, Crown, MessageCircle, Check, XCircle } from 'lucide-react';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 import { useApp } from '@/context/AppContext';
 import { getPrivateCollections, requestCollectionAccess } from '@/services/uhni.service';
 import type { PrivateCollection } from '@/types';
@@ -216,9 +216,11 @@ export default function PrivateCollectionsPage() {
               <div key={collection.id} className="bg-white overflow-hidden group">
                 {/* Hero Image */}
                 <div className="relative aspect-[16/10] overflow-hidden">
-                  <Image
+                  <ImageWithFallback
                     src={collection.heroImage}
                     alt={collection.name}
+                    label={collection.name}
+                    variant="dark"
                     fill
                     className="object-cover transition-transform duration-700 group-hover:scale-105"
                   />

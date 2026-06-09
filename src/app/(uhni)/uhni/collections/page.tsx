@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight, Crown } from 'lucide-react';
 import * as collectionService from '@/services/collection.service';
 import { getCollections } from '@/services/recommendation.service';
 import type { Collection } from '@/types';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 
 export default function UHNICollectionsPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -71,18 +71,14 @@ export default function UHNICollectionsPage() {
                   className="group block"
                 >
                   <div className="relative aspect-[4/5] bg-charcoal-deep overflow-hidden mb-4">
-                    {collection.heroImage ? (
-                      <Image
-                        src={collection.heroImage}
-                        alt={collection.name}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-700"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="font-display text-2xl text-sand/30">{collection.name}</span>
-                      </div>
-                    )}
+                    <ImageWithFallback
+                      src={collection.heroImage}
+                      alt={collection.name}
+                      label={collection.name}
+                      variant="dark"
+                      fill
+                      className="object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
                     <div className="absolute inset-0 bg-gradient-to-t from-noir/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-4 group-hover:translate-y-0 opacity-0 group-hover:opacity-100 transition-all duration-500">
                       <span className="inline-flex items-center gap-2 text-gold-soft text-sm">

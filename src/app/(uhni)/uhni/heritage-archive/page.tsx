@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 import { ArrowLeft, Archive, Calendar, Sparkles, ArrowRight, Crown, BookOpen, Search, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { searchStories, getAllBrands } from '@/services/recommendation.service';
@@ -22,9 +22,6 @@ const TYPE_LABELS: Record<string, string> = {
   artisan: 'Artisan',
 };
 
-function safeImageSrc(src: string | undefined) {
-  return src && src.length > 0 ? src : 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=1600&q=90';
-}
 
 export default function HeritageAndStoriesPage() {
   const searchParams = useSearchParams();
@@ -257,7 +254,14 @@ export default function HeritageAndStoriesPage() {
                       <div className="bg-white p-6 shadow-sm hover:shadow-md transition-shadow">
                         {event.image && (
                           <div className="relative aspect-[16/10] mb-4 overflow-hidden">
-                            <Image src={event.image} alt={event.title} fill className="object-cover" />
+                            <ImageWithFallback
+                              src={event.image}
+                              alt={event.title}
+                              label={event.title}
+                              variant="dark"
+                              fill
+                              className="object-cover"
+                            />
                           </div>
                         )}
                         <div className="flex items-start justify-between gap-4 mb-3">
@@ -319,7 +323,14 @@ export default function HeritageAndStoriesPage() {
             <div className="grid md:grid-cols-2 gap-6">
               {journeys.slice(0, 4).map((journey) => (
                 <Link key={journey.id} href={`/discover/journeys/${journey.id}`} className="group relative aspect-[2/1] overflow-hidden">
-                  <Image src={journey.heroImage} alt={journey.title} fill className="object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <ImageWithFallback
+                    src={journey.heroImage}
+                    alt={journey.title}
+                    label={journey.title}
+                    variant="dark"
+                    fill
+                    className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-noir/80 via-noir/20 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-6">
                     <span className="text-[10px] tracking-[0.2em] uppercase text-gold-soft/80 block mb-1">{journey.duration} · {journey.difficulty}</span>
@@ -428,7 +439,14 @@ export default function HeritageAndStoriesPage() {
               {filteredStories.map((s) => (
                 <Link key={s.id} href={`/story/${s.slug}?storyId=${s.id}`} className="group bg-charcoal-deep border border-gold-soft/10 overflow-hidden">
                   <div className="relative aspect-[16/11] bg-noir">
-                    <Image src={safeImageSrc(s.heroImage)} alt={s.title} fill className="object-cover transition-transform duration-700 group-hover:scale-[1.03]" />
+                    <ImageWithFallback
+                      src={s.heroImage}
+                      alt={s.title}
+                      label={s.title}
+                      variant="dark"
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                    />
                   </div>
                   <div className="p-6">
                     <p className="text-[10px] tracking-[0.35em] uppercase text-gold-soft">{s.type}</p>
