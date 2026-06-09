@@ -2,12 +2,12 @@
 
 import { useState, useMemo, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight, Crown, AlertTriangle, RefreshCw } from 'lucide-react';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
@@ -444,9 +444,11 @@ function DiscoverContent() {
                     onMouseLeave={() => setActiveProductHover(null)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden mb-4 bg-charcoal-deep">
-                      <Image
-                        src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
+                      <ImageWithFallback
+                        src={product.images[0]?.url}
                         alt={product.name}
+                        label={product.name}
+                        variant="light"
                         fill
                         className="object-cover transition-transform duration-700 group-hover:scale-105"
                       />
@@ -549,9 +551,14 @@ function DiscoverContent() {
                     className="group"
                   >
                     <div className="relative aspect-square overflow-hidden mb-4 bg-charcoal-deep">
-                      {brand.logoUrl && (
-                        <Image src={brand.logoUrl} alt={brand.name} fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
-                      )}
+                      <ImageWithFallback
+                        src={brand.logoUrl}
+                        alt={brand.name}
+                        label={brand.name}
+                        variant="dark"
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-700"
+                      />
                       <div className="absolute inset-0 bg-gradient-to-t from-noir/60 to-transparent" />
                       <div className="absolute bottom-4 left-4">
                         <p className="font-display text-lg text-ivory-cream">{brand.name}</p>
@@ -577,9 +584,14 @@ function DiscoverContent() {
                     className="group bg-charcoal-deep border border-gold-soft/10 overflow-hidden"
                   >
                     <div className="relative aspect-[16/11] bg-noir">
-                      {story.heroImage && (
-                        <Image src={story.heroImage} alt={story.title} fill className="object-cover group-hover:scale-[1.03] transition-transform duration-700" />
-                      )}
+                      <ImageWithFallback
+                        src={story.heroImage}
+                        alt={story.title}
+                        label={story.title}
+                        variant="dark"
+                        fill
+                        className="object-cover group-hover:scale-[1.03] transition-transform duration-700"
+                      />
                     </div>
                     <div className="p-6">
                       <p className="text-[10px] tracking-[0.35em] uppercase text-gold-soft">{story.type}</p>
