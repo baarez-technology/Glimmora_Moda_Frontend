@@ -3,6 +3,7 @@
 import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 import { Clock, Share2, Bookmark, BookmarkCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -153,9 +154,11 @@ export default function StoryPage({ params }: StoryPageProps) {
           HERO - Full Screen Editorial
           ============================================ */}
       <section className="relative h-[85vh] min-h-[600px] max-h-[900px] w-full overflow-hidden">
-        <Image
+        <ImageWithFallback
           src={story.heroImage}
           alt={story.title}
+          label={story.title}
+          variant="dark"
           fill
           className={`object-cover transition-all duration-[2s] ease-out ${isLoaded ? 'scale-100' : 'scale-110'}`}
           priority
@@ -252,9 +255,11 @@ export default function StoryPage({ params }: StoryPageProps) {
                   return (
                     <figure key={index} className="my-16 -mx-8 md:-mx-16 lg:-mx-32">
                       <div className="relative aspect-[16/10] overflow-hidden">
-                        <Image
-                          src={section.mediaUrl || ''}
+                        <ImageWithFallback
+                          src={section.mediaUrl}
                           alt={section.content}
+                          label={section.content}
+                          variant="dark"
                           fill
                           className="object-cover"
                         />
@@ -316,9 +321,11 @@ export default function StoryPage({ params }: StoryPageProps) {
                   onMouseLeave={() => setActiveHover(null)}
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-5">
-                    <Image
-                      src={product.images[0]?.url || ''}
+                    <ImageWithFallback
+                      src={product.images[0]?.url}
                       alt={product.name}
+                      label={product.name}
+                      variant="light"
                       fill
                       className="object-cover transition-all duration-700 group-hover:scale-105"
                     />
@@ -389,9 +396,11 @@ export default function StoryPage({ params }: StoryPageProps) {
                     className="group"
                   >
                     <div className="relative aspect-[4/5] overflow-hidden mb-5">
-                      <Image
+                      <ImageWithFallback
                         src={storyItem.heroImage}
                         alt={storyItem.title}
+                        label={storyItem.title}
+                        variant="dark"
                         fill
                         className="object-cover transition-transform duration-700 group-hover:scale-105"
                       />

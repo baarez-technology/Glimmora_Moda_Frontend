@@ -3,6 +3,7 @@
 import { use, useState, useEffect, useRef, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 import { ArrowRight, MapPin, Clock, ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Star, Navigation, Phone } from 'lucide-react';
 import * as brandService from '@/services/brand.service';
 import { getRecommendedProductsPaginated, getRecommendedBrands, searchStories, getCollections } from '@/services/recommendation.service';
@@ -178,18 +179,16 @@ export default function BrandPage({ params }: BrandPageProps) {
     <div className="min-h-screen bg-ivory-cream">
       {/* ═══ HERO ═══ */}
       <section className="relative h-[70vh] min-h-[500px] overflow-hidden">
-        {brand.heroImage ? (
-          <Image
-            src={brand.heroImage}
-            alt={brand.name}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-charcoal-deep" />
-        )}
+        <ImageWithFallback
+          src={brand.heroImage}
+          alt={brand.name}
+          label={brand.name}
+          variant="dark"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-noir/80 via-noir/30 to-noir/10" />
 
         {/* Back Button */}
@@ -439,9 +438,11 @@ export default function BrandPage({ params }: BrandPageProps) {
                     onMouseLeave={() => setActiveProductHover(null)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden bg-parchment mb-3">
-                      <Image
-                        src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
+                      <ImageWithFallback
+                        src={product.images[0]?.url}
                         alt={product.name}
+                        label={product.name}
+                        variant="light"
                         fill
                         sizes="(max-width: 768px) 50vw, 25vw"
                         className={`object-cover transition-transform duration-700 ${activeProductHover === index ? 'scale-105' : 'scale-100'}`}
@@ -560,9 +561,11 @@ export default function BrandPage({ params }: BrandPageProps) {
                   className="group"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden bg-parchment mb-4">
-                    <Image
-                      src={collection.heroImage || 'https://placehold.co/800x500/F5F0EB/8B8680?text=Collection'}
+                    <ImageWithFallback
+                      src={collection.heroImage}
                       alt={collection.name}
+                      label={collection.name}
+                      variant="light"
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
@@ -602,9 +605,11 @@ export default function BrandPage({ params }: BrandPageProps) {
                   className="group bg-white"
                 >
                   <div className="relative aspect-[16/10] overflow-hidden">
-                    <Image
-                      src={story.heroImage || 'https://placehold.co/800x500/F5F0EB/8B8680?text=Story'}
+                    <ImageWithFallback
+                      src={story.heroImage}
                       alt={story.title}
+                      label={story.title}
+                      variant="dark"
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
                       className="object-cover transition-transform duration-700 group-hover:scale-105"
