@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 import { getAllBrands, getRecommendedProducts, searchStories } from '@/services/recommendation.service';
 import type { Product, Brand, BrandStory } from '@/types';
 import { formatPrice } from '@/lib/currency';
@@ -189,9 +190,11 @@ export default function HomePage() {
                 href={`/brand/${brands[0].slug}?brandId=${brands[0].id}`}
                 className="col-span-2 row-span-2 group relative aspect-square overflow-hidden bg-sand-light"
               >
-                <Image
+                <ImageWithFallback
                   src={brands[0].heroImage}
                   alt={brands[0].name}
+                  label={brands[0].name}
+                  variant="dark"
                   fill
                   sizes="(max-width: 768px) 100vw, 50vw"
                   className="object-cover transition-transform duration-1000 ease-out group-hover:scale-105"
@@ -215,9 +218,11 @@ export default function HomePage() {
                 href={`/brand/${brand.slug}?brandId=${brand.id}`}
                 className="group relative aspect-square overflow-hidden bg-sand-light"
               >
-                <Image
+                <ImageWithFallback
                   src={brand.heroImage}
                   alt={brand.name}
+                  label={brand.name}
+                  variant="dark"
                   fill
                   sizes="(max-width: 768px) 50vw, 25vw"
                   className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
@@ -257,9 +262,11 @@ export default function HomePage() {
                 className="group"
               >
                 <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-5">
-                  <Image
-                    src={featuredProducts[0].images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
+                  <ImageWithFallback
+                    src={featuredProducts[0].images[0]?.url}
                     alt={featuredProducts[0].name}
+                    label={featuredProducts[0].name}
+                    variant="light"
                     fill
                     sizes="(max-width: 1024px) 100vw, 50vw"
                     className="object-cover transition-transform duration-1000 ease-out group-hover:scale-[1.02]"
@@ -290,9 +297,11 @@ export default function HomePage() {
                   className="group"
                 >
                   <div className="relative aspect-[3/4] overflow-hidden bg-sand-light mb-3">
-                    <Image
-                      src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
+                    <ImageWithFallback
+                      src={product.images[0]?.url}
                       alt={product.name}
+                      label={product.name}
+                      variant="light"
                       fill
                       sizes="(max-width: 768px) 50vw, 25vw"
                       className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
@@ -334,9 +343,11 @@ export default function HomePage() {
           <div className="grid lg:grid-cols-2 min-h-[80vh]">
             {/* Left - Image */}
             <div className="relative aspect-[4/3] lg:aspect-auto overflow-hidden">
-              <Image
+              <ImageWithFallback
                 src={featuredStories[0].heroImage}
                 alt={featuredStories[0].title}
+                label={featuredStories[0].title}
+                variant="dark"
                 fill
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 className="object-cover"
@@ -390,9 +401,11 @@ export default function HomePage() {
                 className="group"
               >
                 <div className="relative aspect-[4/5] overflow-hidden bg-sand-light mb-4">
-                  <Image
+                  <ImageWithFallback
                     src={story.heroImage}
                     alt={story.title}
+                    label={story.title}
+                    variant="dark"
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"

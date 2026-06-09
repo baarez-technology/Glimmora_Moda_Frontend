@@ -4,6 +4,7 @@ import { useState, useMemo, useRef, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
+import ImageWithFallback from '@/components/shared/ImageWithFallback';
 import { Search, ArrowRight, X, SlidersHorizontal, ChevronLeft, ChevronRight } from 'lucide-react';
 import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/services/recommendation.service';
 import { useApp } from '@/context/AppContext';
@@ -492,9 +493,11 @@ function DiscoverContent() {
                     onMouseLeave={() => setActiveProductHover(null)}
                   >
                     <div className="relative aspect-[3/4] overflow-hidden bg-ivory-cream mb-6">
-                      <Image
-                        src={product.images[0]?.url || 'https://placehold.co/800x1000/F5F0EB/8B8680?text=No+Image'}
+                      <ImageWithFallback
+                        src={product.images[0]?.url}
                         alt={product.name}
+                        label={product.name}
+                        variant="light"
                         fill
                         className="object-cover transition-all duration-700 group-hover:scale-105"
                       />
@@ -674,9 +677,11 @@ function DiscoverContent() {
                       href={`/brand/${filteredBrands[0].slug}?brandId=${filteredBrands[0].id}`}
                       className="col-span-12 lg:col-span-8 group relative aspect-[16/9] overflow-hidden"
                     >
-                      <Image
-                        src={filteredBrands[0].heroImage || filteredBrands[0].logoUrl || 'https://placehold.co/1600x900/1A1A1A/C9A962?text=' + encodeURIComponent(filteredBrands[0].name)}
+                      <ImageWithFallback
+                        src={filteredBrands[0].heroImage || filteredBrands[0].logoUrl}
                         alt={filteredBrands[0].name}
+                        label={filteredBrands[0].name}
+                        variant="dark"
                         fill
                         className="object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-105"
                       />
@@ -703,9 +708,11 @@ function DiscoverContent() {
                         href={`/brand/${brand.slug}?brandId=${brand.id}`}
                         className="group relative aspect-[4/3] lg:aspect-[16/9] overflow-hidden"
                       >
-                        <Image
-                          src={brand.heroImage || brand.logoUrl || 'https://placehold.co/800x600/1A1A1A/C9A962?text=' + encodeURIComponent(brand.name)}
+                        <ImageWithFallback
+                          src={brand.heroImage || brand.logoUrl}
                           alt={brand.name}
+                          label={brand.name}
+                          variant="dark"
                           fill
                           className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                         />
@@ -724,9 +731,11 @@ function DiscoverContent() {
                       href={`/brand/${brand.slug}?brandId=${brand.id}`}
                       className="col-span-4 group relative aspect-square overflow-hidden"
                     >
-                      <Image
-                        src={brand.heroImage || brand.logoUrl || 'https://placehold.co/600x600/1A1A1A/C9A962?text=' + encodeURIComponent(brand.name)}
+                      <ImageWithFallback
+                        src={brand.heroImage || brand.logoUrl}
                         alt={brand.name}
+                        label={brand.name}
+                        variant="dark"
                         fill
                         className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                       />
@@ -766,9 +775,11 @@ function DiscoverContent() {
                     href={`/brand/${brand.slug}?brandId=${brand.id}`}
                     className="group relative aspect-[4/3] overflow-hidden"
                   >
-                    <Image
-                      src={brand.heroImage || brand.logoUrl || 'https://placehold.co/800x600/1A1A1A/C9A962?text=' + encodeURIComponent(brand.name)}
+                    <ImageWithFallback
+                      src={brand.heroImage || brand.logoUrl}
                       alt={brand.name}
+                      label={brand.name}
+                      variant="dark"
                       fill
                       className="object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
                     />
@@ -823,9 +834,11 @@ function DiscoverContent() {
                         className="group"
                       >
                         <div className="relative aspect-[4/5] overflow-hidden mb-6">
-                          <Image
+                          <ImageWithFallback
                             src={story.heroImage}
                             alt={story.title}
+                            label={story.title}
+                            variant="dark"
                             fill
                             className="object-cover transition-transform duration-700 group-hover:scale-105"
                           />
