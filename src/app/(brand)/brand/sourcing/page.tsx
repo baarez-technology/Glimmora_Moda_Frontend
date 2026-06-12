@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Search, Target, Clock, CheckCircle, Package, AlertCircle, Loader2 } from 'lucide-react';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
+import { BrandHero } from '@/components/brand/BrandHero';
+import { BrandKpiCard } from '@/components/brand/BrandKpiCard';
 import {
   fetchBrandSourcingRequests,
   type ApiBrandSourcingRequest,
@@ -121,7 +123,48 @@ export default function SourcingRequestsPage() {
         }
       />
 
-      <div className="p-8 space-y-6">
+      <div className="p-6 md:p-8 lg:p-10 space-y-10">
+        {/* Luxury Hero */}
+        <BrandHero
+          title="Sourcing"
+          emphasis="rare requests, refined response"
+          description="When a UHNI client seeks something specific — vintage, hard-to-find, made just for them — their request lands here for your atelier to answer."
+        />
+
+        {/* KPI Strip */}
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl text-charcoal-deep tracking-[-0.01em]">Requests</h2>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Active &amp; recent</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <BrandKpiCard
+              label="Total Requests"
+              value={requests.length}
+              hint="all-time"
+              accent="gold"
+            />
+            <BrandKpiCard
+              label="Pending"
+              value={requests.filter(r => r.status === 'pending').length}
+              hint="awaiting first response"
+              accent="warning"
+            />
+            <BrandKpiCard
+              label="Awaiting Approval"
+              value={requests.filter(r => r.status === 'awaiting_approval').length}
+              hint="client review"
+              accent="info"
+            />
+            <BrandKpiCard
+              label="Delivered"
+              value={requests.filter(r => r.status === 'delivered').length}
+              hint="successfully sourced"
+              accent="success"
+            />
+          </div>
+        </section>
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
           {filterTabs.map(tab => (

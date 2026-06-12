@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Plus, Search, Grid, List, Filter, Loader2, Download, Upload, ChevronDown, ChevronLeft, ChevronRight, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
+import { BrandHero } from '@/components/brand/BrandHero';
+import { BrandKpiCard } from '@/components/brand/BrandKpiCard';
 import { ApiProductCard, ApiProductGridCard } from '@/components/brand/ProductCard';
 import { fetchProducts, exportProductsFromBackend, computeTotalUnits } from '@/services/brand-product.service';
 import type { BackendProduct } from '@/services/brand-product.service';
@@ -278,7 +280,48 @@ export default function ProductsPage() {
         actions={headerActions}
       />
 
-      <div className="p-8 space-y-6">
+      <div className="p-6 md:p-8 lg:p-10 space-y-10">
+        {/* Luxury Hero */}
+        <BrandHero
+          title="Pieces"
+          emphasis="in your atelier"
+          description="Every piece you have crafted — those published, those in draft, those requiring restock. Refined details, ready for review."
+        />
+
+        {/* KPI Strip */}
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl text-charcoal-deep tracking-[-0.01em]">Catalogue</h2>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Live counts</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <BrandKpiCard
+              label="Active Pieces"
+              value={activeProducts.length}
+              hint="in your catalogue"
+              accent="gold"
+            />
+            <BrandKpiCard
+              label="Published"
+              value={activeProducts.filter(p => p.status === 'published').length}
+              hint="live for customers"
+              accent="success"
+            />
+            <BrandKpiCard
+              label="Drafts"
+              value={activeProducts.filter(p => p.status === 'draft').length}
+              hint="awaiting publish"
+              accent="warning"
+            />
+            <BrandKpiCard
+              label="Low Stock"
+              value={activeProducts.filter(p => p.is_low_stock).length}
+              hint="restock recommended"
+              accent="error"
+            />
+          </div>
+        </section>
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit">
           {filterTabs.map(tab => (

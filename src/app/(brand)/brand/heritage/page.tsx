@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Plus, Clock, Award, Sparkles, Star, Layers, Users, Trash2, Pencil, Loader2, Upload, Download, ChevronDown, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
+import { BrandHero } from '@/components/brand/BrandHero';
+import { BrandKpiCard } from '@/components/brand/BrandKpiCard';
 import { fetchHeritageEvents, softDeleteHeritageEvent, exportHeritageEvents } from '@/services/brand-heritage.service';
 import type { HeritageEventResponse } from '@/services/brand-heritage.service';
 import HeritageUploadModal from '@/components/brand/HeritageUploadModal';
@@ -239,7 +241,48 @@ export default function HeritagePage() {
         actions={headerActions}
       />
 
-      <div className="p-8 space-y-6">
+      <div className="p-6 md:p-8 lg:p-10 space-y-10">
+        {/* Luxury Hero */}
+        <BrandHero
+          title="Heritage"
+          emphasis="the maison's archive"
+          description="Founding, milestones, awards, collaborations — the chronicle of how your maison came to be, preserved here for the customers who care."
+        />
+
+        {/* KPI Strip */}
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl text-charcoal-deep tracking-[-0.01em]">Archive</h2>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Chronological view</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <BrandKpiCard
+              label="Events"
+              value={activeEvents.length}
+              hint="across the timeline"
+              accent="gold"
+            />
+            <BrandKpiCard
+              label="Milestones"
+              value={activeEvents.filter(e => e.significance_type === 'milestone').length}
+              hint="defining moments"
+              accent="success"
+            />
+            <BrandKpiCard
+              label="Innovations"
+              value={activeEvents.filter(e => e.significance_type === 'innovation').length}
+              hint="craft breakthroughs"
+              accent="info"
+            />
+            <BrandKpiCard
+              label="Awards & Cultural"
+              value={activeEvents.filter(e => e.significance_type === 'award' || e.significance_type === 'cultural').length}
+              hint="recognition received"
+              accent="warning"
+            />
+          </div>
+        </section>
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
           {filterTabs.map(tab => (
