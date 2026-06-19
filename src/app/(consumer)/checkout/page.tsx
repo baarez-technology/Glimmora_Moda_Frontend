@@ -206,6 +206,15 @@ export default function CheckoutPage() {
         payment_currency: currency,
       };
 
+      // TODO(payment): Razorpay integration is wired in src/services/payment.service.ts
+      //   (createRazorpayOrder + openRazorpayCheckout + verifyRazorpayPayment)
+      //   but is NOT yet driving this flow. Current code uses demo placeholder values
+      //   ('Demo Card •••• 4242' / 'demo_txn_...' / payment_status='paid') to seed the
+      //   order directly. Real flow should be:
+      //     1. const rzpOrder = await createRazorpayOrder({ address_id, customer_phone_number, delivery_method, payment_currency });
+      //     2. const confirmed  = await openRazorpayCheckout(rzpOrder, { name: 'ModaGlimmora', prefill: { name, email, contact } });
+      //     3. then call orderManagementService.createOrder (or use the confirmed order from BE directly).
+      //   See FE_DEFECTS_AND_HANDOFF.md (P0) for full scope.
       const key = idempotencyKey || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : undefined);
       const createdOrder = await orderManagementService.createOrder(payload, key);
       setPlacedOrder(createdOrder);
