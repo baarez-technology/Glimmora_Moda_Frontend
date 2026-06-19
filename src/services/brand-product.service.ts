@@ -313,6 +313,7 @@ export interface ProductCreatePayload {
   craft_tags?: string[];
   editorial_narrative?: string;
   video_assets?: Array<string | VideoAsset>;
+  motion_assets?: string[];
   // SOW 41P.4 — accepts both legacy internal vocab and Section-1 spec vocab.
   visibility_scope?: BackendProduct['visibility_scope'];
   experience_mode?: BackendProduct['experience_mode'];
@@ -344,6 +345,7 @@ export interface ProductUpdatePayload {
   craft_tags?: string[];
   editorial_narrative?: string;
   video_assets?: Array<string | VideoAsset>;
+  motion_assets?: string[];
   // SOW 41P.4 — accepts both legacy internal vocab and Section-1 spec vocab.
   visibility_scope?: BackendProduct['visibility_scope'];
   experience_mode?: BackendProduct['experience_mode'];

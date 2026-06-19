@@ -524,38 +524,54 @@ function OnboardingContent() {
               COMPLETE
               ============================================ */}
           {currentStep === 'complete' && (
-            <div className={`text-center transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <div className="w-20 h-20 bg-charcoal-deep flex items-center justify-center mx-auto mb-10">
-                <Check size={32} className="text-gold-soft" />
+            <div className={`relative text-center py-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              {/* Soft editorial backdrop */}
+              <div className="absolute inset-0 -z-10 bg-dawn-luxury opacity-50 pointer-events-none" aria-hidden="true" />
+
+              {/* Refined check medallion */}
+              <div className="relative w-24 h-24 mx-auto mb-12">
+                <div className="absolute inset-0 rounded-full border border-gold-soft/50" />
+                <div className="absolute inset-2 rounded-full bg-charcoal-deep flex items-center justify-center">
+                  <Check size={28} className="text-gold-soft" strokeWidth={1.5} />
+                </div>
               </div>
 
-              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-6">
+              {/* Gold thread accent */}
+              <div className="w-12 h-px bg-gold-soft mx-auto mb-6" aria-hidden="true" />
+
+              <span className="text-[11px] font-semibold tracking-[0.5em] uppercase text-gold-deep block mb-6">
                 Profile Complete
               </span>
 
-              <h2 className="font-display text-[clamp(2rem,5vw,3rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-8">
-                Your Style Profile<br />is Ready
+              <h2 className="font-display text-[clamp(2rem,5vw,3.25rem)] text-charcoal-deep leading-[1.05] tracking-[-0.02em] mb-6">
+                Your Style Profile<br />
+                <span className="italic text-stone">is Ready</span>
               </h2>
 
-              <p className="text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
-                We'll curate recommendations that resonate with your preferences and evolve as you explore the collection.
+              <p className="text-base md:text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
+                Welcome to ModaGlimmora. We&rsquo;ll curate recommendations that resonate with your taste and evolve as you explore the maisons.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
                   href="/discover"
-                  className="group inline-flex items-center justify-center gap-4 py-4 px-8 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
+                  className="group inline-flex items-center justify-center gap-4 py-4 px-10 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
                 >
                   <span className="text-sm tracking-[0.15em] uppercase">Start Exploring</span>
-                  <ArrowRight size={16} />
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-300" />
                 </Link>
                 <Link
                   href="/profile"
-                  className="group inline-flex items-center justify-center gap-4 py-4 px-8 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300"
+                  className="group inline-flex items-center justify-center gap-4 py-4 px-10 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300"
                 >
                   <span className="text-sm tracking-[0.15em] uppercase">View Profile</span>
                 </Link>
               </div>
+
+              {/* Closing footer line */}
+              <p className="mt-16 text-[10px] tracking-[0.4em] uppercase text-stone/60">
+                A Baarez Technology production
+              </p>
             </div>
           )}
         </div>

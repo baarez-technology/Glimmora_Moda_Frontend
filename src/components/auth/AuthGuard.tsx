@@ -10,7 +10,9 @@ interface AuthGuardProps {
 
 // Public paths — accessible to unauthenticated visitors.
 // The page component is responsible for rendering anonymous vs authenticated views.
-const PUBLIC_PATHS = ['/'];
+// Legal pages (terms, privacy) must be publicly reachable so the register page
+// can link to them before the user is authenticated.
+const PUBLIC_PATHS = ['/', '/terms', '/privacy'];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.includes(pathname);

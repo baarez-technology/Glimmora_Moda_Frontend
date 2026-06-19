@@ -10,6 +10,7 @@ import { getAllBrands, getRecommendedProductsPaginated, searchStories } from '@/
 import { useApp } from '@/context/AppContext';
 import type { Product, Brand, BrandStory } from '@/types';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
+import { productHref } from '@/services/customer-collection.service';
 
 function DiscoverContent() {
   const searchParams = useSearchParams();
@@ -231,38 +232,17 @@ function DiscoverContent() {
   );
 
   const moodOptions = useMemo(() => {
-    // Keep ids aligned with onboarding ("minimal", "classic", "artistic", "contemporary")
-    const allowedIds = ['minimal', 'classic', 'artistic', 'contemporary'] as const;
-    const labels: Record<string, string> = {
-      minimal: 'Minimal & Structured',
-      classic: 'Classic & Timeless',
-      artistic: 'Artistic & Expressive',
-      contemporary: 'Bold & Contemporary',
-    };
-    const present = new Set<string>();
-
-    products.forEach((p) => {
-      p.tags?.forEach((tag) => {
-        const raw = tag.toLowerCase().replace(/\s+/g, '-');
-
-        // Map richer backend aesthetic tokens to the UI buckets
-        const bucket =
-          raw.includes('minimal') ? 'minimal'
-          : raw.includes('classic') || raw.includes('timeless') ? 'classic'
-          : raw.includes('art') || raw.includes('cultural') || raw.includes('expressive') ? 'artistic'
-          : raw.includes('contemporary') || raw.includes('bold') || raw.includes('statement') || raw.includes('modern') ? 'contemporary'
-          : null;
-
-        if (bucket && allowedIds.includes(bucket)) {
-          present.add(bucket);
-        }
-      });
-    });
-
-    return allowedIds
-      .filter((id) => present.has(id))
-      .map((id) => ({ id, label: labels[id] }));
-  }, [products]);
+    // Keep ids aligned with onboarding ("minimal", "classic", "artistic", "contemporary").
+    // Always show the full canonical set so the filter list does not shrink as
+    // products are filtered — users must be able to clear or change a selection
+    // without the option disappearing from the panel.
+    return [
+      { id: 'minimal', label: 'Minimal & Structured' },
+      { id: 'classic', label: 'Classic & Timeless' },
+      { id: 'artistic', label: 'Artistic & Expressive' },
+      { id: 'contemporary', label: 'Bold & Contemporary' },
+    ];
+  }, []);
 
   const sym = getCurrencySymbol();
   const budgets = [
@@ -470,7 +450,7 @@ function DiscoverContent() {
                 </h2>
               </div>
               <p className="text-sm text-stone max-w-sm">
-                Exceptional pieces from distinguished maisons, selected for discerning taste.
+                Hand-picked pieces from leading luxury brands, chosen to match your style.
               </p>
             </div>
 
@@ -487,7 +467,7 @@ function DiscoverContent() {
                 {displayProducts.map((product, index) => (
                   <Link
                     key={product.id}
-                    href={`/product/${product.slug}?productId=${product.id}`}
+                    href={productHref(product.id, product.name)}
                     className="group"
                     onMouseEnter={() => setActiveProductHover(index)}
                     onMouseLeave={() => setActiveProductHover(null)}
@@ -953,7 +933,7 @@ function DiscoverContent() {
           FILTER DRAWER - Refined Overlay
           ============================================ */}
       <div
-        className={`fixed inset-0 z-50 transition-opacity duration-500 ${showMobileFilters ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-[60] transition-opacity duration-500 ${showMobileFilters ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
         {/* Backdrop */}
         <div

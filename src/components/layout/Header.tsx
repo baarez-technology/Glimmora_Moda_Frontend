@@ -154,14 +154,12 @@ export default function Header() {
             <div
               ref={brandDropdownRef}
               className="relative"
-              onMouseEnter={() => setIsBrandDropdownOpen(true)}
-              onMouseLeave={() => setIsBrandDropdownOpen(false)}
             >
               <button
                 className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors py-2"
                 aria-haspopup="true"
                 aria-expanded={isBrandDropdownOpen}
-                onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+                onClick={() => setIsBrandDropdownOpen(prev => !prev)}
               >
                 Brand Universes
               </button>
