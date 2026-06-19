@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palette } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
@@ -10,11 +11,31 @@ import { invalidateRecommendationsCache } from '@/services/recommendation.servic
 import { getCurrencySymbol } from '@/lib/currency';
 
 type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
+const STEPS: Step[] = ['welcome', 'occasions', 'aesthetics', 'confidence', 'budget', 'complete'];
 
-export default function OnboardingPage() {
+function isStep(value: string | null): value is Step {
+  return value !== null && (STEPS as string[]).includes(value);
+}
+
+function OnboardingContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast, fashionIdentity, updateFashionIdentity } = useApp();
   const { setUserData } = useAuth();
-  const [currentStep, setCurrentStep] = useState<Step>('welcome');
+
+  // Step is URL-driven via ?step=. Browser back/forward updates this naturally
+  // so the wizard plays well with the browser history stack.
+  const stepParam = searchParams.get('step');
+  const currentStep: Step = isStep(stepParam) ? stepParam : 'welcome';
+
+  const goToStep = useCallback((step: Step) => {
+    if (step === 'welcome') {
+      router.push('/onboarding');
+    } else {
+      router.push(`/onboarding?step=${step}`);
+    }
+  }, [router]);
+
   const [isSavingContext, setIsSavingContext] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
@@ -48,13 +69,16 @@ export default function OnboardingPage() {
           budgetRange: fashionIdentity.budgetRange
         });
         setHasExistingProfile(true);
-        // Skip welcome screen and go directly to first step for editing
-        setCurrentStep('occasions');
+        // Only jump to the first preference step on a fresh entry. Respect an
+        // explicit ?step=... so refresh/deep-link doesn't snap users back.
+        if (!stepParam) {
+          goToStep('occasions');
+        }
       }
     }
     setIsInitialized(true);
     setIsLoaded(true);
-  }, [fashionIdentity, isInitialized]);
+  }, [fashionIdentity, isInitialized, stepParam, goToStep]);
 
   const occasionOptions = [
     { id: 'professional', label: 'Professional', desc: 'Business meetings & work', icon: Briefcase },
@@ -95,10 +119,9 @@ export default function OnboardingPage() {
   };
 
   const nextStep = async () => {
-    const steps: Step[] = ['welcome', 'occasions', 'aesthetics', 'confidence', 'budget', 'complete'];
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex < steps.length - 1) {
-      const nextStepValue = steps[currentIndex + 1];
+    const currentIndex = STEPS.indexOf(currentStep);
+    if (currentIndex < STEPS.length - 1) {
+      const nextStepValue = STEPS[currentIndex + 1];
       if (nextStepValue === 'complete') {
         // Create complete FashionIdentity object matching the type schema
         const confidenceLevel = selections.confidenceLevel || 'guided';
@@ -142,15 +165,21 @@ export default function OnboardingPage() {
           }
         }
       }
-      setCurrentStep(nextStepValue);
+      goToStep(nextStepValue);
     }
   };
 
   const prevStep = () => {
-    const steps: Step[] = ['welcome', 'occasions', 'aesthetics', 'confidence', 'budget', 'complete'];
-    const currentIndex = steps.indexOf(currentStep);
+    // Use the browser history so back-arrow consistently undoes the user's
+    // most recent forward action — including any external entry that led
+    // them onto the wizard (e.g. /auth/register).
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      router.back();
+      return;
+    }
+    const currentIndex = STEPS.indexOf(currentStep);
     if (currentIndex > 0) {
-      setCurrentStep(steps[currentIndex - 1]);
+      goToStep(STEPS[currentIndex - 1]);
     }
   };
 
@@ -532,5 +561,13 @@ export default function OnboardingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-ivory-cream" />}>
+      <OnboardingContent />
+    </Suspense>
   );
 }

@@ -9,9 +9,12 @@ import { getAllBrands, getRecommendedProducts, searchStories } from '@/services/
 import type { Product, Brand, BrandStory } from '@/types';
 import { formatPrice } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
+import LandingPage from '@/components/landing/LandingPage';
 
 export default function HomePage() {
   const { currency } = useApp();
+  const { isAuthenticated, isHydrated } = useAuth();
   const [isLoaded, setIsLoaded] = useState(false);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
@@ -20,6 +23,15 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isHydrated) return;
+
+    // Public landing — skip API calls for unauthenticated visitors.
+    if (!isAuthenticated) {
+      setLoading(false);
+      setIsLoaded(true);
+      return;
+    }
+
     async function loadData() {
       try {
         const [recommendedBrands, recommendedProducts, stories] = await Promise.all([
@@ -39,7 +51,12 @@ export default function HomePage() {
       }
     }
     loadData();
-  }, []);
+  }, [isHydrated, isAuthenticated]);
+
+  // Anonymous visitors see the public landing page.
+  if (isHydrated && !isAuthenticated) {
+    return <LandingPage />;
+  }
 
   if (loading) {
     return (

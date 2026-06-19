@@ -10,30 +10,42 @@ import { useApp } from '@/context/AppContext';
 import ConfirmModal from '@/components/shared/ConfirmModal';
 import * as cartService from '@/services/customer-collection.service';
 import { productHref } from '@/services/customer-collection.service';
-import type { CartItem } from '@/services/customer-collection.service';
 
 export default function CartPage() {
   const { isAuthenticated, isHydrated } = useAuth();
-  const { showToast, refreshCart: syncHeaderCart, currency } = useApp();
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const {
+    cartItems,
+    refreshCart,
+    removeFromCart,
+    updateCartQuantity,
+    clearAllCart,
+    currency,
+  } = useApp();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [showClearAll, setShowClearAll] = useState(false);
   const [updatingQtyId, setUpdatingQtyId] = useState<string | null>(null);
 
+  // Single source of truth: AppContext's sessionStorage-backed cart.
+  // We do a direct probe on mount to surface errors; AppContext is then
+  // refreshed in parallel so header badge and cart page can never disagree.
   const fetchCart = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const items = await cartService.getCart();
-      setCartItems(items);
+      const [items] = await Promise.all([
+        cartService.getCart(),
+        refreshCart(),
+      ]);
+      // refreshCart already pushed to AppContext; items is just for error surfacing.
+      void items;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load cart');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshCart]);
 
   useEffect(() => {
     if (isHydrated && isAuthenticated) {
@@ -46,12 +58,7 @@ export default function CartPage() {
   const handleRemove = async (cartId: string) => {
     setRemovingId(cartId);
     try {
-      await cartService.removeFromCart(cartId);
-      setCartItems((prev) => prev.filter((item) => item.cart_id !== cartId));
-      showToast('Item removed from cart', 'info');
-      syncHeaderCart();
-    } catch {
-      showToast('Failed to remove item', 'error');
+      await removeFromCart(cartId);
     } finally {
       setRemovingId(null);
     }
@@ -59,29 +66,16 @@ export default function CartPage() {
 
   const handleQuantityChange = async (cartId: string, newQty: number) => {
     if (newQty < 1) return;
-    const currentItem = cartItems.find((item) => item.cart_id === cartId);
-    if (!currentItem) return;
     setUpdatingQtyId(cartId);
     try {
-      const updated = await cartService.updateCartQuantity(cartId, newQty, currentItem);
-      setCartItems((prev) => prev.map((item) => item.cart_id === cartId ? updated : item));
-      syncHeaderCart();
-    } catch {
-      showToast('Failed to update quantity', 'error');
+      await updateCartQuantity(cartId, newQty);
     } finally {
       setUpdatingQtyId(null);
     }
   };
 
   const handleClearAll = async () => {
-    try {
-      await cartService.clearAllCart();
-      setCartItems([]);
-      showToast('Cart cleared', 'info');
-      syncHeaderCart();
-    } catch {
-      showToast('Failed to clear cart', 'error');
-    }
+    await clearAllCart();
   };
 
   const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);

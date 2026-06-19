@@ -103,7 +103,7 @@ export function getMockFashionPassport(productId: string): FashionPassport {
 
 export const heritageEvents: HeritageEvent[] = [
   // Dior Heritage
-  { id: 'dior-1946', brandId: 'dior', year: 1946, title: 'House Founded', description: 'Christian Dior establishes his couture house at 30 Avenue Montaigne, Paris.', longDescription: 'With backing from textile magnate Marcel Boussac, Christian Dior opened his fashion house, beginning a revolution in post-war fashion.', image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800', significance: 'milestone' },
+  { id: 'dior-1946', brandId: 'dior', year: 1946, title: 'House Founded', description: 'Christian Dior establishes his couture house at 30 Avenue Montaigne, Paris.', longDescription: 'With backing from textile magnate Marcel Boussac, Christian Dior opened his fashion house, beginning a revolution in post-war fashion.', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800', significance: 'milestone' },
   { id: 'dior-1947', brandId: 'dior', year: 1947, title: 'The New Look', description: 'Revolutionary debut collection introduces the iconic "New Look" silhouette.', longDescription: 'The collection featured cinched waists, padded hips, and full skirts, celebrating femininity after years of wartime austerity. Harper\'s Bazaar editor Carmel Snow famously exclaimed, "It\'s such a new look!"', image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800', significance: 'milestone', relatedProducts: ['bar-jacket'] },
   { id: 'dior-1995', brandId: 'dior', year: 1995, title: 'Lady Dior Created', description: 'The Lady Dior bag is created, destined to become Princess Diana\'s favorite.', longDescription: 'Originally named "Chouchou," the bag was renamed after Lady Diana, who received it as a gift from First Lady Bernadette Chirac and became inseparable from it.', image: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800', significance: 'innovation', relatedProducts: ['lady-dior-small'] },
   { id: 'dior-2016', brandId: 'dior', year: 2016, title: 'Maria Grazia Chiuri', description: 'First female artistic director appointed in the house\'s 70-year history.', longDescription: 'Maria Grazia Chiuri brings a feminist perspective to the house, blending heritage with contemporary cultural discourse.', significance: 'cultural' },
@@ -188,7 +188,7 @@ export const culturalJourneys: CulturalJourney[] = [
     title: 'Decades of Style',
     subtitle: 'Fashion Through the Ages',
     description: 'Trace the evolution of style from the post-war New Look to today\'s sustainable luxury movement.',
-    heroImage: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1920',
+    heroImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1920',
     duration: '20 min',
     difficulty: 'intermediate',
     stops: [

@@ -82,7 +82,7 @@ export default function NewPrivateCollectionPage() {
       await createPrivateCollection({
         private_collection_name: formData.name,
         description: formData.description,
-        image_url: formData.heroImage || 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1200&q=80',
+        image_url: formData.heroImage || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=1200&q=80',
         access_level: formData.accessLevel,
         preview_date: formData.previewDate ? new Date(formData.previewDate).toISOString() : null,
         release_date: formData.releaseDate ? new Date(formData.releaseDate).toISOString() : null,
