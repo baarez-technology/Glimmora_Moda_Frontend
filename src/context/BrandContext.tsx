@@ -342,6 +342,23 @@ export function BrandProvider({ children }: { children: ReactNode }) {
     defaultCurrency: 'EUR'
   });
 
+  // Detects an expired-token error message so we can auto-logout and bounce to login.
+  const isAuthExpiredError = (err: unknown): boolean => {
+    const msg = err instanceof Error ? err.message : String(err ?? '');
+    return /401|signature has expired|token validation failed|unauthor/i.test(msg);
+  };
+
+  // Wipe brand session and redirect to login when the token is no longer valid.
+  // Prevents users from staring at "401 Unauthorized" — they get bounced to the
+  // login form with a clear reason instead.
+  const forceReauthOnExpiredSession = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      ['moda-brand-token', 'moda-brand-refresh-token', 'moda-brand-data'].forEach(k => localStorage.removeItem(k));
+    } catch { /* ignore */ }
+    window.location.href = '/auth/login?mode=brand&reason=session_expired';
+  };
+
   // Load all brand data from service
   const loadBrandData = useCallback(async () => {
     setIsLoading(true);
@@ -363,6 +380,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           console.log('[BrandContext] Loaded bespoke orders:', realBespoke.length);
           setBespokeOrders(realBespoke);
         } catch (err) {
+          if (isAuthExpiredError(err)) { forceReauthOnExpiredSession(); return; }
           console.error('[BrandContext] Failed to load bespoke orders:', err instanceof Error ? err.message : err);
         }
         // No mock data for negotiations — no backend API yet
@@ -373,6 +391,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           console.log('[BrandContext] Loaded private collections:', realCollections.length);
           setPrivateCollections(realCollections);
         } catch (err) {
+          if (isAuthExpiredError(err)) { forceReauthOnExpiredSession(); return; }
           console.error('[BrandContext] Failed to load private collections:', err instanceof Error ? err.message : err);
         }
         // Sourcing requests are loaded directly by the sourcing page via brand-sourcing.service
@@ -384,6 +403,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
         setStylingSessions([]);
       }
     } catch (err) {
+      if (isAuthExpiredError(err)) { forceReauthOnExpiredSession(); return; }
       setError(err instanceof Error ? err.message : 'Failed to load brand data');
     } finally {
       setIsLoading(false);

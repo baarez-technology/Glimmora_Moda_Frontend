@@ -301,6 +301,19 @@ export async function getRecommendedProductsPaginated(
 
     if (!res.ok) {
       const errBody = await res.text().catch(() => '');
+      const emptyResult: PaginatedProducts = {
+        products: [],
+        totalMatched: 0,
+        totalPages: 0,
+        pageNumber: body.page_number || 1,
+        pageSize: body.page_size || 20,
+      };
+      // ES outages / BE search failures should not crash consumer pages — return
+      // empty result so callers render their natural empty states.
+      if (res.status >= 500 || res.status === 503 || res.status === 404) {
+        console.warn(`[products] Search backend unavailable (${res.status}). Returning empty result.`, errBody.slice(0, 200));
+        return emptyResult;
+      }
       console.error(`[products] API error ${res.status}:`, errBody);
       throw new Error(`Products API error (${res.status})`);
     }

@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Search, Scissors, Clock, CheckCircle, Palette, Ruler, Loader2, RefreshCw } from 'lucide-react';
 import { BrandPageHeader } from '@/components/brand/BrandPageHeader';
+import { BrandHero } from '@/components/brand/BrandHero';
+import { BrandKpiCard } from '@/components/brand/BrandKpiCard';
 import { fetchBrandBespokeOrders } from '@/services/bespoke.service';
 import type { BespokeOrder } from '@/types/uhni';
 import type { BespokeOrderStatus, BespokeOrderType } from '@/types/uhni';
@@ -113,7 +115,48 @@ export default function BespokeOrdersPage() {
         </button>
       </BrandPageHeader>
 
-      <div className="p-8 space-y-6">
+      <div className="p-6 md:p-8 lg:p-10 space-y-10">
+        {/* Luxury Hero */}
+        <BrandHero
+          title="Bespoke"
+          emphasis="one piece, one client"
+          description="Made-to-measure, custom design, modifications — orders that travel from consultation through fitting to completion."
+        />
+
+        {/* KPI Strip */}
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl text-charcoal-deep tracking-[-0.01em]">Atelier Pipeline</h2>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Active commissions</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <BrandKpiCard
+              label="Total Commissions"
+              value={bespokeOrders.length}
+              hint="all-time"
+              accent="gold"
+            />
+            <BrandKpiCard
+              label="In Consultation"
+              value={bespokeOrders.filter(o => o.status === 'consultation').length}
+              hint="early conversation"
+              accent="info"
+            />
+            <BrandKpiCard
+              label="In Production"
+              value={bespokeOrders.filter(o => o.status === 'production' || o.status === 'fitting' || o.status === 'final_adjustments').length}
+              hint="at the atelier"
+              accent="warning"
+            />
+            <BrandKpiCard
+              label="Completed"
+              value={bespokeOrders.filter(o => o.status === 'complete').length}
+              hint="delivered to client"
+              accent="success"
+            />
+          </div>
+        </section>
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit overflow-x-auto">
           {filterTabs.map(tab => (

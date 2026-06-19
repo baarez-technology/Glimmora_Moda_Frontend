@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Plus, ChevronRight, Package, Loader2, Download, Upload, ChevronDown, FileJson, FileText, FileSpreadsheet } from 'lucide-react';
 import { BrandPageHeader, PrimaryButton } from '@/components/brand/BrandPageHeader';
+import { BrandHero } from '@/components/brand/BrandHero';
+import { BrandKpiCard } from '@/components/brand/BrandKpiCard';
 import { fetchCollections, exportCollectionsFromBackend } from '@/services/brand-collection.service';
 import type { CollectionResponse } from '@/services/brand-collection.service';
 import CollectionBulkUploadModal from '@/components/brand/CollectionBulkUploadModal';
@@ -176,7 +178,48 @@ export default function CollectionsPage() {
         actions={headerActions}
       />
 
-      <div className="p-8 space-y-6">
+      <div className="p-6 md:p-8 lg:p-10 space-y-10">
+        {/* Luxury Hero */}
+        <BrandHero
+          title="Collections"
+          emphasis="curated narratives"
+          description="A collection is more than pieces — it is a season, a mood, a story you tell. Group, publish, and share."
+        />
+
+        {/* KPI Strip */}
+        <section>
+          <div className="flex items-baseline justify-between mb-5">
+            <h2 className="font-display text-xl text-charcoal-deep tracking-[-0.01em]">Library</h2>
+            <span className="text-[10px] tracking-[0.3em] uppercase text-taupe">Curatorial overview</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <BrandKpiCard
+              label="Active Collections"
+              value={activeCollections.length}
+              hint="all narratives"
+              accent="gold"
+            />
+            <BrandKpiCard
+              label="Published"
+              value={activeCollections.filter(c => normalizeStatus(c.status) === 'published').length}
+              hint="visible to customers"
+              accent="success"
+            />
+            <BrandKpiCard
+              label="Drafts"
+              value={activeCollections.filter(c => normalizeStatus(c.status) === 'draft').length}
+              hint="awaiting curation"
+              accent="warning"
+            />
+            <BrandKpiCard
+              label="Archived"
+              value={deletedCollections.length}
+              hint="retired but preserved"
+              accent="neutral"
+            />
+          </div>
+        </section>
+
         {/* Filter Tabs */}
         <div className="flex items-center gap-1 bg-parchment p-1 w-fit">
           {filterTabs.map(tab => (
