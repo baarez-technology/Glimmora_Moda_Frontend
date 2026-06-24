@@ -36,8 +36,8 @@ function getAuthHeaders(): Record<string, string> {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ConversationMeta {
-  id: string;
-  user_id: string;
+  conversation_id: string;
+  user_id?: string;
   title: string;
   created_at: string;
   updated_at: string;
