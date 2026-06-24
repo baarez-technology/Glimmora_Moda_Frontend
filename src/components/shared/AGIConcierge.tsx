@@ -18,6 +18,11 @@ interface Message {
   isStreaming?: boolean;
 }
 
+// Set to true once nginx proxies WebSocket upgrades. While false, all
+// messages go via the REST fallback (POST /{id}/messages) which works
+// through the Next.js /api/v1/* rewrite without any WS upgrade support.
+const USE_WEBSOCKET = false;
+
 const defaultInitialMessage: Message = {
   id: '1',
   role: 'assistant',
@@ -96,7 +101,7 @@ export default function AGIConcierge() {
     if (!token) return null;
 
     // Reuse existing conversation if available
-    if (conversationIdRef.current && wsSessionRef.current) {
+    if (conversationIdRef.current && (!USE_WEBSOCKET || wsSessionRef.current)) {
       return conversationIdRef.current;
     }
 
@@ -105,15 +110,15 @@ export default function AGIConcierge() {
     if (!conversationId) {
       try {
         const convo = await conversationService.createConversation();
-        conversationId = convo.id;
+        conversationId = convo.conversation_id;
         conversationIdRef.current = conversationId;
       } catch {
         return null;
       }
     }
 
-    // Open WebSocket for streaming
-    if (!wsSessionRef.current) {
+    // Open WebSocket for streaming (only when USE_WEBSOCKET is enabled)
+    if (USE_WEBSOCKET && !wsSessionRef.current) {
       wsSessionRef.current = conversationService.connectWebSocket(
         conversationId,
         token,
@@ -245,14 +250,14 @@ export default function AGIConcierge() {
       return;
     }
 
-    // Try WebSocket first (already open from ensureConversation)
-    if (wsSessionRef.current) {
+    // Try WebSocket first (only when USE_WEBSOCKET is enabled and socket is open)
+    if (USE_WEBSOCKET && wsSessionRef.current) {
       wsSessionRef.current.sendMessage(trimmed);
       // Response arrives via WS callbacks above
       return;
     }
 
-    // WebSocket unavailable — use REST fallback
+    // WebSocket disabled or unavailable — use REST
     try {
       const result = await conversationService.sendMessageRest(conversationId, trimmed);
       setMessages(prev =>
