@@ -21,10 +21,13 @@ import {
   FileWarning,
 } from 'lucide-react';
 import { fetchManagedBrands, updateBrandStatus } from '@/services/admin.service';
+import type { ManagedBrandItem } from '@/services/admin.service';
 import { getBrandWarningLevel, getReportsByBrand } from '@/services/reports.service';
 import type { ProductReport } from '@/services/reports.service';
 import { formatPrice } from '@/lib/currency';
-import type { ManagedBrand, BrandStatus } from '@/types/admin';
+import type { BrandStatus } from '@/types/admin';
+
+type ManagedBrand = ManagedBrandItem;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +84,7 @@ export default function BrandDetailPage() {
       const res = await fetchManagedBrands();
       if (cancelled) return;
 
-      const found = res.data?.find((b) => b.id === brandId);
+      const found = res?.brands?.find((b) => b.id === brandId);
       if (found) {
         setBrand(found);
         setWarning(getBrandWarningLevel(found.id));
@@ -97,8 +100,8 @@ export default function BrandDetailPage() {
   // Actions
   async function handleStatusChange(status: BrandStatus) {
     if (!brand) return;
-    const res = await updateBrandStatus(brand.id, status);
-    if (res.data) {
+    const ok = await updateBrandStatus(brand.id, status);
+    if (ok) {
       setBrand((prev) => (prev ? { ...prev, status } : null));
     }
   }
@@ -134,7 +137,7 @@ export default function BrandDetailPage() {
     );
   }
 
-  const status = STATUS_STYLES[brand.status];
+  const status = STATUS_STYLES[brand.status as BrandStatus] ?? STATUS_STYLES.pending;
   const warningStyle = WARNING_STYLES[warning.level] || WARNING_STYLES.none;
   const joinedDate = new Date(brand.partnerSince).toLocaleDateString('en-GB', {
     day: '2-digit',

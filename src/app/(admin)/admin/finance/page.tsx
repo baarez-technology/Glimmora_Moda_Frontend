@@ -21,11 +21,13 @@ import {
   updateCommissionRule,
 } from '@/services/admin.service';
 import type {
-  RevenueBreakdown,
-  CommissionRule,
-  Payout,
-  PayoutStatus,
-} from '@/types/admin';
+  RevenueBreakdown as RevenueBreakdownType,
+  CommissionRuleItem as CommissionRule,
+  PayoutItem as Payout,
+} from '@/services/admin.service';
+
+type RevenueBreakdown = RevenueBreakdownType;
+type PayoutStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -50,7 +52,7 @@ const TIER_BADGE_COLORS: Record<string, string> = {
   standard: 'bg-gray-100 text-gray-700 border border-gray-300',
 };
 
-const STATUS_BADGE_COLORS: Record<PayoutStatus, string> = {
+const STATUS_BADGE_COLORS: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800',
   processing: 'bg-blue-100 text-blue-800',
   completed: 'bg-emerald-100 text-emerald-800',
@@ -86,14 +88,14 @@ export default function FinancePage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const [revRes, crRes, poRes] = await Promise.all([
+      const [revData, crData, poData] = await Promise.all([
         fetchRevenueBreakdown(),
         fetchCommissionRules(),
         fetchPayouts(),
       ]);
-      if (revRes.data) setRevenue(revRes.data);
-      if (crRes.data) setCommissionRules(crRes.data);
-      if (poRes.data) setPayouts(poRes.data);
+      if (revData) setRevenue(revData);
+      setCommissionRules(crData);
+      setPayouts(poData);
       setLoading(false);
     }
     loadData();
@@ -110,10 +112,10 @@ export default function FinancePage() {
     const rate = parseFloat(editingRate);
     if (isNaN(rate) || rate < 0 || rate > 100) return;
     setSavingRule(true);
-    const res = await updateCommissionRule(ruleId, rate);
-    if (res.data) {
+    const updated = await updateCommissionRule(ruleId, rate);
+    if (updated) {
       setCommissionRules((prev) =>
-        prev.map((r) => (r.id === ruleId ? res.data! : r))
+        prev.map((r) => (r.id === ruleId ? updated : r))
       );
     }
     setEditingRuleId(null);
@@ -135,9 +137,9 @@ export default function FinancePage() {
   async function handleProcessPayouts() {
     if (selectedPayoutIds.size === 0) return;
     setProcessingPayouts(true);
-    const res = await processPayouts(Array.from(selectedPayoutIds));
-    if (res.data) {
-      const processedMap = new Map(res.data.map((p) => [p.id, p]));
+    const processed = await processPayouts(Array.from(selectedPayoutIds));
+    if (processed.length > 0) {
+      const processedMap = new Map(processed.map((p) => [p.id, p]));
       setPayouts((prev) =>
         prev.map((p) => processedMap.get(p.id) ?? p)
       );
@@ -441,7 +443,7 @@ export default function FinancePage() {
                         <td className="py-3 pr-4">
                           <span
                             className={`inline-block px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider rounded-full ${
-                              STATUS_BADGE_COLORS[payout.status]
+                              STATUS_BADGE_COLORS[payout.status as PayoutStatus] ?? 'bg-gray-100 text-gray-700'
                             }`}
                           >
                             {payout.status}

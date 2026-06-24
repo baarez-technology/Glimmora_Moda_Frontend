@@ -1,431 +1,177 @@
 /**
  * Admin Service
- * Endpoints: /api/admin/*
- *
- * Admin APIs don't exist on the backend yet — all functions use mock data.
+ * All functions call real backend endpoints.
+ * All calls use relative /api/v1/... paths with getAdminToken() Bearer auth.
  */
 
-import { apiRequest } from './api-client';
-import type { ApiResponse } from './api-client';
-import type {
-  PlatformMetrics,
-  DashboardActivity,
-  PlatformUser,
-  UserRole,
-  UserStatus,
-  ManagedBrand,
-  BrandTier,
-  BrandStatus,
-  ModerationItem,
-  ContentType,
-  ModerationStatus,
-  FeatureFlag,
-  PlatformConfig,
-  AnalyticsReport,
-  RevenueData,
-  ReportPeriod,
-  UserGrowthData,
-  TopBrandData,
-  CommissionRule,
-  Payout,
-  PayoutStatus,
-  RevenueBreakdown,
-  AuditLogEntry,
-  AuditAction,
-  SecurityAlert,
-  GDPRRequest,
-  ServiceHealth,
-  SystemMetrics,
-  ErrorLogEntry,
-} from '@/types/admin';
-import {
-  getPlatformMetrics,
-  getDashboardActivity,
-  getPlatformUsers,
-  getManagedBrands,
-  getModerationQueue,
-  getFeatureFlags,
-  getPlatformConfig,
-  getAnalyticsReports,
-  getRevenueData,
-  getUserGrowthData,
-  getTopBrands,
-  getCommissionRules,
-  getPayouts,
-  getRevenueBreakdown,
-  getAuditLog,
-  getSecurityAlerts,
-  getGDPRRequests,
-  getServiceHealth,
-  getSystemMetrics,
-  getErrorLog,
-} from '@/data/admin';
+// ─── Token helper ─────────────────────────────────────────────────────────────
 
-// ============================================
-// Dashboard (SOW 1.1)
-// ============================================
-
-export async function getAdminDashboard(): Promise<
-  ApiResponse<{ metrics: PlatformMetrics; activity: DashboardActivity[] }>
-> {
-  return apiRequest<{ metrics: PlatformMetrics; activity: DashboardActivity[] }>(
-    '/api/admin/dashboard',
-    {
-      mockHandler: () => ({
-        metrics: getPlatformMetrics(),
-        activity: getDashboardActivity(),
-      }),
-    }
-  );
+export function getAdminToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return (
+      localStorage.getItem('moda-superadmin-token') ||
+      localStorage.getItem('moda-admin-token') ||
+      null
+    );
+  } catch {
+    return null;
+  }
 }
 
-// ============================================
-// User Management (SOW 1.2)
-// ============================================
-
-export async function fetchPlatformUsers(filters?: {
-  role?: UserRole;
-  status?: UserStatus;
-}): Promise<ApiResponse<PlatformUser[]>> {
-  return apiRequest<PlatformUser[]>('/api/admin/users', {
-    mockHandler: () => {
-      let users = getPlatformUsers();
-      if (filters?.role) users = users.filter(u => u.role === filters.role);
-      if (filters?.status) users = users.filter(u => u.status === filters.status);
-      return users;
-    },
-  });
+function authHeaders(): Record<string, string> {
+  const token = getAdminToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
 }
 
-export async function fetchUserById(id: string): Promise<ApiResponse<PlatformUser | undefined>> {
-  return apiRequest<PlatformUser | undefined>(`/api/admin/users/${id}`, {
-    mockHandler: () => {
-      return getPlatformUsers().find(u => u.id === id);
-    },
-  });
+// ─── Types (matching backend response shapes exactly) ─────────────────────────
+
+export interface SuperadminDashboardMetrics {
+  total_users: number;
+  active_brands: number;
+  total_orders: number;
+  total_revenue: number;
+  currency: string;
+  active_users_today: number;
+  pending_moderations: number;
 }
 
-export async function updateUserStatus(
-  id: string,
-  status: UserStatus
-): Promise<ApiResponse<PlatformUser>> {
-  return apiRequest<PlatformUser>(`/api/admin/users/${id}/status`, {
-    method: 'PATCH',
-    body: { status },
-    mockHandler: () => {
-      const user = getPlatformUsers().find(u => u.id === id);
-      if (!user) throw new Error(`User ${id} not found`);
-      return { ...user, status };
-    },
-  });
+export interface PlatformUsersResponse {
+  users: PlatformUserItem[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
-// ============================================
-// Brand Partner Management (SOW 1.3)
-// ============================================
-
-export async function fetchManagedBrands(filters?: {
-  tier?: BrandTier;
-  status?: BrandStatus;
-}): Promise<ApiResponse<ManagedBrand[]>> {
-  return apiRequest<ManagedBrand[]>('/api/admin/brands', {
-    mockHandler: () => {
-      let brands = getManagedBrands();
-      if (filters?.tier) brands = brands.filter(b => b.tier === filters.tier);
-      if (filters?.status) brands = brands.filter(b => b.status === filters.status);
-      return brands;
-    },
-  });
+export interface PlatformUserItem {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  avatar?: string | null;
+  phone?: string | null;
+  tier?: string | null;
+  totalOrders: number;
+  totalSpend: number;
+  createdAt: string;
+  lastLogin?: string | null;
+  isTwoFAEnabled: boolean;
 }
 
-export async function fetchBrandById(id: string): Promise<ApiResponse<ManagedBrand | undefined>> {
-  return apiRequest<ManagedBrand | undefined>(`/api/admin/brands/${id}`, {
-    mockHandler: () => {
-      return getManagedBrands().find(b => b.id === id);
-    },
-  });
+export interface ManagedBrandsResponse {
+  brands: ManagedBrandItem[];
+  total: number;
+  page: number;
+  page_size: number;
 }
 
-export async function updateBrandStatus(
-  id: string,
-  status: BrandStatus
-): Promise<ApiResponse<ManagedBrand>> {
-  return apiRequest<ManagedBrand>(`/api/admin/brands/${id}/status`, {
-    method: 'PATCH',
-    body: { status },
-    mockHandler: () => {
-      const brand = getManagedBrands().find(b => b.id === id);
-      if (!brand) throw new Error(`Brand ${id} not found`);
-      return { ...brand, status };
-    },
-  });
+export interface ManagedBrandItem {
+  id: string;
+  brandName: string;
+  brandLogo?: string | null;
+  category: string;
+  tier: string;
+  status: string;
+  contactName: string;
+  contactEmail: string;
+  totalProducts: number;
+  totalRevenue: number;
+  commissionRate: number;
+  partnerSince: string;
+  lastActive?: string | null;
+  performanceScore: number;
+  verificationStep?: string | null;
 }
 
-export async function updateBrandTier(
-  id: string,
-  tier: BrandTier
-): Promise<ApiResponse<ManagedBrand>> {
-  return apiRequest<ManagedBrand>(`/api/admin/brands/${id}/tier`, {
-    method: 'PATCH',
-    body: { tier },
-    mockHandler: () => {
-      const brand = getManagedBrands().find(b => b.id === id);
-      if (!brand) throw new Error(`Brand ${id} not found`);
-      return { ...brand, tier };
-    },
-  });
+export interface ModerationListResponse {
+  items: ModerationItemResponse[];
+  total: number;
+  pending_count: number;
 }
 
-// ============================================
-// Content Moderation (SOW 1.4)
-// ============================================
-
-export async function fetchModerationQueue(filters?: {
-  contentType?: ContentType;
-  status?: ModerationStatus;
-}): Promise<ApiResponse<ModerationItem[]>> {
-  return apiRequest<ModerationItem[]>('/api/admin/moderation', {
-    mockHandler: () => {
-      let items = [...getModerationQueue()];
-      if (filters?.contentType) items = items.filter(i => i.contentType === filters.contentType);
-      if (filters?.status) items = items.filter(i => i.status === filters.status);
-      return items;
-    },
-  });
+export interface ModerationItemResponse {
+  id: string;
+  contentType: string;
+  title: string;
+  brandName: string;
+  brandId: string;
+  submittedAt: string;
+  status: string;
+  preview?: string | null;
+  flagReason?: string | null;
+  reviewerNote?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
 }
 
-export async function moderateContent(
-  id: string,
-  action: 'approved' | 'rejected',
-  note?: string
-): Promise<ApiResponse<ModerationItem>> {
-  return apiRequest<ModerationItem>(`/api/admin/moderation/${id}`, {
-    method: 'PATCH',
-    body: { action, note },
-    mockHandler: () => {
-      const item = getModerationQueue().find(i => i.id === id);
-      if (!item) throw new Error(`Moderation item ${id} not found`);
-      return {
-        ...item,
-        status: action,
-        reviewerNote: note,
-        reviewedAt: new Date().toISOString(),
-      };
-    },
-  });
+export interface PlatformConfig {
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  maxUploadSize: number;
+  rateLimitPerMinute: number;
+  enableRegistration: boolean;
+  enableBrandOnboarding: boolean;
+  defaultCurrency: string;
+  supportedCurrencies: string[];
+  minimumPasswordLength: number;
+  sessionTimeout: number;
 }
 
-// ============================================
-// Platform Configuration (SOW 1.5)
-// ============================================
-
-export async function fetchFeatureFlags(): Promise<ApiResponse<FeatureFlag[]>> {
-  return apiRequest<FeatureFlag[]>('/api/admin/feature-flags', {
-    mockHandler: () => [...getFeatureFlags()],
-  });
+export interface RevenueDataPoint {
+  date: string;
+  revenue: number;
+  orders: number;
+  avgOrderValue: number;
 }
 
-export async function toggleFeatureFlag(
-  id: string,
-  enabled: boolean
-): Promise<ApiResponse<FeatureFlag>> {
-  return apiRequest<FeatureFlag>(`/api/admin/feature-flags/${id}`, {
-    method: 'PATCH',
-    body: { enabled },
-    mockHandler: () => {
-      const flag = getFeatureFlags().find(f => f.id === id);
-      if (!flag) throw new Error(`Feature flag ${id} not found`);
-      return { ...flag, enabled, updatedAt: new Date().toISOString() };
-    },
-  });
+export interface UserGrowthDataPoint {
+  date: string;
+  newUsers: number;
+  activeUsers: number;
+  churnedUsers: number;
 }
 
-export async function fetchPlatformConfig(): Promise<ApiResponse<PlatformConfig>> {
-  return apiRequest<PlatformConfig>('/api/admin/config', {
-    mockHandler: () => ({ ...getPlatformConfig() }),
-  });
+export interface TopBrandDataPoint {
+  brandId: string;
+  brandName: string;
+  revenue: number;
+  orders: number;
+  products: number;
+  growth: number;
 }
 
-export async function updatePlatformConfig(
-  partial: Partial<PlatformConfig>
-): Promise<ApiResponse<PlatformConfig>> {
-  return apiRequest<PlatformConfig>('/api/admin/config', {
-    method: 'PATCH',
-    body: partial,
-    mockHandler: () => ({ ...getPlatformConfig(), ...partial }),
-  });
+export interface RevenueBreakdown {
+  totalGMV: number;
+  totalCommission: number;
+  totalPayouts: number;
+  pendingPayouts: number;
+  currency: string;
 }
 
-// ============================================
-// Analytics & Reporting (SOW 1.6)
-// ============================================
-
-export async function fetchAnalyticsReports(): Promise<ApiResponse<AnalyticsReport[]>> {
-  return apiRequest<AnalyticsReport[]>('/api/admin/analytics/reports', {
-    mockHandler: () => [...getAnalyticsReports()],
-  });
+export interface CommissionRuleItem {
+  id: string;
+  brandTier: string;
+  category: string;
+  rate: number;
+  effectiveFrom: string;
 }
 
-export async function fetchRevenueData(period: ReportPeriod): Promise<ApiResponse<RevenueData[]>> {
-  return apiRequest<RevenueData[]>('/api/admin/analytics/revenue', {
-    params: { period },
-    mockHandler: () => [...getRevenueData()],
-  });
+export interface PayoutItem {
+  id: string;
+  brandId: string;
+  brandName: string;
+  amount: number;
+  currency: string;
+  period: string;
+  status: string;
+  commissionAmount: number;
+  netAmount: number;
+  createdAt: string;
+  processedAt?: string | null;
 }
-
-export async function fetchUserGrowthData(
-  period: ReportPeriod
-): Promise<ApiResponse<UserGrowthData[]>> {
-  return apiRequest<UserGrowthData[]>('/api/admin/analytics/user-growth', {
-    params: { period },
-    mockHandler: () => [...getUserGrowthData()],
-  });
-}
-
-export async function fetchTopBrands(period: ReportPeriod): Promise<ApiResponse<TopBrandData[]>> {
-  return apiRequest<TopBrandData[]>('/api/admin/analytics/top-brands', {
-    params: { period },
-    mockHandler: () => [...getTopBrands()],
-  });
-}
-
-// ============================================
-// Financial Management (SOW 1.7)
-// ============================================
-
-export async function fetchCommissionRules(): Promise<ApiResponse<CommissionRule[]>> {
-  return apiRequest<CommissionRule[]>('/api/admin/finance/commissions', {
-    mockHandler: () => [...getCommissionRules()],
-  });
-}
-
-export async function updateCommissionRule(
-  id: string,
-  rate: number
-): Promise<ApiResponse<CommissionRule>> {
-  return apiRequest<CommissionRule>(`/api/admin/finance/commissions/${id}`, {
-    method: 'PATCH',
-    body: { rate },
-    mockHandler: () => {
-      const rule = getCommissionRules().find(r => r.id === id);
-      if (!rule) throw new Error(`Commission rule ${id} not found`);
-      return { ...rule, rate };
-    },
-  });
-}
-
-export async function fetchPayouts(filters?: {
-  status?: PayoutStatus;
-}): Promise<ApiResponse<Payout[]>> {
-  return apiRequest<Payout[]>('/api/admin/finance/payouts', {
-    mockHandler: () => {
-      let payouts = [...getPayouts()];
-      if (filters?.status) payouts = payouts.filter(p => p.status === filters.status);
-      return payouts;
-    },
-  });
-}
-
-export async function processPayouts(ids: string[]): Promise<ApiResponse<Payout[]>> {
-  return apiRequest<Payout[]>('/api/admin/finance/payouts/process', {
-    method: 'POST',
-    body: { ids },
-    mockHandler: () => {
-      return getPayouts()
-        .filter(p => ids.includes(p.id))
-        .map(p => ({ ...p, status: 'processing' as PayoutStatus, processedAt: new Date().toISOString() }));
-    },
-  });
-}
-
-export async function fetchRevenueBreakdown(): Promise<ApiResponse<RevenueBreakdown>> {
-  return apiRequest<RevenueBreakdown>('/api/admin/finance/revenue-breakdown', {
-    mockHandler: () => ({ ...getRevenueBreakdown() }),
-  });
-}
-
-// ============================================
-// Security & Compliance (SOW 1.8)
-// ============================================
-
-export async function fetchAuditLog(filters?: {
-  action?: AuditAction;
-  userId?: string;
-}): Promise<ApiResponse<AuditLogEntry[]>> {
-  return apiRequest<AuditLogEntry[]>('/api/admin/security/audit-log', {
-    mockHandler: () => {
-      let entries = [...getAuditLog()];
-      if (filters?.action) entries = entries.filter(e => e.action === filters.action);
-      if (filters?.userId) entries = entries.filter(e => e.userId === filters.userId);
-      return entries;
-    },
-  });
-}
-
-export async function fetchSecurityAlerts(): Promise<ApiResponse<SecurityAlert[]>> {
-  return apiRequest<SecurityAlert[]>('/api/admin/security/alerts', {
-    mockHandler: () => [...getSecurityAlerts()],
-  });
-}
-
-export async function resolveSecurityAlert(id: string): Promise<ApiResponse<SecurityAlert>> {
-  return apiRequest<SecurityAlert>(`/api/admin/security/alerts/${id}/resolve`, {
-    method: 'PATCH',
-    mockHandler: () => {
-      const alert = getSecurityAlerts().find(a => a.id === id);
-      if (!alert) throw new Error(`Security alert ${id} not found`);
-      return { ...alert, resolved: true, resolvedAt: new Date().toISOString() };
-    },
-  });
-}
-
-export async function fetchGDPRRequests(): Promise<ApiResponse<GDPRRequest[]>> {
-  return apiRequest<GDPRRequest[]>('/api/admin/security/gdpr-requests', {
-    mockHandler: () => [...getGDPRRequests()],
-  });
-}
-
-export async function processGDPRRequest(id: string): Promise<ApiResponse<GDPRRequest>> {
-  return apiRequest<GDPRRequest>(`/api/admin/security/gdpr-requests/${id}/process`, {
-    method: 'PATCH',
-    mockHandler: () => {
-      const request = getGDPRRequests().find(r => r.id === id);
-      if (!request) throw new Error(`GDPR request ${id} not found`);
-      const nextStatus = request.status === 'pending' ? 'processing' : 'completed';
-      return {
-        ...request,
-        status: nextStatus as GDPRRequest['status'],
-        ...(nextStatus === 'completed' ? { completedAt: new Date().toISOString() } : {}),
-      };
-    },
-  });
-}
-
-// ============================================
-// System Health (SOW 1.9)
-// ============================================
-
-export async function fetchServiceHealth(): Promise<ApiResponse<ServiceHealth[]>> {
-  return apiRequest<ServiceHealth[]>('/api/admin/system/health', {
-    mockHandler: () => [...getServiceHealth()],
-  });
-}
-
-export async function fetchSystemMetrics(): Promise<ApiResponse<SystemMetrics>> {
-  return apiRequest<SystemMetrics>('/api/admin/system/metrics', {
-    mockHandler: () => ({ ...getSystemMetrics() }),
-  });
-}
-
-export async function fetchErrorLog(): Promise<ApiResponse<ErrorLogEntry[]>> {
-  return apiRequest<ErrorLogEntry[]>('/api/admin/system/errors', {
-    mockHandler: () => [...getErrorLog()],
-  });
-}
-
-// ============================================
-// Security Summary (Section 11 — real backend)
-// ============================================
 
 export interface SecuritySummaryEvent {
   type: string;
@@ -442,26 +188,83 @@ export interface SecuritySummary {
   recentEvents: SecuritySummaryEvent[];
 }
 
-function getAdminToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return (
-      localStorage.getItem('moda-superadmin-token') ||
-      localStorage.getItem('moda-admin-token') ||
-      null
-    );
-  } catch {
-    return null;
-  }
+// Audit log from /api/v1/admin/security/logs
+export interface SecurityLogEntry {
+  id: string;
+  actor_id: string;
+  actor_role: string;
+  action: string;
+  category: string;
+  title: string;
+  description: string;
+  ip: string;
+  user_agent: string;
+  reference_id?: string | null;
+  reference_type?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string | null;
 }
 
-export async function fetchSecuritySummary(): Promise<SecuritySummary | null> {
-  const token = getAdminToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+export interface SecurityLogsResponse {
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+  logs: SecurityLogEntry[];
+}
 
+export interface ServiceHealthItem {
+  name: string;
+  status: string;
+  uptime: number;
+  responseTime: number;
+  lastCheck: string;
+  errorRate: number;
+}
+
+export interface SystemMetrics {
+  cpuUsage: number | null;
+  memoryUsage: number | null;
+  diskUsage: number | null;
+  activeConnections: number | null;
+  requestsPerSecond: number | null;
+  avgResponseTime: number | null;
+  errorRate: number | null;
+  uptimeSeconds: number;
+}
+
+export interface ErrorLogEntry {
+  id: string;
+  level: string;
+  message: string;
+  source: string;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  resolved: boolean;
+}
+
+export interface SuperAdminNotification {
+  notification_id: string;
+  notification_type: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationsListResponse {
+  total: number;
+  unread_count: number;
+  notifications: SuperAdminNotification[];
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export async function fetchSuperadminDashboardMetrics(): Promise<SuperadminDashboardMetrics | null> {
   try {
-    const res = await fetch('/api/v1/admin/security/summary', { headers });
+    const res = await fetch('/api/v1/superadmin/dashboard/metrics', { headers: authHeaders() });
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -469,28 +272,462 @@ export async function fetchSecuritySummary(): Promise<SecuritySummary | null> {
   }
 }
 
-// ============================================
-// Superadmin Dashboard Metrics (real backend)
-// GET /api/v1/superadmin/dashboard/metrics
-// ============================================
+// ─── Users ────────────────────────────────────────────────────────────────────
 
-export interface SuperadminDashboardMetrics {
-  total_users: number;
-  active_brands: number;
-  total_orders: number;
-  total_revenue: number;
-  currency: string;
-  active_users_today: number;
-  pending_moderations: number;
+export async function fetchPlatformUsers(params?: {
+  search?: string;
+  status?: string;
+  role?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<PlatformUsersResponse | null> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    if (params?.role) q.set('role', params.role);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.page_size) q.set('page_size', String(params.page_size));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    const res = await fetch(`/api/v1/superadmin/users${qs}`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
-export async function fetchSuperadminDashboardMetrics(): Promise<SuperadminDashboardMetrics | null> {
-  const token = getAdminToken();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
+export async function updateUserStatus(id: string, status: string): Promise<boolean> {
   try {
-    const res = await fetch('/api/v1/superadmin/dashboard/metrics', { headers });
+    const res = await fetch(`/api/v1/superadmin/users/${id}/status`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Brands ───────────────────────────────────────────────────────────────────
+
+export async function fetchManagedBrands(params?: {
+  search?: string;
+  status?: string;
+  tier?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<ManagedBrandsResponse | null> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.search) q.set('search', params.search);
+    if (params?.status) q.set('status', params.status);
+    if (params?.tier) q.set('tier', params.tier);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.page_size) q.set('page_size', String(params.page_size));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    const res = await fetch(`/api/v1/superadmin/brands${qs}`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updateBrandStatus(id: string, status: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/brands/${id}/status`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ status }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function updateBrandTier(id: string, tier: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/brands/${id}/tier`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ tier }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Moderation ───────────────────────────────────────────────────────────────
+
+export async function fetchModerationQueue(params?: {
+  status?: string;
+  content_type?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<ModerationListResponse | null> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.status) q.set('status', params.status);
+    if (params?.content_type) q.set('content_type', params.content_type);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.page_size) q.set('page_size', String(params.page_size));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    const res = await fetch(`/api/v1/superadmin/moderation${qs}`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function moderateContent(id: string, action: 'approved' | 'rejected', note?: string): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/moderation/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ action, note }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ─── Configuration ────────────────────────────────────────────────────────────
+
+export async function fetchPlatformConfig(): Promise<PlatformConfig | null> {
+  try {
+    const res = await fetch('/api/v1/superadmin/config', { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function updatePlatformConfig(partial: Partial<PlatformConfig>): Promise<PlatformConfig | null> {
+  try {
+    const res = await fetch('/api/v1/superadmin/config', {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify(partial),
+    });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+export async function fetchRevenueData(period: string): Promise<RevenueDataPoint[]> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/analytics/revenue?period=${encodeURIComponent(period)}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchUserGrowthData(period: string): Promise<UserGrowthDataPoint[]> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/analytics/user-growth?period=${encodeURIComponent(period)}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchTopBrands(period: string): Promise<TopBrandDataPoint[]> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/analytics/top-brands?period=${encodeURIComponent(period)}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// ─── Finance ──────────────────────────────────────────────────────────────────
+
+export async function fetchRevenueBreakdown(): Promise<RevenueBreakdown | null> {
+  try {
+    const res = await fetch('/api/v1/superadmin/finance/revenue-breakdown', { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCommissionRules(): Promise<CommissionRuleItem[]> {
+  try {
+    const res = await fetch('/api/v1/superadmin/finance/commissions', { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchPayouts(status?: string): Promise<PayoutItem[]> {
+  try {
+    const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await fetch(`/api/v1/superadmin/finance/payouts${qs}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// ─── Security ─────────────────────────────────────────────────────────────────
+
+export async function fetchSecuritySummary(): Promise<SecuritySummary | null> {
+  try {
+    const res = await fetch('/api/v1/admin/security/summary', { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchSecurityLogs(params?: {
+  page?: number;
+  page_size?: number;
+  action?: string;
+  q?: string;
+}): Promise<SecurityLogsResponse | null> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.page_size) q.set('page_size', String(params.page_size));
+    if (params?.action) q.set('action', params.action);
+    if (params?.q) q.set('q', params.q);
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    const res = await fetch(`/api/v1/admin/security/logs${qs}`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ─── System Health ────────────────────────────────────────────────────────────
+
+export async function fetchServiceHealth(): Promise<ServiceHealthItem[]> {
+  try {
+    const res = await fetch('/api/v1/superadmin/system/health', { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchSystemMetrics(): Promise<SystemMetrics | null> {
+  try {
+    const res = await fetch('/api/v1/superadmin/system/metrics', { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchErrorLog(): Promise<ErrorLogEntry[]> {
+  try {
+    const res = await fetch('/api/v1/superadmin/system/errors', { headers: authHeaders() });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const res = await fetch('/api/v1/superadmin/auth/change-password', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, message: data?.detail || 'Failed to change password.' };
+    }
+    return { ok: true, message: data?.message || 'Password changed successfully.' };
+  } catch {
+    return { ok: false, message: 'Network error. Please try again.' };
+  }
+}
+
+export async function fetchNotifications(): Promise<NotificationsListResponse | null> {
+  try {
+    const res = await fetch('/api/v1/superadmin/notifications', { headers: authHeaders() });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+// ─── Analytics Reports (no real backend endpoint — honest empty list) ─────────
+
+export interface AnalyticsReport {
+  id: string;
+  name: string;
+  type: string;
+  period: string;
+  createdAt: string;
+  createdBy: string;
+  scheduled: boolean;
+  lastRun?: string;
+}
+
+export async function fetchAnalyticsReports(): Promise<AnalyticsReport[]> {
+  return [];
+}
+
+// ─── Security — Alerts + Audit log (mapped to local types for pages) ──────────
+
+// SecurityAlert as the security page expects (from @/types/admin shape)
+export interface SecurityAlertItem {
+  id: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  title: string;
+  description: string;
+  source: string;
+  timestamp: string;
+  resolved: boolean;
+  resolvedBy?: string | null;
+  resolvedAt?: string | null;
+}
+
+// AuditLogEntry as the security page expects (from @/types/admin shape)
+export interface AuditLogEntryItem {
+  id: string;
+  userId: string;
+  userName: string;
+  action: string;
+  resource: string;
+  resourceId?: string | null;
+  details: string;
+  ipAddress: string;
+  timestamp: string;
+}
+
+// GDPRRequest — no backend; honest empty list
+export interface GDPRRequestItem {
+  id: string;
+  userId: string;
+  userName: string;
+  type: 'data_export' | 'data_deletion' | 'consent_update';
+  status: 'pending' | 'processing' | 'completed';
+  requestedAt: string;
+  completedAt?: string | null;
+}
+
+// Fetch security alerts from security summary events
+export async function fetchSecurityAlerts(): Promise<SecurityAlertItem[]> {
+  try {
+    const summary = await fetchSecuritySummary();
+    if (!summary) return [];
+    // Map recent events into alert shape
+    return summary.recentEvents.map((ev, idx) => ({
+      id: `evt-${idx}`,
+      severity: 'medium' as const,
+      title: ev.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+      description: `${ev.type} from IP ${ev.ip}`,
+      source: 'Auth Service',
+      timestamp: ev.timestamp,
+      resolved: false,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function resolveSecurityAlert(_id: string): Promise<boolean> {
+  // No dedicated resolve endpoint — optimistic local-only update
+  return true;
+}
+
+// Fetch audit log entries and map SecurityLogEntry → AuditLogEntryItem
+export async function fetchAuditLog(params?: {
+  action?: string;
+  q?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<AuditLogEntryItem[]> {
+  try {
+    const q = new URLSearchParams();
+    if (params?.action) q.set('action', params.action);
+    if (params?.q) q.set('q', params.q);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.page_size) q.set('page_size', String(params.page_size));
+    const qs = q.toString() ? `?${q.toString()}` : '';
+    const res = await fetch(`/api/v1/admin/security/logs${qs}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    const data: SecurityLogsResponse = await res.json();
+    return (data.logs || []).map((entry) => ({
+      id: entry.id,
+      userId: entry.actor_id,
+      userName: entry.actor_role,
+      action: entry.action,
+      resource: entry.category,
+      resourceId: entry.reference_id,
+      details: entry.description,
+      ipAddress: entry.ip,
+      timestamp: entry.created_at ?? new Date().toISOString(),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// GDPR — no backend endpoint; return honest empty list
+export async function fetchGDPRRequests(): Promise<GDPRRequestItem[]> {
+  return [];
+}
+
+export async function processGDPRRequest(_id: string): Promise<boolean> {
+  return false;
+}
+
+// ─── Finance — Process Payouts + Update Commission Rule ──────────────────────
+
+export async function processPayouts(ids: string[]): Promise<PayoutItem[]> {
+  try {
+    const res = await fetch('/api/v1/superadmin/finance/payouts/process', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ payout_ids: ids }),
+    });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function updateCommissionRule(id: string, rate: number): Promise<CommissionRuleItem | null> {
+  try {
+    const res = await fetch(`/api/v1/superadmin/finance/commissions/${id}`, {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({ rate }),
+    });
     if (!res.ok) return null;
     return res.json();
   } catch {

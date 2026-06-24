@@ -22,11 +22,11 @@ import {
   fetchErrorLog,
 } from '@/services/admin.service';
 import type {
-  ServiceHealth,
+  ServiceHealthItem as ServiceHealth,
   SystemMetrics,
   ErrorLogEntry,
-  ServiceStatus,
-} from '@/types/admin';
+} from '@/services/admin.service';
+type ServiceStatus = 'healthy' | 'degraded' | 'down';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -46,6 +46,8 @@ function statusDotColor(status: ServiceStatus): string {
       return 'bg-amber-500';
     case 'down':
       return 'bg-red-500';
+    default:
+      return 'bg-gray-400';
   }
 }
 
@@ -57,6 +59,8 @@ function statusLabel(status: ServiceStatus): string {
       return 'Degraded';
     case 'down':
       return 'Down';
+    default:
+      return String(status);
   }
 }
 
@@ -80,6 +84,8 @@ function levelBadge(level: ErrorLogEntry['level']): string {
       return 'bg-red-100 text-red-800';
     case 'warning':
       return 'bg-amber-100 text-amber-800';
+    default:
+      return 'bg-gray-100 text-gray-700';
   }
 }
 
@@ -125,14 +131,14 @@ export default function SystemHealthPage() {
 
   async function loadAllData() {
     setLoading(true);
-    const [sRes, mRes, eRes] = await Promise.all([
+    const [sData, mData, eData] = await Promise.all([
       fetchServiceHealth(),
       fetchSystemMetrics(),
       fetchErrorLog(),
     ]);
-    if (sRes.data) setServices(sRes.data);
-    if (mRes.data) setMetrics(mRes.data);
-    if (eRes.data) setErrors(eRes.data.sort((a, b) => b.count - a.count));
+    setServices(sData);
+    if (mData) setMetrics(mData);
+    setErrors([...eData].sort((a, b) => b.count - a.count));
     setLastRefresh(new Date());
     setLoading(false);
   }
@@ -210,9 +216,9 @@ export default function SystemHealthPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span
-                          className={`w-2.5 h-2.5 rounded-full ${statusDotColor(svc.status)}`}
+                          className={`w-2.5 h-2.5 rounded-full ${statusDotColor(svc.status as ServiceStatus)}`}
                         />
-                        <span className="text-xs text-stone/60">{statusLabel(svc.status)}</span>
+                        <span className="text-xs text-stone/60">{statusLabel(svc.status as ServiceStatus)}</span>
                       </div>
                     </div>
 
@@ -281,13 +287,13 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.cpuUsage}%
+                        {metrics.cpuUsage != null ? `${metrics.cpuUsage}%` : 'N/A'}
                       </span>
                     </div>
                     <div className="w-full bg-parchment/60 rounded-full h-3 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.cpuUsage)}`}
-                        style={{ width: `${metrics.cpuUsage}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.cpuUsage ?? 0)}`}
+                        style={{ width: `${metrics.cpuUsage ?? 0}%` }}
                       />
                     </div>
                   </div>
@@ -302,13 +308,13 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.memoryUsage}%
+                        {metrics.memoryUsage != null ? `${metrics.memoryUsage}%` : 'N/A'}
                       </span>
                     </div>
                     <div className="w-full bg-parchment/60 rounded-full h-3 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.memoryUsage)}`}
-                        style={{ width: `${metrics.memoryUsage}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.memoryUsage ?? 0)}`}
+                        style={{ width: `${metrics.memoryUsage ?? 0}%` }}
                       />
                     </div>
                   </div>
@@ -323,13 +329,13 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.diskUsage}%
+                        {metrics.diskUsage != null ? `${metrics.diskUsage}%` : 'N/A'}
                       </span>
                     </div>
                     <div className="w-full bg-parchment/60 rounded-full h-3 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.diskUsage)}`}
-                        style={{ width: `${metrics.diskUsage}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.diskUsage ?? 0)}`}
+                        style={{ width: `${metrics.diskUsage ?? 0}%` }}
                       />
                     </div>
                   </div>
@@ -344,7 +350,7 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.activeConnections.toLocaleString()}
+                        {metrics.activeConnections != null ? metrics.activeConnections.toLocaleString() : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -359,7 +365,7 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.requestsPerSecond.toLocaleString()}
+                        {metrics.requestsPerSecond != null ? metrics.requestsPerSecond.toLocaleString() : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -374,7 +380,7 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.avgResponseTime}ms
+                        {metrics.avgResponseTime != null ? `${metrics.avgResponseTime}ms` : 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -389,13 +395,13 @@ export default function SystemHealthPage() {
                         </p>
                       </div>
                       <span className="text-lg font-semibold text-charcoal-deep">
-                        {metrics.errorRate}%
+                        {metrics.errorRate != null ? `${metrics.errorRate}%` : 'N/A'}
                       </span>
                     </div>
                     <div className="w-full bg-parchment/60 rounded-full h-3 overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor(metrics.errorRate * 10)}`}
-                        style={{ width: `${Math.min(metrics.errorRate * 20, 100)}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${progressBarColor((metrics.errorRate ?? 0) * 10)}`}
+                        style={{ width: `${Math.min((metrics.errorRate ?? 0) * 20, 100)}%` }}
                       />
                     </div>
                   </div>

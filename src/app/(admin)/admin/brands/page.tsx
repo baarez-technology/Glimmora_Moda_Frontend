@@ -13,17 +13,18 @@ import {
   Package,
   DollarSign,
   Calendar,
-  AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
 import { fetchManagedBrands, updateBrandStatus } from '@/services/admin.service';
-import { getBrandWarningLevel } from '@/services/reports.service';
+import type { ManagedBrandItem } from '@/services/admin.service';
 import { formatPrice } from '@/lib/currency';
-import type { ManagedBrand, BrandStatus } from '@/types/admin';
+
+type ManagedBrand = ManagedBrandItem;
+type BrandStatus = string;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_STYLES: Record<BrandStatus, { bg: string; text: string; label: string }> = {
+const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   active:    { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'Active' },
   verified:  { bg: 'bg-sky-100',     text: 'text-sky-800',     label: 'Verified' },
   pending:   { bg: 'bg-amber-100',   text: 'text-amber-800',   label: 'Pending' },
@@ -31,11 +32,6 @@ const STATUS_STYLES: Record<BrandStatus, { bg: string; text: string; label: stri
   rejected:  { bg: 'bg-rose-100',    text: 'text-rose-800',    label: 'Rejected' },
 };
 
-const WARNING_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  low:    { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Low Risk' },
-  medium: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'Medium Risk' },
-  high:   { bg: 'bg-red-100',   text: 'text-red-800',    label: 'High Risk' },
-};
 
 type Tab = 'all' | 'pending' | 'suspended';
 
@@ -46,24 +42,19 @@ export default function BrandPartnersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('all');
-  const [warningMap, setWarningMap] = useState<Record<string, { total: number; level: string }>>({});
 
   // Fetch brands
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const res = await fetchManagedBrands();
-      if (!cancelled && res.data) {
-        setBrands(res.data);
-        // Build warning map
-        const wMap: Record<string, { total: number; level: string }> = {};
-        res.data.forEach((b) => {
-          wMap[b.id] = getBrandWarningLevel(b.id);
-        });
-        setWarningMap(wMap);
+      const res = await fetchManagedBrands({ page_size: 100 });
+      if (!cancelled) {
+        if (res) {
+          setBrands(res.brands);
+        }
+        setLoading(false);
       }
-      if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
   }, []);
@@ -104,8 +95,8 @@ export default function BrandPartnersPage() {
 
   // Actions
   async function handleStatusChange(id: string, status: BrandStatus) {
-    const res = await updateBrandStatus(id, status);
-    if (res.data) {
+    const ok = await updateBrandStatus(id, status);
+    if (ok) {
       setBrands((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
     }
   }
@@ -186,7 +177,6 @@ export default function BrandPartnersPage() {
               <BrandCard
                 key={brand.id}
                 brand={brand}
-                warning={warningMap[brand.id]}
                 isPendingTab={activeTab === 'pending'}
                 onApprove={(id) => handleStatusChange(id, 'active')}
                 onReject={(id) => handleStatusChange(id, 'rejected')}
@@ -259,20 +249,17 @@ function TabButton({
 
 function BrandCard({
   brand,
-  warning,
   isPendingTab,
   onApprove,
   onReject,
 }: {
   brand: ManagedBrand;
-  warning?: { total: number; level: string };
   isPendingTab: boolean;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
 }) {
-  const status = STATUS_STYLES[brand.status];
+  const statusStyle = STATUS_STYLES[brand.status] || { bg: 'bg-gray-100', text: 'text-gray-700', label: brand.status };
   const initial = brand.brandName.charAt(0).toUpperCase();
-  const warningStyle = warning && warning.level !== 'none' ? WARNING_STYLES[warning.level] : null;
   const joinedDate = new Date(brand.partnerSince).toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
@@ -296,15 +283,9 @@ function BrandCard({
           <div className="flex items-center gap-3 flex-wrap">
             <h3 className="text-sm font-semibold text-charcoal-deep">{brand.brandName}</h3>
             <span className="text-xs text-stone/50">{brand.category}</span>
-            <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ${status.bg} ${status.text}`}>
-              {status.label}
+            <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
+              {statusStyle.label}
             </span>
-            {warningStyle && (
-              <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 ${warningStyle.bg} ${warningStyle.text}`}>
-                <AlertTriangle size={10} />
-                {warning!.total} complaint{warning!.total !== 1 ? 's' : ''} &middot; {warningStyle.label}
-              </span>
-            )}
           </div>
 
           {/* Meta row */}
