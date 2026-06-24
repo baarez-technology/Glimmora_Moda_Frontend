@@ -524,6 +524,8 @@ function LoginForm() {
                     </label>
                     <input
                       type="email"
+                      name="forgot-email"
+                      autoComplete="email"
                       value={forgotEmail}
                       onChange={(e) => setForgotEmail(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleForgotSendOtp(); }}
@@ -599,6 +601,8 @@ function LoginForm() {
                     <div className="relative">
                       <input
                         type={forgotShowPassword ? 'text' : 'password'}
+                        name="new-password"
+                        autoComplete="new-password"
                         value={forgotNewPassword}
                         onChange={(e) => setForgotNewPassword(e.target.value)}
                         placeholder="Enter new password"
@@ -616,6 +620,8 @@ function LoginForm() {
                     </label>
                     <input
                       type={forgotShowPassword ? 'text' : 'password'}
+                      name="confirm-password"
+                      autoComplete="new-password"
                       value={forgotConfirmPassword}
                       onChange={(e) => setForgotConfirmPassword(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') handleForgotResetPassword(); }}
@@ -708,6 +714,8 @@ function LoginForm() {
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                   placeholder="000000"
@@ -848,6 +856,8 @@ function LoginForm() {
               </label>
               <input
                 type="email"
+                name="email"
+                autoComplete="username"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 onBlur={() => setTouched(t => ({ ...t, email: true }))}
@@ -870,6 +880,8 @@ function LoginForm() {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete="current-password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   onBlur={() => setTouched(t => ({ ...t, password: true }))}
