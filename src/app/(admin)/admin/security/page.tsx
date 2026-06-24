@@ -9,8 +9,6 @@ import {
   Lock,
   CheckCircle,
   Clock,
-  Eye,
-  Download,
   Search,
   Filter,
 } from 'lucide-react';
@@ -22,14 +20,12 @@ import {
   processGDPRRequest,
   fetchSecuritySummary,
   type SecuritySummary,
+  type AuditLogEntryItem as AuditLogEntry,
+  type SecurityAlertItem as SecurityAlert,
+  type GDPRRequestItem as GDPRRequest,
 } from '@/services/admin.service';
-import type {
-  AuditLogEntry,
-  SecurityAlert,
-  GDPRRequest,
-  AlertSeverity,
-  AuditAction,
-} from '@/types/admin';
+type AlertSeverity = 'low' | 'medium' | 'high' | 'critical';
+type AuditAction = 'login' | 'logout' | 'create' | 'update' | 'delete' | 'export' | 'impersonate' | 'config_change';
 
 type Tab = 'alerts' | 'audit' | 'gdpr';
 
@@ -139,7 +135,7 @@ export default function SecurityCompliancePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [alertsRes, auditRes, gdprRes, summaryRes] = await Promise.all([
+      const [alertsData, auditData, gdprData, summaryData] = await Promise.all([
         fetchSecurityAlerts(),
         fetchAuditLog(
           auditActionFilter !== 'all' ? { action: auditActionFilter } : undefined
@@ -147,10 +143,10 @@ export default function SecurityCompliancePage() {
         fetchGDPRRequests(),
         fetchSecuritySummary(),
       ]);
-      if (alertsRes.data) setAlerts(alertsRes.data);
-      if (auditRes.data) setAuditLog(auditRes.data);
-      if (gdprRes.data) setGDPRRequests(gdprRes.data);
-      setSummary(summaryRes);
+      setAlerts(alertsData);
+      setAuditLog(auditData);
+      setGDPRRequests(gdprData);
+      setSummary(summaryData);
     } catch {
       // silent
     } finally {
@@ -458,7 +454,7 @@ export default function SecurityCompliancePage() {
                               <td className="px-4 py-3 whitespace-nowrap">
                                 <span
                                   className={`inline-flex items-center text-[10px] uppercase tracking-wider font-semibold border rounded-full px-2.5 py-0.5 ${getActionBadge(
-                                    entry.action
+                                    entry.action as AuditAction
                                   )}`}
                                 >
                                   {formatLabel(entry.action)}

@@ -3,7 +3,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import {
-  AlertTriangle,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -17,244 +16,56 @@ import {
   Eye,
   ChevronDown,
   Package,
-  User,
-  Mail,
-  Hash,
   Calendar,
   MessageSquare,
   CheckCircle,
 } from 'lucide-react';
-import {
-  getAllReports,
-  updateReportStatus,
-  getBrandWarningLevel,
-  REPORT_REASONS,
-} from '@/services/reports.service';
-import type {
-  ProductReport,
-  ReportStatus,
-  ReportReason,
-} from '@/services/reports.service';
+import { fetchModerationQueue, moderateContent } from '@/services/admin.service';
+import type { ModerationItemResponse } from '@/services/admin.service';
 
-// ─── Seed Demo Data ────────────────────────────────────────────────────────────
+// ─── Status tabs ───────────────────────────────────────────────────────────────
 
-const SEED_KEY = 'moda-product-reports';
-const SEED_FLAG = 'moda-reports-seeded-v2';
-
-function seedDemoReports(): void {
-  if (typeof window === 'undefined') return;
-  if (localStorage.getItem(SEED_FLAG)) return;
-
-  const existing = localStorage.getItem(SEED_KEY);
-  if (existing && JSON.parse(existing).length > 0) {
-    localStorage.setItem(SEED_FLAG, '1');
-    return;
-  }
-
-  const demo: ProductReport[] = [
-    {
-      id: 'rpt-demo-001',
-      product_id: 'prod-001',
-      product_name: 'Heritage Silk Saree — Midnight Gold',
-      product_image: '/images/products/saree-1.jpg',
-      product_price: 45000,
-      brand_id: 'brand-taneira',
-      brand_name: 'Taneira',
-      customer_id: 'cust-001',
-      customer_name: 'Priya Sharma',
-      customer_email: 'priya.sharma@email.com',
-      order_id: 'ORD-20260315-001',
-      reason: 'not_as_described',
-      description:
-        'The colour of the saree is completely different from what was shown in the listing. The gold border is more bronze/copper and the base is lighter than midnight blue.',
-      status: 'pending',
-      reported_at: '2026-03-20T10:30:00Z',
-    },
-    {
-      id: 'rpt-demo-002',
-      product_id: 'prod-002',
-      product_name: 'Artisan Pashmina Shawl',
-      product_image: '/images/products/shawl-1.jpg',
-      product_price: 32000,
-      brand_id: 'brand-kashmir-loom',
-      brand_name: 'Kashmir Loom',
-      customer_id: 'cust-002',
-      customer_name: 'Ananya Gupta',
-      customer_email: 'ananya.g@email.com',
-      order_id: 'ORD-20260312-045',
-      reason: 'counterfeit',
-      description:
-        'This does not seem like a genuine Pashmina. The weave is machine-made and the GI tag looks printed, not woven. I have purchased Pashminas before and this quality is nowhere close.',
-      status: 'investigating',
-      admin_notes: 'Escalated to authenticity team for verification.',
-      reported_at: '2026-03-18T14:15:00Z',
-    },
-    {
-      id: 'rpt-demo-003',
-      product_id: 'prod-003',
-      product_name: 'Banarasi Brocade Lehenga Set',
-      product_image: '/images/products/lehenga-1.jpg',
-      product_price: 78000,
-      brand_id: 'brand-taneira',
-      brand_name: 'Taneira',
-      customer_id: 'cust-003',
-      customer_name: 'Ritu Malhotra',
-      customer_email: 'ritu.m@email.com',
-      reason: 'poor_quality',
-      description:
-        'Thread pulling observed on the dupatta after first wear. The zari work is already tarnishing despite being labelled as real gold zari.',
-      status: 'warning_sent',
-      admin_notes: 'Warning issued regarding quality control processes.',
-      action_taken: 'Formal warning sent to Taneira regarding zari quality claims.',
-      reported_at: '2026-03-10T09:00:00Z',
-      resolved_at: '2026-03-12T16:30:00Z',
-    },
-    {
-      id: 'rpt-demo-004',
-      product_id: 'prod-004',
-      product_name: 'Chanderi Cotton Kurta',
-      product_image: '/images/products/kurta-1.jpg',
-      product_price: 8500,
-      brand_id: 'brand-fabindia',
-      brand_name: 'FabIndia',
-      customer_id: 'cust-004',
-      customer_name: 'Meera Joshi',
-      customer_email: 'meera.j@email.com',
-      order_id: 'ORD-20260308-112',
-      reason: 'damaged',
-      description:
-        'Package arrived torn and the kurta had a visible stain near the neckline. Seems like it was already used or a return item.',
-      status: 'product_removed',
-      admin_notes: 'Product removed from listing pending quality review.',
-      action_taken: 'Product listing suspended. Brand required to re-submit with QC certificate.',
-      reported_at: '2026-03-05T11:45:00Z',
-      resolved_at: '2026-03-07T14:00:00Z',
-    },
-    {
-      id: 'rpt-demo-005',
-      product_id: 'prod-005',
-      product_name: 'Tussar Silk Dupatta',
-      product_image: '/images/products/dupatta-1.jpg',
-      product_price: 5200,
-      brand_id: 'brand-kashmir-loom',
-      brand_name: 'Kashmir Loom',
-      customer_id: 'cust-005',
-      customer_name: 'Deepa Nair',
-      customer_email: 'deepa.n@email.com',
-      reason: 'misleading_price',
-      description:
-        'Listed at 5200 during checkout, but the MRP tag on the product says 3800. Feels like price gouging.',
-      status: 'dismissed',
-      admin_notes: 'Price difference due to exclusive packaging and shipping. Within platform policy.',
-      action_taken: 'No action required. Price explained by platform premium.',
-      reported_at: '2026-03-01T08:20:00Z',
-      resolved_at: '2026-03-02T10:00:00Z',
-    },
-    {
-      id: 'rpt-demo-006',
-      product_id: 'prod-006',
-      product_name: 'Kanjeevaram Silk Saree — Temple Border',
-      product_image: '/images/products/saree-2.jpg',
-      product_price: 125000,
-      brand_id: 'brand-nalli',
-      brand_name: 'Nalli Silks',
-      customer_id: 'cust-006',
-      customer_name: 'Kavitha Raman',
-      customer_email: 'kavitha.r@email.com',
-      order_id: 'ORD-20260319-078',
-      reason: 'not_as_described',
-      description:
-        'The saree pallu design is different from what was shown. Listing showed a full temple border pallu but received has a simpler motif.',
-      status: 'pending',
-      reported_at: '2026-03-21T16:45:00Z',
-    },
-    {
-      id: 'rpt-demo-007',
-      product_id: 'prod-007',
-      product_name: 'Handwoven Ikat Stole',
-      product_image: '/images/products/stole-1.jpg',
-      product_price: 3800,
-      brand_id: 'brand-taneira',
-      brand_name: 'Taneira',
-      customer_id: 'cust-007',
-      customer_name: 'Sanya Kapoor',
-      customer_email: 'sanya.k@email.com',
-      reason: 'poor_quality',
-      description:
-        'The stole started fraying from the edges within a week. Very poor finishing for the price paid.',
-      status: 'pending',
-      reported_at: '2026-03-22T08:00:00Z',
-    },
-  ];
-
-  localStorage.setItem(SEED_KEY, JSON.stringify(demo));
-  localStorage.setItem(SEED_FLAG, '1');
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-type FilterTab = 'all' | ReportStatus;
+type FilterTab = 'all' | 'pending' | 'approved' | 'rejected' | 'flagged';
 
 const FILTER_TABS: { value: FilterTab; label: string }[] = [
   { value: 'all', label: 'All' },
   { value: 'pending', label: 'Pending' },
-  { value: 'investigating', label: 'Investigating' },
-  { value: 'warning_sent', label: 'Warning Sent' },
-  { value: 'product_removed', label: 'Product Removed' },
-  { value: 'dismissed', label: 'Dismissed' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'rejected', label: 'Rejected' },
+  { value: 'flagged', label: 'Flagged' },
 ];
 
-function getStatusBadge(status: ReportStatus): { label: string; classes: string } {
+function getStatusBadge(status: string): { label: string; classes: string } {
   switch (status) {
     case 'pending':
       return { label: 'Pending', classes: 'bg-amber-50 text-amber-700 border-amber-200' };
-    case 'investigating':
-      return { label: 'Investigating', classes: 'bg-blue-50 text-blue-700 border-blue-200' };
-    case 'warning_sent':
-      return { label: 'Warning Sent', classes: 'bg-orange-50 text-orange-700 border-orange-200' };
-    case 'product_removed':
-      return { label: 'Product Removed', classes: 'bg-red-50 text-red-700 border-red-200' };
-    case 'brand_suspended':
-      return { label: 'Brand Suspended', classes: 'bg-rose-50 text-rose-800 border-rose-200' };
-    case 'dismissed':
-      return { label: 'Dismissed', classes: 'bg-stone/10 text-stone/70 border-stone/20' };
+    case 'approved':
+      return { label: 'Approved', classes: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    case 'rejected':
+      return { label: 'Rejected', classes: 'bg-red-50 text-red-700 border-red-200' };
+    case 'flagged':
+      return { label: 'Flagged', classes: 'bg-orange-50 text-orange-700 border-orange-200' };
     default:
       return { label: status, classes: 'bg-stone/10 text-stone/70 border-stone/20' };
   }
 }
 
-function getReasonBadge(reason: ReportReason): { label: string; classes: string } {
-  const found = REPORT_REASONS.find((r) => r.value === reason);
-  const label = found?.label || reason;
-
-  switch (reason) {
-    case 'counterfeit':
-      return { label, classes: 'bg-rose-50 text-rose-700 border-rose-200' };
-    case 'poor_quality':
-      return { label, classes: 'bg-amber-50 text-amber-700 border-amber-200' };
-    case 'not_as_described':
-      return { label, classes: 'bg-purple-50 text-purple-700 border-purple-200' };
-    case 'damaged':
-      return { label, classes: 'bg-orange-50 text-orange-700 border-orange-200' };
-    case 'misleading_price':
-      return { label, classes: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
-    case 'inappropriate':
-      return { label, classes: 'bg-red-50 text-red-700 border-red-200' };
+function getContentTypeBadge(type: string): { label: string; classes: string } {
+  switch (type) {
+    case 'product':
+      return { label: 'Product', classes: 'bg-blue-50 text-blue-700 border-blue-200' };
+    case 'story':
+      return { label: 'Story', classes: 'bg-purple-50 text-purple-700 border-purple-200' };
+    case 'collection':
+      return { label: 'Collection', classes: 'bg-cyan-50 text-cyan-700 border-cyan-200' };
+    case 'review':
+      return { label: 'Review', classes: 'bg-pink-50 text-pink-700 border-pink-200' };
+    case 'heritage':
+      return { label: 'Heritage', classes: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 'offer':
+      return { label: 'Offer', classes: 'bg-green-50 text-green-700 border-green-200' };
     default:
-      return { label, classes: 'bg-stone/10 text-stone/70 border-stone/20' };
-  }
-}
-
-function getWarningLevelBadge(level: 'none' | 'low' | 'medium' | 'high'): { label: string; classes: string } {
-  switch (level) {
-    case 'low':
-      return { label: 'Low', classes: 'bg-yellow-50 text-yellow-700 border-yellow-300' };
-    case 'medium':
-      return { label: 'Medium', classes: 'bg-orange-50 text-orange-700 border-orange-300' };
-    case 'high':
-      return { label: 'High', classes: 'bg-red-50 text-red-700 border-red-300' };
-    default:
-      return { label: 'None', classes: 'bg-stone/5 text-stone/50 border-stone/20' };
+      return { label: type, classes: 'bg-stone/10 text-stone/70 border-stone/20' };
   }
 }
 
@@ -266,60 +77,51 @@ function formatDate(dateStr: string): string {
   });
 }
 
-function formatDateTime(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-// ─── Modal Types ───────────────────────────────────────────────────────────────
-
-type ModalType = 'warning' | 'remove' | 'suspend' | null;
-
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
-export default function ProductReportsPage() {
-  const [reports, setReports] = useState<ProductReport[]>([]);
+export default function ModerationPage() {
+  const [items, setItems] = useState<ModerationItemResponse[]>([]);
+  const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-
-  // Modal state
-  const [modalType, setModalType] = useState<ModalType>(null);
-  const [modalReport, setModalReport] = useState<ProductReport | null>(null);
-  const [modalMessage, setModalMessage] = useState('');
-
-  // Detail expand
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const loadReports = useCallback(() => {
+  // Modal state for reviewer note
+  const [modalItemId, setModalItemId] = useState<string | null>(null);
+  const [modalAction, setModalAction] = useState<'approved' | 'rejected' | null>(null);
+  const [modalNote, setModalNote] = useState('');
+
+  const loadItems = useCallback(async () => {
     setLoading(true);
-    seedDemoReports();
-    const data = getAllReports();
-    setReports(data);
+    setError(false);
+    const data = await fetchModerationQueue({ page_size: 100 });
+    if (data) {
+      setItems(data.items);
+      setPendingCount(data.pending_count);
+    } else {
+      setError(true);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+    loadItems();
+  }, [loadItems]);
 
   // ── Computed ────────────────────────────────────────────────────────────────
 
   const stats = useMemo(() => ({
-    total: reports.length,
-    pending: reports.filter((r) => r.status === 'pending').length,
-    warning_sent: reports.filter((r) => r.status === 'warning_sent').length,
-    product_removed: reports.filter((r) => r.status === 'product_removed').length,
-  }), [reports]);
+    total: items.length,
+    pending: items.filter((r) => r.status === 'pending').length,
+    approved: items.filter((r) => r.status === 'approved').length,
+    rejected: items.filter((r) => r.status === 'rejected').length,
+  }), [items]);
 
-  const filteredReports = useMemo(() => {
-    let list = reports;
+  const filteredItems = useMemo(() => {
+    let list = items;
     if (activeTab !== 'all') {
       list = list.filter((r) => r.status === activeTab);
     }
@@ -327,61 +129,24 @@ export default function ProductReportsPage() {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (r) =>
-          r.product_name.toLowerCase().includes(q) ||
-          r.brand_name.toLowerCase().includes(q) ||
-          r.customer_name.toLowerCase().includes(q) ||
-          r.customer_email.toLowerCase().includes(q) ||
-          (r.order_id && r.order_id.toLowerCase().includes(q))
+          r.title.toLowerCase().includes(q) ||
+          r.brandName.toLowerCase().includes(q) ||
+          r.contentType.toLowerCase().includes(q)
       );
     }
     return list;
-  }, [reports, activeTab, searchQuery]);
+  }, [items, activeTab, searchQuery]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
 
-  const handleQuickAction = (reportId: string, newStatus: ReportStatus) => {
-    setActionLoading(reportId);
-    updateReportStatus(reportId, newStatus);
-    loadReports();
+  const handleAction = async (id: string, action: 'approved' | 'rejected', note?: string) => {
+    setActionLoading(id);
+    await moderateContent(id, action, note);
+    await loadItems();
     setActionLoading(null);
-  };
-
-  const openActionModal = (report: ProductReport, type: ModalType) => {
-    setModalReport(report);
-    setModalType(type);
-    setModalMessage('');
-  };
-
-  const handleModalConfirm = () => {
-    if (!modalReport || !modalType) return;
-    setActionLoading(modalReport.id);
-
-    let status: ReportStatus;
-    let actionTaken: string;
-
-    switch (modalType) {
-      case 'warning':
-        status = 'warning_sent';
-        actionTaken = `Warning sent to brand: ${modalMessage}`;
-        break;
-      case 'remove':
-        status = 'product_removed';
-        actionTaken = `Product removed: ${modalMessage}`;
-        break;
-      case 'suspend':
-        status = 'brand_suspended';
-        actionTaken = `Brand suspended: ${modalMessage || 'Multiple violations'}`;
-        break;
-      default:
-        return;
-    }
-
-    updateReportStatus(modalReport.id, status, modalMessage, actionTaken);
-    loadReports();
-    setModalType(null);
-    setModalReport(null);
-    setModalMessage('');
-    setActionLoading(null);
+    setModalItemId(null);
+    setModalAction(null);
+    setModalNote('');
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -389,9 +154,9 @@ export default function ProductReportsPage() {
   return (
     <div className="min-h-screen bg-parchment">
       <AdminPageHeader
-        title="Product Reports & Complaints"
-        subtitle="Review consumer complaints, take action on reported products"
-        breadcrumbs={[{ label: 'Reports & Complaints' }]}
+        title="Content Moderation"
+        subtitle="Review and moderate brand content submissions"
+        breadcrumbs={[{ label: 'Moderation' }]}
       />
 
       <div className="max-w-[1400px] mx-auto px-8 py-8 space-y-6">
@@ -403,7 +168,7 @@ export default function ProductReportsPage() {
                 <FileWarning size={20} className="text-charcoal-deep" />
               </div>
               <div>
-                <p className="text-xs text-stone/60 uppercase tracking-wider">Total Reports</p>
+                <p className="text-xs text-stone/60 uppercase tracking-wider">Total Items</p>
                 <p className="text-2xl font-semibold text-charcoal-deep">{stats.total}</p>
               </div>
             </div>
@@ -415,29 +180,29 @@ export default function ProductReportsPage() {
               </div>
               <div>
                 <p className="text-xs text-stone/60 uppercase tracking-wider">Pending Review</p>
-                <p className="text-2xl font-semibold text-charcoal-deep">{stats.pending}</p>
+                <p className="text-2xl font-semibold text-charcoal-deep">{pendingCount}</p>
               </div>
             </div>
           </div>
           <div className="bg-white border border-sand/50 rounded-lg p-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
-                <ShieldAlert size={20} className="text-orange-600" />
+              <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <ShieldCheck size={20} className="text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs text-stone/60 uppercase tracking-wider">Warnings Sent</p>
-                <p className="text-2xl font-semibold text-charcoal-deep">{stats.warning_sent}</p>
+                <p className="text-xs text-stone/60 uppercase tracking-wider">Approved</p>
+                <p className="text-2xl font-semibold text-charcoal-deep">{stats.approved}</p>
               </div>
             </div>
           </div>
           <div className="bg-white border border-sand/50 rounded-lg p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
-                <Trash2 size={20} className="text-red-600" />
+                <ShieldX size={20} className="text-red-600" />
               </div>
               <div>
-                <p className="text-xs text-stone/60 uppercase tracking-wider">Products Removed</p>
-                <p className="text-2xl font-semibold text-charcoal-deep">{stats.product_removed}</p>
+                <p className="text-xs text-stone/60 uppercase tracking-wider">Rejected</p>
+                <p className="text-2xl font-semibold text-charcoal-deep">{stats.rejected}</p>
               </div>
             </div>
           </div>
@@ -449,7 +214,7 @@ export default function ProductReportsPage() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone/40" />
             <input
               type="text"
-              placeholder="Search by product, brand, customer, email or order ID..."
+              placeholder="Search by title, brand name, or content type..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-sm border border-sand/50 rounded-lg bg-parchment/50 text-charcoal-deep placeholder:text-stone/40 focus:outline-none focus:ring-1 focus:ring-gold-soft"
@@ -463,8 +228,8 @@ export default function ProductReportsPage() {
             const isActive = activeTab === tab.value;
             const count =
               tab.value === 'all'
-                ? reports.length
-                : reports.filter((r) => r.status === tab.value).length;
+                ? items.length
+                : items.filter((r) => r.status === tab.value).length;
             return (
               <button
                 key={tab.value}
@@ -488,52 +253,39 @@ export default function ProductReportsPage() {
           })}
         </div>
 
-        {/* ── Report Cards ───────────────────────────────────────────────────── */}
+        {/* ── Content ────────────────────────────────────────────────────────── */}
         {loading ? (
-          <div className="text-center py-16 text-stone/60 text-sm">Loading reports...</div>
-        ) : filteredReports.length === 0 ? (
+          <div className="text-center py-16 text-stone/60 text-sm">Loading moderation queue...</div>
+        ) : error ? (
+          <div className="text-center py-16 text-stone/60 text-sm">Failed to load moderation queue. Please try again.</div>
+        ) : filteredItems.length === 0 ? (
           <div className="text-center py-16">
             <FileWarning size={40} className="mx-auto text-stone/30 mb-3" />
-            <p className="text-stone/60 text-sm">No reports match your filters.</p>
+            <p className="text-stone/60 text-sm">
+              {activeTab === 'pending' ? 'No items pending review.' : 'No items match your filters.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredReports.map((report) => {
-              const statusBadge = getStatusBadge(report.status);
-              const reasonBadge = getReasonBadge(report.reason);
-              const isExpanded = expandedId === report.id;
-              const brandWarning = getBrandWarningLevel(report.brand_id);
-              const warningBadge = getWarningLevelBadge(brandWarning.level);
-              const isPending = report.status === 'pending';
-              const isInvestigating = report.status === 'investigating';
-              const isResolved = !isPending && !isInvestigating;
+            {filteredItems.map((item) => {
+              const statusBadge = getStatusBadge(item.status);
+              const typeBadge = getContentTypeBadge(item.contentType);
+              const isExpanded = expandedId === item.id;
+              const isPending = item.status === 'pending';
 
               return (
                 <div
-                  key={report.id}
+                  key={item.id}
                   className={`bg-white border border-sand/50 rounded-lg overflow-hidden transition-all ${
                     isPending ? 'border-l-4 border-l-amber-400' : ''
-                  } ${isInvestigating ? 'border-l-4 border-l-blue-400' : ''}`}
+                  }`}
                 >
                   {/* ── Card Header ─────────────────────────────────────────── */}
                   <div className="p-5">
                     <div className="flex flex-col md:flex-row md:items-start gap-4">
-                      {/* Thumbnail */}
-                      <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-parchment border border-sand/30 flex items-center justify-center overflow-hidden">
-                        {report.product_image ? (
-                          <img
-                            src={report.product_image}
-                            alt={report.product_name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                              (e.target as HTMLImageElement).parentElement!.innerHTML =
-                                '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-stone/30"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>';
-                            }}
-                          />
-                        ) : (
-                          <Package size={24} className="text-stone/30" />
-                        )}
+                      {/* Icon */}
+                      <div className="flex-shrink-0 w-14 h-14 rounded-lg bg-parchment border border-sand/30 flex items-center justify-center">
+                        <Package size={24} className="text-stone/30" />
                       </div>
 
                       {/* Main content */}
@@ -542,35 +294,23 @@ export default function ProductReportsPage() {
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <h3 className="text-sm font-semibold text-charcoal-deep truncate">
-                                {report.product_name}
+                                {item.title || 'Untitled'}
                               </h3>
-                              <span
-                                className={`inline-flex items-center text-[10px] font-medium border rounded-full px-2 py-0.5 ${reasonBadge.classes}`}
-                              >
-                                {reasonBadge.label}
+                              <span className={`inline-flex items-center text-[10px] font-medium border rounded-full px-2 py-0.5 ${typeBadge.classes}`}>
+                                {typeBadge.label}
                               </span>
-                              <span
-                                className={`inline-flex items-center text-[10px] font-medium border rounded-full px-2 py-0.5 ${statusBadge.classes}`}
-                              >
+                              <span className={`inline-flex items-center text-[10px] font-medium border rounded-full px-2 py-0.5 ${statusBadge.classes}`}>
                                 {statusBadge.label}
                               </span>
                             </div>
                             <p className="text-xs font-semibold text-charcoal-deep mt-1">
-                              {report.brand_name}
-                              {brandWarning.level !== 'none' && (
-                                <span
-                                  className={`ml-2 inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-2 py-0.5 ${warningBadge.classes}`}
-                                >
-                                  <AlertTriangle size={10} />
-                                  {brandWarning.total} reports &middot; {warningBadge.label} risk
-                                </span>
-                              )}
+                              {item.brandName || 'N/A'}
                             </p>
                           </div>
 
                           {/* Expand/Collapse toggle */}
                           <button
-                            onClick={() => setExpandedId(isExpanded ? null : report.id)}
+                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
                             className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-parchment transition-colors text-stone/50 hover:text-charcoal-deep"
                           >
                             <ChevronDown
@@ -580,207 +320,96 @@ export default function ProductReportsPage() {
                           </button>
                         </div>
 
-                        {/* Reporter + Date row */}
+                        {/* Submitted date */}
                         <div className="flex items-center gap-4 mt-2 text-xs text-stone/60 flex-wrap">
                           <span className="flex items-center gap-1">
-                            <User size={12} />
-                            {report.customer_name}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Mail size={12} />
-                            {report.customer_email}
-                          </span>
-                          {report.order_id && (
-                            <span className="flex items-center gap-1">
-                              <Hash size={12} />
-                              {report.order_id}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
                             <Calendar size={12} />
-                            {formatDate(report.reported_at)}
+                            Submitted {formatDate(item.submittedAt)}
                           </span>
+                          {item.flagReason && (
+                            <span className="text-orange-600">Flag: {item.flagReason}</span>
+                          )}
                         </div>
-
-                        {/* Description preview */}
-                        <p className="text-xs text-stone/60 mt-2 line-clamp-2">
-                          {report.description}
-                        </p>
                       </div>
                     </div>
 
                     {/* ── Action Buttons ─────────────────────────────────────── */}
-                    <div className="mt-4 flex items-center gap-2 flex-wrap">
-                      {isPending && (
-                        <>
-                          <button
-                            onClick={() => handleQuickAction(report.id, 'investigating')}
-                            disabled={actionLoading === report.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <Eye size={14} />
-                            Investigate
-                          </button>
-                          <button
-                            onClick={() => handleQuickAction(report.id, 'dismissed')}
-                            disabled={actionLoading === report.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-stone/60 bg-stone/5 hover:bg-stone/10 border border-stone/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <XCircle size={14} />
-                            Dismiss
-                          </button>
-                        </>
-                      )}
+                    {isPending && (
+                      <div className="mt-4 flex items-center gap-2 flex-wrap">
+                        <button
+                          onClick={() => handleAction(item.id, 'approved')}
+                          disabled={actionLoading === item.id}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                        >
+                          <ShieldCheck size={14} />
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => {
+                            setModalItemId(item.id);
+                            setModalAction('rejected');
+                            setModalNote('');
+                          }}
+                          disabled={actionLoading === item.id}
+                          className="inline-flex items-center gap-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={14} />
+                          Reject
+                        </button>
+                      </div>
+                    )}
 
-                      {isInvestigating && (
-                        <>
-                          <button
-                            onClick={() => openActionModal(report, 'warning')}
-                            disabled={actionLoading === report.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <ShieldAlert size={14} />
-                            Send Warning to Brand
-                          </button>
-                          <button
-                            onClick={() => openActionModal(report, 'remove')}
-                            disabled={actionLoading === report.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <Trash2 size={14} />
-                            Remove Product
-                          </button>
-                          <button
-                            onClick={() => openActionModal(report, 'suspend')}
-                            disabled={actionLoading === report.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <Ban size={14} />
-                            Suspend Brand
-                          </button>
-                          <button
-                            onClick={() => handleQuickAction(report.id, 'dismissed')}
-                            disabled={actionLoading === report.id}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium text-stone/60 bg-stone/5 hover:bg-stone/10 border border-stone/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                          >
-                            <XCircle size={14} />
-                            Dismiss
-                          </button>
-                        </>
-                      )}
-
-                      {isResolved && report.action_taken && (
-                        <div className="flex items-center gap-1.5 text-xs text-stone/50">
-                          <CheckCircle size={12} />
-                          Resolved {report.resolved_at ? formatDate(report.resolved_at) : ''}
-                        </div>
-                      )}
-                    </div>
+                    {item.status === 'approved' && (
+                      <div className="mt-3 flex items-center gap-1.5 text-xs text-emerald-600">
+                        <CheckCircle size={12} />
+                        Approved {item.reviewedAt ? formatDate(item.reviewedAt) : ''}
+                      </div>
+                    )}
+                    {item.status === 'rejected' && (
+                      <div className="mt-3 flex items-center gap-1.5 text-xs text-red-600">
+                        <XCircle size={12} />
+                        Rejected {item.reviewedAt ? formatDate(item.reviewedAt) : ''}
+                      </div>
+                    )}
                   </div>
 
                   {/* ── Expanded Details ─────────────────────────────────────── */}
                   {isExpanded && (
                     <div className="border-t border-sand/50 bg-parchment/30 p-5 space-y-4">
-                      {/* Full description */}
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">
-                          Full Description
-                        </p>
-                        <p className="text-sm text-charcoal-deep leading-relaxed">
-                          {report.description}
-                        </p>
-                      </div>
+                      {/* Preview */}
+                      {item.preview && (
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">Preview</p>
+                          <p className="text-sm text-charcoal-deep leading-relaxed">{item.preview}</p>
+                        </div>
+                      )}
 
-                      {/* Grid: Report details */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {/* Metadata grid */}
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">
-                            Report ID
-                          </p>
-                          <p className="text-xs font-mono text-charcoal-deep">{report.id}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">Item ID</p>
+                          <p className="text-xs font-mono text-charcoal-deep">{item.id}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">
-                            Product ID
-                          </p>
-                          <p className="text-xs font-mono text-charcoal-deep">{report.product_id}</p>
+                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">Brand ID</p>
+                          <p className="text-xs font-mono text-charcoal-deep">{item.brandId || 'N/A'}</p>
                         </div>
-                        {report.product_price && (
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">
-                              Product Price
-                            </p>
-                            <p className="text-xs font-medium text-charcoal-deep">
-                              &#8377;{report.product_price.toLocaleString()}
-                            </p>
-                          </div>
-                        )}
                         <div>
-                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">
-                            Reported At
-                          </p>
-                          <p className="text-xs text-charcoal-deep">
-                            {formatDateTime(report.reported_at)}
-                          </p>
+                          <p className="text-[10px] uppercase tracking-wider text-stone/50 mb-1">Content Type</p>
+                          <p className="text-xs text-charcoal-deep capitalize">{item.contentType}</p>
                         </div>
                       </div>
 
-                      {/* Brand Complaint History */}
-                      <div className="bg-white border border-sand/50 rounded-lg p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <ShieldAlert size={14} className="text-charcoal-deep/60" />
-                          <p className="text-xs font-semibold text-charcoal-deep uppercase tracking-wider">
-                            Brand Complaint History &mdash; {report.brand_name}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-sm text-charcoal-deep">
-                            <span className="font-semibold">{brandWarning.total}</span>{' '}
-                            total complaint{brandWarning.total !== 1 ? 's' : ''}
-                          </div>
-                          <span
-                            className={`inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5 ${warningBadge.classes}`}
-                          >
-                            {brandWarning.level === 'high' && <ShieldX size={12} />}
-                            {brandWarning.level === 'medium' && <ShieldAlert size={12} />}
-                            {brandWarning.level === 'low' && <ShieldCheck size={12} />}
-                            {warningBadge.label} Warning Level
-                          </span>
-                          {brandWarning.level === 'high' && (
-                            <span className="text-xs text-red-600 font-medium">
-                              Immediate review recommended
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Admin notes / action taken (for resolved) */}
-                      {report.admin_notes && (
+                      {/* Reviewer note */}
+                      {item.reviewerNote && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                           <div className="flex items-center gap-2 mb-1">
                             <MessageSquare size={14} className="text-blue-600" />
                             <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
-                              Admin Notes
+                              Reviewer Note
                             </p>
                           </div>
-                          <p className="text-sm text-blue-800">{report.admin_notes}</p>
-                        </div>
-                      )}
-
-                      {report.action_taken && (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-                          <div className="flex items-center gap-2 mb-1">
-                            <CheckCircle size={14} className="text-emerald-600" />
-                            <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
-                              Action Taken
-                            </p>
-                          </div>
-                          <p className="text-sm text-emerald-800">{report.action_taken}</p>
-                          {report.resolved_at && (
-                            <p className="text-xs text-emerald-600 mt-1">
-                              Resolved {formatDateTime(report.resolved_at)}
-                            </p>
-                          )}
+                          <p className="text-sm text-blue-800">{item.reviewerNote}</p>
                         </div>
                       )}
                     </div>
@@ -792,157 +421,55 @@ export default function ProductReportsPage() {
         )}
       </div>
 
-      {/* ── Action Modals ──────────────────────────────────────────────────────── */}
-      {modalType && modalReport && (
+      {/* ── Reject Modal ──────────────────────────────────────────────────────── */}
+      {modalItemId && modalAction === 'rejected' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg">
-            {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-sand/50">
               <div className="flex items-center gap-3">
-                {modalType === 'warning' && (
-                  <>
-                    <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center">
-                      <ShieldAlert size={20} className="text-orange-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-semibold text-charcoal-deep">
-                        Send Warning to Brand
-                      </h2>
-                      <p className="text-xs text-stone/60">{modalReport.brand_name}</p>
-                    </div>
-                  </>
-                )}
-                {modalType === 'remove' && (
-                  <>
-                    <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
-                      <Trash2 size={20} className="text-red-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-semibold text-charcoal-deep">
-                        Remove Product
-                      </h2>
-                      <p className="text-xs text-stone/60">{modalReport.product_name}</p>
-                    </div>
-                  </>
-                )}
-                {modalType === 'suspend' && (
-                  <>
-                    <div className="w-10 h-10 rounded-lg bg-rose-50 flex items-center justify-center">
-                      <Ban size={20} className="text-rose-600" />
-                    </div>
-                    <div>
-                      <h2 className="text-base font-semibold text-charcoal-deep">
-                        Suspend Brand
-                      </h2>
-                      <p className="text-xs text-stone/60">{modalReport.brand_name}</p>
-                    </div>
-                  </>
-                )}
+                <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center">
+                  <ShieldX size={20} className="text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-charcoal-deep">Reject Content</h2>
+                  <p className="text-xs text-stone/60">Add an optional note explaining the rejection</p>
+                </div>
               </div>
               <button
-                onClick={() => {
-                  setModalType(null);
-                  setModalReport(null);
-                }}
+                onClick={() => { setModalItemId(null); setModalAction(null); setModalNote(''); }}
                 className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-parchment transition-colors text-stone/60 hover:text-charcoal-deep"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-6 space-y-4">
-              {/* Context */}
-              <div className="bg-parchment/50 border border-sand/50 rounded-lg p-4">
-                <p className="text-xs text-stone/60 mb-1">Report</p>
-                <p className="text-sm font-medium text-charcoal-deep">{modalReport.product_name}</p>
-                <p className="text-xs text-stone/60 mt-1">
-                  Reported by {modalReport.customer_name} &middot;{' '}
-                  {formatDate(modalReport.reported_at)}
-                </p>
-              </div>
-
-              {/* Suspend confirmation */}
-              {modalType === 'suspend' && (
-                <div className="bg-rose-50 border border-rose-200 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-1">
-                    <AlertTriangle size={14} className="text-rose-600" />
-                    <p className="text-xs font-semibold text-rose-700 uppercase tracking-wider">
-                      Warning
-                    </p>
-                  </div>
-                  <p className="text-sm text-rose-800">
-                    Suspending a brand will immediately hide all their products from the marketplace.
-                    This action should only be used for serious or repeated violations.
-                  </p>
-                </div>
-              )}
-
-              {/* Message input */}
               <div>
-                <label className="block text-xs text-stone/60 mb-1.5">
-                  {modalType === 'warning'
-                    ? 'Warning Message'
-                    : modalType === 'remove'
-                    ? 'Removal Reason'
-                    : 'Suspension Reason'}
-                </label>
+                <label className="block text-xs text-stone/60 mb-1.5">Rejection Note (optional)</label>
                 <textarea
-                  value={modalMessage}
-                  onChange={(e) => setModalMessage(e.target.value)}
-                  placeholder={
-                    modalType === 'warning'
-                      ? 'Describe the issue and required corrective actions...'
-                      : modalType === 'remove'
-                      ? 'Reason for removing this product from the marketplace...'
-                      : 'Reason for suspending this brand...'
-                  }
+                  value={modalNote}
+                  onChange={(e) => setModalNote(e.target.value)}
+                  placeholder="Reason for rejecting this content..."
                   rows={4}
                   className="w-full border border-sand/50 rounded-lg px-3 py-2 text-sm bg-parchment/30 text-charcoal-deep placeholder:text-stone/40 focus:outline-none focus:ring-1 focus:ring-gold-soft resize-none"
                 />
               </div>
             </div>
 
-            {/* Modal Footer */}
             <div className="flex items-center justify-end gap-3 p-6 border-t border-sand/50">
               <button
-                onClick={() => {
-                  setModalType(null);
-                  setModalReport(null);
-                }}
+                onClick={() => { setModalItemId(null); setModalAction(null); setModalNote(''); }}
                 className="text-xs font-medium text-stone/60 hover:text-charcoal-deep px-4 py-2 rounded-lg border border-sand/50 hover:bg-parchment transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={handleModalConfirm}
-                disabled={!modalMessage.trim() || actionLoading === modalReport.id}
-                className={`inline-flex items-center gap-1.5 text-xs font-medium rounded-lg px-4 py-2 transition-colors disabled:opacity-50 ${
-                  modalType === 'warning'
-                    ? 'text-orange-700 bg-orange-50 hover:bg-orange-100 border border-orange-200'
-                    : modalType === 'remove'
-                    ? 'text-white bg-red-600 hover:bg-red-700 border border-red-600'
-                    : 'text-white bg-rose-700 hover:bg-rose-800 border border-rose-700'
-                }`}
+                onClick={() => handleAction(modalItemId, 'rejected', modalNote || undefined)}
+                disabled={actionLoading === modalItemId}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 border border-red-600 rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
               >
-                {modalType === 'warning' && (
-                  <>
-                    <ShieldAlert size={14} />
-                    Send Warning
-                  </>
-                )}
-                {modalType === 'remove' && (
-                  <>
-                    <Trash2 size={14} />
-                    Remove Product
-                  </>
-                )}
-                {modalType === 'suspend' && (
-                  <>
-                    <Ban size={14} />
-                    Suspend Brand
-                  </>
-                )}
+                <Ban size={14} />
+                Confirm Reject
               </button>
             </div>
           </div>

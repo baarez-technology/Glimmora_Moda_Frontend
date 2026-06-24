@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { useAdmin } from '@/context/AdminContext';
+import { changePassword } from '@/services/admin.service';
 import { User, Mail, Shield, Bell, Save, Key, CheckCircle, AlertTriangle } from 'lucide-react';
 
 // ─── Toggle Component ────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ export default function AdminSettingsPage() {
     setPasswordSuccess(false);
   };
 
-  const handlePasswordSubmit = () => {
+  const handlePasswordSubmit = async () => {
     setPasswordError('');
     setPasswordSuccess(false);
 
@@ -83,11 +84,14 @@ export default function AdminSettingsPage() {
       return;
     }
 
-    // Mock success — log and show feedback
-    console.log('[Admin Settings] Password change submitted (mock).');
-    setPasswordSuccess(true);
-    setPasswords({ current: '', newPassword: '', confirm: '' });
-    setTimeout(() => setPasswordSuccess(false), 4000);
+    const result = await changePassword(passwords.current, passwords.newPassword);
+    if (result.ok) {
+      setPasswordSuccess(true);
+      setPasswords({ current: '', newPassword: '', confirm: '' });
+      setTimeout(() => setPasswordSuccess(false), 4000);
+    } else {
+      setPasswordError(result.message);
+    }
   };
 
   const handleSave = () => {

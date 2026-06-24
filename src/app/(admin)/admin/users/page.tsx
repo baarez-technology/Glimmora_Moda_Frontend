@@ -21,30 +21,34 @@ import {
   Send,
 } from 'lucide-react';
 import { fetchPlatformUsers, updateUserStatus } from '@/services/admin.service';
-import type { PlatformUser, UserRole, UserStatus } from '@/types/admin';
+import type { PlatformUserItem } from '@/services/admin.service';
 
-const ROLE_BADGE: Record<UserRole, string> = {
+type UserRole = 'consumer' | 'uhni' | 'brand' | 'admin';
+type UserStatus = 'active' | 'suspended' | 'banned' | 'pending';
+
+const ROLE_BADGE: Record<string, string> = {
   admin: 'bg-purple-100 text-purple-700',
   uhni: 'bg-amber-100 text-amber-700',
   brand: 'bg-blue-100 text-blue-700',
   consumer: 'bg-gray-100 text-gray-600',
 };
 
-const STATUS_BADGE: Record<UserStatus, string> = {
+const STATUS_BADGE: Record<string, string> = {
   active: 'bg-emerald-100 text-emerald-700',
   suspended: 'bg-amber-100 text-amber-700',
   banned: 'bg-red-100 text-red-700',
   pending: 'bg-gray-100 text-gray-500',
 };
 
-const STATUS_ICON: Record<UserStatus, React.ReactNode> = {
+const STATUS_ICON: Record<string, React.ReactNode> = {
   active: <CheckCircle size={12} />,
   suspended: <Clock size={12} />,
   banned: <Ban size={12} />,
   pending: <Clock size={12} />,
 };
 
-function formatDate(iso: string): string {
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return 'N/A';
   const d = new Date(iso);
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
@@ -55,13 +59,15 @@ function formatCurrency(n: number): string {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<PlatformUser[]>([]);
+  const [users, setUsers] = useState<PlatformUserItem[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<UserRole | ''>('');
   const [statusFilter, setStatusFilter] = useState<UserStatus | ''>('');
   const [openMenu, setOpenMenu] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<PlatformUser | null>(null);
+  const [selectedUser, setSelectedUser] = useState<PlatformUserItem | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<'admin' | 'moderator'>('admin');
@@ -70,11 +76,18 @@ export default function AdminUsersPage() {
   // ── Load users ──────────────────────────────────────────────────────────────
   const loadUsers = async () => {
     setLoading(true);
-    const res = await fetchPlatformUsers({
+    setError(false);
+    const data = await fetchPlatformUsers({
       ...(roleFilter ? { role: roleFilter } : {}),
       ...(statusFilter ? { status: statusFilter } : {}),
+      page_size: 100,
     });
-    if (res.data) setUsers(res.data);
+    if (data) {
+      setUsers(data.users);
+      setTotal(data.total);
+    } else {
+      setError(true);
+    }
     setLoading(false);
   };
 
@@ -95,12 +108,12 @@ export default function AdminUsersPage() {
   // ── Stats ───────────────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     return {
-      total: users.length,
+      total,
       active: users.filter((u) => u.status === 'active').length,
       suspended: users.filter((u) => u.status === 'suspended').length,
       uhni: users.filter((u) => u.role === 'uhni').length,
     };
-  }, [users]);
+  }, [users, total]);
 
   // ── Actions ─────────────────────────────────────────────────────────────────
   const handleStatusChange = async (userId: string, newStatus: UserStatus) => {
@@ -211,6 +224,10 @@ export default function AdminUsersPage() {
             <div className="flex items-center justify-center py-20 text-stone/40 text-sm">
               Loading users...
             </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-20 text-stone/40 text-sm">
+              Failed to load users. Please try again.
+            </div>
           ) : filtered.length === 0 ? (
             <div className="flex items-center justify-center py-20 text-stone/40 text-sm">
               No users found.
@@ -264,7 +281,7 @@ export default function AdminUsersPage() {
                       {/* Role */}
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_BADGE[user.role]}`}
+                          className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_BADGE[user.role] || 'bg-gray-100 text-gray-600'}`}
                         >
                           {user.role}
                         </span>
@@ -273,9 +290,9 @@ export default function AdminUsersPage() {
                       {/* Status */}
                       <td className="px-4 py-3">
                         <span
-                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[user.status]}`}
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[user.status] || 'bg-gray-100 text-gray-500'}`}
                         >
-                          {STATUS_ICON[user.status]}
+                          {STATUS_ICON[user.status] || <Clock size={12} />}
                           {user.status}
                         </span>
                       </td>
@@ -375,11 +392,11 @@ export default function AdminUsersPage() {
                 <div className="min-w-0">
                   <h3 className="text-lg font-semibold text-charcoal-deep">{selectedUser.name}</h3>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_BADGE[selectedUser.role]}`}>
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${ROLE_BADGE[selectedUser.role] || 'bg-gray-100 text-gray-600'}`}>
                       {selectedUser.role}
                     </span>
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[selectedUser.status]}`}>
-                      {STATUS_ICON[selectedUser.status]}
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_BADGE[selectedUser.status] || 'bg-gray-100 text-gray-500'}`}>
+                      {STATUS_ICON[selectedUser.status] || <Clock size={12} />}
                       {selectedUser.status}
                     </span>
                   </div>

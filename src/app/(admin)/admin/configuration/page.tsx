@@ -8,7 +8,7 @@ import {
   updatePlatformConfig,
 } from '@/services/admin.service';
 import { savePlatformConfig } from '@/lib/platform-config';
-import type { PlatformConfig } from '@/types/admin';
+import type { PlatformConfig } from '@/services/admin.service';
 
 // ─── Toggle Switch Component ────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ export default function ConfigurationPage() {
     async function load() {
       setLoading(true);
       const configRes = await fetchPlatformConfig();
-      if (configRes.data) setConfig(configRes.data);
+      if (configRes) setConfig(configRes);
       setLoading(false);
     }
     load();
@@ -57,11 +57,11 @@ export default function ConfigurationPage() {
     if (!config) return;
     setSaving(true);
     setSaveMessage('');
-    const res = await updatePlatformConfig(config);
-    if (res.data) {
-      setConfig(res.data);
+    const updated = await updatePlatformConfig(config);
+    if (updated) {
+      setConfig(updated);
       // Persist to localStorage so other portals (consumer, brand) can read it
-      savePlatformConfig(res.data);
+      savePlatformConfig(updated);
       setSaveMessage('saved');
     } else {
       setSaveMessage('error');

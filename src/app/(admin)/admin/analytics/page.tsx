@@ -20,12 +20,13 @@ import {
   fetchAnalyticsReports,
 } from '@/services/admin.service';
 import type {
-  RevenueData,
-  UserGrowthData,
-  TopBrandData,
+  RevenueDataPoint as RevenueData,
+  UserGrowthDataPoint as UserGrowthData,
+  TopBrandDataPoint as TopBrandData,
   AnalyticsReport,
-  ReportPeriod,
-} from '@/types/admin';
+} from '@/services/admin.service';
+
+type ReportPeriod = '7d' | '30d' | '90d' | '1y';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -77,16 +78,16 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const [revRes, ugRes, tbRes, rpRes] = await Promise.all([
+      const [revData, ugData, tbData, rpData] = await Promise.all([
         fetchRevenueData(period),
         fetchUserGrowthData(period),
         fetchTopBrands(period),
         fetchAnalyticsReports(),
       ]);
-      if (revRes.data) setRevenueData(revRes.data);
-      if (ugRes.data) setUserGrowthData(ugRes.data);
-      if (tbRes.data) setTopBrands(tbRes.data);
-      if (rpRes.data) setReports(rpRes.data);
+      setRevenueData(revData);
+      setUserGrowthData(ugData);
+      setTopBrands(tbData);
+      setReports(rpData);
       setLoading(false);
     }
     loadData();
