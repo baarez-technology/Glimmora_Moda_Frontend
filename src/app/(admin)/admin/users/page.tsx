@@ -256,7 +256,7 @@ export default function AdminUsersPage() {
                       <td className="px-6 py-3">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-charcoal-deep/10 flex items-center justify-center text-xs font-semibold text-charcoal-deep shrink-0">
-                            {user.avatar ? (
+                            {user.avatar?.startsWith('http') ? (
                               <img
                                 src={user.avatar}
                                 alt={user.name}
@@ -383,7 +383,7 @@ export default function AdminUsersPage() {
             <div className="px-6 py-5 border-b border-sand/30">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-charcoal-deep/10 flex items-center justify-center text-xl font-semibold text-charcoal-deep shrink-0">
-                  {selectedUser.avatar ? (
+                  {selectedUser.avatar?.startsWith('http') ? (
                     <img src={selectedUser.avatar} alt={selectedUser.name} className="w-full h-full rounded-full object-cover" />
                   ) : (
                     selectedUser.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()

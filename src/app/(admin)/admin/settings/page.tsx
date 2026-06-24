@@ -206,59 +206,70 @@ export default function AdminSettingsPage() {
           {/* Change Password */}
           <div className="mb-8">
             <h3 className="text-sm font-semibold text-charcoal-deep mb-4">Change Password</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
-              <div>
-                <label className="block text-xs text-stone/60 mb-1">Current Password</label>
-                <input
-                  type="password"
-                  value={passwords.current}
-                  onChange={(e) => handlePasswordChange('current', e.target.value)}
-                  className="w-full border border-sand/50 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-charcoal-deep/30"
-                  placeholder="Enter current password"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-stone/60 mb-1">New Password</label>
-                <input
-                  type="password"
-                  value={passwords.newPassword}
-                  onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
-                  className="w-full border border-sand/50 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-charcoal-deep/30"
-                  placeholder="Enter new password"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-stone/60 mb-1">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={passwords.confirm}
-                  onChange={(e) => handlePasswordChange('confirm', e.target.value)}
-                  className="w-full border border-sand/50 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-charcoal-deep/30"
-                  placeholder="Confirm new password"
-                />
-              </div>
-            </div>
-
-            {/* Password validation feedback */}
-            {passwordError && (
-              <div className="flex items-center gap-2 mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 max-w-3xl">
-                <AlertTriangle size={14} />
-                <span>{passwordError}</span>
-              </div>
-            )}
-            {passwordSuccess && (
-              <div className="flex items-center gap-2 mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 max-w-3xl">
-                <CheckCircle size={14} />
-                <span>Password changed successfully.</span>
-              </div>
-            )}
-
-            <button
-              onClick={handlePasswordSubmit}
-              className="mt-4 text-xs font-medium text-charcoal-deep border border-charcoal-deep/20 rounded-md px-4 py-2 hover:bg-charcoal-deep hover:text-ivory-cream transition-colors"
+            <form
+              onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
+              noValidate
             >
-              Change Password
-            </button>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
+                <div>
+                  <label className="block text-xs text-stone/60 mb-1">Current Password</label>
+                  <input
+                    type="password"
+                    name="current-password"
+                    autoComplete="current-password"
+                    value={passwords.current}
+                    onChange={(e) => handlePasswordChange('current', e.target.value)}
+                    className="w-full border border-sand/50 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-charcoal-deep/30"
+                    placeholder="Enter current password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-stone/60 mb-1">New Password</label>
+                  <input
+                    type="password"
+                    name="new-password"
+                    autoComplete="new-password"
+                    value={passwords.newPassword}
+                    onChange={(e) => handlePasswordChange('newPassword', e.target.value)}
+                    className="w-full border border-sand/50 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-charcoal-deep/30"
+                    placeholder="Enter new password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-stone/60 mb-1">Confirm New Password</label>
+                  <input
+                    type="password"
+                    name="confirm-password"
+                    autoComplete="new-password"
+                    value={passwords.confirm}
+                    onChange={(e) => handlePasswordChange('confirm', e.target.value)}
+                    className="w-full border border-sand/50 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-charcoal-deep/30"
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+
+              {/* Password validation feedback */}
+              {passwordError && (
+                <div className="flex items-center gap-2 mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 max-w-3xl">
+                  <AlertTriangle size={14} />
+                  <span>{passwordError}</span>
+                </div>
+              )}
+              {passwordSuccess && (
+                <div className="flex items-center gap-2 mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-md px-3 py-2 max-w-3xl">
+                  <CheckCircle size={14} />
+                  <span>Password changed successfully.</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="mt-4 text-xs font-medium text-charcoal-deep border border-charcoal-deep/20 rounded-md px-4 py-2 hover:bg-charcoal-deep hover:text-ivory-cream transition-colors"
+              >
+                Change Password
+              </button>
+            </form>
           </div>
 
           {/* 2FA Status — Coming soon (no backend support) */}

@@ -271,7 +271,7 @@ function BrandCard({
       <div className="flex items-center gap-5">
         {/* Logo / Initial */}
         <div className="w-12 h-12 rounded-xl bg-charcoal-deep/10 flex items-center justify-center text-xl font-display text-charcoal-deep/70 shrink-0 overflow-hidden">
-          {brand.brandLogo ? (
+          {brand.brandLogo?.startsWith('http') ? (
             <img src={brand.brandLogo} alt={brand.brandName} className="w-full h-full object-cover" />
           ) : (
             initial
