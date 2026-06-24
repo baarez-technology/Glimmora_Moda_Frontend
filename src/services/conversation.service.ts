@@ -158,8 +158,16 @@ export function connectWebSocket(
 
   const ws = new WebSocket(url);
 
+  // Frames requested before the socket finishes its handshake are queued here and
+  // flushed on 'open'. Without this, calling ws.send() while the socket is still
+  // CONNECTING is a silent no-op, so the very first message (sent right after the
+  // socket is opened in ensureConversation) is lost and no reply ever streams back.
+  const pendingFrames: string[] = [];
+
   ws.addEventListener('open', () => {
-    // ping immediately to confirm connection before first message
+    while (pendingFrames.length > 0) {
+      ws.send(pendingFrames.shift()!);
+    }
   });
 
   ws.addEventListener('message', (event) => {
@@ -200,9 +208,14 @@ export function connectWebSocket(
 
   return {
     sendMessage(content: string) {
+      const frame = JSON.stringify({ type: 'message', content });
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'message', content }));
+        ws.send(frame);
+      } else if (ws.readyState === WebSocket.CONNECTING) {
+        // Socket still handshaking — queue and flush on 'open'.
+        pendingFrames.push(frame);
       }
+      // CLOSING/CLOSED: drop; caller is notified via onClose.
     },
     close() {
       if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
