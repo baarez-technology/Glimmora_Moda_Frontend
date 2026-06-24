@@ -210,6 +210,16 @@ export default function AdminSettingsPage() {
               onSubmit={(e) => { e.preventDefault(); handlePasswordSubmit(); }}
               noValidate
             >
+              {/* Hidden username field: lets password managers associate the
+                  credential and satisfies the browser a11y hint for password forms. */}
+              <input
+                type="text"
+                name="username"
+                autoComplete="username"
+                value={admin?.email || ''}
+                readOnly
+                hidden
+              />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
                 <div>
                   <label className="block text-xs text-stone/60 mb-1">Current Password</label>
