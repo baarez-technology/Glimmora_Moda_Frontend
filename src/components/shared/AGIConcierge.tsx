@@ -1,18 +1,27 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { MessageCircle, X, Send, Sparkles, Calendar } from 'lucide-react';
 import * as calendarService from '@/services/calendar.service';
+import * as conversationService from '@/services/conversation.service';
 import VoiceInput from '@/components/shared/VoiceInput';
 import type { CalendarEvent } from '@/types';
+import type { WsSession } from '@/services/conversation.service';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   hasCalendarLink?: boolean;
+  citations?: string[];
+  isStreaming?: boolean;
 }
+
+// Set to true once nginx proxies WebSocket upgrades. While false, all
+// messages go via the REST fallback (POST /{id}/messages) which works
+// through the Next.js /api/v1/* rewrite without any WS upgrade support.
+const USE_WEBSOCKET = true;
 
 const defaultInitialMessage: Message = {
   id: '1',
@@ -33,7 +42,13 @@ export default function AGIConcierge() {
   const [messages, setMessages] = useState<Message[]>([defaultInitialMessage]);
   const [input, setInput] = useState('');
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null);
+  const [isSending, setIsSending] = useState(false);
   const chatInputRef = useRef<HTMLInputElement>(null);
+
+  // Backend conversation state
+  const conversationIdRef = useRef<string | null>(null);
+  const wsSessionRef = useRef<WsSession | null>(null);
+  const streamingMsgIdRef = useRef<string | null>(null);
 
   // ESC key handler for chat panel
   useEffect(() => {
@@ -49,6 +64,13 @@ export default function AGIConcierge() {
   useEffect(() => {
     if (isOpen) chatInputRef.current?.focus();
   }, [isOpen]);
+
+  // Close WS on unmount
+  useEffect(() => {
+    return () => {
+      wsSessionRef.current?.close();
+    };
+  }, []);
 
   // Load calendar events from service on mount
   useEffect(() => {
@@ -70,72 +92,199 @@ export default function AGIConcierge() {
     });
   }, []);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
+  /**
+   * Ensure a conversation exists on the backend and a WebSocket is open.
+   * Returns the conversation ID, or null if the user is not authenticated.
+   */
+  const ensureConversation = useCallback(async (): Promise<string | null> => {
+    const token = conversationService.getUserToken();
+    if (!token) return null;
+
+    // Reuse existing conversation if available
+    if (conversationIdRef.current && (!USE_WEBSOCKET || wsSessionRef.current)) {
+      return conversationIdRef.current;
+    }
+
+    // Create conversation via REST
+    let conversationId = conversationIdRef.current;
+    if (!conversationId) {
+      try {
+        const convo = await conversationService.createConversation();
+        conversationId = convo.conversation_id;
+        conversationIdRef.current = conversationId;
+      } catch {
+        return null;
+      }
+    }
+
+    // Open WebSocket for streaming (only when USE_WEBSOCKET is enabled)
+    if (USE_WEBSOCKET && !wsSessionRef.current) {
+      wsSessionRef.current = conversationService.connectWebSocket(
+        conversationId,
+        token,
+        {
+          onToken: (delta) => {
+            const msgId = streamingMsgIdRef.current;
+            if (!msgId) return;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === msgId
+                  ? { ...m, content: m.content + delta }
+                  : m
+              )
+            );
+          },
+          onMessageDone: () => {
+            const msgId = streamingMsgIdRef.current;
+            if (msgId) {
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === msgId ? { ...m, isStreaming: false } : m
+                )
+              );
+            }
+            streamingMsgIdRef.current = null;
+            setIsSending(false);
+          },
+          onCitations: (citations) => {
+            const msgId = streamingMsgIdRef.current;
+            if (msgId) {
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === msgId ? { ...m, citations } : m
+                )
+              );
+            }
+          },
+          onError: (detail) => {
+            streamingMsgIdRef.current = null;
+            setIsSending(false);
+            setMessages(prev => {
+              // Replace any in-progress streaming message with the error
+              const hasStreaming = prev.some(m => m.isStreaming);
+              if (hasStreaming) {
+                return prev.map(m =>
+                  m.isStreaming
+                    ? { ...m, content: 'I\'m having trouble connecting right now. Please try again in a moment.', isStreaming: false }
+                    : m
+                );
+              }
+              return [
+                ...prev,
+                {
+                  id: (Date.now() + 2).toString(),
+                  role: 'assistant',
+                  content: 'I\'m having trouble connecting right now. Please try again in a moment.',
+                },
+              ];
+            });
+          },
+          onClose: () => {
+            // Socket closed — clear session so the next message re-opens it
+            wsSessionRef.current = null;
+            streamingMsgIdRef.current = null;
+            setIsSending(false);
+          },
+        },
+      );
+    }
+
+    return conversationId;
+  }, []);
+
+  const handleSend = useCallback(async () => {
+    const trimmed = input.trim();
+    if (!trimmed || isSending) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      content: input
+      content: trimmed,
     };
 
-    setMessages([...messages, userMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setIsSending(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const responses: Record<string, { content: string; hasCalendarLink?: boolean }> = {
-        'event': {
-          content: nextEvent
-            ? `For your upcoming "${nextEvent.title}", I've curated outfit suggestions based on the ${nextEvent.dressCode || 'smart'} dress code and the venue. You can view all my recommendations in your Style Calendar. I suggest starting with pieces that express sophistication while remaining comfortable for the occasion.`
-            : 'I\'d be happy to help you prepare for an event. Connect your calendar in settings and I\'ll provide personalized outfit suggestions for all your upcoming occasions.',
-          hasCalendarLink: !!nextEvent
-        },
-        'wear': {
-          content: nextEvent
-            ? `Based on your "${nextEvent.title}" event, I recommend an ensemble that balances elegance with the ${nextEvent.eventType.replace('_', ' ')} atmosphere. Check your Style Calendar for detailed suggestions including items from your wardrobe and complementary new pieces.`
-            : 'Tell me more about the occasion and I can suggest appropriate pieces from our collections.',
-          hasCalendarLink: !!nextEvent
-        },
-        'calendar': {
-          content: 'Your Style Calendar syncs with your personal calendar to provide outfit suggestions for upcoming events. I analyze the event type, venue, weather, and your Fashion Identity to curate perfect looks.',
-          hasCalendarLink: true
-        },
-        'evening': {
-          content: 'For evening occasions, I would suggest exploring our Lady Dior collection. The small size in black leather is particularly elegant for gallery openings and dinner events. Would you like me to show you the story behind this iconic piece?',
-        },
-        'gallery': {
-          content: 'A gallery opening calls for understated elegance. Based on your interest, I recommend pieces that balance artistic expression with sophistication. The Dior Bar Jacket paired with statement accessories would create a memorable impression.',
-        },
-        'dior': {
-          content: 'Dior\'s heritage is one of revolutionary elegance. Founded in 1946 by Christian Dior, the house introduced the "New Look" that transformed post-war fashion. Would you like to explore our heritage stories or see iconic pieces?',
-        },
-        'outfit': {
-          content: nextEvent
-            ? `I\'d love to help! For your upcoming "${nextEvent.title}", I\'ve already prepared suggestions in your Style Calendar. Would you like to see them, or are you looking for something specific?`
-            : 'I\'d be happy to help you complete an outfit. Could you tell me more about the occasion and any pieces you already have in mind?',
-          hasCalendarLink: !!nextEvent
-        }
-      };
+    // Placeholder streaming message
+    const streamingId = (Date.now() + 1).toString();
+    const streamingMsg: Message = {
+      id: streamingId,
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+    };
+    setMessages(prev => [...prev, streamingMsg]);
+    streamingMsgIdRef.current = streamingId;
 
-      const responseKey = Object.keys(responses).find(key =>
-        input.toLowerCase().includes(key)
+    const token = conversationService.getUserToken();
+
+    if (!token) {
+      // Not authenticated — fall through to REST-less graceful error
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId
+            ? { ...m, content: 'Please sign in to use the AI Concierge.', isStreaming: false }
+            : m
+        )
       );
+      streamingMsgIdRef.current = null;
+      setIsSending(false);
+      return;
+    }
 
-      const response = responseKey ? responses[responseKey] : {
-        content: 'I understand you\'re looking for something special. Let me help you explore our curated collections. You might enjoy starting with our Brand Universes to discover pieces that resonate with your style.'
-      };
+    const conversationId = await ensureConversation();
 
-      const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.content,
-        hasCalendarLink: response.hasCalendarLink
-      };
+    if (!conversationId) {
+      // Could not create conversation — fall back to REST direct attempt
+      // or show error
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId
+            ? { ...m, content: 'Unable to start a conversation. Please try again.', isStreaming: false }
+            : m
+        )
+      );
+      streamingMsgIdRef.current = null;
+      setIsSending(false);
+      return;
+    }
 
-      setMessages(prev => [...prev, aiMessage]);
-    }, 1000);
-  };
+    // Try WebSocket first (only when USE_WEBSOCKET is enabled and socket is open)
+    if (USE_WEBSOCKET && wsSessionRef.current) {
+      wsSessionRef.current.sendMessage(trimmed);
+      // Response arrives via WS callbacks above
+      return;
+    }
+
+    // WebSocket disabled or unavailable — use REST
+    try {
+      const result = await conversationService.sendMessageRest(conversationId, trimmed);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId
+            ? {
+                ...m,
+                content: result.content,
+                citations: result.citations?.length ? result.citations : undefined,
+                isStreaming: false,
+              }
+            : m
+        )
+      );
+    } catch {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === streamingId
+            ? { ...m, content: 'I\'m having trouble connecting right now. Please try again in a moment.', isStreaming: false }
+            : m
+        )
+      );
+    } finally {
+      streamingMsgIdRef.current = null;
+      setIsSending(false);
+    }
+  }, [input, isSending, ensureConversation]);
 
   const handleSuggestion = (suggestion: string) => {
     setInput(suggestion);
@@ -191,7 +340,19 @@ export default function AGIConcierge() {
                       : 'bg-white text-charcoal-deep rounded-bl-sm shadow-sm'
                   }`}
                 >
-                  <p className="text-sm leading-relaxed">{message.content}</p>
+                  <p className="text-sm leading-relaxed">
+                    {message.content}
+                    {message.isStreaming && (
+                      <span className="inline-block w-1.5 h-3.5 ml-0.5 bg-gold-muted animate-pulse rounded-sm align-middle" aria-hidden="true" />
+                    )}
+                  </p>
+                  {message.citations && message.citations.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {message.citations.map((citation, i) => (
+                        <p key={i} className="text-xs text-stone/70 italic">{citation}</p>
+                      ))}
+                    </div>
+                  )}
                   {message.hasCalendarLink && message.role === 'assistant' && (
                     <Link
                       href="/calendar"
@@ -235,11 +396,12 @@ export default function AGIConcierge() {
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                 placeholder="Ask me anything..."
                 className="flex-1 px-4 py-2.5 bg-parchment border-none rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-gold-muted/50"
+                disabled={isSending}
               />
               <VoiceInput onTranscript={handleVoiceInput} className="scale-90" />
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() || isSending}
                 className="w-10 h-10 rounded-full bg-charcoal-deep text-ivory-cream flex items-center justify-center hover:bg-noir transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Send size={18} />
