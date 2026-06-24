@@ -468,3 +468,32 @@ export async function fetchSecuritySummary(): Promise<SecuritySummary | null> {
     return null;
   }
 }
+
+// ============================================
+// Superadmin Dashboard Metrics (real backend)
+// GET /api/v1/superadmin/dashboard/metrics
+// ============================================
+
+export interface SuperadminDashboardMetrics {
+  total_users: number;
+  active_brands: number;
+  total_orders: number;
+  total_revenue: number;
+  currency: string;
+  active_users_today: number;
+  pending_moderations: number;
+}
+
+export async function fetchSuperadminDashboardMetrics(): Promise<SuperadminDashboardMetrics | null> {
+  const token = getAdminToken();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const res = await fetch('/api/v1/superadmin/dashboard/metrics', { headers });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
