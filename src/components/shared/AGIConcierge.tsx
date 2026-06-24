@@ -21,7 +21,7 @@ interface Message {
 // Set to true once nginx proxies WebSocket upgrades. While false, all
 // messages go via the REST fallback (POST /{id}/messages) which works
 // through the Next.js /api/v1/* rewrite without any WS upgrade support.
-const USE_WEBSOCKET = false;
+const USE_WEBSOCKET = true;
 
 const defaultInitialMessage: Message = {
   id: '1',
