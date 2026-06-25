@@ -8,3 +8,4 @@ export { default as ProductMaterials } from './ProductMaterials';
 export { default as ProductRelated } from './ProductRelated';
 export { default as ProductConcierge } from './ProductConcierge';
 export { default as ProductIntelligencePanel } from './ProductIntelligencePanel';
+export { default as VirtualTryOnModal } from './VirtualTryOnModal';
