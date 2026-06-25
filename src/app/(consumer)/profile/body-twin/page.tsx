@@ -125,19 +125,44 @@ function BodyTwinView({ bodyTwin, onEdit }: { bodyTwin: DigitalBodyTwin; onEdit:
             <Ruler size={18} className="text-stone" />
             <h2 className="text-[11px] tracking-[0.3em] uppercase text-taupe">Measurements</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {[
-              { label: 'Height', value: m.height },
-              { label: 'Chest', value: m.bust },
-              { label: 'Waist', value: m.waist },
-              { label: 'Hips', value: m.hips },
-              { label: 'Inseam', value: m.inseam },
-            ].filter(item => item.value != null).map((item) => (
-              <div key={item.label} className="p-5 bg-parchment">
-                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">{item.label}</p>
-                <p className="font-display text-xl text-charcoal-deep">{item.value} <span className="text-sm text-stone font-normal">cm</span></p>
+          <div className="space-y-6">
+            <div>
+              <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Core</p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {[
+                  { label: 'Height', value: m.height, unit: 'cm' },
+                  { label: 'Chest / Bust', value: m.bust, unit: 'cm' },
+                  { label: 'Waist', value: m.waist, unit: 'cm' },
+                  { label: 'Hips', value: m.hips, unit: 'cm' },
+                  { label: 'Inseam', value: m.inseam, unit: 'cm' },
+                ].filter(item => item.value != null).map((item) => (
+                  <div key={item.label} className="p-5 bg-parchment">
+                    <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">{item.label}</p>
+                    <p className="font-display text-xl text-charcoal-deep">{item.value} <span className="text-sm text-stone font-normal">{item.unit}</span></p>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
+            {[m.weight, m.shoulderWidth, m.sleeveLength, m.neck, m.thigh, m.footLength].some(v => v != null) && (
+              <div>
+                <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-3">Detailed</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[
+                    { label: 'Weight', value: m.weight, unit: 'kg' },
+                    { label: 'Shoulder Width', value: m.shoulderWidth, unit: 'cm' },
+                    { label: 'Sleeve Length', value: m.sleeveLength, unit: 'cm' },
+                    { label: 'Neck', value: m.neck, unit: 'cm' },
+                    { label: 'Thigh', value: m.thigh, unit: 'cm' },
+                    { label: 'Foot Length', value: m.footLength, unit: 'cm' },
+                  ].filter(item => item.value != null).map((item) => (
+                    <div key={item.label} className="p-5 bg-parchment">
+                      <p className="text-[10px] tracking-[0.2em] uppercase text-taupe mb-1">{item.label}</p>
+                      <p className="font-display text-xl text-charcoal-deep">{item.value} <span className="text-sm text-stone font-normal">{item.unit}</span></p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -242,12 +267,22 @@ export default function BodyTwinPage() {
     { title: 'Measurements', description: 'Your precise measurements' },
   ];
 
-  const measurementRanges: Record<string, { min: number; max: number; label: string }> = {
-    height: { min: 100, max: 250, label: 'Height' },
-    bust: { min: 50, max: 180, label: 'Chest' },
-    waist: { min: 40, max: 160, label: 'Waist' },
-    hips: { min: 50, max: 180, label: 'Hips' },
-    inseam: { min: 50, max: 100, label: 'Inseam' },
+  // Validation ranges mirror the backend Pydantic bounds.
+  // Keys map to DigitalBodyTwin.measurements field names.
+  const measurementRanges: Record<string, { min: number; max: number; label: string; unit?: string; group: 'core' | 'detailed' }> = {
+    // ── Core ──────────────────────────────────────────────────────────────
+    height:       { min: 50,  max: 250, label: 'Height',          group: 'core' },
+    bust:         { min: 20,  max: 200, label: 'Chest / Bust',    group: 'core' },
+    waist:        { min: 20,  max: 200, label: 'Waist',           group: 'core' },
+    hips:         { min: 20,  max: 200, label: 'Hips',            group: 'core' },
+    inseam:       { min: 20,  max: 150, label: 'Inseam',          group: 'core' },
+    // ── Detailed ──────────────────────────────────────────────────────────
+    weight:       { min: 20,  max: 300, label: 'Weight',          unit: 'kg', group: 'detailed' },
+    shoulderWidth:{ min: 20,  max: 80,  label: 'Shoulder Width',  group: 'detailed' },
+    sleeveLength: { min: 30,  max: 100, label: 'Sleeve Length',   group: 'detailed' },
+    neck:         { min: 20,  max: 70,  label: 'Neck',            group: 'detailed' },
+    thigh:        { min: 20,  max: 120, label: 'Thigh',           group: 'detailed' },
+    footLength:   { min: 15,  max: 40,  label: 'Foot Length',     group: 'detailed' },
   };
 
   const validateMeasurements = (): boolean => {
@@ -255,10 +290,10 @@ export default function BodyTwinPage() {
     const m = bodyTwin.measurements;
     Object.entries(measurementRanges).forEach(([key, range]) => {
       const value = m?.[key as keyof typeof m];
-      if (value === undefined || value === null) {
-        errors[key] = `${range.label} is required`;
-      } else if (value < range.min || value > range.max) {
-        errors[key] = `${range.label} must be ${range.min}-${range.max} cm`;
+      // All measurements are optional — only validate range when a value is present
+      if (value !== undefined && value !== null && (value < range.min || value > range.max)) {
+        const unitLabel = range.unit ?? 'cm';
+        errors[key] = `${range.label} must be ${range.min}–${range.max} ${unitLabel}`;
       }
     });
     setMeasurementErrors(errors);
@@ -596,18 +631,47 @@ export default function BodyTwinPage() {
                   <h2 className="font-display text-xl text-charcoal-deep mb-3">Measurements</h2>
                   <p className="text-stone mb-8">Enter your measurements for accurate fit predictions</p>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {Object.entries(measurementRanges).map(([key, range]) => (
+                  {/* Core measurements */}
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Core</p>
+                  <div className="grid grid-cols-2 gap-4 mb-8">
+                    {Object.entries(measurementRanges).filter(([, r]) => r.group === 'core').map(([key, range]) => (
                       <div key={key}>
                         <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">
-                          {range.label} (cm)
-                          <span className="text-taupe ml-2 normal-case tracking-normal">{range.min}-{range.max}</span>
+                          {range.label} ({range.unit ?? 'cm'})
+                          <span className="text-taupe ml-2 normal-case tracking-normal">{range.min}–{range.max}</span>
                         </label>
                         <input
                           type="number"
                           min={range.min}
                           max={range.max}
-                          value={bodyTwin.measurements?.[key as keyof typeof bodyTwin.measurements] || ''}
+                          value={bodyTwin.measurements?.[key as keyof typeof bodyTwin.measurements] ?? ''}
+                          onChange={(e) => handleMeasurementChange(key, e.target.value)}
+                          placeholder={String(Math.round((range.min + range.max) / 2))}
+                          className={`w-full px-5 py-4 border focus:outline-none focus:border-charcoal-deep transition-colors ${
+                            measurementErrors[key] ? 'border-red-400' : 'border-sand'
+                          }`}
+                        />
+                        {measurementErrors[key] && (
+                          <p className="text-xs text-red-500 mt-1">{measurementErrors[key]}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Detailed measurements */}
+                  <p className="text-[10px] tracking-[0.3em] uppercase text-taupe mb-4">Detailed</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    {Object.entries(measurementRanges).filter(([, r]) => r.group === 'detailed').map(([key, range]) => (
+                      <div key={key}>
+                        <label className="text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-3 block">
+                          {range.label} ({range.unit ?? 'cm'})
+                          <span className="text-taupe ml-2 normal-case tracking-normal">{range.min}–{range.max}</span>
+                        </label>
+                        <input
+                          type="number"
+                          min={range.min}
+                          max={range.max}
+                          value={bodyTwin.measurements?.[key as keyof typeof bodyTwin.measurements] ?? ''}
                           onChange={(e) => handleMeasurementChange(key, e.target.value)}
                           placeholder={String(Math.round((range.min + range.max) / 2))}
                           className={`w-full px-5 py-4 border focus:outline-none focus:border-charcoal-deep transition-colors ${

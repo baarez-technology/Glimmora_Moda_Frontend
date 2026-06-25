@@ -42,11 +42,11 @@ export const mockBodyTwin: DigitalBodyTwin = {
   silhouette: 'average',
   measurements: {
     height: 168,
-    chest: 88,
+    bust: 88,
     waist: 68,
     hips: 96,
     inseam: 78,
-    shoulders: 38
+    shoulderWidth: 38,
   },
   fitPreferences: {
     tops: 'fitted',
