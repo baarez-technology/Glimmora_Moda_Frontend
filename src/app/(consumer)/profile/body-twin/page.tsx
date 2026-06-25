@@ -346,29 +346,37 @@ export default function BodyTwinPage() {
   return (
     <div className="min-h-screen bg-ivory-cream">
       {/* Header */}
-      <div className="bg-charcoal-deep">
-        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-12">
+      {/* Luxury Header */}
+      <div className="relative bg-gradient-to-b from-charcoal-deep to-noir overflow-hidden border-b border-sand/20">
+        {/* Decorative Background Glows */}
+        <div className="absolute top-0 right-0 w-3/4 h-full bg-gradient-to-bl from-gold-soft/5 via-transparent to-transparent opacity-80 pointer-events-none" />
+        <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-80 h-80 bg-gold-soft/5 blur-[100px] rounded-full pointer-events-none" />
+
+        <div className="max-w-[800px] mx-auto px-8 md:px-16 lg:px-24 py-16 lg:py-20 relative z-10">
           <Link
             href="/profile"
-            className="inline-flex items-center gap-2 text-sm text-sand hover:text-ivory-cream transition-colors mb-8"
+            className="group inline-flex items-center gap-3 text-xs tracking-[0.15em] uppercase text-sand hover:text-gold-soft transition-colors mb-12"
           >
-            <ArrowLeft size={16} />
-            Back to Profile
+            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+            Return to Profile
           </Link>
 
-          <div className={`flex items-center gap-5 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-            <div className="w-14 h-14 bg-ivory-cream/10 flex items-center justify-center">
-              <User size={28} className="text-ivory-cream" />
+          <div className={`flex items-start md:items-center gap-6 md:gap-8 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'}`}>
+            <div className="w-16 h-16 md:w-20 md:h-20 shrink-0 bg-gradient-to-br from-sand/10 to-transparent border border-gold-soft/20 flex items-center justify-center rounded-sm backdrop-blur-sm shadow-xl">
+              <User size={28} className="text-gold-soft/80" />
             </div>
             <div>
-              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-2">
-                Fit Profile
-              </span>
-              <h1 className="font-display text-[clamp(1.5rem,3vw,2.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em]">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-[1px] bg-gold-soft/40" />
+                <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft block">
+                  Intelligence Profile
+                </span>
+              </div>
+              <h1 className="font-display text-[clamp(2rem,4vw,3.5rem)] text-ivory-cream leading-[1.1] tracking-[-0.02em]">
                 Digital Body Twin
               </h1>
-              <p className="text-sand mt-2">
-                {mode === 'view' ? 'Your saved fit profile' : 'Abstract fit representation for accurate recommendations'}
+              <p className="text-taupe mt-3 text-sm md:text-base font-light max-w-md leading-relaxed">
+                {mode === 'view' ? 'Your precise physical architecture, saved for perfect fit predictions and bespoke curation.' : 'Abstract physical representation for immaculate, personalized recommendations.'}
               </p>
             </div>
           </div>

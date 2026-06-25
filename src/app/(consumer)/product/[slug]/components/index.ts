@@ -8,3 +8,7 @@ export { default as ProductMaterials } from './ProductMaterials';
 export { default as ProductRelated } from './ProductRelated';
 export { default as ProductConcierge } from './ProductConcierge';
 export { default as ProductIntelligencePanel } from './ProductIntelligencePanel';
+export { default as PdpIntelligenceHero } from './PdpIntelligenceHero';
+export { default as PdpTryOnPromote } from './PdpTryOnPromote';
+export { default as PdpCompleteLookCollapsed } from './PdpCompleteLookCollapsed';
+export { default as PdpSilentCartButton } from './PdpSilentCartButton';
