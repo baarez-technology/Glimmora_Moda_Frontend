@@ -1103,7 +1103,7 @@ function LoginForm() {
                 {brandOnboardingOpen && (
                   <>
                     {' '}&middot;{' '}
-                    <Link href="/auth/register?mode=brand" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
+                    <Link href="/auth/brand-register" className="text-charcoal-deep hover:text-gold-muted font-medium transition-colors">
                       Register as brand
                     </Link>
                   </>

@@ -696,7 +696,7 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
   const fabricSimulation: FabricSimulation | undefined = useMemo(() => {
     if (serviceData.fabricSimulation) return serviceData.fabricSimulation;
     if (!product.materials.length) return undefined;
-    const materialName = product.materials[0]?.name?.toLowerCase() || '';
+    const materialName = String(product.materials[0]?.name || '').toLowerCase();
     const fabricType: FabricSimulation['fabricType'] =
       materialName.includes('silk') ? 'silk' :
       materialName.includes('wool') ? 'wool' :

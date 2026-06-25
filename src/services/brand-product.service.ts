@@ -115,13 +115,12 @@ export interface BackendProduct {
     | 'standard'
     | 'iv_immersive'
     | 'bespoke_only';
-  pricing_visibility: 'visible' | 'hidden' | 'redacted' | 'on_request' | 'private';
+  pricing_visibility: 'visible' | 'authenticated_only' | 'hidden_until_uhni' | 'on_request' | 'private';
   commerce_action_type:
     | 'purchase'
-    | 'add_to_cart'
-    | 'request_to_buy'
-    | 'concierge'
-    | 'redirect'
+    | 'enquiry_only'
+    | 'appointment'
+    | 'view_only'
     | 'add_to_considerations'
     | 'request_access'
     | 'direct_purchase';

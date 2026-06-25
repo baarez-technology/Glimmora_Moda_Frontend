@@ -149,8 +149,26 @@ export default function Header() {
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
 
-          {/* Navigation Left */}
-          <nav className="hidden lg:flex items-center gap-8" aria-label="Main navigation">
+          {/* Navigation Left — Intelligence-first ordering (P3 rework)
+              Order: For You → Discover → Brands → Stories → Collections
+              "For You" leads because it's where each customer's intelligence lives. */}
+          <nav className="hidden lg:flex items-center gap-7" aria-label="Main navigation">
+            <Link
+              href="/for-you"
+              className="relative text-sm tracking-[0.1em] uppercase text-charcoal-deep hover:text-noir transition-colors group"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex h-1 w-1 rounded-full bg-gold-deep animate-pulse-gold" />
+                For You
+              </span>
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-gold-deep group-hover:w-full transition-all duration-300" />
+            </Link>
+            <Link
+              href="/discover"
+              className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors"
+            >
+              Discover
+            </Link>
             <div
               ref={brandDropdownRef}
               className="relative"
@@ -161,7 +179,7 @@ export default function Header() {
                 aria-expanded={isBrandDropdownOpen}
                 onClick={() => setIsBrandDropdownOpen(prev => !prev)}
               >
-                Brand Universes
+                Brands
               </button>
               {isBrandDropdownOpen && (
                 <div className="absolute top-full left-0 pt-4">
@@ -185,16 +203,10 @@ export default function Header() {
               )}
             </div>
             <Link
-              href="/discover"
+              href="/stories"
               className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors"
             >
-              Discover
-            </Link>
-            <Link
-              href="/collection"
-              className="text-sm tracking-[0.1em] uppercase text-charcoal-warm hover:text-noir transition-colors"
-            >
-              Collections
+              Stories
             </Link>
           </nav>
 
@@ -316,35 +328,27 @@ export default function Header() {
                   <div className="bg-white shadow-lg min-w-[220px] border border-sand/30">
                     {isHydrated && isAuthenticated ? (
                       <>
-                        <Link
-                          href="/profile"
-                          onClick={() => setIsAccountOpen(false)}
-                          className="flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
-                        >
-                          <User size={16} />
-                          <span>My Profile</span>
-                        </Link>
-                        {/* Membership - hidden for consumers
-                        <Link
-                          href="/pricing-tiers"
-                          onClick={() => setIsAccountOpen(false)}
-                          className="flex items-center justify-between px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
-                        >
-                          <div className="flex items-center gap-3">
-                            <Sparkles size={16} />
-                            <span>Membership</span>
-                          </div>
-                          <TierBadge tier={pricingTier} size="sm" />
-                        </Link>
-                        */}
-                        <Link
-                          href="/profile/settings"
-                          onClick={() => setIsAccountOpen(false)}
-                          className="flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors border-b border-sand/30"
-                        >
-                          <Settings size={16} />
-                          <span>Settings</span>
-                        </Link>
+                        <div className="px-5 py-3 border-b border-sand/30 bg-parchment/30">
+                          <p className="text-xs tracking-[0.15em] uppercase text-greige mb-2">Your Intelligence</p>
+                          <Link href="/profile/body-twin" onClick={() => setIsAccountOpen(false)} className="block py-1.5 text-sm text-charcoal-deep hover:text-gold-muted transition-colors">Body Twin</Link>
+                          <Link href="/wardrobe" onClick={() => setIsAccountOpen(false)} className="block py-1.5 text-sm text-charcoal-deep hover:text-gold-muted transition-colors">Wardrobe</Link>
+                          <Link href="/profile/silent-cart" onClick={() => setIsAccountOpen(false)} className="block py-1.5 text-sm text-charcoal-deep hover:text-gold-muted transition-colors">Silent Cart</Link>
+                          <Link href="/profile/style-dna" onClick={() => setIsAccountOpen(false)} className="block py-1.5 text-sm text-charcoal-deep hover:text-gold-muted transition-colors">Style DNA</Link>
+                        </div>
+                        <div className="py-2 border-b border-sand/30">
+                          <Link href="/profile" onClick={() => setIsAccountOpen(false)} className="flex items-center gap-3 px-5 py-2 text-sm text-charcoal-deep hover:bg-parchment transition-colors">
+                            <User size={16} />
+                            <span>My Profile</span>
+                          </Link>
+                          <Link href="/profile/orders" onClick={() => setIsAccountOpen(false)} className="flex items-center gap-3 px-5 py-2 text-sm text-charcoal-deep hover:bg-parchment transition-colors">
+                            <ShoppingBag size={16} />
+                            <span>Orders</span>
+                          </Link>
+                          <Link href="/profile/settings" onClick={() => setIsAccountOpen(false)} className="flex items-center gap-3 px-5 py-2 text-sm text-charcoal-deep hover:bg-parchment transition-colors">
+                            <Settings size={16} />
+                            <span>Settings</span>
+                          </Link>
+                        </div>
                         <button
                           onClick={handleLogout}
                           className="w-full flex items-center gap-3 px-5 py-4 text-sm text-charcoal-deep hover:bg-parchment transition-colors"
@@ -388,8 +392,17 @@ export default function Header() {
                 </div>
               )}
 
-              <div>
-                <p className="text-xs tracking-[0.15em] uppercase text-greige mb-4">Brand Universes</p>
+              {/* P3 rework: For You leads the mobile drawer */}
+              <Link
+                href="/for-you"
+                className="flex items-center gap-2 text-base tracking-[0.1em] uppercase text-charcoal-deep font-medium"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                <span className="inline-flex h-1.5 w-1.5 rounded-full bg-gold-deep animate-pulse-gold" />
+                For You
+              </Link>
+              <div className="border-t border-sand/30 pt-6">
+                <p className="text-xs tracking-[0.15em] uppercase text-greige mb-4">Brands</p>
                 <div className="space-y-3 pl-4">
                   {brands.map((brand) => (
                     <Link
@@ -412,11 +425,11 @@ export default function Header() {
                   Discover
                 </Link>
                 <Link
-                  href="/collection"
+                  href="/stories"
                   className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  Collections
+                  Stories
                 </Link>
                 <Link
                   href="/consideration"
@@ -434,19 +447,19 @@ export default function Header() {
                 {/* Account Section - Different for logged in vs guest */}
                 {isHydrated && isAuthenticated ? (
                   <>
+                    <div className="border-b border-sand/30 pb-4 mb-4">
+                      <p className="text-xs tracking-[0.15em] uppercase text-greige mb-2">Your Intelligence</p>
+                      <Link href="/profile/body-twin" className="block text-sm text-charcoal-deep mb-2" onClick={() => setIsMenuOpen(false)}>Body Twin</Link>
+                      <Link href="/wardrobe" className="block text-sm text-charcoal-deep mb-2" onClick={() => setIsMenuOpen(false)}>Wardrobe</Link>
+                      <Link href="/profile/silent-cart" className="block text-sm text-charcoal-deep mb-2" onClick={() => setIsMenuOpen(false)}>Silent Cart</Link>
+                      <Link href="/profile/style-dna" className="block text-sm text-charcoal-deep" onClick={() => setIsMenuOpen(false)}>Style DNA</Link>
+                    </div>
                     <Link
                       href="/profile"
                       className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       My Profile
-                    </Link>
-                    <Link
-                      href="/wardrobe"
-                      className="block text-sm tracking-[0.1em] uppercase text-charcoal-warm"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      My Wardrobe
                     </Link>
                     <button
                       onClick={() => {

@@ -8,6 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import * as productService from '@/services/product.service';
 import { getProductDetail, getRecommendedBrands, getProductAIInsights, type ProductAIInsights } from '@/services/recommendation.service';
 import OutfitSuggestions from '@/components/product/OutfitSuggestions';
+import FitConfidenceCard from '@/components/product/FitConfidenceCard';
 import { useProductPageState, useProductIntelligence } from './hooks/useProductPageState';
 import {
   ProductGallery,
@@ -19,7 +20,11 @@ import {
   ProductMaterials,
   ProductRelated,
   ProductConcierge,
-  ProductIntelligencePanel
+  ProductIntelligencePanel,
+  PdpIntelligenceHero,
+  PdpTryOnPromote,
+  PdpCompleteLookCollapsed,
+  PdpSilentCartButton,
 } from './components';
 import type { Product } from '@/types';
 
@@ -97,6 +102,24 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
               fashionIdentity={state.fashionIdentity}
             />
 
+            {/* ── P1: Intelligence-led PDP rework ────────────────────────────
+                  Promote Body-Twin sizing into the customer's eyeline
+                  (above variant selection) so USP 10 stops being hidden. */}
+            <PdpIntelligenceHero
+              productSlug={product.slug}
+              fitConfidence={intelligence.fitConfidence}
+              bodyTwin={state.bodyTwin}
+              expandedDetail={
+                intelligence.fitConfidence ? (
+                  <FitConfidenceCard
+                    fitConfidence={intelligence.fitConfidence}
+                    bodyTwin={state.bodyTwin}
+                    selectedSize={state.selectedSize}
+                  />
+                ) : undefined
+              }
+            />
+
             <ProductVariants
               sizeVariants={state.sizeVariants}
               colorVariants={state.colorVariants}
@@ -110,34 +133,68 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
               onQuantityChange={state.setQuantity}
             />
 
-            <ProductActions
-              product={product}
-              sizeVariants={state.sizeVariants}
-              colorVariants={state.colorVariants}
-              selectedSize={state.selectedSize}
-              selectedColor={state.selectedColor}
-              inConsiderations={state.inConsiderations}
-              inCart={state.inCart}
-              inWardrobe={state.inWardrobe}
-              watchingRestock={state.watchingRestock}
-              showIntelligence={state.showIntelligence}
-              onShowIntelligence={() => state.setShowIntelligence(!state.showIntelligence)}
-              onAddToConsiderations={state.handleAddToConsiderations}
-              onRemoveFromConsiderations={state.handleRemoveFromConsiderations}
-              onAddToCart={state.handleAddToCart}
-              onAddToWardrobe={state.handleAddToWardrobe}
-              onRemoveFromWardrobe={state.handleRemoveFromWardrobe}
-              onShare={state.handleShare}
-              onNotifyRestock={state.handleNotifyRestock}
-              onShowConcierge={() => state.setShowConcierge(true)}
-              onShowIV={() => state.setShowIV(true)}
-              onShowViewOnMe={() => state.setShowViewOnMe(true)}
-              onShowVirtualTryOn={() => state.setShowVirtualTryOn(true)}
-              isUHNI={state.isUHNI}
-              onNegotiatePrice={state.handleNegotiatePrice}
-              pricingTier={state.pricingTier}
-              hasPriceAlert={state.hasPriceAlert}
-              onSetPriceAlert={state.handleSetPriceAlert}
+            {/* ── P1: Prominent Virtual Try-On CTA ──────────────────────────
+                  Was buried inside ProductActions; now a high-priority button
+                  between variant pick and Add-to-Cart. */}
+            <PdpTryOnPromote
+              productName={product.name}
+              hasUploadedPhoto={Boolean(state.bodyTwin)}
+              onLaunch={() => state.setShowViewOnMe(true)}
+            />
+
+            {/* ── P1: Add-to-Cart + Silent Cart side-by-side ────────────────
+                  ProductActions still owns the main commerce CTAs; Silent Cart
+                  becomes a peer-level icon button so USP 7 is one tap away. */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-1">
+                <ProductActions
+                  product={product}
+                  sizeVariants={state.sizeVariants}
+                  colorVariants={state.colorVariants}
+                  selectedSize={state.selectedSize}
+                  selectedColor={state.selectedColor}
+                  inConsiderations={state.inConsiderations}
+                  inCart={state.inCart}
+                  inWardrobe={state.inWardrobe}
+                  watchingRestock={state.watchingRestock}
+                  showIntelligence={state.showIntelligence}
+                  onShowIntelligence={() => state.setShowIntelligence(!state.showIntelligence)}
+                  onAddToConsiderations={state.handleAddToConsiderations}
+                  onRemoveFromConsiderations={state.handleRemoveFromConsiderations}
+                  onAddToCart={state.handleAddToCart}
+                  onAddToWardrobe={state.handleAddToWardrobe}
+                  onRemoveFromWardrobe={state.handleRemoveFromWardrobe}
+                  onShare={state.handleShare}
+                  onNotifyRestock={state.handleNotifyRestock}
+                  onShowConcierge={() => state.setShowConcierge(true)}
+                  onShowIV={() => state.setShowIV(true)}
+                  onShowViewOnMe={() => state.setShowViewOnMe(true)}
+                  onShowVirtualTryOn={() => state.setShowVirtualTryOn(true)}
+                  isUHNI={state.isUHNI}
+                  onNegotiatePrice={state.handleNegotiatePrice}
+                  pricingTier={state.pricingTier}
+                  hasPriceAlert={state.hasPriceAlert}
+                  onSetPriceAlert={state.handleSetPriceAlert}
+                />
+              </div>
+              <PdpSilentCartButton
+                inConsiderations={state.inConsiderations}
+                onAddToConsiderations={state.handleAddToConsiderations}
+                onRemoveFromConsiderations={state.handleRemoveFromConsiderations}
+              />
+            </div>
+
+            {/* ── P1: Complete-the-Look hoisted above the fold ──────────────
+                  Was at the very bottom of the page (after Craftsmanship +
+                  Materials). Now collapsed-by-default trigger sits right after
+                  the action area; expanding renders the existing component inline. */}
+            <PdpCompleteLookCollapsed
+              productName={product.name}
+              outfitsAvailable={intelligence.outfitSuggestions.length}
+              outfits={intelligence.outfitSuggestions}
+              expandedContent={
+                <OutfitSuggestions product={product} outfits={intelligence.outfitSuggestions} />
+              }
             />
 
             <ProductIntelligencePanel
@@ -171,8 +228,7 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
         materialFeel={materialFeel}
       />
 
-      {/* Complete the Look - Outfit Suggestions */}
-      <OutfitSuggestions product={product} outfits={intelligence.outfitSuggestions} />
+      {/* Complete the Look — hoisted above the fold into <PdpCompleteLookCollapsed>; removed from here to avoid duplication */}
 
       {/* Related Products */}
       <ProductRelated products={state.relatedProducts} brand={state.brand} />

@@ -292,66 +292,62 @@ export async function getRecommendedProductsPaginated(
 
   console.log('[products] Request body:', body);
 
-  return cachedFetch(cacheKey, async () => {
-    const res = await fetchWithTimeout(`/api/v1/products/recommendations`, {
-      method: 'POST',
-      headers: authHeaders(),
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => '');
-      const emptyResult: PaginatedProducts = {
-        products: [],
-        totalMatched: 0,
-        totalPages: 0,
-        pageNumber: body.page_number || 1,
-        pageSize: body.page_size || 20,
-      };
-      // ES outages / BE search failures should not crash consumer pages — return
-      // empty result so callers render their natural empty states.
-      if (res.status >= 500 || res.status === 503 || res.status === 404) {
-        console.warn(`[products] Search backend unavailable (${res.status}). Returning empty result.`, errBody.slice(0, 200));
-        return emptyResult;
-      }
-      console.error(`[products] API error ${res.status}:`, errBody);
-      throw new Error(`Products API error (${res.status})`);
-    }
-
-    const data: ProductRecommendationResponse = await res.json();
-    if (!data.products_data) {
-      console.warn('[products] API returned no products_data field. Response keys:', Object.keys(data));
-      return {
-        products: [],
-        totalMatched: 0,
-        totalPages: 0,
-        pageNumber: body.page_number || 1,
-        pageSize: body.page_size || 20,
-      };
-    }
-    if (data.products_data.length > 0) {
-      const sample = data.products_data[0] as unknown as Record<string, unknown>;
-      console.log('[products] Raw API sample:', {
-        product_id: sample.product_id,
-        product_name: sample.product_name,
-        image_url: sample.image_url,
-        product_image: sample.product_image,
-        product_images: sample.product_images,
-        all_keys: Object.keys(sample),
+  try {
+    return await cachedFetch(cacheKey, async () => {
+      const res = await fetchWithTimeout(`/api/v1/products/recommendations`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body),
       });
-      const withImages = data.products_data.filter(p => !!p.image_url).length;
-      console.log(`[products] ${withImages}/${data.products_data.length} have image_url`);
-    } else {
-      console.warn('[products] API returned 0 products for request:', body);
-    }
+
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        const emptyResult: PaginatedProducts = {
+          products: [],
+          totalMatched: 0,
+          totalPages: 0,
+          pageNumber: body.page_number || 1,
+          pageSize: body.page_size || 20,
+        };
+        // ES outages / BE search failures should not crash consumer pages — return
+        // empty result so callers render their natural empty states.
+        if (res.status >= 500 || res.status === 503 || res.status === 404) {
+          console.warn(`[products] Search backend unavailable (${res.status}). Returning empty result.`, errBody.slice(0, 200));
+          return emptyResult;
+        }
+        console.error(`[products] API error ${res.status}:`, errBody);
+        throw new Error(`Products API error (${res.status})`);
+      }
+
+      const data: ProductRecommendationResponse = await res.json();
+      if (!data.products_data) {
+        console.warn('[products] API returned no products_data field. Response keys:', Object.keys(data));
+        return {
+          products: [],
+          totalMatched: 0,
+          totalPages: 0,
+          pageNumber: body.page_number || 1,
+          pageSize: body.page_size || 20,
+        };
+      }
+      return {
+        products: data.products_data.map(mapToProduct),
+        totalMatched: data.total_matched || 0,
+        totalPages: data.total_pages || 0,
+        pageNumber: data.page_number || body.page_number || 1,
+        pageSize: data.page_size || body.page_size || 20,
+      };
+    }, PRODUCTS_TTL);
+  } catch (err) {
+    console.warn('[products] Network or timeout error:', err);
     return {
-      products: data.products_data.map(mapToProduct),
-      totalMatched: data.total_matched || 0,
-      totalPages: data.total_pages || 0,
-      pageNumber: data.page_number || body.page_number || 1,
-      pageSize: data.page_size || body.page_size || 20,
+      products: [],
+      totalMatched: 0,
+      totalPages: 0,
+      pageNumber: body.page_number || 1,
+      pageSize: body.page_size || 20,
     };
-  }, PRODUCTS_TTL);
+  }
 }
 
 // ============================================
@@ -629,8 +625,10 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   // Normalize: support both ai_data (new) and ai_metadata (legacy) shapes
   const aiData = raw.ai_data;
   const aiMeta = raw.ai_metadata;
-  const fabrics = aiData?.fabrics || aiMeta?.fabrics || '';
-  const productCategory = raw.product_category || aiMeta?.product_category || '';
+  const fabricsRaw = aiData?.fabrics || aiMeta?.fabrics || '';
+  const fabrics = Array.isArray(fabricsRaw) ? fabricsRaw.join(', ') : fabricsRaw;
+  const productCategoryRaw = raw.product_category || aiMeta?.product_category || '';
+  const productCategory = Array.isArray(productCategoryRaw) ? productCategoryRaw[0] : productCategoryRaw;
   const occasions = aiData?.occasions || raw.occasions || [];
   const aesthetics = aiData?.aesthetics || raw.aesthetics || [];
 

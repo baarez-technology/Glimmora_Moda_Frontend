@@ -192,20 +192,21 @@ export default function ProfilePage() {
       {/* ============================================
           HERO - Profile Header
           ============================================ */}
-      <section className="relative bg-charcoal-deep py-20 lg:py-28 overflow-hidden">
+      <section className="relative bg-gradient-to-b from-charcoal-deep to-noir py-20 lg:py-28 overflow-hidden border-b border-sand/20">
         {/* Decorative Elements */}
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-gold-soft/5 to-transparent" />
+        <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-bl from-gold-soft/10 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute -left-32 top-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gold-soft/5 blur-[120px] rounded-full pointer-events-none" />
 
-        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24 relative">
-          <div className={`flex flex-col md:flex-row items-center md:items-end gap-8 md:gap-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24 relative z-10">
+          <div className={`flex flex-col md:flex-row items-center md:items-start gap-8 md:gap-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             {/* Avatar */}
-            <div className="w-28 h-28 bg-charcoal-warm flex items-center justify-center border border-gold-soft/20 overflow-hidden">
+            <div className="w-32 h-32 md:w-40 md:h-40 bg-gradient-to-br from-charcoal-warm to-noir flex shrink-0 items-center justify-center border border-gold-soft/30 overflow-hidden shadow-2xl shadow-black/40 ring-1 ring-gold-soft/10">
               {profilePicture ? (
                 <Image
                   src={profilePicture}
                   alt={user.name}
-                  width={112}
-                  height={112}
+                  width={160}
+                  height={160}
                   className="object-cover w-full h-full"
                 />
               ) : (
@@ -214,19 +215,20 @@ export default function ProfilePage() {
             </div>
 
             {/* Info */}
-            <div className="text-center md:text-left flex-1">
-              <div className="flex items-center gap-3 mb-3 justify-center md:justify-start">
-                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50">
+            <div className="text-center md:text-left flex-1 md:mt-4">
+              <div className="flex items-center gap-3 mb-4 justify-center md:justify-start">
+                <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft/80">
                   {user.memberSince
                     ? `Member Since ${new Date(user.memberSince).getFullYear()}`
                     : 'Member Since 2024'}
                 </span>
+                <div className="w-4 h-[1px] bg-gold-soft/40" />
                 <TierBadge tier={pricingTier} size="md" />
               </div>
-              <h1 className="font-display text-[clamp(2rem,5vw,3.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-3">
+              <h1 className="font-display text-[clamp(2.5rem,5vw,4.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
                 {user.name}
               </h1>
-              <p className="text-taupe">{user.email}</p>
+              <p className="text-taupe text-sm md:text-base font-light tracking-wide">{user.email}</p>
             </div>
 
             {/* Edit Profile */}

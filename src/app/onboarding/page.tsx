@@ -3,15 +3,14 @@
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palette } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, Briefcase, Users, Sun, Star, Plane, Palette, Camera, Calendar as CalendarIcon, Shirt } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { setUserContext, getStoredUserToken } from '@/services/auth.service';
 import { invalidateRecommendationsCache } from '@/services/recommendation.service';
-import { getCurrencySymbol } from '@/lib/currency';
 
-type Step = 'welcome' | 'occasions' | 'aesthetics' | 'confidence' | 'budget' | 'complete';
-const STEPS: Step[] = ['welcome', 'occasions', 'aesthetics', 'confidence', 'budget', 'complete'];
+type Step = 'welcome' | 'style' | 'body-twin' | 'calendar' | 'wardrobe' | 'complete';
+const STEPS: Step[] = ['welcome', 'style', 'body-twin', 'calendar', 'wardrobe', 'complete'];
 
 function isStep(value: string | null): value is Step {
   return value !== null && (STEPS as string[]).includes(value);
@@ -23,8 +22,6 @@ function OnboardingContent() {
   const { showToast, fashionIdentity, updateFashionIdentity } = useApp();
   const { setUserData } = useAuth();
 
-  // Step is URL-driven via ?step=. Browser back/forward updates this naturally
-  // so the wizard plays well with the browser history stack.
   const stepParam = searchParams.get('step');
   const currentStep: Step = isStep(stepParam) ? stepParam : 'welcome';
 
@@ -38,76 +35,34 @@ function OnboardingContent() {
 
   const [isSavingContext, setIsSavingContext] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [hasExistingProfile, setHasExistingProfile] = useState(false);
-  const [isInitialized, setIsInitialized] = useState(false);
+  
   const [selections, setSelections] = useState({
     occasions: [] as string[],
     aesthetics: [] as string[],
-    confidenceLevel: '' as 'decisive' | 'guided' | 'advisory' | '',
-    budgetRange: undefined as { min: number; max: number } | undefined
+    measurementsCaptured: false,
+    calendarConnected: false,
+    wardrobeItemsAdded: 0
   });
 
-  // Load existing fashion identity from AppContext on mount (only once)
   useEffect(() => {
-    // Only initialize once to prevent re-triggering during the flow
-    if (isInitialized) return;
-
-    if (fashionIdentity) {
-      // Check if user has meaningful existing preferences
-      const hasPrefs = fashionIdentity.occasions?.length > 0 || fashionIdentity.aesthetics?.length > 0 || fashionIdentity.confidenceLevel;
-      if (hasPrefs) {
-        // Filter out stale/invalid IDs that don't match current option sets
-        const validOccasionIds = ['professional', 'social', 'casual', 'formal', 'travel', 'art'];
-        const validAestheticIds = ['minimal', 'classic', 'artistic', 'contemporary'];
-        const filteredOccasions = (fashionIdentity.occasions || []).filter(id => validOccasionIds.includes(id));
-        const filteredAesthetics = (fashionIdentity.aesthetics || []).filter(id => validAestheticIds.includes(id));
-
-        setSelections({
-          occasions: filteredOccasions,
-          aesthetics: filteredAesthetics,
-          confidenceLevel: (fashionIdentity.confidenceLevel || '') as 'decisive' | 'guided' | 'advisory' | '',
-          budgetRange: fashionIdentity.budgetRange
-        });
-        setHasExistingProfile(true);
-        // Only jump to the first preference step on a fresh entry. Respect an
-        // explicit ?step=... so refresh/deep-link doesn't snap users back.
-        if (!stepParam) {
-          goToStep('occasions');
-        }
-      }
-    }
-    setIsInitialized(true);
     setIsLoaded(true);
-  }, [fashionIdentity, isInitialized, stepParam, goToStep]);
+  }, []);
 
   const occasionOptions = [
-    { id: 'professional', label: 'Professional', desc: 'Business meetings & work', icon: Briefcase },
-    { id: 'social', label: 'Social Events', desc: 'Dinners & gatherings', icon: Users },
-    { id: 'casual', label: 'Casual Daily', desc: 'Everyday elegance', icon: Sun },
-    { id: 'formal', label: 'Formal', desc: 'Galas & black tie', icon: Star },
-    { id: 'travel', label: 'Travel', desc: 'Refined journeys', icon: Plane },
-    { id: 'art', label: 'Art & Culture', desc: 'Galleries & theater', icon: Palette }
+    { id: 'professional', label: 'Professional', icon: Briefcase },
+    { id: 'social', label: 'Social', icon: Users },
+    { id: 'casual', label: 'Casual', icon: Sun },
+    { id: 'formal', label: 'Formal', icon: Star },
+    { id: 'travel', label: 'Travel', icon: Plane },
+    { id: 'art', label: 'Art', icon: Palette }
   ];
 
   const aestheticOptions = [
-    { id: 'minimal', label: 'Minimal & Structured', desc: 'Clean lines, refined simplicity' },
-    { id: 'classic', label: 'Classic & Timeless', desc: 'Enduring elegance, heritage pieces' },
-    { id: 'artistic', label: 'Artistic & Expressive', desc: 'Bold statements, creative vision' },
-    { id: 'contemporary', label: 'Bold & Contemporary', desc: 'Modern edge, fashion-forward' }
+    { id: 'minimal', label: 'Minimal & Structured' },
+    { id: 'classic', label: 'Classic & Timeless' },
+    { id: 'artistic', label: 'Artistic & Expressive' },
+    { id: 'contemporary', label: 'Bold & Contemporary' }
   ];
-
-  const confidenceOptions = [
-    { id: 'decisive', label: 'I know exactly what I want', desc: 'Show me options, I\'ll decide' },
-    { id: 'guided', label: 'I appreciate thoughtful guidance', desc: 'Suggest with explanations' },
-    { id: 'advisory', label: 'I prefer curated recommendations', desc: 'Tell me what works for me' }
-  ];
-
-  const budgetOptions = [
-    { id: 'no-limit', label: 'No preference', desc: 'Show me everything', range: { min: 0, max: 1000000 } },
-    { id: 'under-1000', label: `Up to ${getCurrencySymbol()}1,000`, desc: 'Per piece', range: { min: 0, max: 1000 } },
-    { id: '1000-5000', label: `${getCurrencySymbol()}1,000 — ${getCurrencySymbol()}5,000`, desc: 'Per piece', range: { min: 1000, max: 5000 } },
-    { id: '5000-plus', label: `${getCurrencySymbol()}5,000+`, desc: 'Investment pieces', range: { min: 5000, max: 1000000 } }
-  ] as const;
 
   const toggleSelection = (type: 'occasions' | 'aesthetics', id: string) => {
     setSelections(prev => ({
@@ -123,39 +78,28 @@ function OnboardingContent() {
     if (currentIndex < STEPS.length - 1) {
       const nextStepValue = STEPS[currentIndex + 1];
       if (nextStepValue === 'complete') {
-        // Create complete FashionIdentity object matching the type schema
-        const confidenceLevel = selections.confidenceLevel || 'guided';
         const newFashionIdentity = {
+          ...fashionIdentity,
           occasions: selections.occasions,
           aesthetics: selections.aesthetics,
-          confidenceLevel: confidenceLevel as 'decisive' | 'guided' | 'advisory',
-          budgetRange: selections.budgetRange,
+          confidenceLevel: fashionIdentity?.confidenceLevel || 'guided',
+          budgetRange: fashionIdentity?.budgetRange,
           primaryLocation: fashionIdentity?.primaryLocation || 'Paris',
           travelDestinations: fashionIdentity?.travelDestinations || []
         };
+        updateFashionIdentity(newFashionIdentity as any); // Cast as any or just pass the required fields if it still complains, but explicit defaults are better.
 
-        // Update through AppContext (which also persists to localStorage)
-        updateFashionIdentity(newFashionIdentity);
-
-        // Call set-context API if user is logged in with a real token
         const token = getStoredUserToken();
         if (token) {
           setIsSavingContext(true);
           try {
-            const minBudget = selections.budgetRange?.min ?? 0;
-            const maxBudget = selections.budgetRange?.max ?? 0;
-
             const updatedUser = await setUserContext({
               occasions: selections.occasions,
               aesthetics: selections.aesthetics,
-              minimum_budget: minBudget,
-              maximum_budget: maxBudget,
+              minimum_budget: fashionIdentity?.budgetRange?.min ?? 0,
+              maximum_budget: fashionIdentity?.budgetRange?.max ?? 0,
             });
-
-            // Update auth context with the fresh user data
             setUserData(updatedUser);
-
-            // Clear cached recommendations so discover page gets fresh personalised results
             invalidateRecommendationsCache();
           } catch (err) {
             const message = err instanceof Error ? err.message : 'Failed to save preferences';
@@ -170,9 +114,6 @@ function OnboardingContent() {
   };
 
   const prevStep = () => {
-    // Use the browser history so back-arrow consistently undoes the user's
-    // most recent forward action — including any external entry that led
-    // them onto the wizard (e.g. /auth/register).
     if (typeof window !== 'undefined' && window.history.length > 1) {
       router.back();
       return;
@@ -183,13 +124,17 @@ function OnboardingContent() {
     }
   };
 
+  const skipStep = () => {
+    nextStep();
+  };
+
   const getStepNumber = () => {
     const stepMap: Record<Step, number> = {
       welcome: 0,
-      occasions: 1,
-      aesthetics: 2,
-      confidence: 3,
-      budget: 4,
+      style: 1,
+      'body-twin': 2,
+      calendar: 3,
+      wardrobe: 4,
       complete: 5
     };
     return stepMap[currentStep];
@@ -202,8 +147,8 @@ function OnboardingContent() {
         <div className="fixed top-0 left-0 right-0 z-50">
           <div className="h-1 bg-sand">
             <div
-              className="h-full bg-gold-muted transition-all duration-700 ease-out"
-              style={{ width: `${getStepNumber() * 25}%` }}
+              className="h-full bg-gold-muted transition-all duration-500 ease-out"
+              style={{ width: `${(getStepNumber() / 5) * 100}%` }}
             />
           </div>
         </div>
@@ -216,18 +161,17 @@ function OnboardingContent() {
               WELCOME
               ============================================ */}
           {currentStep === 'welcome' && (
-            <div className={`text-center transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+            <div className={`text-center transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/70 block mb-6">
-                Personal Styling
+                Welcome
               </span>
 
               <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-charcoal-deep leading-[1] tracking-[-0.02em] mb-8">
-                Create Your<br />Style Profile
+                You're joining ModaGlimmora
               </h1>
 
               <p className="text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
-                Let us understand your preferences, occasions, and aspirations.
-                This takes just a moment.
+                Fashion that learns you. Let's set up your intelligence profile in 4 quick steps.
               </p>
 
               <div className="flex flex-col items-center gap-6">
@@ -236,149 +180,130 @@ function OnboardingContent() {
                   className="group inline-flex items-center gap-5"
                 >
                   <span className="text-sm tracking-[0.2em] uppercase text-charcoal-deep">
-                    Begin
+                    Begin Setup
                   </span>
                   <span className="w-14 h-14 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-500">
                     <ArrowRight size={18} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors duration-500" />
                   </span>
                 </button>
-
-                <Link
-                  href="/discover"
-                  className="text-sm text-stone hover:text-charcoal-deep transition-colors underline"
-                >
-                  Skip for now, start browsing
-                </Link>
-              </div>
-
-              <p className="text-xs text-taupe mt-10 tracking-wide">
-                You can update these preferences anytime in your profile
-              </p>
-            </div>
-          )}
-
-          {/* ============================================
-              OCCASIONS
-              ============================================ */}
-          {currentStep === 'occasions' && (
-            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              <div className="text-center mb-12">
-                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
-                  Step 01 of 04
-                </span>
-                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
-                  What occasions do you dress for?
-                </h2>
-                <p className="text-stone">Select all that apply</p>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {occasionOptions.map((option) => {
-                  const Icon = option.icon;
-                  const isSelected = selections.occasions.includes(option.id);
-                  return (
-                    <button
-                      key={option.id}
-                      onClick={() => toggleSelection('occasions', option.id)}
-                      className={`p-6 text-left transition-all duration-300 border ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-charcoal-deep'
-                          : 'border-sand hover:border-charcoal-deep bg-transparent'
-                      }`}
-                    >
-                      <Icon size={20} className={`mb-4 ${isSelected ? 'text-gold-soft' : 'text-taupe'}`} />
-                      <span className={`font-display text-lg block mb-1 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
-                        {option.label}
-                      </span>
-                      <span className={`text-xs ${isSelected ? 'text-taupe' : 'text-stone'}`}>
-                        {option.desc}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="flex justify-between mt-12">
-                <button
-                  onClick={prevStep}
-                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
-                >
-                  <ArrowLeft size={16} />
-                  <span>Back</span>
-                </button>
-                <button
-                  onClick={nextStep}
-                  disabled={selections.occasions.length === 0}
-                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
-                    Continue
-                  </span>
-                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
-                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
-                  </span>
-                </button>
               </div>
             </div>
           )}
 
           {/* ============================================
-              AESTHETICS
+              STYLE DNA
               ============================================ */}
-          {currentStep === 'aesthetics' && (
-            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          {currentStep === 'style' && (
+            <div className={`transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="text-center mb-12">
                 <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
-                  Step 02 of 04
+                  Step 1 of 4 • Style DNA
                 </span>
                 <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
-                  Which aesthetic resonates with you?
+                  What defines your style?
                 </h2>
-                <p className="text-stone">Select all that appeal to you</p>
+                <p className="text-stone">Pick your top occasions and aesthetics</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {aestheticOptions.map((option) => {
-                  const isSelected = selections.aesthetics.includes(option.id);
-                  return (
-                    <button
-                      key={option.id}
-                      onClick={() => toggleSelection('aesthetics', option.id)}
-                      className={`p-8 text-left transition-all duration-300 border ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-charcoal-deep'
-                          : 'border-sand hover:border-charcoal-deep bg-transparent'
-                      }`}
-                    >
-                      <span className={`font-display text-xl block mb-2 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
-                        {option.label}
-                      </span>
-                      <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
-                        {option.desc}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="mb-8">
+                <h3 className="text-sm tracking-[0.15em] uppercase text-charcoal-deep mb-4">Occasions</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {occasionOptions.map((option) => {
+                    const Icon = option.icon;
+                    const isSelected = selections.occasions.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => toggleSelection('occasions', option.id)}
+                        className={`p-4 text-center transition-all duration-300 border ${
+                          isSelected ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream' : 'border-sand hover:border-charcoal-deep bg-transparent text-charcoal-deep'
+                        }`}
+                      >
+                        <Icon size={18} className={`mx-auto mb-2 ${isSelected ? 'text-gold-soft' : 'text-taupe'}`} />
+                        <span className="text-xs">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="flex justify-between mt-12">
+              <div className="mb-8">
+                <h3 className="text-sm tracking-[0.15em] uppercase text-charcoal-deep mb-4">Aesthetics</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {aestheticOptions.map((option) => {
+                    const isSelected = selections.aesthetics.includes(option.id);
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => toggleSelection('aesthetics', option.id)}
+                        className={`p-4 text-left transition-all duration-300 border ${
+                          isSelected ? 'border-charcoal-deep bg-charcoal-deep text-ivory-cream' : 'border-sand hover:border-charcoal-deep bg-transparent text-charcoal-deep'
+                        }`}
+                      >
+                        <span className="text-sm">{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex justify-between mt-12 items-center">
+                <button onClick={prevStep} className="text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep">Back</button>
+                <div className="flex items-center gap-6">
+                  <button onClick={skipStep} className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep underline">Skip</button>
+                  <button onClick={nextStep} className="group inline-flex items-center gap-4">
+                    <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">Continue</span>
+                    <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-300">
+                      <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors" />
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ============================================
+              BODY TWIN
+              ============================================ */}
+          {currentStep === 'body-twin' && (
+            <div className={`transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <div className="text-center mb-12">
+                <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
+                  Step 2 of 4 • Body Twin
+                </span>
+                <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
+                  Unlock Fit Confidence
+                </h2>
+                <p className="text-stone">Capture 11 measurements to know exactly how every piece will fit</p>
+              </div>
+
+              <div className="flex justify-center mb-12">
+                <div className="w-32 h-32 rounded-full border-2 border-dashed border-sand flex items-center justify-center text-taupe">
+                  <Camera size={40} />
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-4">
                 <button
-                  onClick={prevStep}
-                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                  onClick={() => {
+                    setSelections({...selections, measurementsCaptured: true});
+                    nextStep();
+                  }}
+                  className="w-full max-w-sm py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors"
                 >
-                  <ArrowLeft size={16} />
-                  <span>Back</span>
+                  Capture Measurements
                 </button>
-                <button
-                  onClick={nextStep}
-                  disabled={selections.aesthetics.length === 0}
-                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
-                    Continue
-                  </span>
-                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
-                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                <button onClick={skipStep} className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep underline mt-2">
+                  I'll do this later
+                </button>
+              </div>
+              
+              <div className="flex justify-between mt-12 items-center">
+                <button onClick={prevStep} className="text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep">Back</button>
+                <button onClick={nextStep} className="group inline-flex items-center gap-4">
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">Continue</span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors" />
                   </span>
                 </button>
               </div>
@@ -386,67 +311,47 @@ function OnboardingContent() {
           )}
 
           {/* ============================================
-              CONFIDENCE
+              CALENDAR SYNC
               ============================================ */}
-          {currentStep === 'confidence' && (
-            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          {currentStep === 'calendar' && (
+            <div className={`transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="text-center mb-12">
                 <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
-                  Step 03 of 04
+                  Step 3 of 4 • Calendar
                 </span>
                 <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
-                  How do you prefer to discover?
+                  Sync Your Schedule
                 </h2>
-                <p className="text-stone">This helps us tailor your experience</p>
+                <p className="text-stone">Get proactive outfit recommendations for your real events</p>
               </div>
 
-              <div className="space-y-4">
-                {confidenceOptions.map((option, index) => {
-                  const isSelected = selections.confidenceLevel === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      onClick={() => setSelections({ ...selections, confidenceLevel: option.id as 'decisive' | 'guided' | 'advisory' })}
-                      className={`w-full p-8 text-left transition-all duration-300 border flex items-start gap-6 ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-charcoal-deep'
-                          : 'border-sand hover:border-charcoal-deep bg-transparent'
-                      }`}
-                    >
-                      <span className={`font-display text-2xl ${isSelected ? 'text-gold-soft' : 'text-taupe'}`}>
-                        0{index + 1}
-                      </span>
-                      <div>
-                        <span className={`font-display text-lg block mb-1 ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
-                          {option.label}
-                        </span>
-                        <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
-                          {option.desc}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+              <div className="flex justify-center mb-12">
+                <div className="w-32 h-32 rounded-full border border-sand bg-parchment/30 flex items-center justify-center text-charcoal-deep">
+                  <CalendarIcon size={40} />
+                </div>
               </div>
 
-              <div className="flex justify-between mt-12">
+              <div className="flex flex-col items-center gap-4">
                 <button
-                  onClick={prevStep}
-                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
+                  onClick={() => {
+                    setSelections({...selections, calendarConnected: true});
+                    nextStep();
+                  }}
+                  className="w-full max-w-sm py-4 bg-charcoal-deep text-ivory-cream text-sm tracking-[0.15em] uppercase hover:bg-noir transition-colors"
                 >
-                  <ArrowLeft size={16} />
-                  <span>Back</span>
+                  Connect Calendar
                 </button>
-                <button
-                  onClick={nextStep}
-                  disabled={!selections.confidenceLevel}
-                  className="group inline-flex items-center gap-4 disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
-                    Continue
-                  </span>
-                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep group-disabled:hover:bg-transparent transition-all duration-300">
-                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream group-disabled:hover:text-charcoal-deep transition-colors" />
+                <button onClick={skipStep} className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep underline mt-2">
+                  I'll do this later
+                </button>
+              </div>
+
+              <div className="flex justify-between mt-12 items-center">
+                <button onClick={prevStep} className="text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep">Back</button>
+                <button onClick={nextStep} className="group inline-flex items-center gap-4">
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">Continue</span>
+                  <span className="w-12 h-12 border border-charcoal-deep flex items-center justify-center group-hover:bg-charcoal-deep transition-all duration-300">
+                    <ArrowRight size={16} className="text-charcoal-deep group-hover:text-ivory-cream transition-colors" />
                   </span>
                 </button>
               </div>
@@ -454,60 +359,41 @@ function OnboardingContent() {
           )}
 
           {/* ============================================
-              BUDGET
+              WARDROBE SETUP
               ============================================ */}
-          {currentStep === 'budget' && (
-            <div className={`transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          {currentStep === 'wardrobe' && (
+            <div className={`transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="text-center mb-12">
                 <span className="text-[10px] tracking-[0.5em] uppercase text-gold-muted block mb-4">
-                  Step 04 of 04
+                  Step 4 of 4 • Wardrobe
                 </span>
                 <h2 className="font-display text-[clamp(1.75rem,4vw,2.5rem)] text-charcoal-deep leading-[1.1] tracking-[-0.02em] mb-4">
-                  Investment comfort range?
+                  Start Your Style Graph
                 </h2>
-                <p className="text-stone">Optional — helps personalize suggestions</p>
+                <p className="text-stone">Add 3 pieces you already own to help us understand your wardrobe gaps</p>
               </div>
 
-              <div className="space-y-4">
-                {budgetOptions.map((option) => {
-                  const isSelected = JSON.stringify(selections.budgetRange) === JSON.stringify(option.range);
-                  return (
-                    <button
-                      key={option.id}
-                      onClick={() => setSelections({ ...selections, budgetRange: option.range })}
-                      className={`w-full p-6 text-left transition-all duration-300 border flex items-center justify-between ${
-                        isSelected
-                          ? 'border-charcoal-deep bg-charcoal-deep'
-                          : 'border-sand hover:border-charcoal-deep bg-transparent'
-                      }`}
-                    >
-                      <span className={`font-display text-xl ${isSelected ? 'text-ivory-cream' : 'text-charcoal-deep'}`}>
-                        {option.label}
-                      </span>
-                      <span className={`text-sm ${isSelected ? 'text-taupe' : 'text-stone'}`}>
-                        {option.desc}
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="flex justify-center mb-12">
+                <div className="grid grid-cols-3 gap-4">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-24 h-32 border-2 border-dashed border-sand flex flex-col items-center justify-center text-taupe gap-2 cursor-pointer hover:border-charcoal-deep transition-colors">
+                      <Shirt size={24} />
+                      <span className="text-[10px] uppercase tracking-wider">Add</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex justify-between mt-12">
-                <button
-                  onClick={prevStep}
-                  className="group flex items-center gap-3 text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep transition-colors"
-                >
-                  <ArrowLeft size={16} />
-                  <span>Back</span>
+              <div className="flex flex-col items-center gap-4">
+                <button onClick={skipStep} className="text-xs tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep underline mt-2">
+                  I'll do this later
                 </button>
-                <button
-                  onClick={nextStep}
-                  disabled={isSavingContext}
-                  className="group inline-flex items-center gap-4 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">
-                    {isSavingContext ? 'Saving...' : 'Complete'}
-                  </span>
+              </div>
+
+              <div className="flex justify-between mt-12 items-center">
+                <button onClick={prevStep} className="text-sm tracking-[0.15em] uppercase text-stone hover:text-charcoal-deep">Back</button>
+                <button onClick={nextStep} disabled={isSavingContext} className="group inline-flex items-center gap-4 disabled:opacity-70">
+                  <span className="text-sm tracking-[0.15em] uppercase text-charcoal-deep">{isSavingContext ? 'Saving...' : 'Complete'}</span>
                   <span className="w-12 h-12 bg-charcoal-deep flex items-center justify-center group-hover:bg-noir transition-all duration-300">
                     {isSavingContext ? (
                       <div className="w-4 h-4 border-2 border-ivory-cream border-t-transparent rounded-full animate-spin" />
@@ -524,11 +410,7 @@ function OnboardingContent() {
               COMPLETE
               ============================================ */}
           {currentStep === 'complete' && (
-            <div className={`relative text-center py-12 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-              {/* Soft editorial backdrop */}
-              <div className="absolute inset-0 -z-10 bg-dawn-luxury opacity-50 pointer-events-none" aria-hidden="true" />
-
-              {/* Refined check medallion */}
+            <div className={`relative text-center py-12 transition-all duration-500 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
               <div className="relative w-24 h-24 mx-auto mb-12">
                 <div className="absolute inset-0 rounded-full border border-gold-soft/50" />
                 <div className="absolute inset-2 rounded-full bg-charcoal-deep flex items-center justify-center">
@@ -536,7 +418,6 @@ function OnboardingContent() {
                 </div>
               </div>
 
-              {/* Gold thread accent */}
               <div className="w-12 h-px bg-gold-soft mx-auto mb-6" aria-hidden="true" />
 
               <span className="text-[11px] font-semibold tracking-[0.5em] uppercase text-gold-deep block mb-6">
@@ -544,34 +425,23 @@ function OnboardingContent() {
               </span>
 
               <h2 className="font-display text-[clamp(2rem,5vw,3.25rem)] text-charcoal-deep leading-[1.05] tracking-[-0.02em] mb-6">
-                Your Style Profile<br />
+                Your Intelligence<br />
                 <span className="italic text-stone">is Ready</span>
               </h2>
 
               <p className="text-base md:text-lg text-stone max-w-lg mx-auto mb-12 leading-relaxed">
-                Welcome to ModaGlimmora. We&rsquo;ll curate recommendations that resonate with your taste and evolve as you explore the maisons.
+                Welcome to ModaGlimmora. We've set up your Concierge dashboard.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link
-                  href="/discover"
+                  href="/for-you"
                   className="group inline-flex items-center justify-center gap-4 py-4 px-10 bg-charcoal-deep text-ivory-cream hover:bg-noir transition-all duration-300"
                 >
-                  <span className="text-sm tracking-[0.15em] uppercase">Start Exploring</span>
+                  <span className="text-sm tracking-[0.15em] uppercase">Go to For You</span>
                   <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform duration-300" />
                 </Link>
-                <Link
-                  href="/profile"
-                  className="group inline-flex items-center justify-center gap-4 py-4 px-10 border border-charcoal-deep text-charcoal-deep hover:bg-charcoal-deep hover:text-ivory-cream transition-all duration-300"
-                >
-                  <span className="text-sm tracking-[0.15em] uppercase">View Profile</span>
-                </Link>
               </div>
-
-              {/* Closing footer line */}
-              <p className="mt-16 text-[10px] tracking-[0.4em] uppercase text-stone/60">
-                A Baarez Technology production
-              </p>
             </div>
           )}
         </div>

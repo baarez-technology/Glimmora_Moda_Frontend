@@ -93,27 +93,34 @@ export default function WardrobePage() {
       {/* ============================================
           HERO - Page Header
           ============================================ */}
-      <section className="bg-charcoal-deep py-16 lg:py-24">
-        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24">
+      <section className="relative bg-gradient-to-b from-charcoal-deep to-noir overflow-hidden border-b border-sand/20 py-16 lg:py-24">
+        {/* Luxury Decorative Background */}
+        <div className="absolute top-0 right-0 w-3/4 h-full bg-gradient-to-bl from-gold-soft/5 via-transparent to-transparent opacity-80 pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-gold-soft/5 blur-[120px] rounded-full pointer-events-none" />
+
+        <div className="max-w-[1600px] mx-auto px-8 md:px-16 lg:px-24 relative z-10">
           {/* Back Button */}
           <Link
             href="/profile"
-            className="group inline-flex items-center gap-3 mb-8 text-ivory-cream/60 hover:text-ivory-cream transition-colors"
+            className="group inline-flex items-center gap-3 mb-10 text-xs tracking-[0.15em] uppercase text-sand hover:text-gold-soft transition-colors"
           >
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="text-sm tracking-[0.1em] uppercase">Back to Profile</span>
+            <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+            Return to Profile
           </Link>
 
-          <div className={`flex flex-col lg:flex-row lg:items-end justify-between gap-8 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+          <div className={`flex flex-col lg:flex-row lg:items-end justify-between gap-10 transition-all duration-1000 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
             <div>
-              <span className="text-[10px] tracking-[0.5em] uppercase text-gold-soft/50 block mb-4">
-                Your Collection
-              </span>
-              <h1 className="font-display text-[clamp(2.5rem,6vw,4rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-[1px] bg-gold-soft/40" />
+                <span className="text-[10px] tracking-[0.4em] uppercase text-gold-soft block">
+                  Curated Archive
+                </span>
+              </div>
+              <h1 className="font-display text-[clamp(2.5rem,6vw,4.5rem)] text-ivory-cream leading-[1] tracking-[-0.02em] mb-4">
                 Digital Wardrobe
               </h1>
-              <p className="text-taupe max-w-lg">
-                {wardrobe.length} piece{wardrobe.length !== 1 ? 's' : ''} carefully curated in your personal collection.
+              <p className="text-taupe text-sm md:text-base font-light max-w-lg leading-relaxed">
+                {wardrobe.length} exquisite piece{wardrobe.length !== 1 ? 's' : ''} meticulously cataloged in your personal collection.
               </p>
             </div>
 
