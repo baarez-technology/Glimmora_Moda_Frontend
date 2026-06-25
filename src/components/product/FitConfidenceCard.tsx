@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { User, Check, AlertCircle, ChevronDown, Sparkles, Ruler, Shield } from 'lucide-react';
+import { User, Check, AlertCircle, ChevronDown, Sparkles, Ruler, Shield, Database } from 'lucide-react';
 import type { FitConfidence, DigitalBodyTwin } from '@/types';
 
 interface FitConfidenceCardProps {
@@ -245,6 +245,34 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
               <p className="text-sm text-stone">{fitConfidence.recommendation}</p>
             </div>
           </div>
+
+          {/* RAG Evidence Source */}
+          {fitConfidence.fitEvidenceSummary && (
+            <div className="mt-3 p-3 bg-parchment/40 rounded-lg border border-sand/60">
+              <div className="flex items-start gap-2">
+                <Database size={13} className="text-greige mt-0.5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs text-stone">{fitConfidence.fitEvidenceSummary.sourceLabel}</p>
+                  {fitConfidence.fitEvidenceSummary.fabricStretch && (
+                    <p className="text-[10px] text-greige/70 mt-0.5">
+                      Fabric stretch: {fitConfidence.fitEvidenceSummary.fabricStretch}
+                    </p>
+                  )}
+                  <span
+                    className={`inline-block mt-1 text-[9px] tracking-wider uppercase font-medium px-2 py-0.5 rounded-full ${
+                      fitConfidence.fitEvidenceSummary.dataQuality === 'high'
+                        ? 'bg-success/10 text-success'
+                        : fitConfidence.fitEvidenceSummary.dataQuality === 'medium'
+                          ? 'bg-gold-muted/20 text-gold-deep'
+                          : 'bg-sand/60 text-stone'
+                    }`}
+                  >
+                    {fitConfidence.fitEvidenceSummary.dataQuality} data quality
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Engine Version */}
           {fitConfidence.fitEngineVersion && (
