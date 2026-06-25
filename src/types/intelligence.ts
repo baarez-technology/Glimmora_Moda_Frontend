@@ -108,14 +108,27 @@ export interface DigitalBodyTwin {
   id: string;
   userId: string;
   silhouette: 'petite' | 'average' | 'tall' | 'curvy' | 'athletic';
+  /**
+   * 11 body measurements (all optional — partial records are valid).
+   * All values in centimetres except weight (kg).
+   *
+   * Core (5):    height, bust/chest, waist, hips, inseam
+   * Detailed (6): weight, shoulderWidth, sleeveLength, neck, thigh, footLength
+   */
   measurements: {
-    height?: number;
-    chest?: number;
-    bust?: number;
-    waist?: number;
-    hips?: number;
-    inseam?: number;
-    shoulders?: number;
+    // Core
+    height?: number;       // cm
+    bust?: number;         // cm  (chest circumference)
+    waist?: number;        // cm
+    hips?: number;         // cm
+    inseam?: number;       // cm
+    // Detailed
+    weight?: number;       // kg
+    shoulderWidth?: number; // cm
+    sleeveLength?: number;  // cm  (arm length)
+    neck?: number;          // cm
+    thigh?: number;         // cm
+    footLength?: number;    // cm
   };
   fitPreferences: {
     tops: 'fitted' | 'relaxed' | 'oversized';

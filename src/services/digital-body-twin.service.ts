@@ -35,11 +35,19 @@ export interface DigitalBodyTwinApiResponse {
   digital_body_twin_id: string;
   customer_id: string;
   measurements: {
+    // Core (existing)
     height_cm: number | null;
     chest_cm: number | null;
     waist_cm: number | null;
     hips_cm: number | null;
     inseam_cm: number | null;
+    // Detailed (new)
+    weight_kg: number | null;
+    shoulder_width_cm: number | null;
+    sleeve_length_cm: number | null;
+    neck_cm: number | null;
+    thigh_cm: number | null;
+    foot_length_cm: number | null;
   };
   fit_preferences: {
     general: string | null;
@@ -66,11 +74,19 @@ function fromApi(res: DigitalBodyTwinApiResponse): DigitalBodyTwin {
     userId: res.customer_id,
     silhouette: (res.silhouette as DigitalBodyTwin['silhouette']) || 'average',
     measurements: {
+      // Core
       height: res.measurements.height_cm ?? undefined,
       bust: res.measurements.chest_cm ?? undefined,
       waist: res.measurements.waist_cm ?? undefined,
       hips: res.measurements.hips_cm ?? undefined,
       inseam: res.measurements.inseam_cm ?? undefined,
+      // Detailed
+      weight: res.measurements.weight_kg ?? undefined,
+      shoulderWidth: res.measurements.shoulder_width_cm ?? undefined,
+      sleeveLength: res.measurements.sleeve_length_cm ?? undefined,
+      neck: res.measurements.neck_cm ?? undefined,
+      thigh: res.measurements.thigh_cm ?? undefined,
+      footLength: res.measurements.foot_length_cm ?? undefined,
     },
     fitPreferences: {
       tops: (res.fit_preferences.tops as DigitalBodyTwin['fitPreferences']['tops']) || 'relaxed',
@@ -92,11 +108,19 @@ function fromApi(res: DigitalBodyTwinApiResponse): DigitalBodyTwin {
 function toCreatePayload(bt: DigitalBodyTwin) {
   return {
     measurements: {
+      // Core
       height_cm: bt.measurements.height ?? null,
       chest_cm: bt.measurements.bust ?? null,
       waist_cm: bt.measurements.waist ?? null,
       hips_cm: bt.measurements.hips ?? null,
       inseam_cm: bt.measurements.inseam ?? null,
+      // Detailed
+      weight_kg: bt.measurements.weight ?? null,
+      shoulder_width_cm: bt.measurements.shoulderWidth ?? null,
+      sleeve_length_cm: bt.measurements.sleeveLength ?? null,
+      neck_cm: bt.measurements.neck ?? null,
+      thigh_cm: bt.measurements.thigh ?? null,
+      foot_length_cm: bt.measurements.footLength ?? null,
     },
     fit_preferences: {
       general: bt.preferredFit,
