@@ -79,10 +79,10 @@ export default function ProductDetailPage() {
       | 'commerce' | 'story_only' | 'experience_iv' | 'concierge' | 'standard'
       | 'iv_immersive' | 'bespoke_only',
     pricing_visibility: 'visible' as
-      | 'visible' | 'hidden' | 'redacted'
+      | 'visible' | 'authenticated_only' | 'hidden_until_uhni'
       | 'on_request' | 'private',
     commerce_action_type: 'purchase' as
-      | 'purchase' | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect'
+      | 'purchase' | 'enquiry_only' | 'appointment' | 'view_only'
       | 'add_to_considerations' | 'request_access' | 'direct_purchase',
   });
 

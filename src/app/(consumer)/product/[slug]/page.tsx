@@ -133,7 +133,6 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
               onQuantityChange={state.setQuantity}
             />
 
-<<<<<<< HEAD
             {/* ── P1: Prominent Virtual Try-On CTA ──────────────────────────
                   Was buried inside ProductActions; now a high-priority button
                   between variant pick and Add-to-Cart. */}
