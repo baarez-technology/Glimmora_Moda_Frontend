@@ -64,15 +64,17 @@ function getUserToken(): string | null {
  * Returns the public URL of the uploaded image.
  */
 export async function uploadImageFile(file: File): Promise<string> {
-  // const token = getUserToken();
+  const token = getUserToken();
   const formData = new FormData();
   formData.append('file', file);
 
   const res = await fetch(`/api/v1/upload`, {
     method: 'POST',
-    // headers: {
-    //   ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    // },
+    // Only the auth header — do NOT set Content-Type; the browser adds the
+    // multipart/form-data boundary automatically for FormData bodies.
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: formData,
   });
 
