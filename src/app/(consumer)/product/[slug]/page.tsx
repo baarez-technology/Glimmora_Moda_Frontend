@@ -32,6 +32,10 @@ const BodyVisualization = dynamic(
   () => import('@/components/product/BodyVisualization'),
   { ssr: false }
 );
+const VirtualTryOnModal = dynamic(
+  () => import('./components/VirtualTryOnModal'),
+  { ssr: false }
+);
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -128,6 +132,7 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
               onShowConcierge={() => state.setShowConcierge(true)}
               onShowIV={() => state.setShowIV(true)}
               onShowViewOnMe={() => state.setShowViewOnMe(true)}
+              onShowVirtualTryOn={() => state.setShowVirtualTryOn(true)}
               isUHNI={state.isUHNI}
               onNegotiatePrice={state.handleNegotiatePrice}
               pricingTier={state.pricingTier}
@@ -222,6 +227,12 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
         personalizationMatch={intelligence.personalizationMatch}
         relatedProducts={state.relatedProducts}
         sizeVariants={state.sizeVariants}
+      />
+
+      <VirtualTryOnModal
+        product={product}
+        isOpen={state.showVirtualTryOn}
+        onClose={() => state.setShowVirtualTryOn(false)}
       />
     </div>
   );

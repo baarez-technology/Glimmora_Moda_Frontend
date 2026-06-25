@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, DollarSign, X, Crown, TrendingDown, Flag } from 'lucide-react';
+import { Heart, Share2, Check, Bell, Eye, User, Sparkles, MessageCircle, ShoppingBag, DollarSign, X, Crown, TrendingDown, Flag, Camera } from 'lucide-react';
 import { formatPrice, getCurrencySymbol } from '@/lib/currency';
 import { useApp } from '@/context/AppContext';
 import { submitProductReport, hasReportedProduct, REPORT_REASONS, type ReportReason } from '@/services/reports.service';
@@ -29,6 +29,7 @@ interface ProductActionsProps {
   onNotifyRestock: () => void;
   onShowIV: () => void;
   onShowViewOnMe: () => void;
+  onShowVirtualTryOn: () => void;
   onShowIntelligence: () => void;
   onShowConcierge: () => void;
   showIntelligence: boolean;
@@ -58,6 +59,7 @@ export default function ProductActions({
   onNotifyRestock,
   onShowIV,
   onShowViewOnMe,
+  onShowVirtualTryOn,
   onShowIntelligence,
   onShowConcierge,
   showIntelligence,
@@ -97,23 +99,31 @@ export default function ProductActions({
 
   return (
     <>
-      {/* IV™ Button - See How It Looks */}
+      {/* IV™ / Try it on / View on Me */}
       <div className="flex gap-3 mb-6">
         <button
           onClick={onShowIV}
-          className="flex-1 py-4 px-6 border border-gold-muted text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-gold-muted/10 group"
+          className="flex-1 py-4 px-3 border border-gold-muted text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-gold-muted/10 group"
           title="Immersive Visualization™ - Visualize this piece on your Digital Body Twin with AI-powered styling"
         >
-          <Eye size={18} className="text-gold-muted" />
-          <span className="text-sm tracking-[0.15em] uppercase">IV™</span>
+          <Eye size={16} className="text-gold-muted" />
+          <span className="text-xs tracking-[0.12em] uppercase">IV™</span>
+        </button>
+        <button
+          onClick={onShowVirtualTryOn}
+          className="flex-1 py-4 px-3 border border-charcoal-deep/60 text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-charcoal-deep/5 group"
+          title="Virtual Try-On — upload your photo and see yourself wearing this piece"
+        >
+          <Camera size={16} className="text-charcoal-deep/70" />
+          <span className="text-xs tracking-[0.12em] uppercase">Try it on</span>
         </button>
         <button
           onClick={onShowViewOnMe}
-          className="flex-1 py-4 px-6 border border-sapphire-subtle text-charcoal-deep flex items-center justify-center gap-3 transition-all duration-300 hover:bg-sapphire-subtle/10 group"
+          className="flex-1 py-4 px-3 border border-sapphire-subtle text-charcoal-deep flex items-center justify-center gap-2 transition-all duration-300 hover:bg-sapphire-subtle/10 group"
           title="View on Me - See how this piece looks on your body type"
         >
-          <User size={18} className="text-sapphire-subtle" />
-          <span className="text-sm tracking-[0.15em] uppercase">View on Me</span>
+          <User size={16} className="text-sapphire-subtle" />
+          <span className="text-xs tracking-[0.12em] uppercase">View on Me</span>
         </button>
       </div>
 
