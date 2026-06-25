@@ -187,6 +187,34 @@ export interface BrandProfileUpdatePayload {
   };
 }
 
+export interface BrandRegisterPayload {
+  brand_name: string;
+  brand_category: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  phone_number: string;
+  job_title: string;
+}
+
+export async function brandRegister(
+  payload: BrandRegisterPayload
+): Promise<BrandLoginResponse> {
+  const res = await fetchWithTimeout(`/api/v1/auth/brand/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+    throw new Error(err.detail || `Registration failed (${res.status})`);
+  }
+
+  return res.json();
+}
+
 export async function updateBrandProfile(
   payload: BrandProfileUpdatePayload
 ): Promise<BrandLoginResponse['brand']> {

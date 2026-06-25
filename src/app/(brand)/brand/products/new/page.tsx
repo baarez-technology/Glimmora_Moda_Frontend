@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Plus, X } from 'lucide-react';
+import { ArrowLeft, Plus, X, ChevronDown, Globe, Eye, Tag, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { BrandPageHeader, PrimaryButton, SecondaryButton } from '@/components/brand/BrandPageHeader';
 import { CoverImageUpload } from '@/components/brand/CoverImageUpload';
@@ -57,10 +57,10 @@ export default function NewProductPage() {
       | 'commerce' | 'story_only' | 'experience_iv' | 'concierge'
       | 'standard' | 'iv_immersive' | 'bespoke_only',
     pricing_visibility: 'visible' as
-      | 'visible' | 'hidden' | 'redacted'
+      | 'visible' | 'authenticated_only' | 'hidden_until_uhni'
       | 'on_request' | 'private',
-    commerce_action: 'add_to_cart' as
-      | 'add_to_cart' | 'request_to_buy' | 'concierge' | 'redirect'
+    commerce_action: 'purchase' as
+      | 'purchase' | 'enquiry_only' | 'appointment' | 'view_only'
       | 'add_to_considerations' | 'request_access' | 'direct_purchase',
   });
 
@@ -261,17 +261,20 @@ export default function NewProductPage() {
                 <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
                   Collection Name *
                 </label>
-                <select
+                <input
+                  type="text"
+                  list="collection-names"
                   required
                   value={formData.collection_name}
                   onChange={(e) => updateField('collection_name', e.target.value)}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
-                >
-                  <option value="">Select collection</option>
+                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
+                  placeholder="Select or type a collection"
+                />
+                <datalist id="collection-names">
                   {collectionNames.map((col) => (
-                    <option key={col.collection_id} value={col.collection_name}>{col.collection_name}</option>
+                    <option key={col.collection_id} value={col.collection_name} />
                   ))}
-                </select>
+                </datalist>
               </div>
 
               <div>
@@ -280,11 +283,22 @@ export default function NewProductPage() {
                 </label>
                 <input
                   type="text"
+                  list="product-categories"
                   value={formData.product_category}
                   onChange={(e) => updateField('product_category', e.target.value)}
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep placeholder:text-taupe focus:outline-none focus:border-charcoal-deep transition-colors"
-                  placeholder="e.g., Handbags, Clothing, Shoes"
+                  placeholder="e.g., Handbags, Ready-to-Wear"
                 />
+                <datalist id="product-categories">
+                  <option value="Ready-to-Wear" />
+                  <option value="Handbags" />
+                  <option value="Shoes" />
+                  <option value="Accessories" />
+                  <option value="Fine Jewelry" />
+                  <option value="Watches" />
+                  <option value="Leather Goods" />
+                  <option value="Fragrance" />
+                </datalist>
               </div>
 
               <div>
@@ -297,7 +311,7 @@ export default function NewProductPage() {
                   className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep transition-colors cursor-pointer"
                 >
                   <option value="draft">Draft</option>
-                  <option value="published">Published</option>
+                  <option value="active">Active</option>
                 </select>
               </div>
             </div>
@@ -551,83 +565,122 @@ export default function NewProductPage() {
           </section>
 
           {/* SOW 41P.4 — Visibility Settings */}
-          <section className="bg-white border border-sand/50 p-6 space-y-6 mt-8">
-            <h2 className="font-medium text-charcoal-deep border-b border-sand/50 pb-4">
-              Visibility Settings
-            </h2>
+          <section className="bg-white border border-sand/50 p-8 space-y-8 mt-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-charcoal-deep"></div>
+            
+            <div>
+              <h2 className="text-lg font-display text-charcoal-deep tracking-wide mb-1">
+                Visibility & Commerce Settings
+              </h2>
+              <p className="text-sm text-stone">
+                Configure how this product is discovered and experienced by different client tiers.
+              </p>
+            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Visibility Scope */}
+              <div className="space-y-2 group">
+                <label className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-charcoal-deep font-semibold mb-1">
+                  <Globe size={12} className="text-taupe" />
                   Visibility Scope
                 </label>
-                <select
-                  value={formData.visibility_scope}
-                  onChange={e => updateField('visibility_scope', e.target.value as typeof formData.visibility_scope)}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
-                >
-                  <option value="public">Public</option>
-                  <option value="logged_in">Logged In Only</option>
-                  <option value="invite_only">Invite Only</option>
-                  <option value="uhni_only">UHNI Only</option>
-                  <option value="private">Private</option>
-                  <option value="geo_restricted">Geo Restricted</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.visibility_scope}
+                    onChange={e => updateField('visibility_scope', e.target.value as typeof formData.visibility_scope)}
+                    className="w-full px-4 py-3 bg-parchment/30 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep focus:bg-white cursor-pointer appearance-none transition-colors"
+                  >
+                    <option value="public">Public (Everyone)</option>
+                    <option value="logged_in">Logged In Clients</option>
+                    <option value="invite_only">Invite Only</option>
+                    <option value="uhni_only">UHNI Only (Exclusive)</option>
+                    <option value="private">Private (Hidden)</option>
+                    <option value="geo_restricted">Geo Restricted</option>
+                  </select>
+                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-taupe pointer-events-none group-hover:text-charcoal-deep transition-colors" />
+                </div>
+                <p className="text-[11px] text-stone leading-relaxed">
+                  Controls who can see this product in search results and collections.
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+              {/* Experience Mode */}
+              <div className="space-y-2 group">
+                <label className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-charcoal-deep font-semibold mb-1">
+                  <Eye size={12} className="text-taupe" />
                   Experience Mode
                 </label>
-                <select
-                  value={formData.experience_mode}
-                  onChange={e => updateField('experience_mode', e.target.value as typeof formData.experience_mode)}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
-                >
-                  <option value="standard">Standard</option>
-                  <option value="commerce">Commerce</option>
-                  <option value="story_only">Story Only</option>
-                  <option value="experience_iv">Experience + IV</option>
-                  <option value="iv_immersive">IV Immersive</option>
-                  <option value="bespoke_only">Bespoke Only</option>
-                  <option value="concierge">Concierge</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.experience_mode}
+                    onChange={e => updateField('experience_mode', e.target.value as typeof formData.experience_mode)}
+                    className="w-full px-4 py-3 bg-parchment/30 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep focus:bg-white cursor-pointer appearance-none transition-colors"
+                  >
+                    <option value="standard">Standard Presentation</option>
+                    <option value="commerce">Commerce Focused</option>
+                    <option value="story_only">Story / Editorial Only</option>
+                    <option value="experience_iv">Immersive Visualization (IV)</option>
+                    <option value="iv_immersive">IV + Full Screen</option>
+                    <option value="bespoke_only">Bespoke Only</option>
+                    <option value="concierge">Concierge Assistance</option>
+                  </select>
+                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-taupe pointer-events-none group-hover:text-charcoal-deep transition-colors" />
+                </div>
+                <p className="text-[11px] text-stone leading-relaxed">
+                  Sets the primary UI presentation mode on the product page.
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
+              {/* Pricing Visibility */}
+              <div className="space-y-2 group">
+                <label className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-charcoal-deep font-semibold mb-1">
+                  <Tag size={12} className="text-taupe" />
                   Pricing Visibility
                 </label>
-                <select
-                  value={formData.pricing_visibility}
-                  onChange={e => updateField('pricing_visibility', e.target.value as typeof formData.pricing_visibility)}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
-                >
-                  <option value="visible">Visible</option>
-                  <option value="hidden">Hidden</option>
-                  <option value="on_request">On Request</option>
-                  <option value="private">Private</option>
-                  <option value="redacted">Redacted</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.pricing_visibility}
+                    onChange={e => updateField('pricing_visibility', e.target.value as typeof formData.pricing_visibility)}
+                    className="w-full px-4 py-3 bg-parchment/30 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep focus:bg-white cursor-pointer appearance-none transition-colors"
+                  >
+                    <option value="visible">Always Visible</option>
+                    <option value="authenticated_only">Visible to Authenticated</option>
+                    <option value="hidden_until_uhni">Hidden Until UHNI Access</option>
+                    <option value="on_request">Price on Request (POA)</option>
+                    <option value="private">Private (Not displayed)</option>
+                  </select>
+                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-taupe pointer-events-none group-hover:text-charcoal-deep transition-colors" />
+                </div>
+                <p className="text-[11px] text-stone leading-relaxed">
+                  Determines if and how the price is shown to the user.
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[10px] tracking-[0.2em] uppercase text-charcoal-deep mb-2">
-                  Commerce Action
+              {/* Commerce Action */}
+              <div className="space-y-2 group">
+                <label className="flex items-center gap-2 text-[10px] tracking-[0.2em] uppercase text-charcoal-deep font-semibold mb-1">
+                  <Lock size={12} className="text-taupe" />
+                  Primary Action (CTA)
                 </label>
-                <select
-                  value={formData.commerce_action}
-                  onChange={e => updateField('commerce_action', e.target.value as typeof formData.commerce_action)}
-                  className="w-full px-4 py-3 bg-transparent border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep cursor-pointer"
-                >
-                  <option value="add_to_cart">Add to Cart</option>
-                  <option value="add_to_considerations">Add to Considerations</option>
-                  <option value="request_to_buy">Request to Buy</option>
-                  <option value="request_access">Request Access</option>
-                  <option value="direct_purchase">Direct Purchase</option>
-                  <option value="concierge">Concierge Handoff</option>
-                  <option value="redirect">Redirect</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={formData.commerce_action}
+                    onChange={e => updateField('commerce_action', e.target.value as typeof formData.commerce_action)}
+                    className="w-full px-4 py-3 bg-parchment/30 border border-sand text-charcoal-deep focus:outline-none focus:border-charcoal-deep focus:bg-white cursor-pointer appearance-none transition-colors"
+                  >
+                    <option value="purchase">Direct Purchase</option>
+                    <option value="add_to_considerations">Add to Considerations (Wishlist)</option>
+                    <option value="enquiry_only">Enquiry Only</option>
+                    <option value="request_access">Request Access (Waitlist)</option>
+                    <option value="direct_purchase">Instant Buy</option>
+                    <option value="appointment">Book Appointment</option>
+                    <option value="view_only">View Only (No actions)</option>
+                  </select>
+                  <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-taupe pointer-events-none group-hover:text-charcoal-deep transition-colors" />
+                </div>
+                <p className="text-[11px] text-stone leading-relaxed">
+                  Configures the main button on the product page.
+                </p>
               </div>
             </div>
           </section>
