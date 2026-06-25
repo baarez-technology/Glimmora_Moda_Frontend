@@ -4,9 +4,12 @@
  *
  * Calls the real backend to get GPT-4o-powered fit analysis
  * for a (customer, product) pair. Requires customer auth token.
+ *
+ * product_sizes is optional — the backend auto-derives sizes from the product
+ * document when not supplied. Pass it to override or when you already have the list.
  */
 
-import type { FitConfidence } from '@/types';
+import type { FitConfidence, FitEvidenceSummary } from '@/types';
 import { fetchWithTimeout } from '@/lib/api-cache';
 
 function getUserToken(): string | null {
@@ -59,9 +62,36 @@ interface FitConfidenceApiResponse {
     low_confidence_flag: boolean;
     explanation: string;
   };
+  /** RAG evidence summary — which size chart grounded this analysis */
+  fit_evidence_summary?: {
+    source_label: string;
+    size_chart_found: boolean;
+    garment_dimensions_used: boolean;
+    retrieval_confidence: number;
+    brand_id: string;
+    category: string;
+    fabric_stretch: string | null;
+    data_quality: 'high' | 'medium' | 'low';
+  };
   body_twin_used: boolean;
   fit_engine_version: string;
   created_at: string;
+}
+
+function mapFitEvidenceSummary(
+  raw: FitConfidenceApiResponse['fit_evidence_summary'],
+): FitEvidenceSummary | undefined {
+  if (!raw) return undefined;
+  return {
+    sourceLabel: raw.source_label,
+    sizeChartFound: raw.size_chart_found,
+    garmentDimensionsUsed: raw.garment_dimensions_used,
+    retrievalConfidence: raw.retrieval_confidence,
+    brandId: raw.brand_id,
+    category: raw.category,
+    fabricStretch: raw.fabric_stretch,
+    dataQuality: raw.data_quality,
+  };
 }
 
 function mapToFitConfidence(api: FitConfidenceApiResponse): FitConfidence {
@@ -89,6 +119,7 @@ function mapToFitConfidence(api: FitConfidenceApiResponse): FitConfidence {
           explanation: api.confidence_interval.explanation,
         }
       : undefined,
+    fitEvidenceSummary: mapFitEvidenceSummary(api.fit_evidence_summary),
     sizeNotes: api.fit_notes,
     returnRisk: api.return_risk.level,
     returnRiskScore: api.return_risk.risk_score_percent,
@@ -101,22 +132,29 @@ function mapToFitConfidence(api: FitConfidenceApiResponse): FitConfidence {
 /**
  * Fetch personalised fit confidence from the backend.
  * Returns null if the user is not logged in or the API call fails.
+ *
+ * @param productId   - The product's MongoDB ObjectId string.
+ * @param productSizes - Optional list of available sizes. When omitted, the
+ *                       backend auto-derives sizes from the product document.
  */
 export async function getFitConfidenceFromAPI(
   productId: string,
-  productSizes: string[],
+  productSizes?: string[],
 ): Promise<FitConfidence | null> {
   const token = getUserToken();
   if (!token) return null;
 
   try {
+    const body: Record<string, unknown> = { product_id: productId };
+    // Only include product_sizes when explicitly provided — backend auto-derives otherwise
+    if (productSizes && productSizes.length > 0) {
+      body.product_sizes = productSizes;
+    }
+
     const res = await fetchWithTimeout(`/api/v1/customer/fit-confidence`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({
-        product_id: productId,
-        product_sizes: productSizes,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {

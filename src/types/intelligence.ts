@@ -55,6 +55,19 @@ export interface CompleteOutfit {
 // Fit Confidence
 // ============================================
 
+export interface FitEvidenceSummary {
+  /** Human-readable label for the data source, e.g. "Based on Zara's official size chart" */
+  sourceLabel: string;
+  sizeChartFound: boolean;
+  garmentDimensionsUsed: boolean;
+  retrievalConfidence: number;
+  brandId: string;
+  category: string;
+  fabricStretch: string | null;
+  /** 'high' | 'medium' | 'low' — how much evidence backed this analysis */
+  dataQuality: 'high' | 'medium' | 'low';
+}
+
 export interface FitConfidence {
   overallScore: number;
   suggestedSize: string;
@@ -77,6 +90,8 @@ export interface FitConfidence {
     lowConfidenceFlag: boolean;
     explanation: string;
   };
+  /** RAG evidence summary — which size chart / source grounded the analysis */
+  fitEvidenceSummary?: FitEvidenceSummary;
   sizeNotes: string[];
   returnRisk: 'low' | 'medium' | 'high';
   returnRiskScore: number;
