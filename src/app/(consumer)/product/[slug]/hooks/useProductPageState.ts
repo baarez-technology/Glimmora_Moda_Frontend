@@ -77,6 +77,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const [showIntelligence, setShowIntelligence] = useState(false);
   const [showConcierge, setShowConcierge] = useState(false);
   const [showViewOnMe, setShowViewOnMe] = useState(false);
+  const [showVirtualTryOn, setShowVirtualTryOn] = useState(false);
 
   // User Data
   const [bodyTwin, setBodyTwin] = useState<DigitalBodyTwin | undefined>(undefined);
@@ -157,12 +158,13 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
         if (showIV) setShowIV(false);
         else if (showConcierge) setShowConcierge(false);
         else if (showViewOnMe) setShowViewOnMe(false);
+        else if (showVirtualTryOn) setShowVirtualTryOn(false);
       }
     };
 
     window.addEventListener('keydown', handleEscKey);
     return () => window.removeEventListener('keydown', handleEscKey);
-  }, [showIV, showConcierge, showViewOnMe]);
+  }, [showIV, showConcierge, showViewOnMe, showVirtualTryOn]);
 
   // Image navigation
   const nextImage = useCallback(() => {
@@ -374,6 +376,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     showIntelligence,
     showConcierge,
     showViewOnMe,
+    showVirtualTryOn,
     bodyTwin,
     fashionIdentity,
 
@@ -398,6 +401,7 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
     setShowIntelligence,
     setShowConcierge,
     setShowViewOnMe,
+    setShowVirtualTryOn,
 
     // Actions
     nextImage,

@@ -12,3 +12,4 @@ export { default as PdpIntelligenceHero } from './PdpIntelligenceHero';
 export { default as PdpTryOnPromote } from './PdpTryOnPromote';
 export { default as PdpCompleteLookCollapsed } from './PdpCompleteLookCollapsed';
 export { default as PdpSilentCartButton } from './PdpSilentCartButton';
+export { default as VirtualTryOnModal } from './VirtualTryOnModal';

@@ -113,6 +113,7 @@ export {
   type AvailabilityIntelligence,
   type CompleteOutfit,
   type FitConfidence,
+  type FitEvidenceSummary,
   type DigitalBodyTwin,
   type WardrobeGap,
   type WardrobeAnalysis,
