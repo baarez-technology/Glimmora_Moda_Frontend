@@ -62,7 +62,7 @@ function FitConfidenceEmptyState() {
             </p>
           ) : (
             <p className="text-sm text-stone">
-              <Link href="/login" className="underline text-gold-deep hover:text-gold-muted">
+              <Link href="/auth/login?mode=consumer" className="underline text-gold-deep hover:text-gold-muted">
                 Sign in
               </Link>{' '}
               to see your fit analysis for this piece.
