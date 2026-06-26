@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState, useEffect, useMemo } from 'react';
+import { use, useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { ArrowRight } from 'lucide-react';
@@ -238,8 +238,8 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
   );
 }
 
-export default function ProductPage({ params }: ProductPageProps) {
-  const { slug } = use(params);
+/** Inner component — uses useSearchParams(), must be wrapped in <Suspense>. */
+function ProductPageInner({ slug }: { slug: string }) {
   const searchParams = useSearchParams();
   const productIdParam = searchParams.get('productId');
   const imageParam = searchParams.get('img');
@@ -308,7 +308,7 @@ export default function ProductPage({ params }: ProductPageProps) {
       }
     }
     loadData();
-  }, [slug, productIdParam]);
+  }, [slug, productIdParam, imageParam]);
 
   if (loading) {
     return (
@@ -361,4 +361,25 @@ export default function ProductPage({ params }: ProductPageProps) {
   }
 
   return <ProductPageContent product={product} aiInsights={aiInsights} />;
+}
+
+/** Loading skeleton shown while useSearchParams suspends during SSR/streaming. */
+function ProductPageLoading() {
+  return (
+    <div className="min-h-screen bg-ivory-cream flex items-center justify-center">
+      <div className="text-center">
+        <div className="w-8 h-8 border-2 border-charcoal-deep border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-sm text-stone tracking-wider">Loading</p>
+      </div>
+    </div>
+  );
+}
+
+export default function ProductPage({ params }: ProductPageProps) {
+  const { slug } = use(params);
+  return (
+    <Suspense fallback={<ProductPageLoading />}>
+      <ProductPageInner slug={slug} />
+    </Suspense>
+  );
 }
