@@ -606,6 +606,46 @@ interface ApiProductDetail {
       activity_level?: string;
       best_seasons?: string[];
     };
+    sustainability?: {
+      sustainability_score?: {
+        score?: number;
+        grade?: string;
+        summary?: string;
+      };
+      environmental_metrics?: {
+        carbon_emission_kg_co2e?: number;
+        water_usage_liters?: number;
+        recyclable_percentage?: number;
+      };
+      certifications?: { name?: string; description?: string }[];
+      detailed_breakdown?: {
+        materials_score?: number;
+        production_score?: number;
+        packaging_score?: number;
+        transport_score?: number;
+        materials_description?: string;
+        production_description?: string;
+        packaging_description?: string;
+        transport_description?: string;
+      };
+      data_quality?: string;
+      data_quality_note?: string;
+    };
+    fabric_intelligence?: {
+      fabric_type?: string;
+      fabric_simulation?: string;
+      properties?: {
+        drape?: { score?: number; description?: string };
+        structure?: { score?: number; description?: string };
+        movement?: { score?: number; description?: string };
+      };
+      physical_attributes?: {
+        weight?: string;
+        breathability?: string;
+      };
+      texture_description?: string;
+      care_level?: string;
+    };
   };
   // Legacy shape: ai_metadata + top-level arrays
   ai_metadata?: {
@@ -679,6 +719,106 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
       return 'low' as const;
     })(),
   } : undefined;
+
+  // Map sustainability from ai_data → SustainabilityScore
+  const sus = aiData?.sustainability;
+  const sustainabilityScore = sus?.sustainability_score?.score !== undefined ? (() => {
+    const rawScore = sus.sustainability_score!.score!;
+    const bd = sus.detailed_breakdown;
+    const em = sus.environmental_metrics;
+    const certs = (sus.certifications ?? [])
+      .map(c => c.name)
+      .filter((n): n is string => Boolean(n));
+    // recyclable_percentage → map to 'high'/'medium'/'low'/'none'
+    const recyclePct = em?.recyclable_percentage;
+    const recyclability: 'high' | 'medium' | 'low' | 'none' =
+      recyclePct === undefined ? 'low' :
+      recyclePct >= 70 ? 'high' :
+      recyclePct >= 40 ? 'medium' :
+      recyclePct > 0 ? 'low' : 'none';
+    return {
+      productId: raw.product_id,
+      overallScore: rawScore,
+      breakdown: {
+        materials: bd?.materials_score ?? 0,
+        production: bd?.production_score ?? 0,
+        packaging: bd?.packaging_score ?? 0,
+        transport: bd?.transport_score ?? 0,
+        longevity: 0,
+        endOfLife: 0,
+      },
+      certifications: certs,
+      carbonFootprint: em?.carbon_emission_kg_co2e !== undefined
+        ? `${em.carbon_emission_kg_co2e} kg CO2e`
+        : '',
+      waterUsage: em?.water_usage_liters !== undefined
+        ? `${em.water_usage_liters}L`
+        : '',
+      recyclability,
+      repairability: 'medium' as const,
+      biodegradable: false,
+      veganFriendly: false,
+      highlights: [],
+      improvements: [],
+    };
+  })() : undefined;
+
+  // Map fabric_intelligence from ai_data → FabricSimulation
+  const fi = aiData?.fabric_intelligence;
+  const fabricSimulation = fi ? (() => {
+    const knownFabrics = ['silk', 'wool', 'cotton', 'leather', 'cashmere', 'linen', 'canvas', 'tweed', 'velvet', 'denim'] as const;
+    type FT = typeof knownFabrics[number];
+    const rawType = (fi.fabric_type ?? '').toLowerCase();
+    const fabricType: FT = knownFabrics.includes(rawType as FT) ? (rawType as FT) : 'cotton';
+
+    const drapeRaw = fi.properties?.drape?.score;
+    const structureRaw = fi.properties?.structure?.score;
+    const movementRaw = fi.properties?.movement?.score;
+
+    // Clamp scores to 1–5
+    const clampLevel = (v: number | undefined): 1 | 2 | 3 | 4 | 5 => {
+      if (v === undefined) return 3;
+      const c = Math.max(1, Math.min(5, Math.round(v)));
+      return c as 1 | 2 | 3 | 4 | 5;
+    };
+
+    const drapeLevel = clampLevel(drapeRaw);
+    const structureLevel = clampLevel(structureRaw);
+
+    // movement score 1-2 → 'minimal', 3 → 'moderate', 4-5 → 'flowing'
+    const movement: 'minimal' | 'moderate' | 'flowing' =
+      movementRaw === undefined ? 'moderate' :
+      movementRaw >= 4 ? 'flowing' :
+      movementRaw >= 3 ? 'moderate' : 'minimal';
+
+    const rawWeight = (fi.physical_attributes?.weight ?? '').toLowerCase();
+    const weight: 'ultralight' | 'light' | 'medium' | 'heavy' =
+      rawWeight === 'ultralight' ? 'ultralight' :
+      rawWeight === 'light' ? 'light' :
+      rawWeight === 'heavy' ? 'heavy' : 'medium';
+
+    const rawBreath = (fi.physical_attributes?.breathability ?? '').toLowerCase();
+    const breathability: 'low' | 'medium' | 'high' =
+      rawBreath === 'high' ? 'high' :
+      rawBreath === 'low' ? 'low' : 'medium';
+
+    const rawCare = (fi.care_level ?? '').toLowerCase();
+    const careComplexity: 'easy' | 'moderate' | 'delicate' =
+      rawCare === 'easy' ? 'easy' :
+      rawCare === 'delicate' ? 'delicate' : 'moderate';
+
+    return {
+      productId: raw.product_id,
+      fabricType,
+      drapeLevel,
+      structureLevel,
+      weight,
+      movement,
+      breathability,
+      texture: fi.texture_description ?? '',
+      careComplexity,
+    };
+  })() : undefined;
 
   // Build variants from backend data
   const variants: Product['variants'] = [];
@@ -915,6 +1055,8 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
     craftTags: [],
     colorImageMap: Object.keys(colorImageMap).length > 0 ? colorImageMap : undefined,
     climateSuitability,
+    sustainabilityScore,
+    fabricSimulation,
   };
 }
 
