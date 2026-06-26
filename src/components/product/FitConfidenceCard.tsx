@@ -72,7 +72,7 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
             <div className={`text-2xl font-display ${getScoreColor(fitConfidence.overallScore)}`}>
               {fitConfidence.overallScore}%
             </div>
-            <p className="text-[9px] text-stone/60 tracking-wider">estimate</p>
+            <p className="text-[9px] text-stone/60 tracking-wider">AI fit analysis</p>
           </div>
           <ChevronDown
             size={20}
@@ -88,7 +88,7 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
           <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg mb-4">
             <AlertCircle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
             <p className="text-xs text-amber-700">
-              Size recommendation is an estimate. Check the brand&apos;s size guide for exact measurements before ordering.
+              AI-generated from your Digital Body Twin. We still recommend checking the brand&apos;s size guide for exact measurements before ordering.
             </p>
           </div>
 
@@ -101,7 +101,7 @@ export default function FitConfidenceCard({ fitConfidence, bodyTwin, selectedSiz
               ) : (
                 <p className="font-display text-lg text-charcoal-deep">{fitConfidence.suggestedSize}</p>
               )}
-              <p className="text-[10px] text-stone/60 mt-0.5">Estimated — verify with brand size chart</p>
+              <p className="text-[10px] text-stone/60 mt-0.5">Matched to your Digital Body Twin</p>
             </div>
             {selectedSize === fitConfidence.suggestedSize ? (
               <div className="flex items-center gap-2 text-success text-sm">
