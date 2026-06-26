@@ -21,8 +21,8 @@ interface ProductIntelligencePanelProps {
   isVisible: boolean;
   availabilityIntelligence: AvailabilityIntelligenceType;
   fitConfidence: FitConfidence | null;
-  climateSuitability: ClimateSuitabilityType;
-  sustainabilityScore: SustainabilityScoreType;
+  climateSuitability: ClimateSuitabilityType | null;
+  sustainabilityScore: SustainabilityScoreType | null;
   fabricSimulation?: FabricSimulationType;
   bodyTwin?: DigitalBodyTwin;
   selectedSize: string | null;
@@ -110,10 +110,22 @@ export default function ProductIntelligencePanel({
       )}
 
       {/* Climate Suitability */}
-      <ClimateSuitability suitability={climateSuitability} />
+      {climateSuitability ? (
+        <ClimateSuitability suitability={climateSuitability} />
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <p className="text-sm text-stone">Climate analysis not available for this piece.</p>
+        </div>
+      )}
 
       {/* Sustainability Score */}
-      <SustainabilityScore score={sustainabilityScore} />
+      {sustainabilityScore ? (
+        <SustainabilityScore score={sustainabilityScore} />
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <p className="text-sm text-stone">Sustainability data not available yet.</p>
+        </div>
+      )}
 
       {/* Fabric Simulation */}
       {fabricSimulation && (

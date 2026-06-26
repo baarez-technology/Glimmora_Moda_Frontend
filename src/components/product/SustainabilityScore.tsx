@@ -146,7 +146,7 @@ export default function SustainabilityScore({
           </div>
           <div className="text-left">
             <p className="font-medium text-charcoal-deep">Sustainability Score</p>
-            <p className="text-sm text-stone">{gradeInfo.label} environmental performance · <span className="italic text-stone/60">Estimated</span></p>
+            <p className="text-sm text-stone">{gradeInfo.label} environmental performance</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ export default function SustainabilityScore({
             </div>
             <div className="text-center">
               <Recycle className="w-5 h-5 text-amber-500 mx-auto mb-1" />
-              <p className="text-lg font-display text-charcoal-deep">{score.recyclability}%</p>
+              <p className="text-lg font-display text-charcoal-deep capitalize">{score.recyclability}</p>
               <p className="text-[10px] text-stone/50 uppercase tracking-wider">Recyclable</p>
             </div>
           </div>
@@ -252,7 +252,7 @@ export default function SustainabilityScore({
           {/* Disclaimer */}
           <div className="px-5 pb-2">
             <p className="text-[10px] text-stone/50 italic">
-              Estimated sustainability data — not verified by a third-party auditor. Figures are AI-generated approximations.
+              Sustainability data sourced from AI analysis of product information. Not independently audited.
             </p>
           </div>
 

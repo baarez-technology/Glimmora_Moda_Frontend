@@ -68,16 +68,18 @@ export default function AvailabilityIntelligence({ availability, onNotifyRestock
       {/* Expanded Content */}
       {expanded && (
         <div className="px-4 pb-4 border-t border-sand pt-4">
-          {/* Local Confidence */}
-          <div className="flex items-center justify-between p-3 bg-parchment rounded-lg mb-4">
-            <div className="flex items-center gap-2">
-              <MapPin size={16} className="text-stone" />
-              <span className="text-sm text-stone">Local Availability Confidence</span>
+          {/* Local Confidence — only when a real confidence value is present */}
+          {availability.localConfidence > 0 && (
+            <div className="flex items-center justify-between p-3 bg-parchment rounded-lg mb-4">
+              <div className="flex items-center gap-2">
+                <MapPin size={16} className="text-stone" />
+                <span className="text-sm text-stone">Local Availability Confidence</span>
+              </div>
+              <span className={`font-medium ${availability.localConfidence >= 80 ? 'text-success' : 'text-gold-deep'}`}>
+                {availability.localConfidence}%
+              </span>
             </div>
-            <span className={`font-medium ${availability.localConfidence >= 80 ? 'text-success' : 'text-gold-deep'}`}>
-              {availability.localConfidence}%
-            </span>
-          </div>
+          )}
 
           {/* Geography Alternatives */}
           {geographyAlternatives.length > 0 && (
@@ -100,7 +102,7 @@ export default function AvailabilityIntelligence({ availability, onNotifyRestock
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-charcoal-deep">{alt.city}, {alt.region}</p>
-                        <p className="text-sm text-stone">{alt.availabilityConfidence}% confidence</p>
+                        <p className="text-sm text-success">In stock</p>
                       </div>
                       <div className="text-right">
                         <div className="flex items-center gap-1 text-sm text-stone">

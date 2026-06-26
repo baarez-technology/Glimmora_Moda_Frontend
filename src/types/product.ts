@@ -109,4 +109,6 @@ export interface Product {
   media?: ProductMedia;
   colorImageMap?: Record<string, ProductImage[]>;
   climateSuitability?: import('./sustainability').ClimateSuitability;
+  sustainabilityScore?: import('./sustainability').SustainabilityScore;
+  fabricSimulation?: import('./visualization').FabricSimulation;
 }

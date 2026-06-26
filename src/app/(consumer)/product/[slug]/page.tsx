@@ -51,24 +51,24 @@ function ProductPageContent({ product, aiInsights }: { product: Product; aiInsig
     sizeVariants: state.sizeVariants,
     fashionIdentity: state.fashionIdentity,
     wardrobe: state.wardrobe,
-    brand: state.brand,
-    allProducts: state.allProducts,
     showIntelligence: state.showIntelligence
   });
 
-  // Override materialFeel with AI insights data when available
+  // Override materialFeel with AI insights data when available.
+  // If mf fields are absent/empty we leave them as empty strings — never substitute
+  // fabricated prose. The MaterialFeel card handles empty strings gracefully.
   const materialFeel = useMemo(() => {
     const mf = aiInsights?.material_feel;
     if (!mf) return intelligence.materialFeel;
     return {
       productId: product.id,
-      texture: mf.texture || 'smooth',
-      weight: mf.weight || 'medium',
-      temperature: mf.temperature || 'neutral',
-      comfort: mf.comfort || 'Comfortable',
-      aging: mf.aging || 'gracefully',
-      sensoryHighlights: mf.sensory_highlights || [],
-      agiDescription: mf.agi_description || '',
+      texture: mf.texture ?? '',
+      weight: mf.weight ?? '',
+      temperature: mf.temperature ?? '',
+      comfort: mf.comfort ?? '',
+      aging: mf.aging ?? '',
+      sensoryHighlights: mf.sensory_highlights ?? [],
+      agiDescription: mf.agi_description ?? '',
     };
   }, [aiInsights, intelligence.materialFeel, product.id]);
 

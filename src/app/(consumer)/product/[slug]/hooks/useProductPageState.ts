@@ -461,13 +461,11 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
 }
 
 // Separate hook for intelligence data — loads from service layer with fallbacks
-export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, brand, allProducts, showIntelligence }: {
+export function useProductIntelligence({ product, sizeVariants, fashionIdentity, wardrobe, showIntelligence }: {
   product: Product;
   sizeVariants: Product['variants'];
   fashionIdentity: FashionIdentity | null;
   wardrobe: { product: Product }[];
-  brand?: { name: string } | null;
-  allProducts: Product[];
   showIntelligence?: boolean;
 }) {
   // Eager service data (outfit suggestions + material feel — always visible on page)
@@ -577,13 +575,17 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     materialFeel: eagerData.materialFeel,
   }), [panelData, eagerData]);
 
-  // G-SAIL™ Availability Intelligence — service data with fallback
+  // G-SAIL™ Availability Intelligence — service data with real regional stocks fallback.
+  // localConfidence and restockPrediction are only set when real data provides them.
   const availabilityIntelligence: AvailabilityIntelligence = useMemo(() => {
     if (serviceData.availability) return serviceData.availability;
     return {
       productId: product.id,
       currentStatus: product.availability.status,
-      localConfidence: product.availability.regions[0]?.confidence || 85,
+      // Use the real per-region confidence when available; omit (undefined) otherwise
+      // so the UI can show an honest state. Cast: type requires number, so we fall
+      // back to 0 which the card treats as "unknown".
+      localConfidence: product.availability.regions[0]?.confidence ?? 0,
       alternatives: product.availability.regions
         .filter(r => r.available)
         .map(r => ({
@@ -593,12 +595,10 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
           availabilityConfidence: r.confidence,
           deliveryDays: r.deliveryDays,
           priceDifference: 0,
-          reason: `Available at ${product.brandName} ${r.city} boutique with ${r.confidence}% confidence`
+          reason: `Available at ${product.brandName} ${r.city} boutique`
         })),
-      restockPrediction: product.availability.status === 'unavailable' ? {
-        estimatedDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        probability: 78
-      } : undefined,
+      // No fabricated restock prediction — only show if real data provides one
+      restockPrediction: undefined,
       conciergeOption: product.availability.status !== 'available'
     };
   }, [serviceData.availability, product]);
@@ -609,29 +609,10 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     return serviceData.fitConfidence ?? null;
   }, [serviceData.fitConfidence]);
 
-  // Outfit Suggestions — service data with fallback
+  // Outfit Suggestions — real service data only. Empty array = honest "none available" state.
   const outfitSuggestions: CompleteOutfit[] = useMemo(() => {
-    if (serviceData.outfitSuggestions.length > 0) return serviceData.outfitSuggestions;
-    const complementaryProducts = allProducts
-      .filter(p => p.id !== product.id && p.category !== product.category)
-      .slice(0, 4);
-    return [
-      {
-        id: 'outfit-1',
-        name: 'Curated Ensemble',
-        occasion: 'Evening',
-        description: 'A sophisticated ensemble for cultural events where understated elegance speaks volumes.',
-        items: [
-          { type: 'suggested' as const, productId: product.id, product, category: product.category, note: 'The focal point' },
-          ...(complementaryProducts[0] ? [{ type: 'suggested' as const, productId: complementaryProducts[0].id, product: complementaryProducts[0], category: complementaryProducts[0].category }] : []),
-          ...(complementaryProducts[1] ? [{ type: 'suggested' as const, productId: complementaryProducts[1].id, product: complementaryProducts[1], category: complementaryProducts[1].category }] : [])
-        ].filter(Boolean),
-        compatibilityScore: 90,
-        totalPrice: product.price + (complementaryProducts[0]?.price || 0) + (complementaryProducts[1]?.price || 0),
-        agiReasoning: `This combination highlights the ${product.name} as the centerpiece.`
-      }
-    ];
-  }, [serviceData.outfitSuggestions, product, allProducts]);
+    return serviceData.outfitSuggestions.length > 0 ? serviceData.outfitSuggestions : [];
+  }, [serviceData.outfitSuggestions]);
 
   // Personalization Match — computed from user data (no service endpoint)
   const personalizationMatch: PersonalizationMatch | null = useMemo(() => {
@@ -707,96 +688,30 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     };
   }, []);
 
-  // Fabric Simulation — service data with fallback
+  // Fabric Simulation — real data only: service panel data → product.fabricSimulation → undefined.
+  // Never fabricate drape/structure/weight numbers.
   const fabricSimulation: FabricSimulation | undefined = useMemo(() => {
-    if (serviceData.fabricSimulation) return serviceData.fabricSimulation;
-    if (!product.materials.length) return undefined;
-    const materialName = String(product.materials[0]?.name ?? '').toLowerCase();
-    const fabricType: FabricSimulation['fabricType'] =
-      materialName.includes('silk') ? 'silk' :
-      materialName.includes('wool') ? 'wool' :
-      materialName.includes('leather') ? 'leather' :
-      materialName.includes('cashmere') ? 'cashmere' :
-      materialName.includes('linen') ? 'linen' :
-      materialName.includes('canvas') ? 'canvas' :
-      materialName.includes('tweed') ? 'tweed' :
-      materialName.includes('velvet') ? 'velvet' :
-      materialName.includes('denim') ? 'denim' : 'cotton';
-    return {
-      productId: product.id,
-      fabricType,
-      drapeLevel: 4 as const,
-      structureLevel: 3 as const,
-      weight: 'medium',
-      movement: 'moderate',
-      breathability: 'medium',
-      texture: `The ${product.materials[0]?.name || 'fabric'} provides an elegant drape that moves naturally with the body while maintaining its structure.`,
-      careComplexity: 'moderate'
-    };
-  }, [serviceData.fabricSimulation, product]);
+    return serviceData.fabricSimulation ?? product.fabricSimulation ?? undefined;
+  }, [serviceData.fabricSimulation, product.fabricSimulation]);
 
-  // Climate Suitability — API data takes priority, then service data, then hardcoded fallback
-  const climateSuitability: ClimateSuitability = useMemo(() => {
-    if (product.climateSuitability) return product.climateSuitability;
-    if (serviceData.climateSuitability) return serviceData.climateSuitability;
-    return {
-      productId: product.id,
-      temperatureRange: { min: 15, max: 28 },
-      humidity: 'medium',
-      weather: ['sunny', 'cloudy'],
-      seasons: ['spring', 'autumn'],
-      climates: ['temperate', 'continental'],
-      indoorOutdoor: 'both',
-      activityLevel: 'moderate'
-    };
-  }, [product.climateSuitability, serviceData.climateSuitability, product.id]);
+  // Climate Suitability — real data only: product.climateSuitability → service data → null.
+  // Never fabricate temperature ranges.
+  const climateSuitability: ClimateSuitability | null = useMemo(() => {
+    return product.climateSuitability ?? serviceData.climateSuitability ?? null;
+  }, [product.climateSuitability, serviceData.climateSuitability]);
 
-  // Sustainability Score — service data with fallback (NO Math.random)
-  const sustainabilityScore: SustainabilityScore = useMemo(() => {
-    if (serviceData.sustainabilityScore) return serviceData.sustainabilityScore;
-    return {
-      productId: product.id,
-      overallScore: 75,
-      breakdown: {
-        materials: 78,
-        production: 74,
-        packaging: 68,
-        transport: 65,
-        longevity: 85,
-        endOfLife: 60
-      },
-      certifications: ['Responsibly Sourced'],
-      carbonFootprint: '8.5 kg CO2e',
-      waterUsage: '55L',
-      recyclability: 'medium',
-      repairability: 'high',
-      biodegradable: false,
-      veganFriendly: true,
-      highlights: ['Responsibly sourced materials', 'Low water consumption'],
-      improvements: ['Working on carbon-neutral shipping']
-    };
-  }, [serviceData.sustainabilityScore, product.id]);
+  // Sustainability Score — real data only: service data → product.sustainabilityScore → null.
+  // Never fabricate scores or carbon footprint numbers.
+  const sustainabilityScore: SustainabilityScore | null = useMemo(() => {
+    return serviceData.sustainabilityScore ?? product.sustainabilityScore ?? null;
+  }, [serviceData.sustainabilityScore, product.sustainabilityScore]);
 
-  // Material Feel — service data with fallback
+  // Material Feel — real data only: service eager data → undefined.
+  // The page.tsx layer further overrides this with aiInsights.material_feel when available.
+  // Never fabricate prose descriptions.
   const materialFeel: MaterialFeel | undefined = useMemo(() => {
-    if (serviceData.materialFeel) return serviceData.materialFeel;
-    if (!product.materials.length) return undefined;
-    return {
-      productId: product.id,
-      texture: 'Buttery soft with a subtle grain that speaks to artisanal quality',
-      weight: 'Substantial without being heavy—a presence you feel without effort',
-      temperature: 'Naturally cool to the touch, warming gently with your body',
-      comfort: 'Moves with you gracefully, never restricts or binds',
-      sound: 'Whisper-quiet movement, no rustling',
-      aging: `With proper care, this piece will develop a beautiful patina over time, becoming more personal and distinctive with each wear.`,
-      sensoryHighlights: [
-        'Soft hand feel',
-        'Temperature-regulating',
-        'Flexible yet structured'
-      ],
-      agiDescription: `This ${product.materials[0]?.name || 'piece'} offers a luxurious sensory experience against the skin, with a refined texture that exemplifies ${brand?.name || 'the brand'}'s commitment to quality.`
-    };
-  }, [serviceData.materialFeel, product, brand]);
+    return serviceData.materialFeel ?? undefined;
+  }, [serviceData.materialFeel]);
 
   return {
     availabilityIntelligence,
