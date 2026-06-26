@@ -16,7 +16,7 @@ interface ProductConciergeProps {
   product: Product;
   brand?: Brand | null;
   bodyTwin?: DigitalBodyTwin;
-  fitConfidence: FitConfidence;
+  fitConfidence: FitConfidence | null;
   personalizationMatch: PersonalizationMatch | null;
   relatedProducts: Product[];
   sizeVariants: Product['variants'];
@@ -38,7 +38,7 @@ export default function ProductConcierge({
   const questions = [
     {
       q: 'Will this fit me?',
-      a: `Based on ${brand?.name}'s sizing, this piece ${sizeVariants.length > 0 ? `runs ${fitConfidence.sizeNotes[0]?.toLowerCase() || 'true to size'}` : 'follows standard luxury sizing'}. ${bodyTwin ? 'With your Body Twin data, I can provide a more precise recommendation.' : 'Set up your Body Twin for personalized fit predictions.'}`
+      a: `Based on ${brand?.name}'s sizing, this piece ${sizeVariants.length > 0 ? `runs ${fitConfidence?.sizeNotes[0]?.toLowerCase() || 'true to size'}` : 'follows standard luxury sizing'}. ${bodyTwin ? 'With your Body Twin data, I can provide a more precise recommendation.' : 'Set up your Body Twin for personalized fit predictions.'}`
     },
     {
       q: 'How does this compare to similar pieces?',

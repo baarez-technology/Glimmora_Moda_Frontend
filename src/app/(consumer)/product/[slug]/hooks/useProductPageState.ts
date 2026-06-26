@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useApp } from '@/context/AppContext';
 import * as productService from '@/services/product.service';
-import * as brandService from '@/services/brand.service';
+import { getAllBrands, getRecommendedProducts } from '@/services/recommendation.service';
 import * as intelligenceService from '@/services/intelligence.service';
 import * as wardrobeService from '@/services/wardrobe.service';
 import { getFitConfidenceFromAPI } from '@/services/fit-confidence.service';
@@ -88,7 +88,29 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
 
   // Derived Data
-  const brand = useMemo(() => allBrands.find(b => b.id === product.brandId), [product.brandId, allBrands]);
+  // Prefer a full Brand object from the loaded brands list; fall back to a minimal object
+  // built from the product's own brandName/brandId so the UI never shows a blank brand name
+  // while the brands list is still loading or if the brand isn't in the list.
+  const brand = useMemo(() => {
+    const found = allBrands.find(b => b.id === product.brandId);
+    if (found) return found;
+    if (product.brandName) {
+      const slug = product.brandName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+      return {
+        id: product.brandId,
+        name: product.brandName,
+        slug,
+        tagline: '',
+        description: '',
+        heroImage: '',
+        logoUrl: '',
+        heritage: { founded: 0, founder: '', origin: '', story: '' },
+        collections: [],
+        stories: [],
+      };
+    }
+    return undefined;
+  }, [product.brandId, product.brandName, allBrands]);
   const sizeVariants = useMemo(() => product.variants.filter(v => v.type === 'size'), [product.variants]);
   const colorVariants = useMemo(() => product.variants.filter(v => v.type === 'color'), [product.variants]);
   const inConsiderations = isInConsiderations(product.id);
@@ -112,19 +134,34 @@ export function useProductPageState({ product }: UseProductPageStateProps) {
   // Load service data and user data
   useEffect(() => {
     async function loadServiceData() {
+      // Determine whether this is a real (backend) product or a mock slug product.
+      // Real products have a 24-hex MongoDB ObjectId as their id.
+      const isRealProduct = /^[0-9a-f]{24}$/.test(product.id);
+
       try {
-        const [brandsRes, productsRes] = await Promise.all([
-          brandService.getAllBrands(),
-          productService.getAllProducts(),
-        ]);
-        setAllBrands(brandsRes.data ?? []);
-        setAllProducts(productsRes.data ?? []);
+        if (isRealProduct) {
+          // Use real backend APIs for real catalogue products
+          const [brands, products] = await Promise.allSettled([
+            getAllBrands(),
+            getRecommendedProducts({ page_size: 50, page_number: 1 }),
+          ]);
+          setAllBrands(brands.status === 'fulfilled' ? brands.value : []);
+          setAllProducts(products.status === 'fulfilled' ? products.value : []);
+        } else {
+          // Fall back to mock data services for mock slug pages (e.g. /product/bar-jacket)
+          const [brandsRes, productsRes] = await Promise.all([
+            import('@/services/brand.service').then(m => m.getAllBrands()),
+            productService.getAllProducts(),
+          ]);
+          setAllBrands(brandsRes.data ?? []);
+          setAllProducts(productsRes.data ?? []);
+        }
       } catch (error) {
         console.error('Failed to load product page service data:', error);
       }
     }
     loadServiceData();
-  }, []);
+  }, [product.id]);
 
   // Load user data from localStorage
   useEffect(() => {
@@ -566,33 +603,11 @@ export function useProductIntelligence({ product, sizeVariants, fashionIdentity,
     };
   }, [serviceData.availability, product]);
 
-  // Fit Confidence — service data with fallback
-  const fitConfidence: FitConfidence = useMemo(() => {
-    if (serviceData.fitConfidence) return serviceData.fitConfidence;
-    const suggestedSize = sizeVariants.find(v => v.available)?.value || 'M';
-    return {
-      overallScore: 87,
-      suggestedSize,
-      availableSizes: sizeVariants.filter(v => v.available).map(v => v.value),
-      breakdown: { sizeMatch: 92, styleMatch: 85, proportionMatch: 84 },
-      measurementAnalysis: {
-        chestDifferenceCm: null,
-        waistDifferenceCm: null,
-        shoulderAlignment: null,
-        sleeveLengthEstimate: null,
-      },
-      sizeNotes: [
-        'Runs true to size based on brand standards',
-        'Structured fit that defines the silhouette',
-        product.category === 'clothing' ? 'Consider sizing up for layering' : 'Standard dimensions for this style'
-      ],
-      returnRisk: 'low',
-      returnRiskScore: 20,
-      recommendation: `Based on the ${product.brandName} fit profile, ${suggestedSize} will provide the intended silhouette. The ${product.materials[0]?.name || 'fabric'} has minimal stretch, so accurate sizing ensures optimal drape and comfort.`,
-      bodyTwinUsed: false,
-      fitEngineVersion: '',
-    };
-  }, [serviceData.fitConfidence, product, sizeVariants]);
+  // Fit Confidence — real API data only. Returns null when not yet loaded or unavailable.
+  // HARD RULE: never return fabricated/estimate numbers. The UI handles null honestly.
+  const fitConfidence: FitConfidence | null = useMemo(() => {
+    return serviceData.fitConfidence ?? null;
+  }, [serviceData.fitConfidence]);
 
   // Outfit Suggestions — service data with fallback
   const outfitSuggestions: CompleteOutfit[] = useMemo(() => {
