@@ -629,7 +629,12 @@ function mapProductDetail(raw: ApiProductDetail, brandName?: string): Product {
   // Normalize: support both ai_data (new) and ai_metadata (legacy) shapes
   const aiData = raw.ai_data;
   const aiMeta = raw.ai_metadata;
-  const fabrics = aiData?.fabrics || aiMeta?.fabrics || '';
+  // ai_data.fabrics can arrive as a string OR a string[] from the backend —
+  // normalize to a single display string so downstream string ops never crash.
+  const fabricsRaw: unknown = aiData?.fabrics ?? aiMeta?.fabrics ?? '';
+  const fabrics = Array.isArray(fabricsRaw)
+    ? fabricsRaw.filter(Boolean).join(', ')
+    : (typeof fabricsRaw === 'string' ? fabricsRaw : '');
   const productCategory = raw.product_category || aiMeta?.product_category || '';
   const occasions = aiData?.occasions || raw.occasions || [];
   const aesthetics = aiData?.aesthetics || raw.aesthetics || [];
