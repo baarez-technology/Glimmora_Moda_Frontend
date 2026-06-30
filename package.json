@@ -10,7 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "autoprefixer": "^10.4.23",
+    "autoprefixer": "^10.5.2",
     "firebase": "^12.15.0",
     "framer-motion": "^12.41.0",
     "html2canvas": "^1.4.1",
